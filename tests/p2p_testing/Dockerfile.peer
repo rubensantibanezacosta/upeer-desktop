@@ -1,0 +1,34 @@
+FROM ubuntu:22.04
+
+# Evitar prompts interactivos
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependencias
+RUN apt-get update && apt-get install -y \
+    curl \
+    python3 \
+    python3-nacl \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Descargar e instalar Yggdrasil v0.5.12 desde el .deb oficial
+RUN curl -L -o ygg.deb https://github.com/yggdrasil-network/yggdrasil-go/releases/download/v0.5.12/yggdrasil-0.5.12-amd64.deb && \
+    apt-get update && apt-get install -y ./ygg.deb && \
+    rm ygg.deb
+
+# Crear el directorio para el socket de admin por si acaso
+RUN mkdir -p /var/run/yggdrasil
+
+WORKDIR /app
+COPY peer_bot.py .
+COPY gen_config.py .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+# Inicializar configuración de Yggdrasil e inyectar pares públicos
+RUN yggdrasil -genconf > /etc/yggdrasil.conf && \
+    python3 gen_config.py
+
+# Script de arranque
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["./entrypoint.sh"]
