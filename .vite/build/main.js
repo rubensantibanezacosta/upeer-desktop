@@ -4821,6 +4821,7 @@ const contacts = sqliteTable("contacts", {
   address: text("address").notNull(),
   name: text("name").notNull(),
   publicKey: text("public_key"),
+  ephemeralPublicKey: text("ephemeral_public_key"),
   status: text("status").notNull().default("connected"),
   lastSeen: text("last_seen").default(sql`CURRENT_TIMESTAMP`)
 });
@@ -4852,6 +4853,7 @@ function initDB() {
       address TEXT NOT NULL,
       name TEXT NOT NULL,
       public_key TEXT,
+      ephemeral_public_key TEXT,
       status TEXT NOT NULL DEFAULT 'connected',
       last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -4883,6 +4885,9 @@ function updateContactLocation(revelnestId2, address) {
 function updateContactPublicKey(revelnestId2, publicKey2) {
   return db.update(contacts).set({ publicKey: publicKey2, status: "connected" }).where(eq(contacts.revelnestId, revelnestId2)).run();
 }
+function updateContactEphemeralPublicKey(revelnestId2, ephemeralPublicKey2) {
+  return db.update(contacts).set({ ephemeralPublicKey: ephemeralPublicKey2 }).where(eq(contacts.revelnestId, revelnestId2)).run();
+}
 function updateMessageStatus(id, status) {
   return db.update(messages).set({ status }).where(eq(messages.id, id)).run();
 }
@@ -4905,16 +4910,17 @@ function getContacts() {
   });
   return result;
 }
-function addOrUpdateContact(revelnestId2, address, name, publicKey2, status = "connected") {
+function addOrUpdateContact(revelnestId2, address, name, publicKey2, status = "connected", ephemeralPublicKey2) {
   return db.insert(contacts).values({
     revelnestId: revelnestId2,
     address,
     name,
     publicKey: publicKey2,
+    ephemeralPublicKey: ephemeralPublicKey2,
     status
   }).onConflictDoUpdate({
     target: contacts.revelnestId,
-    set: { address, name, publicKey: publicKey2, status }
+    set: { address, name, publicKey: publicKey2, status, ephemeralPublicKey: ephemeralPublicKey2 }
   }).run();
 }
 function deleteContact(revelnestId2) {
@@ -4929,6 +4935,8 @@ function closeDB() {
 let publicKey;
 let secretKey;
 let revelnestId;
+let ephemeralPublicKey;
+let ephemeralSecretKey;
 function initIdentity() {
   const keyPath = path.join(app.getPath("userData"), "identity.key");
   if (fs.existsSync(keyPath)) {
@@ -4946,6 +4954,9 @@ function initIdentity() {
   const hash = Buffer.alloc(16);
   sodium.crypto_generichash(hash, publicKey);
   revelnestId = hash.toString("hex");
+  ephemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+  ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+  sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
   console.log("--- Identidad RevelNest Inicializada ---");
   console.log("RevelNest ID:", revelnestId);
 }
@@ -4968,6 +4979,44 @@ function sign(message) {
 }
 function verify(message, signature, senderPublicKey) {
   return sodium.crypto_sign_verify_detached(signature, message, senderPublicKey);
+}
+function getMyEphemeralPublicKeyHex() {
+  return ephemeralPublicKey.toString("hex");
+}
+function encrypt(message, recipientPublicKey, useEphemeral = false) {
+  let recipientCurvePK;
+  let myCurveSK;
+  if (useEphemeral) {
+    recipientCurvePK = recipientPublicKey;
+    myCurveSK = ephemeralSecretKey;
+  } else {
+    recipientCurvePK = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+    sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePK, recipientPublicKey);
+    myCurveSK = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+    sodium.crypto_sign_ed25519_sk_to_curve25519(myCurveSK, secretKey);
+  }
+  const nonce = Buffer.allocUnsafe(sodium.crypto_box_NONCEBYTES);
+  sodium.randombytes_buf(nonce);
+  const ciphertext = Buffer.alloc(message.length + sodium.crypto_box_MACBYTES);
+  sodium.crypto_box_easy(ciphertext, message, nonce, recipientCurvePK, myCurveSK);
+  return { ciphertext, nonce };
+}
+function decrypt(ciphertext, nonce, senderPublicKey, useEphemeral = false) {
+  let senderCurvePK;
+  let myCurveSK;
+  if (useEphemeral) {
+    senderCurvePK = senderPublicKey;
+    myCurveSK = ephemeralSecretKey;
+  } else {
+    senderCurvePK = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+    sodium.crypto_sign_ed25519_pk_to_curve25519(senderCurvePK, senderPublicKey);
+    myCurveSK = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+    sodium.crypto_sign_ed25519_sk_to_curve25519(myCurveSK, secretKey);
+  }
+  const decrypted = Buffer.alloc(ciphertext.length - sodium.crypto_box_MACBYTES);
+  const success = sodium.crypto_box_open_easy(decrypted, ciphertext, nonce, senderCurvePK, myCurveSK);
+  if (!success) return null;
+  return decrypted;
 }
 function canonicalStringify(obj) {
   const allKeys = Object.keys(obj).sort();
@@ -5000,12 +5049,13 @@ function startUDPServer(win) {
       const { signature, senderRevelnestId, ...data } = fullPacket;
       if (data.type === "HANDSHAKE_REQ") {
         console.log(`[Handshake] Solicitud de ${rinfo.address}: ${data.revelnestId}`);
-        addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, void 0, "incoming");
+        addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, data.publicKey, "incoming", data.ephemeralPublicKey);
         mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-request-received", {
           revelnestId: data.revelnestId,
           address: rinfo.address,
           alias: data.alias,
-          publicKey: data.publicKey
+          publicKey: data.publicKey,
+          ephemeralPublicKey: data.ephemeralPublicKey
         });
         return;
       }
@@ -5018,6 +5068,9 @@ function startUDPServer(win) {
         const existing = await getContactByRevelnestId(data.revelnestId);
         if (existing && existing.status === "pending") {
           updateContactPublicKey(data.revelnestId, data.publicKey);
+          if (data.ephemeralPublicKey) {
+            updateContactEphemeralPublicKey(data.revelnestId, data.ephemeralPublicKey);
+          }
           mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-handshake-finished", { revelnestId: data.revelnestId });
         }
         return;
@@ -5048,14 +5101,40 @@ function startUDPServer(win) {
         sendSecureUDPMessage(rinfo.address, { type: "PONG" });
       } else if (data.type === "CHAT") {
         const msgId = data.id || crypto$1.randomUUID();
-        saveMessage(msgId, revelnestId2, false, data.content, data.replyTo, signature);
+        if (data.ephemeralPublicKey) {
+          updateContactEphemeralPublicKey(revelnestId2, data.ephemeralPublicKey);
+        }
+        let displayContent = data.content;
+        if (data.nonce) {
+          try {
+            const senderKeyHex = data.useRecipientEphemeral ? data.ephemeralPublicKey : contact.publicKey;
+            const useEphemeral = !!data.useRecipientEphemeral;
+            if (!senderKeyHex) throw new Error("La llave pública del remitente no está disponible para descifrar");
+            const decrypted = decrypt(
+              Buffer.from(data.content, "hex"),
+              Buffer.from(data.nonce, "hex"),
+              Buffer.from(senderKeyHex, "hex"),
+              useEphemeral
+            );
+            if (decrypted) {
+              displayContent = decrypted.toString("utf-8");
+            } else {
+              displayContent = "🔒 [Error de descifrado: El mensaje podría estar corrupto o la llave es incorrecta]";
+            }
+          } catch (err) {
+            displayContent = "🔒 [Error crítico de seguridad al descifrar PFS]";
+            console.error("Decryption failed:", err);
+          }
+        }
+        saveMessage(msgId, revelnestId2, false, displayContent, data.replyTo, signature);
         mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("receive-p2p-message", {
           id: msgId,
           revelnestId: revelnestId2,
           isMine: false,
-          message: data.content,
+          message: displayContent,
           replyTo: data.replyTo,
-          status: "received"
+          status: "received",
+          encrypted: !!data.nonce
         });
         sendSecureUDPMessage(rinfo.address, { type: "ACK", id: msgId });
       } else if (data.type === "ACK") {
@@ -5089,6 +5168,7 @@ async function sendContactRequest(targetIp, alias) {
     type: "HANDSHAKE_REQ",
     revelnestId: getMyRevelNestId(),
     publicKey: getMyPublicKeyHex(),
+    ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
     alias
   };
   const buf = Buffer.from(JSON.stringify(data));
@@ -5103,7 +5183,8 @@ async function acceptContactRequest(revelnestId2, publicKey2) {
   const data = {
     type: "HANDSHAKE_ACCEPT",
     revelnestId: getMyRevelNestId(),
-    publicKey: getMyPublicKeyHex()
+    publicKey: getMyPublicKeyHex(),
+    ephemeralPublicKey: getMyEphemeralPublicKeyHex()
   };
   const buf = Buffer.from(JSON.stringify(data));
   if (udpSocket) {
@@ -5122,15 +5203,25 @@ function sendSecureUDPMessage(ip, data) {
   const buf = Buffer.from(JSON.stringify(fullPacket));
   udpSocket.send(buf, YGG_PORT, ip);
 }
-function sendUDPMessage(revelnestId2, message, replyTo) {
+async function sendUDPMessage(revelnestId2, message, replyTo) {
   const msgId = crypto$1.randomUUID();
   const content = typeof message === "string" ? message : message.content;
-  const contact = getContactByRevelnestId(revelnestId2);
-  if (!contact || contact.status !== "connected") return void 0;
+  const contact = await getContactByRevelnestId(revelnestId2);
+  if (!contact || contact.status !== "connected" || !contact.publicKey) return void 0;
+  const useEphemeral = !!contact.ephemeralPublicKey;
+  const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
+  const { ciphertext, nonce } = encrypt(
+    Buffer.from(content, "utf-8"),
+    Buffer.from(targetKeyHex, "hex"),
+    useEphemeral
+  );
   const data = {
     type: "CHAT",
     id: msgId,
-    content,
+    content: ciphertext.toString("hex"),
+    nonce: nonce.toString("hex"),
+    ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
+    useRecipientEphemeral: useEphemeral,
     replyTo
   };
   const signature = sign(Buffer.from(canonicalStringify(data)));
@@ -5223,7 +5314,7 @@ ipcMain.handle("accept-contact-request", async (event, { revelnestId: revelnestI
   return { success: true };
 });
 ipcMain.handle("delete-contact", (event, { revelnestId: revelnestId2 }) => deleteContact(revelnestId2));
-ipcMain.handle("send-p2p-message", (event, { revelnestId: revelnestId2, message, replyTo }) => sendUDPMessage(revelnestId2, message, replyTo));
+ipcMain.handle("send-p2p-message", async (event, { revelnestId: revelnestId2, message, replyTo }) => await sendUDPMessage(revelnestId2, message, replyTo));
 ipcMain.handle("send-typing-indicator", (event, { revelnestId: revelnestId2 }) => sendTypingIndicator(revelnestId2));
 ipcMain.handle("send-read-receipt", (event, { revelnestId: revelnestId2, id }) => sendReadReceipt(revelnestId2, id));
 ipcMain.handle("send-contact-card", (event, { targetRevelnestId, contact }) => sendContactCard(targetRevelnestId, contact));

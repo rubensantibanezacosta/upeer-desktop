@@ -31,6 +31,7 @@ export function initDB() {
       address TEXT NOT NULL,
       name TEXT NOT NULL,
       public_key TEXT,
+      ephemeral_public_key TEXT,
       status TEXT NOT NULL DEFAULT 'connected',
       last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -90,6 +91,13 @@ export function updateContactPublicKey(revelnestId: string, publicKey: string) {
         .run();
 }
 
+export function updateContactEphemeralPublicKey(revelnestId: string, ephemeralPublicKey: string) {
+    return db.update(schema.contacts)
+        .set({ ephemeralPublicKey })
+        .where(eq(schema.contacts.revelnestId, revelnestId))
+        .run();
+}
+
 export function updateMessageStatus(id: string, status: 'sent' | 'delivered' | 'read') {
     return db.update(schema.messages)
         .set({ status })
@@ -122,16 +130,17 @@ export function getContacts() {
     return result;
 }
 
-export function addOrUpdateContact(revelnestId: string, address: string, name: string, publicKey?: string, status: 'pending' | 'incoming' | 'connected' = 'connected') {
+export function addOrUpdateContact(revelnestId: string, address: string, name: string, publicKey?: string, status: 'pending' | 'incoming' | 'connected' = 'connected', ephemeralPublicKey?: string) {
     return db.insert(schema.contacts).values({
         revelnestId,
         address,
         name,
         publicKey,
+        ephemeralPublicKey,
         status
     }).onConflictDoUpdate({
         target: schema.contacts.revelnestId,
-        set: { address, name, publicKey, status }
+        set: { address, name, publicKey, status, ephemeralPublicKey }
     }).run();
 }
 

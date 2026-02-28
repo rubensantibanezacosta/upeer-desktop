@@ -27,6 +27,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import PushPinIcon from '@mui/icons-material/PushPin';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import BlockIcon from '@mui/icons-material/Block';
@@ -105,8 +106,8 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     }
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <Typography level="body-md" sx={{ fontWeight: 500 }} noWrap>
-                            {c.name} {c.status === 'incoming' && '🔔'}
+                        <Typography level="body-md" sx={{ fontWeight: 500, display: 'flex', alignItems: 'center' }} noWrap>
+                            {c.name} {c.status === 'incoming' && <NotificationsIcon color="primary" sx={{ fontSize: 18, ml: 0.5 }} />}
                         </Typography>
                         <Typography level="body-xs" color={isTyping ? "primary" : "neutral"} sx={{ ml: 1, minWidth: 'max-content' }}>
                             {timeStr}

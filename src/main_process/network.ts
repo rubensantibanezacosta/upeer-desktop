@@ -10,10 +10,11 @@ import {
     getContactByAddress,
     deleteContact,
     updateContactLocation,
-    updateContactPublicKey
+    updateContactPublicKey,
+    updateContactEphemeralPublicKey
 } from './database.js';
 import crypto from 'node:crypto';
-import { getMyPublicKeyHex, getMyRevelNestId, sign, verify } from './identity.js';
+import { getMyPublicKeyHex, getMyRevelNestId, sign, verify, encrypt, decrypt, getMyEphemeralPublicKeyHex } from './identity.js';
 
 /**
  * Ensures JSON keys are always in the same order for consistent signatures.
@@ -57,13 +58,14 @@ export function startUDPServer(win: BrowserWindow) {
             if (data.type === 'HANDSHAKE_REQ') {
                 console.log(`[Handshake] Solicitud de ${rinfo.address}: ${data.revelnestId}`);
 
-                addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, undefined, 'incoming');
+                addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, data.publicKey, 'incoming', data.ephemeralPublicKey);
 
                 mainWindow?.webContents.send('contact-request-received', {
                     revelnestId: data.revelnestId,
                     address: rinfo.address,
                     alias: data.alias,
-                    publicKey: data.publicKey
+                    publicKey: data.publicKey,
+                    ephemeralPublicKey: data.ephemeralPublicKey
                 });
                 return;
             }
@@ -80,6 +82,9 @@ export function startUDPServer(win: BrowserWindow) {
                 const existing = await getContactByRevelnestId(data.revelnestId);
                 if (existing && existing.status === 'pending') {
                     updateContactPublicKey(data.revelnestId, data.publicKey);
+                    if (data.ephemeralPublicKey) {
+                        updateContactEphemeralPublicKey(data.revelnestId, data.ephemeralPublicKey);
+                    }
                     mainWindow?.webContents.send('contact-handshake-finished', { revelnestId: data.revelnestId });
                 }
                 return;
@@ -120,14 +125,46 @@ export function startUDPServer(win: BrowserWindow) {
                 sendSecureUDPMessage(rinfo.address, { type: 'PONG' });
             } else if (data.type === 'CHAT') {
                 const msgId = data.id || crypto.randomUUID();
-                saveMessage(msgId, revelnestId, false, data.content, data.replyTo, signature);
+
+                if (data.ephemeralPublicKey) {
+                    updateContactEphemeralPublicKey(revelnestId, data.ephemeralPublicKey);
+                    // Actualizamos memoria temporal si es necesario, pero SQLite lo maneja
+                }
+
+                // 🔐 E2EE Decryption
+                let displayContent = data.content;
+                if (data.nonce) {
+                    try {
+                        const senderKeyHex = data.useRecipientEphemeral ? data.ephemeralPublicKey : contact.publicKey;
+                        const useEphemeral = !!data.useRecipientEphemeral;
+                        if (!senderKeyHex) throw new Error("La llave pública del remitente no está disponible para descifrar");
+
+                        const decrypted = decrypt(
+                            Buffer.from(data.content, 'hex'),
+                            Buffer.from(data.nonce, 'hex'),
+                            Buffer.from(senderKeyHex, 'hex'),
+                            useEphemeral
+                        );
+                        if (decrypted) {
+                            displayContent = decrypted.toString('utf-8');
+                        } else {
+                            displayContent = "🔒 [Error de descifrado: El mensaje podría estar corrupto o la llave es incorrecta]";
+                        }
+                    } catch (err) {
+                        displayContent = "🔒 [Error crítico de seguridad al descifrar PFS]";
+                        console.error('Decryption failed:', err);
+                    }
+                }
+
+                saveMessage(msgId, revelnestId, false, displayContent, data.replyTo, signature);
                 mainWindow?.webContents.send('receive-p2p-message', {
                     id: msgId,
                     revelnestId: revelnestId,
                     isMine: false,
-                    message: data.content,
+                    message: displayContent,
                     replyTo: data.replyTo,
-                    status: 'received'
+                    status: 'received',
+                    encrypted: !!data.nonce
                 });
                 sendSecureUDPMessage(rinfo.address, { type: 'ACK', id: msgId });
             } else if (data.type === 'ACK') {
@@ -164,6 +201,7 @@ export async function sendContactRequest(targetIp: string, alias: string) {
         type: 'HANDSHAKE_REQ',
         revelnestId: getMyRevelNestId(),
         publicKey: getMyPublicKeyHex(),
+        ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
         alias: alias
     };
 
@@ -182,7 +220,8 @@ export async function acceptContactRequest(revelnestId: string, publicKey: strin
     const data = {
         type: 'HANDSHAKE_ACCEPT',
         revelnestId: getMyRevelNestId(),
-        publicKey: getMyPublicKeyHex()
+        publicKey: getMyPublicKeyHex(),
+        ephemeralPublicKey: getMyEphemeralPublicKeyHex()
     };
 
     const buf = Buffer.from(JSON.stringify(data));
@@ -206,17 +245,30 @@ function sendSecureUDPMessage(ip: string, data: any) {
     udpSocket.send(buf, YGG_PORT, ip);
 }
 
-export function sendUDPMessage(revelnestId: string, message: string | { [key: string]: any }, replyTo?: string): string | undefined {
+export async function sendUDPMessage(revelnestId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<string | undefined> {
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
 
-    const contact = getContactByRevelnestId(revelnestId);
-    if (!contact || contact.status !== 'connected') return undefined;
+    const contact = await getContactByRevelnestId(revelnestId);
+    if (!contact || contact.status !== 'connected' || !contact.publicKey) return undefined;
+
+    // PFS E2EE Encryption
+    const useEphemeral = !!contact.ephemeralPublicKey;
+    const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
+
+    const { ciphertext, nonce } = encrypt(
+        Buffer.from(content, 'utf-8'),
+        Buffer.from(targetKeyHex, 'hex'),
+        useEphemeral
+    );
 
     const data = {
         type: 'CHAT',
         id: msgId,
-        content: content,
+        content: ciphertext.toString('hex'),
+        nonce: nonce.toString('hex'),
+        ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
+        useRecipientEphemeral: useEphemeral,
         replyTo: replyTo
     };
 

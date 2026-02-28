@@ -6,6 +6,8 @@ import { app } from 'electron';
 let publicKey: Buffer;
 let secretKey: Buffer;
 let revelnestId: string;
+let ephemeralPublicKey: Buffer;
+let ephemeralSecretKey: Buffer;
 
 export function initIdentity() {
     const keyPath = path.join(app.getPath('userData'), 'identity.key');
@@ -28,6 +30,11 @@ export function initIdentity() {
     const hash = Buffer.alloc(16);
     sodium.crypto_generichash(hash, publicKey);
     revelnestId = hash.toString('hex');
+
+    // Ephemeral Key setup for PFS per session
+    ephemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+    ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+    sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
 
     console.log('--- Identidad RevelNest Inicializada ---');
     console.log('RevelNest ID:', revelnestId);
@@ -60,4 +67,58 @@ export function sign(message: Buffer): Buffer {
 
 export function verify(message: Buffer, signature: Buffer, senderPublicKey: Buffer): boolean {
     return sodium.crypto_sign_verify_detached(signature, message, senderPublicKey);
+}
+
+export function getMyEphemeralPublicKeyHex() {
+    return ephemeralPublicKey.toString('hex');
+}
+
+/**
+ * ENCRYPTION (E2EE)
+ * Using crypto_box (X25519 + Salsa20 + Poly1305)
+ * We convert our Ed25519 identity keys to Curve25519 keys for encryption.
+ */
+
+export function encrypt(message: Buffer, recipientPublicKey: Buffer, useEphemeral: boolean = false): { ciphertext: Buffer; nonce: Buffer } {
+    let recipientCurvePK: Buffer;
+    let myCurveSK: Buffer;
+
+    if (useEphemeral) {
+        recipientCurvePK = recipientPublicKey; // Already Curve25519
+        myCurveSK = ephemeralSecretKey;
+    } else {
+        recipientCurvePK = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+        sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePK, recipientPublicKey);
+        myCurveSK = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+        sodium.crypto_sign_ed25519_sk_to_curve25519(myCurveSK, secretKey);
+    }
+
+    const nonce = Buffer.allocUnsafe(sodium.crypto_box_NONCEBYTES);
+    sodium.randombytes_buf(nonce);
+
+    const ciphertext = Buffer.alloc(message.length + sodium.crypto_box_MACBYTES);
+    sodium.crypto_box_easy(ciphertext, message, nonce, recipientCurvePK, myCurveSK);
+
+    return { ciphertext, nonce };
+}
+
+export function decrypt(ciphertext: Buffer, nonce: Buffer, senderPublicKey: Buffer, useEphemeral: boolean = false): Buffer | null {
+    let senderCurvePK: Buffer;
+    let myCurveSK: Buffer;
+
+    if (useEphemeral) {
+        senderCurvePK = senderPublicKey; // Already Curve25519
+        myCurveSK = ephemeralSecretKey;
+    } else {
+        senderCurvePK = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+        sodium.crypto_sign_ed25519_pk_to_curve25519(senderCurvePK, senderPublicKey);
+        myCurveSK = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+        sodium.crypto_sign_ed25519_sk_to_curve25519(myCurveSK, secretKey);
+    }
+
+    const decrypted = Buffer.alloc(ciphertext.length - sodium.crypto_box_MACBYTES);
+    const success = sodium.crypto_box_open_easy(decrypted, ciphertext, nonce, senderCurvePK, myCurveSK);
+
+    if (!success) return null;
+    return decrypted;
 }

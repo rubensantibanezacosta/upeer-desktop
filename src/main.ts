@@ -98,7 +98,7 @@ ipcMain.handle('accept-contact-request', async (event, { revelnestId, publicKey 
 });
 
 ipcMain.handle('delete-contact', (event, { revelnestId }) => deleteContact(revelnestId));
-ipcMain.handle('send-p2p-message', (event, { revelnestId, message, replyTo }) => sendUDPMessage(revelnestId, message, replyTo));
+ipcMain.handle('send-p2p-message', async (event, { revelnestId, message, replyTo }) => await sendUDPMessage(revelnestId, message, replyTo));
 ipcMain.handle('send-typing-indicator', (event, { revelnestId }) => sendTypingIndicator(revelnestId));
 ipcMain.handle('send-read-receipt', (event, { revelnestId, id }) => sendReadReceipt(revelnestId, id));
 ipcMain.handle('send-contact-card', (event, { targetRevelnestId, contact }) => sendContactCard(targetRevelnestId, contact));

@@ -51,6 +51,12 @@ El objetivo es construir una aplicación "Zero-Config" para usuarios no técnico
 - Indicadores visuales de estado de conexión mesh.
 - Sistema de notificaciones nativas y persistencia local (SQLite/TypeORM).
 
+#### Fase 7: Privacidad Total (E2EE)
+
+- **Cifrado de Contenidos:** Todos los mensajes se cifran y descifran localmente usando `crypto_box` (X25519, Salsa20, Poly1305).
+- **Secreto Perfectamente Adelantado (PFS):** Integración de intercambio de Llaves Efímeras (Ephemeral Key Exchange) durante la configuración de cada sesión.
+- **Verificación de Seguridad:** Sistema de visualización de "Safety Numbers" y comprobación de huellas dactilares para prevenir ataques _Man-in-the-Middle_.
+
 ---
 
 ## 🛠️ Instrucciones de Inicio Rápido (Devs)

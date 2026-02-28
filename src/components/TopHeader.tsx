@@ -12,6 +12,7 @@ import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import LockIcon from '@mui/icons-material/Lock';
 
 interface TopHeaderProps {
     contactName?: string;
@@ -22,10 +23,11 @@ interface TopHeaderProps {
     isTyping?: boolean;
     status?: 'pending' | 'incoming' | 'connected';
     lastSeen?: string;
+    onShowSecurity?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-    contactName, onDelete, onShare, onAccept, isOnline, isTyping, status, lastSeen
+    contactName, onDelete, onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity
 }) => (
     <Box sx={{
         p: 1.5,
@@ -39,8 +41,40 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         height: '60px',
         boxSizing: 'border-box'
     }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}>
-            <Avatar size="sm">{contactName ? contactName[0] : ''}</Avatar>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ position: 'relative' }}>
+                <Avatar size="sm">{contactName ? contactName[0] : ''}</Avatar>
+                {status === 'connected' && (
+                    <Tooltip title="Protegido con E2EE" variant="soft">
+                        <IconButton
+                            size="sm"
+                            variant="solid"
+                            color="success"
+                            onClick={onShowSecurity}
+                            sx={{
+                                position: 'absolute',
+                                bottom: -2,
+                                right: -2,
+                                width: 14,
+                                height: 14,
+                                minWidth: 14,
+                                minHeight: 14,
+                                p: 0,
+                                borderRadius: '50%',
+                                border: '2px solid',
+                                borderColor: 'background.surface',
+                                '&:hover': {
+                                    backgroundColor: 'success.main',
+                                    transform: 'scale(1.2)'
+                                },
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <LockIcon sx={{ fontSize: '8px', color: 'white' }} />
+                        </IconButton>
+                    </Tooltip>
+                )}
+            </Box>
             <Box>
                 <Typography level="body-md" sx={{ fontWeight: 500 }}>{contactName || 'Selecciona un chat'}</Typography>
                 {contactName && (

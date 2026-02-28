@@ -8,6 +8,7 @@ import { AddContactModal } from './components/AddContactModal.js';
 import { NavigationRail } from './components/NavigationRail.js';
 import { IdentityModal } from './components/IdentityModal.js';
 import { ShareContactModal } from './components/ShareContactModal.js';
+import { SecurityModal } from './components/SecurityModal.js';
 import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
 
 interface ChatMessage {
@@ -42,6 +43,7 @@ export default function App() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
     const [typingStatus, setTypingStatus] = useState<Record<string, NodeJS.Timeout>>({});
     const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
     const [myIdentity, setMyIdentity] = useState<{ address: string | null, revelnestId: string, publicKey: string } | null>(null);
@@ -236,6 +238,7 @@ export default function App() {
                                 onDelete={handleDeleteContact}
                                 onShare={() => setIsShareModalOpen(true)}
                                 onAccept={handleAcceptContact}
+                                onShowSecurity={() => setIsSecurityModalOpen(true)}
                             />
                             <ChatArea
                                 chatHistory={chatHistory}
@@ -310,6 +313,15 @@ export default function App() {
                         }
                     }}
                 />
+                {isSecurityModalOpen && activeContact && (
+                    <SecurityModal
+                        open={isSecurityModalOpen}
+                        onClose={() => setIsSecurityModalOpen(false)}
+                        contactName={activeContact.name}
+                        contactPublicKey={activeContact.publicKey || ''}
+                        myPublicKey={myIdentity?.publicKey || ''}
+                    />
+                )}
             </Sheet>
         </CssVarsProvider>
     );

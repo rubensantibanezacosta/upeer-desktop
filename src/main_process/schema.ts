@@ -18,6 +18,7 @@ export const contacts = sqliteTable('contacts', {
     address: text('address').notNull(),
     name: text('name').notNull(),
     publicKey: text('public_key'),
+    ephemeralPublicKey: text('ephemeral_public_key'),
     status: text('status').notNull().default('connected'),
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
 });
