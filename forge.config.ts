@@ -10,7 +10,10 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extraResource: ['./resources/bin']
+    extraResource: [
+      './resources/bin',
+      './drizzle'
+    ]
   },
   rebuildConfig: {},
   makers: [

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, List, Divider } from '@mui/joy';
-import { SidebarHeader } from './Sidebar/SidebarHeader.js';
-import { SidebarSearch } from './Sidebar/SidebarSearch.js';
-import { ContactItem } from './Sidebar/ContactItem.js';
+import { SidebarHeader } from './SidebarHeader.js';
+import { SidebarSearch } from './SidebarSearch.js';
+import { ContactItem } from './ContactItem.js';
 
 interface Contact {
     revelnestId: string;

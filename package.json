@@ -11,7 +11,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "lint": "eslint --ext .ts,.tsx .",
+    "test-phase11": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --import tsx tests/test_phase11.ts"
   },
   "keywords": [],
   "author": {
@@ -41,6 +42,7 @@
     "electron": "40.6.1",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
   },

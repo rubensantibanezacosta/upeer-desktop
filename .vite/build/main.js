@@ -7,18 +7,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import started from "electron-squirrel-startup";
 import Client from "better-sqlite3";
-import os from "node:os";
-import dgram from "node:dgram";
 import crypto$1 from "node:crypto";
-import sodium from "sodium-native";
 import fs from "node:fs";
-import { exec } from "node:child_process";
-import require$$0 from "child_process";
-import require$$1 from "crypto";
-import require$$2 from "fs";
-import require$$3 from "os";
-import require$$4 from "path";
-import "util";
+import dgram from "node:dgram";
+import sodium from "sodium-native";
+import os from "node:os";
+import { exec, spawn } from "node:child_process";
+import sudo from "@vscode/sudo-prompt";
 const entityKind = Symbol.for("drizzle:entityKind");
 function is(value, type) {
   if (!value || typeof value !== "object") {
@@ -4813,18 +4808,25 @@ function drizzle(...params) {
 const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),
   chatRevelnestId: text("chat_revelnest_id").notNull(),
-  // Linked to identity
   isMine: integer("is_mine", { mode: "boolean" }).notNull(),
   message: text("message").notNull(),
   replyTo: text("reply_to"),
   signature: text("signature"),
   status: text("status").notNull().default("sent"),
+  isDeleted: integer("is_deleted", { mode: "boolean" }).notNull().default(false),
+  isEdited: integer("is_edited", { mode: "boolean" }).notNull().default(false),
+  timestamp: text("timestamp").default(sql`CURRENT_TIMESTAMP`)
+});
+const reactions = sqliteTable("reactions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  messageId: text("message_id").notNull(),
+  revelnestId: text("revelnest_id").notNull(),
+  emoji: text("emoji").notNull(),
   timestamp: text("timestamp").default(sql`CURRENT_TIMESTAMP`)
 });
 const contacts = sqliteTable("contacts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   revelnestId: text("revelnest_id").unique(),
-  // Primary cryptographic ID
   address: text("address").notNull(),
   name: text("name").notNull(),
   publicKey: text("public_key"),
@@ -4837,39 +4839,61 @@ const contacts = sqliteTable("contacts", {
 const schema = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   contacts,
-  messages
+  messages,
+  reactions
 }, Symbol.toStringTag, { value: "Module" }));
+function readMigrationFiles(config) {
+  const migrationFolderTo = config.migrationsFolder;
+  const migrationQueries = [];
+  const journalPath = `${migrationFolderTo}/meta/_journal.json`;
+  if (!fs.existsSync(journalPath)) {
+    throw new Error(`Can't find meta/_journal.json file`);
+  }
+  const journalAsString = fs.readFileSync(`${migrationFolderTo}/meta/_journal.json`).toString();
+  const journal = JSON.parse(journalAsString);
+  for (const journalEntry of journal.entries) {
+    const migrationPath = `${migrationFolderTo}/${journalEntry.tag}.sql`;
+    try {
+      const query = fs.readFileSync(`${migrationFolderTo}/${journalEntry.tag}.sql`).toString();
+      const result = query.split("--> statement-breakpoint").map((it) => {
+        return it;
+      });
+      migrationQueries.push({
+        sql: result,
+        bps: journalEntry.breakpoints,
+        folderMillis: journalEntry.when,
+        hash: crypto$1.createHash("sha256").update(query).digest("hex")
+      });
+    } catch {
+      throw new Error(`No file ${migrationPath} found in ${migrationFolderTo} folder`);
+    }
+  }
+  return migrationQueries;
+}
+function migrate(db2, config) {
+  const migrations = readMigrationFiles(config);
+  db2.dialect.migrate(migrations, db2.session, config);
+}
 let sqlite;
 let db;
-function initDB() {
-  const dbPath = path.join(app.getPath("userData"), "p2p-chat.db");
+async function initDB(userDataPath) {
+  const dbPath = path.join(userDataPath, "p2p-chat.db");
   sqlite = new Client(dbPath);
   db = drizzle(sqlite, { schema });
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      chat_revelnest_id TEXT NOT NULL,
-      is_mine BOOLEAN NOT NULL,
-      message TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'sent',
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      reply_to TEXT,
-      signature TEXT
-    );
-    CREATE TABLE IF NOT EXISTS contacts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      revelnest_id TEXT UNIQUE,
-      address TEXT NOT NULL,
-      name TEXT NOT NULL,
-      public_key TEXT,
-      ephemeral_public_key TEXT,
-      dht_seq INTEGER NOT NULL DEFAULT 0,
-      dht_signature TEXT,
-      status TEXT NOT NULL DEFAULT 'connected',
-      last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_revelnest_id ON contacts(revelnest_id);
-  `);
+  try {
+    let migrationsPath = path.join(process.cwd(), "drizzle");
+    try {
+      const { app: electronApp } = await import("electron");
+      if (electronApp == null ? void 0 : electronApp.isPackaged) {
+        migrationsPath = path.join(process.resourcesPath, "drizzle");
+      }
+    } catch (e) {
+    }
+    migrate(db, { migrationsFolder: migrationsPath });
+    console.log("[DB] Migraciones aplicadas correctamente.");
+  } catch (err) {
+    console.error("[DB] Error en migraciones:", err);
+  }
 }
 function saveMessage(id, chatRevelnestId, isMine, message, replyTo, signature) {
   return db.insert(messages).values({
@@ -4882,7 +4906,45 @@ function saveMessage(id, chatRevelnestId, isMine, message, replyTo, signature) {
   }).run();
 }
 function getMessages(chatRevelnestId) {
-  return db.select().from(messages).where(eq(messages.chatRevelnestId, chatRevelnestId)).orderBy(desc(messages.timestamp)).limit(100).all();
+  const msgs = db.select().from(messages).where(eq(messages.chatRevelnestId, chatRevelnestId)).orderBy(desc(messages.timestamp)).limit(100).all();
+  return msgs.map((m) => {
+    const msgReactions = db.select().from(reactions).where(eq(reactions.messageId, m.id)).all();
+    return { ...m, reactions: msgReactions };
+  });
+}
+function saveReaction(messageId, revelnestId2, emoji) {
+  const existing = db.select().from(reactions).where(and(
+    eq(reactions.messageId, messageId),
+    eq(reactions.revelnestId, revelnestId2),
+    eq(reactions.emoji, emoji)
+  )).get();
+  if (!existing) {
+    return db.insert(reactions).values({
+      messageId,
+      revelnestId: revelnestId2,
+      emoji
+    }).run();
+  }
+}
+function deleteReaction(messageId, revelnestId2, emoji) {
+  return db.delete(reactions).where(and(
+    eq(reactions.messageId, messageId),
+    eq(reactions.revelnestId, revelnestId2),
+    eq(reactions.emoji, emoji)
+  )).run();
+}
+function updateMessageContent(id, newMessage, signature) {
+  return db.update(messages).set({
+    message: newMessage,
+    isEdited: true,
+    signature
+  }).where(eq(messages.id, id)).run();
+}
+function deleteMessageLocally(id) {
+  return db.update(messages).set({
+    message: "Mensaje eliminado",
+    isDeleted: true
+  }).where(eq(messages.id, id)).run();
 }
 function getContactByRevelnestId(revelnestId2) {
   return db.select().from(contacts).where(eq(contacts.revelnestId, revelnestId2)).get();
@@ -4950,11 +5012,13 @@ function updateLastSeen(revelnestId2) {
 function closeDB() {
   if (sqlite) sqlite.close();
 }
-const database = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+const db$1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   addOrUpdateContact,
   closeDB,
   deleteContact,
+  deleteMessageLocally,
+  deleteReaction,
   getContactByAddress,
   getContactByRevelnestId,
   getContacts,
@@ -4962,11 +5026,13 @@ const database = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProp
   getMessages,
   initDB,
   saveMessage,
+  saveReaction,
   updateContactDhtLocation,
   updateContactEphemeralPublicKey,
   updateContactLocation,
   updateContactPublicKey,
   updateLastSeen,
+  updateMessageContent,
   updateMessageStatus
 }, Symbol.toStringTag, { value: "Module" }));
 let publicKey;
@@ -4976,8 +5042,8 @@ let ephemeralPublicKey;
 let ephemeralSecretKey;
 let dhtSeq = 0;
 let dhtStatePath;
-function initIdentity() {
-  const keyPath = path.join(app.getPath("userData"), "identity.key");
+function initIdentity(userDataPath) {
+  const keyPath = path.join(userDataPath, "identity.key");
   if (fs.existsSync(keyPath)) {
     const data = fs.readFileSync(keyPath);
     if (data.length === sodium.crypto_sign_SECRETKEYBYTES) {
@@ -4996,7 +5062,7 @@ function initIdentity() {
   ephemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
   ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
   sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
-  dhtStatePath = path.join(app.getPath("userData"), "dht_state.json");
+  dhtStatePath = path.join(userDataPath, "dht_state.json");
   if (fs.existsSync(dhtStatePath)) {
     try {
       const dhtData = JSON.parse(fs.readFileSync(dhtStatePath, "utf8"));
@@ -5098,15 +5164,14 @@ function verifyLocationBlock(revelnestId2, block, publicKeyHex) {
     Buffer.from(publicKeyHex, "hex")
   );
 }
-const YGG_PORT = 50005;
-let udpSocket = null;
-let mainWindow$1 = null;
 function getNetworkAddress() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     if (name.includes("ygg") || name === "utun2" || name === "tun0") {
       for (const net of interfaces[name] || []) {
-        if (net.family === "IPv6" && net.address.startsWith("200:")) {
+        const family = net.family;
+        const isIPv6 = family === "IPv6" || family === 6;
+        if (isIPv6 && (net.address.startsWith("200:") || net.address.startsWith("201:"))) {
           return net.address;
         }
       }
@@ -5114,219 +5179,361 @@ function getNetworkAddress() {
   }
   return null;
 }
+async function handlePacket(msg, rinfo, win, sendResponse, startDhtSearch2) {
+  try {
+    const fullPacket = JSON.parse(msg.toString());
+    const { signature, senderRevelnestId, ...data } = fullPacket;
+    if (data.type === "HANDSHAKE_REQ") {
+      console.log(`[Handshake] Solicitud de ${rinfo.address}: ${data.revelnestId}`);
+      addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, data.publicKey, "incoming", data.ephemeralPublicKey);
+      win == null ? void 0 : win.webContents.send("contact-request-received", {
+        revelnestId: data.revelnestId,
+        address: rinfo.address,
+        alias: data.alias,
+        publicKey: data.publicKey,
+        ephemeralPublicKey: data.ephemeralPublicKey
+      });
+      return;
+    }
+    if (data.type === "HANDSHAKE_ACCEPT") {
+      console.log(`[Handshake] ACEPTADA de ${rinfo.address}: ${data.revelnestId}`);
+      const ghost = await getContactByAddress(rinfo.address);
+      if (ghost && ghost.revelnestId.startsWith("pending-")) {
+        deleteContact(ghost.revelnestId);
+      }
+      const existing = await getContactByRevelnestId(data.revelnestId);
+      if (existing && existing.status === "pending") {
+        updateContactPublicKey(data.revelnestId, data.publicKey);
+        if (data.ephemeralPublicKey) {
+          updateContactEphemeralPublicKey(data.revelnestId, data.ephemeralPublicKey);
+        }
+        win == null ? void 0 : win.webContents.send("contact-handshake-finished", { revelnestId: data.revelnestId });
+      }
+      return;
+    }
+    const revelnestId2 = senderRevelnestId;
+    if (!revelnestId2) return;
+    const contact = await getContactByRevelnestId(revelnestId2);
+    if (!contact || contact.status !== "connected" || !contact.publicKey) {
+      console.warn(`[Security] Origen no conectado o sin llave: ${revelnestId2}`);
+      return;
+    }
+    const verified = verify(
+      Buffer.from(canonicalStringify(data)),
+      Buffer.from(signature, "hex"),
+      Buffer.from(contact.publicKey, "hex")
+    );
+    if (!verified) {
+      console.error(`[Security] Firma INVÁLIDA de ${revelnestId2}.`);
+      return;
+    }
+    if (contact.address !== rinfo.address) {
+      updateContactLocation(revelnestId2, rinfo.address);
+    }
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    updateLastSeen(revelnestId2);
+    win == null ? void 0 : win.webContents.send("contact-presence", { revelnestId: revelnestId2, lastSeen: nowIso });
+    switch (data.type) {
+      case "DHT_UPDATE":
+        handleDhtUpdate(revelnestId2, contact, data);
+        break;
+      case "DHT_EXCHANGE":
+        handleDhtExchange(revelnestId2, data);
+        break;
+      case "DHT_QUERY":
+        handleDhtQuery(revelnestId2, data, rinfo.address, sendResponse);
+        break;
+      case "DHT_RESPONSE":
+        handleDhtResponse(revelnestId2, data, sendResponse);
+        break;
+      case "PING":
+        sendResponse(rinfo.address, { type: "PONG" });
+        break;
+      case "CHAT":
+        handleChatMessage(revelnestId2, contact, data, win, signature, rinfo.address, sendResponse);
+        break;
+      case "ACK":
+        handleAck(revelnestId2, data, win);
+        break;
+      case "READ":
+        handleReadReceipt(revelnestId2, data, win);
+        break;
+      case "TYPING":
+        win == null ? void 0 : win.webContents.send("peer-typing", { revelnestId: revelnestId2 });
+        break;
+      case "CHAT_REACTION":
+        handleIncomingReaction(revelnestId2, data, win);
+        break;
+      case "CHAT_UPDATE":
+        handleIncomingUpdate(revelnestId2, contact, data, win, signature);
+        break;
+      case "CHAT_DELETE":
+        handleIncomingDelete(revelnestId2, data, win);
+        break;
+      default:
+        console.warn(`[Network] Paquete desconocido de ${revelnestId2}: ${data.type}`);
+    }
+  } catch (e) {
+    console.error("UDP Packet Error:", e);
+  }
+}
+async function handleDhtUpdate(revelnestId2, contact, data) {
+  const block = data.locationBlock;
+  if (!block || typeof block.dhtSeq !== "number" || !block.address || !block.signature) return;
+  const isValid = verifyLocationBlock(revelnestId2, block, contact.publicKey);
+  if (!isValid) {
+    console.error(`[DHT Security] Invalid DHT_UPDATE signature from ${revelnestId2}`);
+    return;
+  }
+  if (block.dhtSeq > (contact.dhtSeq || 0)) {
+    console.log(`[DHT] Actualizando ubicación de ${revelnestId2} a ${block.address} (Seq: ${block.dhtSeq})`);
+    updateContactDhtLocation(revelnestId2, block.address, block.dhtSeq, block.signature);
+  }
+}
+async function handleDhtExchange(revelnestId2, data) {
+  if (!Array.isArray(data.peers)) return;
+  console.log(`[DHT PEEREX] Recibiendo ${data.peers.length} ubicaciones de ${revelnestId2}`);
+  for (const peer of data.peers) {
+    if (!peer.revelnestId || !peer.publicKey || !peer.locationBlock) continue;
+    if (peer.revelnestId === getMyRevelNestId()) continue;
+    const existing = await getContactByRevelnestId(peer.revelnestId);
+    if (!existing) continue;
+    const block = peer.locationBlock;
+    if (typeof block.dhtSeq !== "number" || !block.address || !block.signature) continue;
+    const isValid = verifyLocationBlock(peer.revelnestId, block, existing.publicKey);
+    if (!isValid) {
+      console.error(`[DHT Security] Invalid PEEREX signature for ${peer.revelnestId}`);
+      continue;
+    }
+    if (block.dhtSeq > (existing.dhtSeq || 0)) {
+      updateContactDhtLocation(peer.revelnestId, block.address, block.dhtSeq, block.signature);
+    }
+  }
+}
+async function handleDhtQuery(revelnestId2, data, fromAddress, sendResponse) {
+  console.log(`[DHT Query] Buscando ${data.targetId} a petición de ${revelnestId2}`);
+  const target = await getContactByRevelnestId(data.targetId);
+  let responseData = { type: "DHT_RESPONSE", targetId: data.targetId };
+  if (target && target.status === "connected" && target.dhtSignature) {
+    responseData.locationBlock = {
+      address: target.address,
+      dhtSeq: target.dhtSeq,
+      signature: target.dhtSignature
+    };
+    responseData.publicKey = target.publicKey;
+  } else {
+    const allContacts = getContacts();
+    const distanceXOR = (idA, idB) => {
+      try {
+        return BigInt("0x" + idA) ^ BigInt("0x" + idB);
+      } catch {
+        return BigInt(0);
+      }
+    };
+    const closest = allContacts.filter((c) => c.status === "connected" && c.revelnestId !== revelnestId2).map((c) => ({
+      revelnestId: c.revelnestId,
+      publicKey: c.publicKey,
+      locationBlock: { address: c.address, dhtSeq: c.dhtSeq, signature: c.dhtSignature },
+      dist: distanceXOR(c.revelnestId, data.targetId)
+    })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).slice(0, 5).map(({ dist, ...d }) => d);
+    responseData.neighbors = closest;
+  }
+  sendResponse(fromAddress, responseData);
+}
+async function handleDhtResponse(revelnestId2, data, sendResponse) {
+  var _a2, _b2;
+  if (data.locationBlock) {
+    const block = data.locationBlock;
+    const existing = await getContactByRevelnestId(data.targetId);
+    if (!existing) return;
+    const isValid = verifyLocationBlock(data.targetId, block, existing.publicKey || data.publicKey);
+    if (isValid && block.dhtSeq > (existing.dhtSeq || 0)) {
+      console.log(`[DHT Search] ¡ENCONTRADO! Nueva IP para ${data.targetId}: ${block.address}`);
+      updateContactDhtLocation(data.targetId, block.address, block.dhtSeq, block.signature);
+    }
+  } else if (data.neighbors) {
+    console.log(`[DHT Search] Recibidos ${data.neighbors.length} referidos de ${revelnestId2} para buscar a ${data.targetId}`);
+    for (const peer of data.neighbors) {
+      if (peer.revelnestId === getMyRevelNestId()) continue;
+      const existing = await getContactByRevelnestId(peer.revelnestId);
+      if (!existing) {
+        if ((_a2 = peer.locationBlock) == null ? void 0 : _a2.address) {
+          sendResponse(peer.locationBlock.address, { type: "DHT_QUERY", targetId: data.targetId });
+        }
+      } else if (((_b2 = peer.locationBlock) == null ? void 0 : _b2.dhtSeq) > (existing.dhtSeq || 0)) {
+        updateContactDhtLocation(peer.revelnestId, peer.locationBlock.address, peer.locationBlock.dhtSeq, peer.locationBlock.signature);
+        sendResponse(peer.locationBlock.address, { type: "DHT_QUERY", targetId: data.targetId });
+      }
+    }
+  }
+}
+async function handleChatMessage(revelnestId2, contact, data, win, signature, fromAddress, sendResponse) {
+  const msgId = data.id || crypto$1.randomUUID();
+  if (data.ephemeralPublicKey) {
+    updateContactEphemeralPublicKey(revelnestId2, data.ephemeralPublicKey);
+  }
+  let displayContent = data.content;
+  if (data.nonce) {
+    try {
+      const senderKeyHex = data.useRecipientEphemeral ? data.ephemeralPublicKey : contact.publicKey;
+      const useEphemeral = !!data.useRecipientEphemeral;
+      if (!senderKeyHex) throw new Error("La llave pública del remitente no está disponible para descifrar");
+      const decrypted = decrypt(
+        Buffer.from(data.content, "hex"),
+        Buffer.from(data.nonce, "hex"),
+        Buffer.from(senderKeyHex, "hex"),
+        useEphemeral
+      );
+      if (decrypted) {
+        displayContent = decrypted.toString("utf-8");
+      } else {
+        displayContent = "🔒 [Error de descifrado]";
+      }
+    } catch (err) {
+      displayContent = "🔒 [Error crítico de seguridad]";
+      console.error("Decryption failed:", err);
+    }
+  }
+  saveMessage(msgId, revelnestId2, false, displayContent, data.replyTo, signature);
+  win == null ? void 0 : win.webContents.send("receive-p2p-message", {
+    id: msgId,
+    revelnestId: revelnestId2,
+    isMine: false,
+    message: displayContent,
+    replyTo: data.replyTo,
+    status: "received",
+    encrypted: !!data.nonce
+  });
+  sendResponse(fromAddress, { type: "ACK", id: msgId });
+}
+function handleAck(revelnestId2, data, win) {
+  if (data.id) {
+    updateMessageStatus(data.id, "delivered");
+    win == null ? void 0 : win.webContents.send("message-delivered", { id: data.id, revelnestId: revelnestId2 });
+  }
+}
+function handleReadReceipt(revelnestId2, data, win) {
+  if (data.id) {
+    updateMessageStatus(data.id, "read");
+    win == null ? void 0 : win.webContents.send("message-read", { id: data.id, revelnestId: revelnestId2 });
+  }
+}
+async function handleIncomingReaction(revelnestId2, data, win) {
+  const { msgId, emoji, remove } = data;
+  if (remove) {
+    deleteReaction(msgId, revelnestId2, emoji);
+  } else {
+    saveReaction(msgId, revelnestId2, emoji);
+  }
+  win == null ? void 0 : win.webContents.send("message-reaction-updated", { msgId, revelnestId: revelnestId2, emoji, remove });
+}
+async function handleIncomingUpdate(revelnestId2, contact, data, win, signature) {
+  const { msgId, content, nonce, ephemeralPublicKey: ephemeralPublicKey2, useRecipientEphemeral } = data;
+  let displayContent = content;
+  if (nonce) {
+    const senderKeyHex = useRecipientEphemeral ? ephemeralPublicKey2 : contact.publicKey;
+    const decrypted = decrypt(
+      Buffer.from(content, "hex"),
+      Buffer.from(nonce, "hex"),
+      Buffer.from(senderKeyHex, "hex"),
+      !!useRecipientEphemeral
+    );
+    if (decrypted) displayContent = decrypted.toString("utf-8");
+  }
+  updateMessageContent(msgId, displayContent, signature);
+  win == null ? void 0 : win.webContents.send("message-updated", { id: msgId, revelnestId: revelnestId2, content: displayContent });
+}
+async function handleIncomingDelete(revelnestId2, data, win) {
+  const { msgId } = data;
+  deleteMessageLocally(msgId);
+  win == null ? void 0 : win.webContents.send("message-deleted", { id: msgId, revelnestId: revelnestId2 });
+}
+let lastKnownIp = null;
+function broadcastDhtUpdate(sendSecureUDPMessage2) {
+  const currentIp = getNetworkAddress();
+  if (!currentIp) return;
+  if (currentIp !== lastKnownIp) {
+    lastKnownIp = currentIp;
+    const newSeq = incrementMyDhtSeq();
+    console.log(`[DHT] IP propia detectada/cambiada a ${currentIp}. Propagando DHT_UPDATE (Seq: ${newSeq})...`);
+    const locBlock = generateSignedLocationBlock(currentIp, newSeq);
+    const contacts2 = getContacts();
+    for (const contact of contacts2) {
+      if (contact.status === "connected") {
+        sendSecureUDPMessage2(contact.address, {
+          type: "DHT_UPDATE",
+          locationBlock: locBlock
+        });
+      }
+    }
+  }
+}
+async function sendDhtExchange(targetRevelnestId, sendSecureUDPMessage2) {
+  const targetContact = await getContactByRevelnestId(targetRevelnestId);
+  if (!targetContact || targetContact.status !== "connected") return;
+  const allContacts = getContacts();
+  const distanceXOR = (idA, idB) => {
+    try {
+      return BigInt("0x" + idA) ^ BigInt("0x" + idB);
+    } catch {
+      return BigInt(0);
+    }
+  };
+  const payload = allContacts.filter((c) => c.status === "connected" && c.dhtSignature && c.revelnestId !== targetRevelnestId).map((c) => ({
+    revelnestId: c.revelnestId,
+    publicKey: c.publicKey,
+    locationBlock: {
+      address: c.address,
+      dhtSeq: c.dhtSeq,
+      signature: c.dhtSignature
+    },
+    dist: distanceXOR(c.revelnestId, targetRevelnestId)
+  })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).map(({ dist, ...data }) => data);
+  const limitedPayload = payload.slice(0, 5);
+  if (limitedPayload.length > 0) {
+    sendSecureUDPMessage2(targetContact.address, {
+      type: "DHT_EXCHANGE",
+      peers: limitedPayload
+    });
+  }
+}
+async function startDhtSearch(revelnestId2, sendSecureUDPMessage2) {
+  console.log(`[DHT Search] Iniciando búsqueda activa para: ${revelnestId2}`);
+  const allContacts = getContacts();
+  const distanceXOR = (idA, idB) => {
+    try {
+      return BigInt("0x" + idA) ^ BigInt("0x" + idB);
+    } catch {
+      return BigInt(0);
+    }
+  };
+  const queryTargets = allContacts.filter((c) => c.status === "connected" && c.revelnestId !== revelnestId2).map((c) => ({
+    revelnestId: c.revelnestId,
+    address: c.address,
+    dist: distanceXOR(c.revelnestId, revelnestId2)
+  })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).slice(0, 3);
+  for (const target of queryTargets) {
+    sendSecureUDPMessage2(target.address, {
+      type: "DHT_QUERY",
+      targetId: revelnestId2
+    });
+  }
+}
+const YGG_PORT = 50005;
+let udpSocket = null;
+let mainWindow$1 = null;
 function startUDPServer(win) {
   mainWindow$1 = win;
   const networkAddr = getNetworkAddress();
   if (!networkAddr) return;
   udpSocket = dgram.createSocket({ type: "udp6", reuseAddr: true });
   udpSocket.on("message", async (msg, rinfo) => {
-    var _a2, _b2;
-    try {
-      const fullPacket = JSON.parse(msg.toString());
-      const { signature, senderRevelnestId, ...data } = fullPacket;
-      if (data.type === "HANDSHAKE_REQ") {
-        console.log(`[Handshake] Solicitud de ${rinfo.address}: ${data.revelnestId}`);
-        addOrUpdateContact(data.revelnestId, rinfo.address, data.alias || `Peer ${data.revelnestId.slice(0, 4)}`, data.publicKey, "incoming", data.ephemeralPublicKey);
-        mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-request-received", {
-          revelnestId: data.revelnestId,
-          address: rinfo.address,
-          alias: data.alias,
-          publicKey: data.publicKey,
-          ephemeralPublicKey: data.ephemeralPublicKey
-        });
-        return;
-      }
-      if (data.type === "HANDSHAKE_ACCEPT") {
-        console.log(`[Handshake] ACEPTADA de ${rinfo.address}: ${data.revelnestId}`);
-        const ghost = await getContactByAddress(rinfo.address);
-        if (ghost && ghost.revelnestId.startsWith("pending-")) {
-          deleteContact(ghost.revelnestId);
-        }
-        const existing = await getContactByRevelnestId(data.revelnestId);
-        if (existing && existing.status === "pending") {
-          updateContactPublicKey(data.revelnestId, data.publicKey);
-          if (data.ephemeralPublicKey) {
-            updateContactEphemeralPublicKey(data.revelnestId, data.ephemeralPublicKey);
-          }
-          mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-handshake-finished", { revelnestId: data.revelnestId });
-        }
-        return;
-      }
-      const revelnestId2 = senderRevelnestId;
-      if (!revelnestId2) return;
-      const contact = await getContactByRevelnestId(revelnestId2);
-      if (!contact || contact.status !== "connected" || !contact.publicKey) {
-        console.warn(`[Security] Origen no conectado o sin llave: ${revelnestId2}`);
-        return;
-      }
-      const verified = verify(
-        Buffer.from(canonicalStringify(data)),
-        Buffer.from(signature, "hex"),
-        Buffer.from(contact.publicKey, "hex")
-      );
-      if (!verified) {
-        console.error(`[Security] Firma INVÁLIDA de ${revelnestId2}.`);
-        return;
-      }
-      if (contact.address !== rinfo.address) {
-        updateContactLocation(revelnestId2, rinfo.address);
-      }
-      const nowIso = (/* @__PURE__ */ new Date()).toISOString();
-      updateLastSeen(revelnestId2);
-      mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-presence", { revelnestId: revelnestId2, lastSeen: nowIso });
-      if (data.type === "DHT_UPDATE") {
-        const block = data.locationBlock;
-        if (!block || typeof block.dhtSeq !== "number" || !block.address || !block.signature) return;
-        const isValid = verifyLocationBlock(revelnestId2, block, contact.publicKey);
-        if (!isValid) {
-          console.error(`[DHT Security] Invalid DHT_UPDATE signature from ${revelnestId2}`);
-          return;
-        }
-        if (block.dhtSeq > (contact.dhtSeq || 0)) {
-          console.log(`[DHT] Actualizando ubicación de ${revelnestId2} a ${block.address} (Seq: ${block.dhtSeq})`);
-          updateContactDhtLocation(revelnestId2, block.address, block.dhtSeq, block.signature);
-        } else {
-          console.log(`[DHT] Ignorando actualización obsoleta o inválida de ${revelnestId2} (Seq: ${block.dhtSeq} <= ${contact.dhtSeq})`);
-        }
-        return;
-      } else if (data.type === "DHT_EXCHANGE") {
-        if (!Array.isArray(data.peers)) return;
-        console.log(`[DHT PEEREX] Recibiendo ${data.peers.length} ubicaciones de ${revelnestId2}`);
-        for (const peer of data.peers) {
-          if (!peer.revelnestId || !peer.publicKey || !peer.locationBlock) continue;
-          if (peer.revelnestId === getMyRevelNestId()) continue;
-          const existing = await getContactByRevelnestId(peer.revelnestId);
-          if (!existing) continue;
-          const block = peer.locationBlock;
-          if (typeof block.dhtSeq !== "number" || !block.address || !block.signature) continue;
-          const isValid = verifyLocationBlock(peer.revelnestId, block, existing.publicKey);
-          if (!isValid) {
-            console.error(`[DHT Security] Invalid PEEREX signature for ${peer.revelnestId}`);
-            continue;
-          }
-          if (block.dhtSeq > (existing.dhtSeq || 0)) {
-            console.log(`[DHT] Actualizada IP de ${peer.revelnestId} a ${block.address} via PEEREX (Seq: ${block.dhtSeq})`);
-            updateContactDhtLocation(
-              peer.revelnestId,
-              block.address,
-              block.dhtSeq,
-              block.signature
-            );
-          }
-        }
-        return;
-      } else if (data.type === "DHT_QUERY") {
-        console.log(`[DHT Query] Buscando ${data.targetId} a petición de ${revelnestId2}`);
-        const target = await getContactByRevelnestId(data.targetId);
-        let responseData = { type: "DHT_RESPONSE", targetId: data.targetId };
-        if (target && target.status === "connected" && target.dhtSignature) {
-          responseData.locationBlock = {
-            address: target.address,
-            dhtSeq: target.dhtSeq,
-            signature: target.dhtSignature
-          };
-          responseData.publicKey = target.publicKey;
-        } else {
-          const allContacts = getContacts();
-          const distanceXOR = (idA, idB) => {
-            try {
-              return BigInt("0x" + idA) ^ BigInt("0x" + idB);
-            } catch {
-              return BigInt(0);
-            }
-          };
-          const closest = allContacts.filter((c) => c.status === "connected" && c.revelnestId !== revelnestId2).map((c) => ({
-            revelnestId: c.revelnestId,
-            publicKey: c.publicKey,
-            locationBlock: { address: c.address, dhtSeq: c.dhtSeq, signature: c.dhtSignature },
-            dist: distanceXOR(c.revelnestId, data.targetId)
-          })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).slice(0, 5).map(({ dist, ...d }) => d);
-          responseData.neighbors = closest;
-        }
-        sendSecureUDPMessage(rinfo.address, responseData);
-        return;
-      } else if (data.type === "DHT_RESPONSE") {
-        if (data.locationBlock) {
-          const block = data.locationBlock;
-          const existing = await getContactByRevelnestId(data.targetId);
-          if (!existing) return;
-          const isValid = verifyLocationBlock(data.targetId, block, existing.publicKey || data.publicKey);
-          if (isValid && block.dhtSeq > (existing.dhtSeq || 0)) {
-            console.log(`[DHT Search] ¡ENCONTRADO! Nueva IP para ${data.targetId}: ${block.address}`);
-            updateContactDhtLocation(data.targetId, block.address, block.dhtSeq, block.signature);
-          }
-        } else if (data.neighbors) {
-          console.log(`[DHT Search] Recibidos ${data.neighbors.length} referidos de ${revelnestId2} para buscar a ${data.targetId}`);
-          for (const peer of data.neighbors) {
-            if (peer.revelnestId === getMyRevelNestId()) continue;
-            const existing = await getContactByRevelnestId(peer.revelnestId);
-            if (!existing) {
-              if ((_a2 = peer.locationBlock) == null ? void 0 : _a2.address) {
-                sendSecureUDPMessage(peer.locationBlock.address, { type: "DHT_QUERY", targetId: data.targetId });
-              }
-            } else if (((_b2 = peer.locationBlock) == null ? void 0 : _b2.dhtSeq) > (existing.dhtSeq || 0)) {
-              updateContactDhtLocation(peer.revelnestId, peer.locationBlock.address, peer.locationBlock.dhtSeq, peer.locationBlock.signature);
-              sendSecureUDPMessage(peer.locationBlock.address, { type: "DHT_QUERY", targetId: data.targetId });
-            }
-          }
-        }
-        return;
-      } else if (data.type === "PING") {
-        sendSecureUDPMessage(rinfo.address, { type: "PONG" });
-      } else if (data.type === "CHAT") {
-        const msgId = data.id || crypto$1.randomUUID();
-        if (data.ephemeralPublicKey) {
-          updateContactEphemeralPublicKey(revelnestId2, data.ephemeralPublicKey);
-        }
-        let displayContent = data.content;
-        if (data.nonce) {
-          try {
-            const senderKeyHex = data.useRecipientEphemeral ? data.ephemeralPublicKey : contact.publicKey;
-            const useEphemeral = !!data.useRecipientEphemeral;
-            if (!senderKeyHex) throw new Error("La llave pública del remitente no está disponible para descifrar");
-            const decrypted = decrypt(
-              Buffer.from(data.content, "hex"),
-              Buffer.from(data.nonce, "hex"),
-              Buffer.from(senderKeyHex, "hex"),
-              useEphemeral
-            );
-            if (decrypted) {
-              displayContent = decrypted.toString("utf-8");
-            } else {
-              displayContent = "🔒 [Error de descifrado: El mensaje podría estar corrupto o la llave es incorrecta]";
-            }
-          } catch (err) {
-            displayContent = "🔒 [Error crítico de seguridad al descifrar PFS]";
-            console.error("Decryption failed:", err);
-          }
-        }
-        saveMessage(msgId, revelnestId2, false, displayContent, data.replyTo, signature);
-        mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("receive-p2p-message", {
-          id: msgId,
-          revelnestId: revelnestId2,
-          isMine: false,
-          message: displayContent,
-          replyTo: data.replyTo,
-          status: "received",
-          encrypted: !!data.nonce
-        });
-        sendSecureUDPMessage(rinfo.address, { type: "ACK", id: msgId });
-      } else if (data.type === "ACK") {
-        if (data.id) {
-          updateMessageStatus(data.id, "delivered");
-          mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("message-delivered", { id: data.id, revelnestId: revelnestId2 });
-        }
-      } else if (data.type === "READ") {
-        if (data.id) {
-          updateMessageStatus(data.id, "read");
-          mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("message-read", { id: data.id, revelnestId: revelnestId2 });
-        }
-      } else if (data.type === "TYPING") {
-        mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("peer-typing", { revelnestId: revelnestId2 });
-      }
-    } catch (e) {
-      console.error("UDP Packet Error:", e);
-    }
+    await handlePacket(
+      msg,
+      rinfo,
+      mainWindow$1,
+      sendSecureUDPMessage
+    );
   });
   udpSocket.on("error", (err) => {
     console.error("UDP Error:", err);
@@ -5336,6 +5543,18 @@ function startUDPServer(win) {
   } catch (e) {
     console.error("Failed to bind socket:", e);
   }
+}
+function sendSecureUDPMessage(ip, data) {
+  if (!udpSocket) return;
+  const myId = getMyRevelNestId();
+  const signature = sign(Buffer.from(canonicalStringify(data)));
+  const fullPacket = {
+    ...data,
+    senderRevelnestId: myId,
+    signature: signature.toString("hex")
+  };
+  const buf = Buffer.from(JSON.stringify(fullPacket));
+  udpSocket.send(buf, YGG_PORT, ip);
 }
 async function sendContactRequest(targetIp, alias) {
   const data = {
@@ -5365,18 +5584,6 @@ async function acceptContactRequest(revelnestId2, publicKey2) {
     udpSocket.send(buf, YGG_PORT, contact.address);
   }
 }
-function sendSecureUDPMessage(ip, data) {
-  if (!udpSocket) return;
-  const myId = getMyRevelNestId();
-  const signature = sign(Buffer.from(canonicalStringify(data)));
-  const fullPacket = {
-    ...data,
-    senderRevelnestId: myId,
-    signature: signature.toString("hex")
-  };
-  const buf = Buffer.from(JSON.stringify(fullPacket));
-  udpSocket.send(buf, YGG_PORT, ip);
-}
 async function sendUDPMessage(revelnestId2, message, replyTo) {
   const msgId = crypto$1.randomUUID();
   const content = typeof message === "string" ? message : message.content;
@@ -5402,11 +5609,11 @@ async function sendUDPMessage(revelnestId2, message, replyTo) {
   saveMessage(msgId, revelnestId2, true, content, replyTo, signature.toString("hex"));
   sendSecureUDPMessage(contact.address, data);
   setTimeout(async () => {
-    const { getMessageStatus: getMessageStatus2 } = await Promise.resolve().then(() => database);
+    const { getMessageStatus: getMessageStatus2 } = await Promise.resolve().then(() => db$1);
     const status = await getMessageStatus2(msgId);
     if (status === "sent") {
       console.warn(`[Network] Mensaje ${msgId} no entregado a ${revelnestId2}. Iniciando búsqueda reactiva...`);
-      startDhtSearch(revelnestId2);
+      startDhtSearch(revelnestId2, sendSecureUDPMessage);
     }
   }, 5e3);
   return msgId;
@@ -5415,29 +5622,12 @@ function checkHeartbeat(contacts2) {
   for (const contact of contacts2) {
     if (contact.status === "connected") {
       sendSecureUDPMessage(contact.address, { type: "PING" });
-      sendDhtExchange(contact.revelnestId);
+      sendDhtExchange(contact.revelnestId, sendSecureUDPMessage);
     }
   }
 }
-let lastKnownIp = null;
-function broadcastDhtUpdate() {
-  const currentIp = getNetworkAddress();
-  if (!currentIp) return;
-  if (currentIp !== lastKnownIp) {
-    lastKnownIp = currentIp;
-    const newSeq = incrementMyDhtSeq();
-    console.log(`[DHT] IP propia detectada/cambiada a ${currentIp}. Propagando DHT_UPDATE (Seq: ${newSeq})...`);
-    const locBlock = generateSignedLocationBlock(currentIp, newSeq);
-    const contacts2 = getContacts();
-    for (const contact of contacts2) {
-      if (contact.status === "connected") {
-        sendSecureUDPMessage(contact.address, {
-          type: "DHT_UPDATE",
-          locationBlock: locBlock
-        });
-      }
-    }
-  }
+function wrappedBroadcastDhtUpdate() {
+  broadcastDhtUpdate(sendSecureUDPMessage);
 }
 function sendTypingIndicator(revelnestId2) {
   const contact = getContactByRevelnestId(revelnestId2);
@@ -5465,646 +5655,46 @@ function sendContactCard(targetRevelnestId, contact) {
   sendSecureUDPMessage(targetContact.address, data);
   return msgId;
 }
-async function sendDhtExchange(targetRevelnestId) {
-  const targetContact = await getContactByRevelnestId(targetRevelnestId);
-  if (!targetContact || targetContact.status !== "connected") return;
-  const allContacts = getContacts();
-  const distanceXOR = (idA, idB) => {
-    try {
-      return BigInt("0x" + idA) ^ BigInt("0x" + idB);
-    } catch {
-      return BigInt(0);
-    }
-  };
-  const payload = allContacts.filter((c) => c.status === "connected" && c.dhtSignature && c.revelnestId !== targetRevelnestId).map((c) => ({
-    revelnestId: c.revelnestId,
-    publicKey: c.publicKey,
-    locationBlock: {
-      address: c.address,
-      dhtSeq: c.dhtSeq,
-      signature: c.dhtSignature
-    },
-    dist: distanceXOR(c.revelnestId, targetRevelnestId)
-  })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).map(({ dist, ...data }) => data);
-  const limitedPayload = payload.slice(0, 5);
-  if (limitedPayload.length > 0) {
-    sendSecureUDPMessage(targetContact.address, {
-      type: "DHT_EXCHANGE",
-      peers: limitedPayload
-    });
-  }
+async function sendChatReaction(revelnestId2, msgId, emoji, remove) {
+  const contact = await getContactByRevelnestId(revelnestId2);
+  if (!contact || contact.status !== "connected") return;
+  if (remove) deleteReaction(msgId, getMyRevelNestId(), emoji);
+  else saveReaction(msgId, getMyRevelNestId(), emoji);
+  const data = { type: "CHAT_REACTION", msgId, emoji, remove };
+  sendSecureUDPMessage(contact.address, data);
 }
-async function startDhtSearch(revelnestId2) {
-  console.log(`[DHT Search] Iniciando búsqueda activa para: ${revelnestId2}`);
-  const allContacts = getContacts();
-  const distanceXOR = (idA, idB) => {
-    try {
-      return BigInt("0x" + idA) ^ BigInt("0x" + idB);
-    } catch {
-      return BigInt(0);
-    }
+async function sendChatUpdate(revelnestId2, msgId, newContent) {
+  const contact = await getContactByRevelnestId(revelnestId2);
+  if (!contact || contact.status !== "connected" || !contact.publicKey) return;
+  const useEphemeral = !!contact.ephemeralPublicKey;
+  const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
+  const { ciphertext, nonce } = encrypt(
+    Buffer.from(newContent, "utf-8"),
+    Buffer.from(targetKeyHex, "hex"),
+    useEphemeral
+  );
+  const data = {
+    type: "CHAT_UPDATE",
+    msgId,
+    content: ciphertext.toString("hex"),
+    nonce: nonce.toString("hex"),
+    ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
+    useRecipientEphemeral: useEphemeral
   };
-  const queryTargets = allContacts.filter((c) => c.status === "connected" && c.revelnestId !== revelnestId2).map((c) => ({
-    revelnestId: c.revelnestId,
-    address: c.address,
-    dist: distanceXOR(c.revelnestId, revelnestId2)
-  })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).slice(0, 3);
-  for (const target of queryTargets) {
-    sendSecureUDPMessage(target.address, {
-      type: "DHT_QUERY",
-      targetId: revelnestId2
-    });
-  }
+  const signature = sign(Buffer.from(canonicalStringify(data)));
+  updateMessageContent(msgId, newContent, signature.toString("hex"));
+  sendSecureUDPMessage(contact.address, data);
+}
+async function sendChatDelete(revelnestId2, msgId) {
+  const contact = await getContactByRevelnestId(revelnestId2);
+  if (!contact || contact.status !== "connected") return;
+  deleteMessageLocally(msgId);
+  const data = { type: "CHAT_DELETE", msgId };
+  sendSecureUDPMessage(contact.address, data);
 }
 function closeUDPServer() {
   if (udpSocket) udpSocket.close();
 }
-var sudoPrompt = {};
-var Node = {
-  child: require$$0,
-  crypto: require$$1,
-  fs: require$$2,
-  os: require$$3,
-  path: require$$4,
-  process
-};
-function Attempt(instance, end) {
-  var platform = Node.process.platform;
-  if (platform === "darwin") return Mac(instance, end);
-  if (platform === "linux") return Linux(instance, end);
-  if (platform === "win32") return Windows(instance, end);
-  end(new Error("Platform not yet supported."));
-}
-function EscapeDoubleQuotes(string) {
-  if (typeof string !== "string") throw new Error("Expected a string.");
-  return string.replace(/"/g, '\\"');
-}
-function isObject(arg) {
-  return arg !== null && typeof arg === "object";
-}
-function isFunction(arg) {
-  return typeof arg === "function";
-}
-function Exec() {
-  if (arguments.length < 1 || arguments.length > 3) {
-    throw new Error("Wrong number of arguments.");
-  }
-  var command = arguments[0];
-  var options = {};
-  var end = function() {
-  };
-  if (typeof command !== "string") {
-    throw new Error("Command should be a string.");
-  }
-  if (arguments.length === 2) {
-    if (isObject(arguments[1])) {
-      options = arguments[1];
-    } else if (isFunction(arguments[1])) {
-      end = arguments[1];
-    } else {
-      throw new Error("Expected options or callback.");
-    }
-  } else if (arguments.length === 3) {
-    if (isObject(arguments[1])) {
-      options = arguments[1];
-    } else {
-      throw new Error("Expected options to be an object.");
-    }
-    if (isFunction(arguments[2])) {
-      end = arguments[2];
-    } else {
-      throw new Error("Expected callback to be a function.");
-    }
-  }
-  if (/^sudo/i.test(command)) {
-    return end(new Error('Command should not be prefixed with "sudo".'));
-  }
-  if (typeof options.name === "undefined") {
-    var title = Node.process.title;
-    if (ValidName(title)) {
-      options.name = title;
-    } else {
-      return end(new Error("process.title cannot be used as a valid name."));
-    }
-  } else if (!ValidName(options.name)) {
-    var error = "";
-    error += "options.name must be alphanumeric only ";
-    error += "(spaces are allowed) and <= 70 characters.";
-    return end(new Error(error));
-  }
-  if (typeof options.icns !== "undefined") {
-    if (typeof options.icns !== "string") {
-      return end(new Error("options.icns must be a string if provided."));
-    } else if (options.icns.trim().length === 0) {
-      return end(new Error("options.icns must not be empty if provided."));
-    }
-  }
-  if (typeof options.env !== "undefined") {
-    if (typeof options.env !== "object") {
-      return end(new Error("options.env must be an object if provided."));
-    } else if (Object.keys(options.env).length === 0) {
-      return end(new Error("options.env must not be empty if provided."));
-    } else {
-      for (var key in options.env) {
-        var value = options.env[key];
-        if (typeof key !== "string" || typeof value !== "string") {
-          return end(
-            new Error("options.env environment variables must be strings.")
-          );
-        }
-        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
-          return end(
-            new Error(
-              "options.env has an invalid environment variable name: " + JSON.stringify(key)
-            )
-          );
-        }
-        if (/[\r\n]/.test(value)) {
-          return end(
-            new Error(
-              "options.env has an invalid environment variable value: " + JSON.stringify(value)
-            )
-          );
-        }
-      }
-    }
-  }
-  var platform = Node.process.platform;
-  if (platform !== "darwin" && platform !== "linux" && platform !== "win32") {
-    return end(new Error("Platform not yet supported."));
-  }
-  var instance = {
-    command,
-    options,
-    uuid: void 0,
-    path: void 0
-  };
-  Attempt(instance, end);
-}
-function Linux(instance, end) {
-  LinuxBinary(
-    instance,
-    function(error, binary) {
-      if (error) return end(error);
-      var command = [];
-      command.push('cd "' + EscapeDoubleQuotes(Node.process.cwd()) + '";');
-      for (var key in instance.options.env) {
-        var value = instance.options.env[key];
-        command.push("export " + key + '="' + EscapeDoubleQuotes(value) + '";');
-      }
-      command.push('"' + EscapeDoubleQuotes(binary) + '"');
-      if (/kdesudo/i.test(binary)) {
-        command.push(
-          "--comment",
-          '"' + instance.options.name + ' wants to make changes. Enter your password to allow this."'
-        );
-        command.push("-d");
-        command.push("--");
-      } else if (/pkexec/i.test(binary)) {
-        command.push("--disable-internal-agent");
-      }
-      var magic = "SUDOPROMPT\n";
-      command.push(
-        '/bin/bash -c "echo ' + EscapeDoubleQuotes(magic.trim()) + "; " + EscapeDoubleQuotes(instance.command) + '"'
-      );
-      command = command.join(" ");
-      Node.child.exec(
-        command,
-        { encoding: "utf-8", maxBuffer: MAX_BUFFER },
-        function(error2, stdout, stderr) {
-          var elevated = stdout && stdout.slice(0, magic.length) === magic;
-          if (elevated) stdout = stdout.slice(magic.length);
-          if (error2 && !elevated) {
-            if (/No authentication agent found/.test(stderr)) {
-              error2.message = NO_POLKIT_AGENT;
-            } else {
-              error2.message = PERMISSION_DENIED;
-            }
-          }
-          end(error2, stdout, stderr);
-        }
-      );
-    }
-  );
-}
-function LinuxBinary(instance, end) {
-  var index = 0;
-  var paths = ["/usr/bin/kdesudo", "/usr/bin/pkexec"];
-  function test() {
-    if (index === paths.length) {
-      return end(new Error("Unable to find pkexec or kdesudo."));
-    }
-    var path2 = paths[index++];
-    Node.fs.stat(
-      path2,
-      function(error) {
-        if (error) {
-          if (error.code === "ENOTDIR") return test();
-          if (error.code === "ENOENT") return test();
-          end(error);
-        } else {
-          end(void 0, path2);
-        }
-      }
-    );
-  }
-  test();
-}
-function Mac(instance, callback) {
-  var temp = Node.os.tmpdir();
-  if (!temp) return callback(new Error("os.tmpdir() not defined."));
-  var user = Node.process.env.USER;
-  if (!user) return callback(new Error("env['USER'] not defined."));
-  UUID(
-    instance,
-    function(error, uuid) {
-      if (error) return callback(error);
-      instance.uuid = uuid;
-      instance.path = Node.path.join(
-        temp,
-        instance.uuid,
-        instance.options.name + ".app"
-      );
-      function end(error2, stdout, stderr) {
-        Remove(
-          Node.path.dirname(instance.path),
-          function(errorRemove) {
-            if (error2) return callback(error2);
-            if (errorRemove) return callback(errorRemove);
-            callback(void 0, stdout, stderr);
-          }
-        );
-      }
-      MacApplet(
-        instance,
-        function(error2, stdout, stderr) {
-          if (error2) return end(error2, stdout, stderr);
-          MacIcon(
-            instance,
-            function(error3) {
-              if (error3) return end(error3);
-              MacPropertyList(
-                instance,
-                function(error4, stdout2, stderr2) {
-                  if (error4) return end(error4, stdout2, stderr2);
-                  MacCommand(
-                    instance,
-                    function(error5) {
-                      if (error5) return end(error5);
-                      MacOpen(
-                        instance,
-                        function(error6, stdout3, stderr3) {
-                          if (error6) return end(error6, stdout3, stderr3);
-                          MacResult(instance, end);
-                        }
-                      );
-                    }
-                  );
-                }
-              );
-            }
-          );
-        }
-      );
-    }
-  );
-}
-function MacApplet(instance, end) {
-  var parent = Node.path.dirname(instance.path);
-  Node.fs.mkdir(
-    parent,
-    function(error) {
-      if (error) return end(error);
-      var zip = Node.path.join(parent, "sudo-prompt-applet.zip");
-      Node.fs.writeFile(
-        zip,
-        APPLET,
-        "base64",
-        function(error2) {
-          if (error2) return end(error2);
-          var command = [];
-          command.push("/usr/bin/unzip");
-          command.push("-o");
-          command.push('"' + EscapeDoubleQuotes(zip) + '"');
-          command.push('-d "' + EscapeDoubleQuotes(instance.path) + '"');
-          command = command.join(" ");
-          Node.child.exec(command, { encoding: "utf-8" }, end);
-        }
-      );
-    }
-  );
-}
-function MacCommand(instance, end) {
-  var path2 = Node.path.join(
-    instance.path,
-    "Contents",
-    "MacOS",
-    "sudo-prompt-command"
-  );
-  var script = [];
-  script.push('cd "' + EscapeDoubleQuotes(Node.process.cwd()) + '"');
-  for (var key in instance.options.env) {
-    var value = instance.options.env[key];
-    script.push("export " + key + '="' + EscapeDoubleQuotes(value) + '"');
-  }
-  script.push(instance.command);
-  script = script.join("\n");
-  Node.fs.writeFile(path2, script, "utf-8", end);
-}
-function MacIcon(instance, end) {
-  if (!instance.options.icns) return end();
-  Node.fs.readFile(
-    instance.options.icns,
-    function(error, buffer) {
-      if (error) return end(error);
-      var icns = Node.path.join(
-        instance.path,
-        "Contents",
-        "Resources",
-        "applet.icns"
-      );
-      Node.fs.writeFile(icns, buffer, end);
-    }
-  );
-}
-function MacOpen(instance, end) {
-  var binary = Node.path.join(instance.path, "Contents", "MacOS", "applet");
-  var options = {
-    cwd: Node.path.dirname(binary),
-    encoding: "utf-8"
-  };
-  Node.child.exec("./" + Node.path.basename(binary), options, end);
-}
-function MacPropertyList(instance, end) {
-  var plist = Node.path.join(instance.path, "Contents", "Info.plist");
-  var path2 = EscapeDoubleQuotes(plist);
-  var key = EscapeDoubleQuotes("CFBundleName");
-  var value = instance.options.name + " Password Prompt";
-  if (/'/.test(value)) {
-    return end(new Error("Value should not contain single quotes."));
-  }
-  var command = [];
-  command.push("/usr/bin/defaults");
-  command.push("write");
-  command.push('"' + path2 + '"');
-  command.push('"' + key + '"');
-  command.push("'" + value + "'");
-  command = command.join(" ");
-  Node.child.exec(command, { encoding: "utf-8" }, end);
-}
-function MacResult(instance, end) {
-  var cwd = Node.path.join(instance.path, "Contents", "MacOS");
-  Node.fs.readFile(
-    Node.path.join(cwd, "code"),
-    "utf-8",
-    function(error, code) {
-      if (error) {
-        if (error.code === "ENOENT") return end(new Error(PERMISSION_DENIED));
-        end(error);
-      } else {
-        Node.fs.readFile(
-          Node.path.join(cwd, "stdout"),
-          "utf-8",
-          function(error2, stdout) {
-            if (error2) return end(error2);
-            Node.fs.readFile(
-              Node.path.join(cwd, "stderr"),
-              "utf-8",
-              function(error3, stderr) {
-                if (error3) return end(error3);
-                code = parseInt(code.trim(), 10);
-                if (code === 0) {
-                  end(void 0, stdout, stderr);
-                } else {
-                  error3 = new Error(
-                    "Command failed: " + instance.command + "\n" + stderr
-                  );
-                  error3.code = code;
-                  end(error3, stdout, stderr);
-                }
-              }
-            );
-          }
-        );
-      }
-    }
-  );
-}
-function Remove(path2, end) {
-  if (typeof path2 !== "string" || !path2.trim()) {
-    return end(new Error("Argument path not defined."));
-  }
-  var command = [];
-  if (Node.process.platform === "win32") {
-    if (/"/.test(path2)) {
-      return end(new Error("Argument path cannot contain double-quotes."));
-    }
-    command.push('rmdir /s /q "' + path2 + '"');
-  } else {
-    command.push("/bin/rm");
-    command.push("-rf");
-    command.push('"' + EscapeDoubleQuotes(Node.path.normalize(path2)) + '"');
-  }
-  command = command.join(" ");
-  Node.child.exec(command, { encoding: "utf-8" }, end);
-}
-function UUID(instance, end) {
-  Node.crypto.randomBytes(
-    256,
-    function(error, random) {
-      if (error) random = Date.now() + "" + Math.random();
-      var hash = Node.crypto.createHash("SHA256");
-      hash.update("sudo-prompt-3");
-      hash.update(instance.options.name);
-      hash.update(instance.command);
-      hash.update(random);
-      var uuid = hash.digest("hex").slice(-32);
-      if (!uuid || typeof uuid !== "string" || uuid.length !== 32) {
-        return end(new Error("Expected a valid UUID."));
-      }
-      end(void 0, uuid);
-    }
-  );
-}
-function ValidName(string) {
-  if (!/^[a-z0-9 ]+$/i.test(string)) return false;
-  if (string.trim().length === 0) return false;
-  if (string.length > 70) return false;
-  return true;
-}
-function Windows(instance, callback) {
-  var temp = Node.os.tmpdir();
-  if (!temp) return callback(new Error("os.tmpdir() not defined."));
-  UUID(
-    instance,
-    function(error, uuid) {
-      if (error) return callback(error);
-      instance.uuid = uuid;
-      instance.path = Node.path.join(temp, instance.uuid);
-      if (/"/.test(instance.path)) {
-        return callback(
-          new Error("instance.path cannot contain double-quotes.")
-        );
-      }
-      instance.pathElevate = Node.path.join(instance.path, "elevate.vbs");
-      instance.pathExecute = Node.path.join(instance.path, "execute.bat");
-      instance.pathCommand = Node.path.join(instance.path, "command.bat");
-      instance.pathStdout = Node.path.join(instance.path, "stdout");
-      instance.pathStderr = Node.path.join(instance.path, "stderr");
-      instance.pathStatus = Node.path.join(instance.path, "status");
-      Node.fs.mkdir(
-        instance.path,
-        function(error2) {
-          if (error2) return callback(error2);
-          function end(error3, stdout, stderr) {
-            Remove(
-              instance.path,
-              function(errorRemove) {
-                if (error3) return callback(error3);
-                if (errorRemove) return callback(errorRemove);
-                callback(void 0, stdout, stderr);
-              }
-            );
-          }
-          WindowsWriteExecuteScript(
-            instance,
-            function(error3) {
-              if (error3) return end(error3);
-              WindowsWriteCommandScript(
-                instance,
-                function(error4) {
-                  if (error4) return end(error4);
-                  WindowsElevate(
-                    instance,
-                    function(error5, stdout, stderr) {
-                      if (error5) return end(error5, stdout, stderr);
-                      WindowsWaitForStatus(
-                        instance,
-                        function(error6) {
-                          if (error6) return end(error6);
-                          WindowsResult(instance, end);
-                        }
-                      );
-                    }
-                  );
-                }
-              );
-            }
-          );
-        }
-      );
-    }
-  );
-}
-function WindowsElevate(instance, end) {
-  var command = [];
-  command.push("powershell.exe");
-  command.push("Start-Process");
-  command.push("-FilePath");
-  command.push(`"'` + instance.pathExecute.replace(/'/g, "`'") + `'"`);
-  command.push("-WindowStyle hidden");
-  command.push("-Verb runAs");
-  command = command.join(" ");
-  var child = Node.child.exec(
-    command,
-    { encoding: "utf-8" },
-    function(error, stdout, stderr) {
-      if (error) return end(new Error(PERMISSION_DENIED), stdout, stderr);
-      end();
-    }
-  );
-  child.stdin.end();
-}
-function WindowsResult(instance, end) {
-  Node.fs.readFile(
-    instance.pathStatus,
-    "utf-8",
-    function(error, code) {
-      if (error) return end(error);
-      Node.fs.readFile(
-        instance.pathStdout,
-        "utf-8",
-        function(error2, stdout) {
-          if (error2) return end(error2);
-          Node.fs.readFile(
-            instance.pathStderr,
-            "utf-8",
-            function(error3, stderr) {
-              if (error3) return end(error3);
-              code = parseInt(code.trim(), 10);
-              if (code === 0) {
-                end(void 0, stdout, stderr);
-              } else {
-                error3 = new Error(
-                  "Command failed: " + instance.command + "\r\n" + stderr
-                );
-                error3.code = code;
-                end(error3, stdout, stderr);
-              }
-            }
-          );
-        }
-      );
-    }
-  );
-}
-function WindowsWaitForStatus(instance, end) {
-  Node.fs.stat(
-    instance.pathStatus,
-    function(error, stats) {
-      if (error && error.code === "ENOENT" || stats.size < 2) {
-        setTimeout(
-          function() {
-            Node.fs.stat(
-              instance.pathStdout,
-              function(error2) {
-                if (error2) return end(new Error(PERMISSION_DENIED));
-                WindowsWaitForStatus(instance, end);
-              }
-            );
-          },
-          1e3
-        );
-      } else if (error) {
-        end(error);
-      } else {
-        end();
-      }
-    }
-  );
-}
-function WindowsWriteCommandScript(instance, end) {
-  var cwd = Node.process.cwd();
-  if (/"/.test(cwd)) {
-    return end(new Error("process.cwd() cannot contain double-quotes."));
-  }
-  var script = [];
-  script.push("@echo off");
-  script.push("chcp 65001>nul");
-  script.push('cd /d "' + cwd + '"');
-  for (var key in instance.options.env) {
-    var value = instance.options.env[key];
-    script.push("set " + key + "=" + value.replace(/([<>\\|&^])/g, "^$1"));
-  }
-  script.push(instance.command);
-  script = script.join("\r\n");
-  Node.fs.writeFile(instance.pathCommand, script, "utf-8", end);
-}
-function WindowsWriteExecuteScript(instance, end) {
-  var script = [];
-  script.push("@echo off");
-  script.push(
-    'call "' + instance.pathCommand + '" > "' + instance.pathStdout + '" 2> "' + instance.pathStderr + '"'
-  );
-  script.push('(echo %ERRORLEVEL%) > "' + instance.pathStatus + '"');
-  script = script.join("\r\n");
-  Node.fs.writeFile(instance.pathExecute, script, "utf-8", end);
-}
-sudoPrompt.exec = Exec;
-var APPLET = "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";
-var PERMISSION_DENIED = "User did not grant permission.";
-var NO_POLKIT_AGENT = "No polkit authentication agent found.";
-var MAX_BUFFER = 134217728;
 async function manageYggdrasilInstance() {
   const existingAddress = getNetworkAddress();
   if (existingAddress) {
@@ -6130,27 +5720,144 @@ async function manageYggdrasilInstance() {
         else resolve(stdout);
       });
     });
-    const modConf = genconf.replace(
+    let modConf = genconf.replace(
       /(Peers: \[)(.*?)(\])/s,
       `$1
     "tls://ygg.mkg20001.io:443",
     "tcp://ygg.tomasgl.ru:10526"
   $3`
     );
+    modConf = modConf.replace(/AdminListen: .*/, "AdminListen: none");
+    modConf = modConf.replace(/IfName: .*/, "IfName: ygg0");
     fs.writeFileSync(confPath, modConf);
     console.log("[Yggdrasil] Configuración generada.");
   }
-  console.log("[Yggdrasil] Iniciando proceso local (requerirá permisos de superusuario para crear la red mesh)...");
+  let configContent = fs.readFileSync(confPath, "utf8");
+  let newContent = configContent;
+  if (!newContent.includes("AdminListen:")) {
+    const ifNameRegex = /IfName: ygg0/;
+    const match = ifNameRegex.exec(newContent);
+    if (match) {
+      const insertPos = match.index + match[0].length;
+      newContent = newContent.slice(0, insertPos) + "\n  AdminListen: none" + newContent.slice(insertPos);
+    }
+  } else {
+    newContent = newContent.replace(/AdminListen: .*/, "AdminListen: none");
+  }
+  newContent = newContent.replace(/IfName: .*/, "IfName: ygg0");
+  if (newContent !== configContent) {
+    fs.writeFileSync(confPath, newContent);
+    console.log("[Yggdrasil] Configuración actualizada.");
+  }
+  console.log("[Yggdrasil] Preparando conexión a la red descentralizada RevelNest...");
+  console.log("[Yggdrasil] Nota: Se requieren permisos de administrador para crear una red privada segura.");
   return new Promise((resolve, reject) => {
-    const cmd = process.platform === "win32" ? `cd "${userDataPath}" && "${yggPath}" -useconffile "${confPath}"` : `sh -c '"${yggPath}" -useconffile "${confPath}" > "${userDataPath}/ygg.log" 2>&1 & echo $! > "${pidPath}"'`;
-    sudoPrompt.exec(cmd, { name: "RevelNet (Habilitar conexión a la red distribuida)" }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("[Yggdrasil] Error de inicio:", error);
-        reject(error);
-        return;
+    const cleanRootOwnedFiles = () => {
+      try {
+        const stat = fs.statSync(pidPath);
+        if (stat && (stat.uid === 0 || (stat.mode & 128) === 0)) {
+          console.log("[Yggdrasil] Eliminando archivo PID de root...");
+          fs.unlinkSync(pidPath);
+        }
+      } catch (e) {
       }
-      console.log("[Yggdrasil] Lanzado en background.");
-      setTimeout(resolve, 3e3);
+      try {
+        const stat = fs.statSync(path.join(userDataPath, "ygg.log"));
+        if (stat && (stat.uid === 0 || (stat.mode & 128) === 0)) {
+          console.log("[Yggdrasil] Eliminando archivo log de root...");
+          fs.unlinkSync(path.join(userDataPath, "ygg.log"));
+        }
+      } catch (e) {
+      }
+    };
+    const spawnWithoutSudo = () => {
+      return new Promise((spawnResolve, spawnReject) => {
+        var _a2, _b2, _c2;
+        console.log("[Yggdrasil] Intentando conexión con permisos estándar...");
+        cleanRootOwnedFiles();
+        if (process.platform === "win32") {
+          const cmd = `cd "${userDataPath}" && start /B "${yggPath}" -useconffile "${confPath}"`;
+          exec(cmd, { cwd: userDataPath }, (error) => {
+            if (error) {
+              spawnReject(error);
+            } else {
+              console.log("[Yggdrasil] Lanzado en background (modo estándar).");
+              setTimeout(spawnResolve, 3e3);
+            }
+          });
+        } else {
+          const child = spawn(yggPath, ["-useconffile", confPath], {
+            cwd: userDataPath,
+            detached: true,
+            stdio: ["ignore", "pipe", "pipe"]
+          });
+          if (!(child == null ? void 0 : child.pid)) {
+            spawnReject(new Error("No se pudo crear el proceso Yggdrasil"));
+            return;
+          }
+          fs.writeFileSync(pidPath, child.pid.toString());
+          child.unref();
+          let stderrData = "";
+          (_a2 = child.stderr) == null ? void 0 : _a2.on("data", (data) => {
+            stderrData += data.toString();
+            if (stderrData.includes("operation not permitted") || stderrData.includes("failed to create TUN") || stderrData.includes("panic:")) {
+              console.error("[Yggdrasil] Error crítico detectado:", stderrData);
+              try {
+                process.kill(child.pid, "SIGKILL");
+              } catch (e) {
+              }
+              spawnReject(new Error("Yggdrasil falló al crear la interfaz de red"));
+            }
+          });
+          const logStream = fs.createWriteStream(path.join(userDataPath, "ygg.log"), { flags: "a" });
+          (_b2 = child.stdout) == null ? void 0 : _b2.pipe(logStream);
+          (_c2 = child.stderr) == null ? void 0 : _c2.pipe(logStream);
+          console.log("[Yggdrasil] Lanzado en background (PID: %d).", child.pid);
+          setTimeout(() => {
+            try {
+              process.kill(child.pid, 0);
+              spawnResolve();
+            } catch (err) {
+              spawnReject(new Error("El proceso Yggdrasil terminó prematuramente"));
+            }
+          }, 2e3);
+        }
+      });
+    };
+    const runWithSudo = () => {
+      return new Promise((sudoResolve, sudoReject) => {
+        console.log("[Yggdrasil] Se requieren permisos de administrador para la red privada.");
+        console.log("[Yggdrasil] Se mostrará un diálogo para ingresar su contraseña.");
+        const cmd = process.platform === "win32" ? `cd "${userDataPath}" && "${yggPath}" -useconffile "${confPath}"` : `sh -c '"${yggPath}" -useconffile "${confPath}" > "${userDataPath}/ygg.log" 2>&1 & echo $! > "${pidPath}"'`;
+        try {
+          sudo.exec(cmd, { name: "RevelNest Secure Network" }, (error, stdout, stderr) => {
+            if (error) {
+              console.error("[Yggdrasil] Error con permisos elevados:", error);
+              sudoReject(error);
+            } else {
+              console.log("[Yggdrasil] Lanzado con permisos elevados.");
+              setTimeout(sudoResolve, 3e3);
+            }
+          });
+        } catch (sudoError) {
+          console.error("[Yggdrasil] Error síncrono en sudo.exec:", sudoError);
+          sudoReject(sudoError);
+        }
+      });
+    };
+    spawnWithoutSudo().then(() => {
+      console.log("[Yggdrasil] Red descentralizada lista.");
+      resolve();
+    }).catch((spawnError) => {
+      console.log("[Yggdrasil] Falló el modo estándar:", spawnError.message);
+      console.log("[Yggdrasil] Intentando con permisos elevados...");
+      runWithSudo().then(() => {
+        console.log("[Yggdrasil] Red descentralizada lista (con permisos elevados).");
+        resolve();
+      }).catch((sudoError) => {
+        console.error("[Yggdrasil] No se pudo iniciar Yggdrasil:", sudoError.message);
+        reject(new Error(`No se pudo establecer la red descentralizada: ${sudoError.message}`));
+      });
     });
   });
 }
@@ -6160,10 +5867,10 @@ function stopYggdrasil() {
     const pid = fs.readFileSync(pidPath, "utf8").trim();
     if (!pid) return;
     console.log(`[Yggdrasil] Deteniendo proceso ${pid}...`);
-    const killCmd = process.platform === "win32" ? `taskkill /PID ${pid} /F` : `kill -9 ${pid}`;
-    sudoPrompt.exec(killCmd, { name: "RevelNet" }, (error) => {
+    const killCmd = process.platform === "win32" ? `taskkill /PID ${pid} /F` : `kill -9 ${pid} 2>/dev/null || sudo kill -9 ${pid}`;
+    exec(killCmd, (error) => {
       if (error) {
-        console.error("[Yggdrasil] Error al detener:", error);
+        console.error("[Yggdrasil] Error al detener:", error.message);
         try {
           process.kill(parseInt(pid), 9);
         } catch (e) {
@@ -6193,7 +5900,7 @@ const createWindow = () => {
     }
   });
   {
-    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.loadURL("http://localhost:5174");
   }
 };
 app.on("ready", async () => {
@@ -6202,12 +5909,13 @@ app.on("ready", async () => {
   } catch (err) {
     console.error("[Yggdrasil] Error inicializando sidecar:", err);
   }
-  initIdentity();
-  initDB();
+  const userDataPath = app.getPath("userData");
+  initIdentity(userDataPath);
+  await initDB(userDataPath);
   createWindow();
   if (mainWindow) startUDPServer(mainWindow);
   setInterval(() => {
-    broadcastDhtUpdate();
+    wrappedBroadcastDhtUpdate();
     const contacts2 = getContacts();
     checkHeartbeat(contacts2.map((c) => ({ address: c.address, status: c.status })));
   }, 3e4);
@@ -6237,6 +5945,9 @@ ipcMain.handle("send-p2p-message", async (event, { revelnestId: revelnestId2, me
 ipcMain.handle("send-typing-indicator", (event, { revelnestId: revelnestId2 }) => sendTypingIndicator(revelnestId2));
 ipcMain.handle("send-read-receipt", (event, { revelnestId: revelnestId2, id }) => sendReadReceipt(revelnestId2, id));
 ipcMain.handle("send-contact-card", (event, { targetRevelnestId, contact }) => sendContactCard(targetRevelnestId, contact));
+ipcMain.handle("send-chat-reaction", (event, { revelnestId: revelnestId2, msgId, emoji, remove }) => sendChatReaction(revelnestId2, msgId, emoji, remove));
+ipcMain.handle("send-chat-update", (event, { revelnestId: revelnestId2, msgId, newContent }) => sendChatUpdate(revelnestId2, msgId, newContent));
+ipcMain.handle("send-chat-delete", (event, { revelnestId: revelnestId2, msgId }) => sendChatDelete(revelnestId2, msgId));
 ipcMain.handle("get-my-identity", () => ({
   address: getNetworkAddress(),
   revelnestId: getMyRevelNestId(),

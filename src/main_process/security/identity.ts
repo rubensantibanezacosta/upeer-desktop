@@ -1,7 +1,6 @@
 import sodium from 'sodium-native';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from 'electron';
 
 let publicKey: Buffer;
 let secretKey: Buffer;
@@ -11,8 +10,8 @@ let ephemeralSecretKey: Buffer;
 let dhtSeq: number = 0;
 let dhtStatePath: string;
 
-export function initIdentity() {
-    const keyPath = path.join(app.getPath('userData'), 'identity.key');
+export function initIdentity(userDataPath: string) {
+    const keyPath = path.join(userDataPath, 'identity.key');
 
     if (fs.existsSync(keyPath)) {
         const data = fs.readFileSync(keyPath);
@@ -39,7 +38,7 @@ export function initIdentity() {
     sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
 
     // DHT State setup
-    dhtStatePath = path.join(app.getPath('userData'), 'dht_state.json');
+    dhtStatePath = path.join(userDataPath, 'dht_state.json');
     if (fs.existsSync(dhtStatePath)) {
         try {
             const dhtData = JSON.parse(fs.readFileSync(dhtStatePath, 'utf8'));

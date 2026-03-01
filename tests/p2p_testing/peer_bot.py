@@ -144,7 +144,7 @@ def listen_with_sock(s, known_peers):
                     known_peers[sender_revelnest] = { "pk": sender_pk, "ephemeral_pk": sender_ephemeral, "dht_seq": 0, "address": addr[0] }
                     
                     # First message automatically
-                    first_msg_text = "¡Hola! Soy el bot de RevelNest. Te he agregado automáticamente y aquí tienes mi primer mensaje. 😊"
+                    first_msg_text = "Hola! Soy el bot de RevelNest. Te he agregado automaticamente y aqui tienes mi primer mensaje."
                     reply = { "type": "CHAT", "content": first_msg_text }
                     
                     # Encrypt PFS
@@ -304,6 +304,37 @@ def listen_with_sock(s, known_peers):
                     delivered_msgs.add(full_packet['id'])
                     print(f"[{MY_NAME}] ACK recibido para {full_packet['id']}")
 
+            elif p_type == 'CHAT_REACTION':
+                msg_id = full_packet.get('msgId')
+                emoji = full_packet.get('emoji')
+                remove = full_packet.get('remove', False)
+                action = "ELIMINÓ" if remove else "AÑADIÓ"
+                print(f"[{MY_NAME}] REACCIÓN: {sender_revelnest} {action} {emoji} al mensaje {msg_id}")
+
+            elif p_type == 'CHAT_UPDATE':
+                msg_id = full_packet.get('msgId')
+                # Decrypt update content
+                content_hex = full_packet.get('content')
+                nonce_hex = full_packet.get('nonce')
+                if content_hex and nonce_hex:
+                    try:
+                        use_eph = full_packet.get('useRecipientEphemeral')
+                        target_pk_hex = known_peers[sender_revelnest]['ephemeral_pk'] if use_eph else known_peers[sender_revelnest]['pk']
+                        target_pk = nacl.public.PublicKey(target_pk_hex, encoder=nacl.encoding.HexEncoder)
+                        target_curve_pk = target_pk if use_eph else target_pk.to_curve25519_public_key()
+                        box = nacl.public.Box(my_private_key, target_curve_pk)
+                        nonce = bytes.fromhex(nonce_hex)
+                        ciphertext = bytes.fromhex(content_hex)
+                        decrypted = box.decrypt(ciphertext, nonce)
+                        new_content = decrypted.decode()
+                        print(f"[{MY_NAME}] EDICIÓN: {sender_revelnest} actualizó mensaje {msg_id} a: {new_content}")
+                    except Exception as e:
+                        print(f"[{MY_NAME}] EDICIÓN: Error descifrando: {e}")
+
+            elif p_type == 'CHAT_DELETE':
+                msg_id = full_packet.get('msgId')
+                print(f"[{MY_NAME}] ELIMINACIÓN: {sender_revelnest} eliminó el mensaje {msg_id}")
+
         except Exception as e:
             print(f"[{MY_NAME}] Error procesando: {e}")
 
@@ -405,6 +436,42 @@ if __name__ == "__main__":
                         rid = cmd["rid"]
                         known_peers_dict[rid] = { "pk": cmd["pk"], "dht_seq": 0, "address": cmd["address"], "signature": cmd.get("signature") }
                         print(f"[{MY_NAME}] Contacto {rid} añadido manualmente.")
+
+                    elif cmd.get("type") == "SEND_REACTION":
+                        target_rid = cmd["target_rid"]
+                        if target_rid in known_peers_dict:
+                            data = { "type": "CHAT_REACTION", "msgId": cmd["msgId"], "emoji": cmd["emoji"], "remove": cmd.get("remove", False) }
+                            full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
+                            sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers_dict[target_rid]['address'], 50005))
+                    
+                    elif cmd.get("type") == "SEND_UPDATE":
+                        target_rid = cmd["target_rid"]
+                        if target_rid in known_peers_dict:
+                            content = cmd["content"]
+                            target_pk_hex = known_peers_dict[target_rid].get('ephemeral_pk') or known_peers_dict[target_rid]['pk']
+                            target_pk = nacl.public.PublicKey(target_pk_hex, encoder=nacl.encoding.HexEncoder)
+                            target_curve_pk = target_pk if known_peers_dict[target_rid].get('ephemeral_pk') else target_pk.to_curve25519_public_key()
+                            box = nacl.public.Box(my_private_key, target_curve_pk)
+                            nonce = nacl.utils.random(nacl.public.Box.NONCE_SIZE)
+                            encrypted = box.encrypt(content.encode(), nonce)
+                            
+                            data = { 
+                                "type": "CHAT_UPDATE", 
+                                "msgId": cmd["msgId"], 
+                                "content": encrypted.ciphertext.hex(), 
+                                "nonce": nonce.hex(),
+                                "ephemeralPublicKey": my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode(),
+                                "useRecipientEphemeral": bool(known_peers_dict[target_rid].get('ephemeral_pk'))
+                            }
+                            full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
+                            sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers_dict[target_rid]['address'], 50005))
+
+                    elif cmd.get("type") == "SEND_DELETE":
+                        target_rid = cmd["target_rid"]
+                        if target_rid in known_peers_dict:
+                            data = { "type": "CHAT_DELETE", "msgId": cmd["msgId"] }
+                            full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
+                            sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers_dict[target_rid]['address'], 50005))
 
                 except Exception as e:
                     print(f"[{MY_NAME}] Error en comando: {e}")

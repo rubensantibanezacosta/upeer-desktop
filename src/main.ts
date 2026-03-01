@@ -11,9 +11,8 @@ import {
   addOrUpdateContact,
   deleteContact,
   closeDB
-} from './main_process/database.js';
+} from './main_process/storage/db.js';
 import {
-  getNetworkAddress,
   startUDPServer,
   sendUDPMessage,
   checkHeartbeat,
@@ -23,10 +22,14 @@ import {
   sendContactCard,
   sendContactRequest,
   acceptContactRequest,
-  broadcastDhtUpdate
-} from './main_process/network.js';
-import { initIdentity, getMyRevelNestId, getMyPublicKeyHex } from './main_process/identity.js';
-import { manageYggdrasilInstance, stopYggdrasil } from './main_process/yggdrasil.js';
+  broadcastDhtUpdate,
+  sendChatReaction,
+  sendChatUpdate,
+  sendChatDelete
+} from './main_process/network/server.js';
+import { getNetworkAddress } from './main_process/network/utils.js';
+import { initIdentity, getMyRevelNestId, getMyPublicKeyHex } from './main_process/security/identity.js';
+import { manageYggdrasilInstance, stopYggdrasil } from './main_process/sidecars/yggdrasil.js';
 
 if (started) {
   app.quit();
@@ -64,8 +67,9 @@ app.on('ready', async () => {
     console.error('[Yggdrasil] Error inicializando sidecar:', err);
   }
 
-  initIdentity();
-  initDB();
+  const userDataPath = app.getPath('userData');
+  initIdentity(userDataPath);
+  await initDB(userDataPath);
   createWindow();
   if (mainWindow) startUDPServer(mainWindow);
 
@@ -112,6 +116,9 @@ ipcMain.handle('send-p2p-message', async (event, { revelnestId, message, replyTo
 ipcMain.handle('send-typing-indicator', (event, { revelnestId }) => sendTypingIndicator(revelnestId));
 ipcMain.handle('send-read-receipt', (event, { revelnestId, id }) => sendReadReceipt(revelnestId, id));
 ipcMain.handle('send-contact-card', (event, { targetRevelnestId, contact }) => sendContactCard(targetRevelnestId, contact));
+ipcMain.handle('send-chat-reaction', (event, { revelnestId, msgId, emoji, remove }) => sendChatReaction(revelnestId, msgId, emoji, remove));
+ipcMain.handle('send-chat-update', (event, { revelnestId, msgId, newContent }) => sendChatUpdate(revelnestId, msgId, newContent));
+ipcMain.handle('send-chat-delete', (event, { revelnestId, msgId }) => sendChatDelete(revelnestId, msgId));
 
 ipcMain.handle('get-my-identity', () => ({
   address: getNetworkAddress(),

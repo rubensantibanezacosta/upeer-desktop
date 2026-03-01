@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('revelnest', {
     sendTypingIndicator: (revelnestId: string) => ipcRenderer.invoke('send-typing-indicator', { revelnestId }),
     sendReadReceipt: (revelnestId: string, id: string) => ipcRenderer.invoke('send-read-receipt', { revelnestId, id }),
     sendContactCard: (targetRevelnestId: string, contact: any) => ipcRenderer.invoke('send-contact-card', { targetRevelnestId, contact }),
+    sendChatReaction: (revelnestId: string, msgId: string, emoji: string, remove: boolean) => ipcRenderer.invoke('send-chat-reaction', { revelnestId, msgId, emoji, remove }),
+    sendChatUpdate: (revelnestId: string, msgId: string, newContent: string) => ipcRenderer.invoke('send-chat-update', { revelnestId, msgId, newContent }),
+    sendChatDelete: (revelnestId: string, msgId: string) => ipcRenderer.invoke('send-chat-delete', { revelnestId, msgId }),
     getMyIdentity: () => ipcRenderer.invoke('get-my-identity'),
     onReceive: (callback: (data: any) => void) => {
         ipcRenderer.removeAllListeners('receive-p2p-message');
@@ -30,6 +33,15 @@ contextBridge.exposeInMainWorld('revelnest', {
     },
     onMessageRead: (callback: (data: { id: string, revelnestId: string }) => void) => {
         ipcRenderer.on('message-read', (event, data) => callback(data));
+    },
+    onMessageReactionUpdated: (callback: (data: any) => void) => {
+        ipcRenderer.on('message-reaction-updated', (event, data) => callback(data));
+    },
+    onMessageUpdated: (callback: (data: any) => void) => {
+        ipcRenderer.on('message-updated', (event, data) => callback(data));
+    },
+    onMessageDeleted: (callback: (data: any) => void) => {
+        ipcRenderer.on('message-deleted', (event, data) => callback(data));
     },
     onTyping: (callback: (data: { revelnestId: string }) => void) => {
         ipcRenderer.on('peer-typing', (event, data) => callback(data));

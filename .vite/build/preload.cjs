@@ -11,6 +11,9 @@ electron.contextBridge.exposeInMainWorld("revelnest", {
   sendTypingIndicator: (revelnestId) => electron.ipcRenderer.invoke("send-typing-indicator", { revelnestId }),
   sendReadReceipt: (revelnestId, id) => electron.ipcRenderer.invoke("send-read-receipt", { revelnestId, id }),
   sendContactCard: (targetRevelnestId, contact) => electron.ipcRenderer.invoke("send-contact-card", { targetRevelnestId, contact }),
+  sendChatReaction: (revelnestId, msgId, emoji, remove) => electron.ipcRenderer.invoke("send-chat-reaction", { revelnestId, msgId, emoji, remove }),
+  sendChatUpdate: (revelnestId, msgId, newContent) => electron.ipcRenderer.invoke("send-chat-update", { revelnestId, msgId, newContent }),
+  sendChatDelete: (revelnestId, msgId) => electron.ipcRenderer.invoke("send-chat-delete", { revelnestId, msgId }),
   getMyIdentity: () => electron.ipcRenderer.invoke("get-my-identity"),
   onReceive: (callback) => {
     electron.ipcRenderer.removeAllListeners("receive-p2p-message");
@@ -30,6 +33,15 @@ electron.contextBridge.exposeInMainWorld("revelnest", {
   },
   onMessageRead: (callback) => {
     electron.ipcRenderer.on("message-read", (event, data) => callback(data));
+  },
+  onMessageReactionUpdated: (callback) => {
+    electron.ipcRenderer.on("message-reaction-updated", (event, data) => callback(data));
+  },
+  onMessageUpdated: (callback) => {
+    electron.ipcRenderer.on("message-updated", (event, data) => callback(data));
+  },
+  onMessageDeleted: (callback) => {
+    electron.ipcRenderer.on("message-deleted", (event, data) => callback(data));
   },
   onTyping: (callback) => {
     electron.ipcRenderer.on("peer-typing", (event, data) => callback(data));

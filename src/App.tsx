@@ -1,213 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { CssVarsProvider, Sheet, Box, Typography } from '@mui/joy';
-import { Sidebar } from './components/Sidebar.js';
-import { ChatArea } from './components/ChatArea.js';
-import { TopHeader } from './components/TopHeader.js';
-import { InputArea } from './components/InputArea.js';
-import { AddContactModal } from './components/AddContactModal.js';
-import { NavigationRail } from './components/NavigationRail.js';
-import { IdentityModal } from './components/IdentityModal.js';
-import { ShareContactModal } from './components/ShareContactModal.js';
-import { SecurityModal } from './components/SecurityModal.js';
+import { Sidebar } from './components/layout/Sidebar.js';
+import { ChatArea } from './components/chat/ChatArea.js';
+import { TopHeader } from './components/layout/TopHeader.js';
+import { InputArea } from './components/chat/InputArea.js';
+import { AddContactModal } from './components/modals/AddContactModal.js';
+import { NavigationRail } from './components/layout/NavigationRail.js';
+import { IdentityModal } from './components/modals/IdentityModal.js';
+import { ShareContactModal } from './components/modals/ShareContactModal.js';
+import { SecurityModal } from './components/modals/SecurityModal.js';
 import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
-
-interface ChatMessage {
-    id?: string;
-    revelnestId: string;
-    isMine: boolean;
-    message: string;
-    status: string;
-    timestamp: string;
-    replyTo?: string;
-}
-
-interface Contact {
-    revelnestId: string;
-    address: string;
-    name: string;
-    status: 'pending' | 'incoming' | 'connected';
-    publicKey?: string;
-    lastSeen?: string;
-    lastMessage?: string;
-    lastMessageTime?: string;
-    lastMessageIsMine?: boolean;
-    lastMessageStatus?: string;
-}
+import { useChatState } from './hooks/useChatState.js';
 
 export default function App() {
-    const [networkAddress, setNetworkAddress] = useState<string>('');
-    const [targetRevelnestId, setTargetRevelnestId] = useState('');
-    const [message, setMessage] = useState('');
-    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-    const [contacts, setContacts] = useState<Contact[]>([]);
+    const {
+        networkAddress,
+        targetRevelnestId,
+        setTargetRevelnestId,
+        message,
+        setMessage,
+        chatHistory,
+        contacts,
+        typingStatus,
+        replyToMessage,
+        setReplyToMessage,
+        editingMessage,
+        setEditingMessage,
+        myIdentity,
+        handleSend,
+        handleTyping,
+        handleReaction,
+        handleUpdateMessage,
+        handleDeleteMessage,
+        handleAddContact,
+        handleAcceptContact,
+        handleDeleteContact,
+    } = useChatState();
+
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-    const [typingStatus, setTypingStatus] = useState<Record<string, NodeJS.Timeout>>({});
-    const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
-    const [myIdentity, setMyIdentity] = useState<{ address: string | null, revelnestId: string, publicKey: string } | null>(null);
-
-    const [incomingRequests, setIncomingRequests] = useState<Record<string, string>>({});
-
-    const refreshContacts = () => {
-        window.revelnest.getContacts().then(setContacts);
-    };
-
-    useEffect(() => {
-        window.revelnest.getMyNetworkAddress().then(setNetworkAddress);
-        window.revelnest.getMyIdentity().then(setMyIdentity);
-        refreshContacts();
-
-        window.revelnest.onReceive((data: any) => {
-            refreshContacts();
-            setChatHistory(prev => {
-                if (data.revelnestId === targetRevelnestId) {
-                    if (data.id) window.revelnest.sendReadReceipt(targetRevelnestId, data.id);
-                    return [...prev, {
-                        ...data,
-                        status: 'read',
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    }];
-                }
-                return prev;
-            });
-        });
-
-        window.revelnest.onContactRequest((data: any) => {
-            setIncomingRequests(prev => ({ ...prev, [data.revelnestId]: data.publicKey }));
-            refreshContacts();
-        });
-
-        window.revelnest.onHandshakeFinished((data: any) => {
-            refreshContacts();
-            setTargetRevelnestId(prev => {
-                if (prev.startsWith('pending-')) return data.revelnestId;
-                return prev;
-            });
-        });
-
-        window.revelnest.onMessageDelivered((data: any) => {
-            refreshContacts();
-            setChatHistory(prev => prev.map(msg =>
-                msg.id === data.id && msg.status !== 'read' ? { ...msg, status: 'delivered' } : msg
-            ));
-        });
-
-        window.revelnest.onMessageRead((data: any) => {
-            refreshContacts();
-            setChatHistory(prev => prev.map(msg =>
-                msg.id === data.id ? { ...msg, status: 'read' } : msg
-            ));
-        });
-
-        window.revelnest.onTyping((data: any) => {
-            const { revelnestId } = data;
-            setTypingStatus(prev => {
-                if (prev[revelnestId]) clearTimeout(prev[revelnestId]);
-                const timeout = setTimeout(() => {
-                    setTypingStatus(curr => {
-                        const newState = { ...curr };
-                        delete newState[revelnestId];
-                        return newState;
-                    });
-                }, 3000);
-                return { ...prev, [revelnestId]: timeout };
-            });
-        });
-
-        window.revelnest.onPresence((data: any) => {
-            setContacts(prev => prev.map(c =>
-                c.revelnestId === data.revelnestId ? { ...c, lastSeen: data.lastSeen } : c
-            ));
-        });
-
-        const interval = setInterval(refreshContacts, 10000);
-        return () => clearInterval(interval);
-    }, [targetRevelnestId]);
-
-    useEffect(() => {
-        if (targetRevelnestId) {
-            window.revelnest.getMessages(targetRevelnestId).then(msgs => {
-                setChatHistory(msgs.reverse().map((m: any) => {
-                    if (!m.isMine && m.status !== 'read') {
-                        window.revelnest.sendReadReceipt(targetRevelnestId, m.id);
-                        m.status = 'read';
-                    }
-                    return {
-                        id: m.id,
-                        revelnestId: m.chatRevelnestId, // Handle DB field name
-                        isMine: !!m.isMine,
-                        message: m.message,
-                        status: m.status,
-                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        replyTo: m.replyTo
-                    };
-                }));
-            });
-        } else {
-            setChatHistory([]);
-        }
-    }, [targetRevelnestId]);
-
-    const handleSend = async () => {
-        if (!targetRevelnestId || !message) return;
-        const sentMessageId = await window.revelnest.sendMessage(targetRevelnestId, message, replyToMessage?.id);
-
-        if (sentMessageId) {
-            setChatHistory(prev => [...prev, {
-                id: sentMessageId,
-                revelnestId: targetRevelnestId,
-                isMine: true,
-                message: message,
-                status: 'sent',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                replyTo: replyToMessage?.id
-            }]);
-        }
-
-        setReplyToMessage(null);
-        refreshContacts();
-        setMessage('');
-    };
-
-    const handleTyping = () => {
-        if (!targetRevelnestId) return;
-        const now = Date.now();
-        if (now - (window as any).lastTypingSentTime > 2500) {
-            window.revelnest.sendTypingIndicator(targetRevelnestId);
-            (window as any).lastTypingSentTime = now;
-        }
-    };
-
-    const handleAddContact = (idAtAddress: string, name: string) => {
-        window.revelnest.addContact(idAtAddress, name).then((res) => {
-            refreshContacts();
-            if (res.revelnestId) setTargetRevelnestId(res.revelnestId);
-        });
-    };
-
-    const handleAcceptContact = () => {
-        const pk = incomingRequests[targetRevelnestId];
-        if (pk) {
-            window.revelnest.acceptContactRequest(targetRevelnestId, pk).then(() => {
-                refreshContacts();
-            });
-        }
-    };
-
-    const handleDeleteContact = (id?: string) => {
-        const targetId = id || targetRevelnestId;
-        if (!targetId) return;
-
-        // We'll use a better modal in the component, but keep this as fallback/logic
-        window.revelnest.deleteContact(targetId).then(() => {
-            refreshContacts();
-            if (targetId === targetRevelnestId) {
-                setTargetRevelnestId('');
-            }
-        });
-    };
 
     const activeContact = contacts.find(c => c.revelnestId === targetRevelnestId);
     const isOnline = activeContact?.lastSeen && (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000;
@@ -245,15 +78,26 @@ export default function App() {
                                 myIp={networkAddress || ''}
                                 contacts={contacts.map(c => ({ address: c.address, name: c.name }))}
                                 onReply={(msg: any) => setReplyToMessage(msg)}
+                                onReact={handleReaction}
+                                onEdit={(msg: any) => {
+                                    setEditingMessage(msg);
+                                    setMessage(msg.message);
+                                }}
+                                onDelete={handleDeleteMessage}
                             />
                             <InputArea
                                 message={message}
                                 setMessage={setMessage}
-                                onSend={handleSend}
+                                onSend={editingMessage ? () => handleUpdateMessage(editingMessage.id!, message) : handleSend}
                                 onTyping={handleTyping}
                                 disabled={!targetRevelnestId || activeContact?.status !== 'connected'}
                                 replyToMessage={replyToMessage}
                                 onCancelReply={() => setReplyToMessage(null)}
+                                editingMessage={editingMessage}
+                                onCancelEdit={() => {
+                                    setEditingMessage(null);
+                                    setMessage('');
+                                }}
                             />
                         </>
                     ) : (
@@ -291,13 +135,11 @@ export default function App() {
                     )}
                 </Box>
 
-                {isAddModalOpen && (
-                    <AddContactModal
-                        open={isAddModalOpen}
-                        onClose={() => setIsAddModalOpen(false)}
-                        onAdd={handleAddContact}
-                    />
-                )}
+                <AddContactModal
+                    open={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onAdd={handleAddContact}
+                />
                 <IdentityModal
                     open={isIdentityModalOpen}
                     onClose={() => setIsIdentityModalOpen(false)}

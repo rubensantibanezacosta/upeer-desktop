@@ -5,6 +5,8 @@
     "moduleResolution": "Node16",
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
     "strict": true
   }
 }

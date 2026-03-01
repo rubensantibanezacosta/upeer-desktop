@@ -1,44 +1,40 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import path from 'node:path';
-import { app } from 'electron';
 import * as schema from './schema.js';
-import { eq, desc, or } from 'drizzle-orm';
+import { eq, desc, or, and } from 'drizzle-orm';
+
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 let sqlite: Database.Database;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 
-export function initDB() {
-    const dbPath = path.join(app.getPath('userData'), 'p2p-chat.db');
+export async function initDB(userDataPath: string) {
+    const dbPath = path.join(userDataPath, 'p2p-chat.db');
     sqlite = new Database(dbPath);
     db = drizzle(sqlite, { schema });
 
-    // Canonical Identity-First Schema (RevelNest ID)
-    sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      chat_revelnest_id TEXT NOT NULL,
-      is_mine BOOLEAN NOT NULL,
-      message TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'sent',
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      reply_to TEXT,
-      signature TEXT
-    );
-    CREATE TABLE IF NOT EXISTS contacts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      revelnest_id TEXT UNIQUE,
-      address TEXT NOT NULL,
-      name TEXT NOT NULL,
-      public_key TEXT,
-      ephemeral_public_key TEXT,
-      dht_seq INTEGER NOT NULL DEFAULT 0,
-      dht_signature TEXT,
-      status TEXT NOT NULL DEFAULT 'connected',
-      last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_revelnest_id ON contacts(revelnest_id);
-  `);
+    // Canonical Migration System
+    try {
+        // En desarrollo (tsx/etc) process.cwd(), en prod/electron process.resourcesPath
+        // Intentamos detectar dónde están las migraciones
+        let migrationsPath = path.join(process.cwd(), 'drizzle');
+
+        // Si estamos en Electron, podemos ser más precisos
+        try {
+            const { app: electronApp } = await import('electron');
+            if (electronApp?.isPackaged) {
+                migrationsPath = path.join(process.resourcesPath, 'drizzle');
+            }
+        } catch (e) {
+            // No estamos en Electron o no podemos importar app, usamos el fallback de cwd
+        }
+
+        migrate(db, { migrationsFolder: migrationsPath });
+        console.log('[DB] Migraciones aplicadas correctamente.');
+    } catch (err) {
+        console.error('[DB] Error en migraciones:', err);
+    }
 }
 
 export function saveMessage(id: string, chatRevelnestId: string, isMine: boolean, message: string, replyTo?: string, signature?: string) {
@@ -53,11 +49,66 @@ export function saveMessage(id: string, chatRevelnestId: string, isMine: boolean
 }
 
 export function getMessages(chatRevelnestId: string) {
-    return db.select().from(schema.messages)
+    const msgs = db.select().from(schema.messages)
         .where(eq(schema.messages.chatRevelnestId, chatRevelnestId))
         .orderBy(desc(schema.messages.timestamp))
         .limit(100)
         .all();
+
+    return msgs.map(m => {
+        const msgReactions = db.select().from(schema.reactions)
+            .where(eq(schema.reactions.messageId, m.id))
+            .all();
+        return { ...m, reactions: msgReactions };
+    });
+}
+
+export function saveReaction(messageId: string, revelnestId: string, emoji: string) {
+    // Evitar duplicados del mismo usuario con el mismo emoji
+    const existing = db.select().from(schema.reactions)
+        .where(and(
+            eq(schema.reactions.messageId, messageId),
+            eq(schema.reactions.revelnestId, revelnestId),
+            eq(schema.reactions.emoji, emoji)
+        )).get();
+
+    if (!existing) {
+        return db.insert(schema.reactions).values({
+            messageId,
+            revelnestId,
+            emoji
+        }).run();
+    }
+}
+
+export function deleteReaction(messageId: string, revelnestId: string, emoji: string) {
+    return db.delete(schema.reactions)
+        .where(and(
+            eq(schema.reactions.messageId, messageId),
+            eq(schema.reactions.revelnestId, revelnestId),
+            eq(schema.reactions.emoji, emoji)
+        )).run();
+}
+
+export function updateMessageContent(id: string, newMessage: string, signature?: string) {
+    return db.update(schema.messages)
+        .set({
+            message: newMessage,
+            isEdited: true,
+            signature: signature
+        })
+        .where(eq(schema.messages.id, id))
+        .run();
+}
+
+export function deleteMessageLocally(id: string) {
+    return db.update(schema.messages)
+        .set({
+            message: "Mensaje eliminado",
+            isDeleted: true
+        })
+        .where(eq(schema.messages.id, id))
+        .run();
 }
 
 export function getContactByRevelnestId(revelnestId: string) {

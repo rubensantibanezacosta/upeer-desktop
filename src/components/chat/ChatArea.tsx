@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Box } from '@mui/joy';
-import { EmptyChat } from './Chat/EmptyChat.js';
-import { MessageItem } from './Chat/MessageItem.js';
+import { EmptyChat } from './EmptyChat.js';
+import { MessageItem } from './MessageItem.js';
 
 interface ChatMessage {
     id?: string;
@@ -11,6 +11,9 @@ interface ChatMessage {
     status: string;
     timestamp: string;
     replyTo?: string;
+    isDeleted?: boolean;
+    isEdited?: boolean;
+    reactions?: Array<{ revelnestId: string; emoji: string }>;
 }
 
 interface ChatAreaProps {
@@ -18,9 +21,12 @@ interface ChatAreaProps {
     myIp: string;
     contacts: { address: string, name: string }[];
     onReply: (msg: ChatMessage) => void;
+    onReact: (msgId: string, emoji: string, remove: boolean) => void;
+    onEdit: (msg: ChatMessage) => void;
+    onDelete: (msgId: string) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp, contacts, onReply }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp, contacts, onReply, onReact, onEdit, onDelete }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -54,6 +60,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp, contacts,
                         key={msg.id || idx}
                         msg={msg}
                         onReply={onReply}
+                        onReact={onReact}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
                         originalMessage={msg.replyTo ? getMessageById(msg.replyTo)?.message : undefined}
                     />
                 ))

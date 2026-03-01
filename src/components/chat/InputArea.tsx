@@ -9,6 +9,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AddIcon from '@mui/icons-material/Add';
 import MoodIcon from '@mui/icons-material/Mood';
 import MicIcon from '@mui/icons-material/Mic';
+import EditIcon from '@mui/icons-material/Edit';
 
 import CloseIcon from '@mui/icons-material/Close';
 import ReplyIcon from '@mui/icons-material/Reply';
@@ -21,6 +22,8 @@ interface InputAreaProps {
     disabled: boolean;
     replyToMessage?: { id?: string; message: string; isMine: boolean } | null;
     onCancelReply?: () => void;
+    editingMessage?: { id?: string; message: string } | null;
+    onCancelEdit?: () => void;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
@@ -30,7 +33,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
     onTyping,
     disabled,
     replyToMessage,
-    onCancelReply
+    onCancelReply,
+    editingMessage,
+    onCancelEdit
 }) => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,18 +53,11 @@ export const InputArea: React.FC<InputAreaProps> = ({
         }}>
             {replyToMessage && (
                 <Box sx={{
-                    p: 1,
-                    px: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    backgroundColor: 'background.level1',
-                    borderLeft: '4px solid',
-                    borderColor: 'primary.main',
-                    mx: 2,
-                    mt: 1,
-                    borderRadius: '4px',
+                    p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                    backgroundColor: 'background.level1', borderLeft: '4px solid',
+                    borderColor: 'primary.main', mx: 2, mt: 1, borderRadius: '4px',
                 }}>
+                    <ReplyIcon sx={{ fontSize: '18px', color: 'primary.main' }} />
                     <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                         <Typography level="body-xs" sx={{ fontWeight: 600, color: 'primary.main' }}>
                             {replyToMessage.isMine ? 'Tú' : 'Contacto'}
@@ -69,6 +67,27 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         </Typography>
                     </Box>
                     <IconButton size="sm" variant="plain" color="neutral" onClick={onCancelReply}>
+                        <CloseIcon sx={{ fontSize: '18px' }} />
+                    </IconButton>
+                </Box>
+            )}
+
+            {editingMessage && (
+                <Box sx={{
+                    p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                    backgroundColor: 'background.level1', borderLeft: '4px solid',
+                    borderColor: 'warning.main', mx: 2, mt: 1, borderRadius: '4px',
+                }}>
+                    <EditIcon sx={{ fontSize: '18px', color: 'warning.main' }} />
+                    <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+                        <Typography level="body-xs" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                            Editando mensaje
+                        </Typography>
+                        <Typography level="body-sm" noWrap sx={{ opacity: 0.8 }}>
+                            {editingMessage.message}
+                        </Typography>
+                    </Box>
+                    <IconButton size="sm" variant="plain" color="neutral" onClick={onCancelEdit}>
                         <CloseIcon sx={{ fontSize: '18px' }} />
                     </IconButton>
                 </Box>
@@ -86,7 +105,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 <IconButton variant="plain" color="neutral"><MoodIcon /></IconButton>
                 <IconButton variant="plain" color="neutral"><AddIcon /></IconButton>
                 <Input
-                    placeholder="Escribe un mensaje"
+                    placeholder={editingMessage ? "Edita tu mensaje..." : "Escribe un mensaje..."}
                     value={message}
                     onChange={handleChange}
                     onKeyPress={(e) => e.key === 'Enter' && onSend()}
@@ -108,7 +127,11 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     onClick={message ? onSend : undefined}
                     disabled={disabled}
                 >
-                    {message ? <SendIcon color="primary" /> : <MicIcon />}
+                    {message ? (
+                        editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />
+                    ) : (
+                        <MicIcon />
+                    )}
                 </IconButton>
             </Box>
         </Box>
