@@ -22,7 +22,8 @@ import {
   sendReadReceipt,
   sendContactCard,
   sendContactRequest,
-  acceptContactRequest
+  acceptContactRequest,
+  broadcastDhtUpdate
 } from './main_process/network.js';
 import { initIdentity, getMyRevelNestId, getMyPublicKeyHex } from './main_process/identity.js';
 
@@ -62,6 +63,7 @@ app.on('ready', () => {
 
   // Heartbeat every 30s
   setInterval(() => {
+    broadcastDhtUpdate(); // Detect IP changes and broadcast
     const contacts = getContacts();
     checkHeartbeat(contacts.map(c => ({ address: (c as any).address, status: (c as any).status })));
   }, 30000);

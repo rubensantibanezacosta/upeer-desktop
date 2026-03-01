@@ -8,6 +8,8 @@ let secretKey: Buffer;
 let revelnestId: string;
 let ephemeralPublicKey: Buffer;
 let ephemeralSecretKey: Buffer;
+let dhtSeq: number = 0;
+let dhtStatePath: string;
 
 export function initIdentity() {
     const keyPath = path.join(app.getPath('userData'), 'identity.key');
@@ -36,8 +38,25 @@ export function initIdentity() {
     ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
     sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
 
+    // DHT State setup
+    dhtStatePath = path.join(app.getPath('userData'), 'dht_state.json');
+    if (fs.existsSync(dhtStatePath)) {
+        try {
+            const dhtData = JSON.parse(fs.readFileSync(dhtStatePath, 'utf8'));
+            if (typeof dhtData.seq === 'number') {
+                dhtSeq = dhtData.seq;
+            }
+        } catch (e) {
+            console.error('Error reading DHT state:', e);
+        }
+    } else {
+        dhtSeq = Date.now(); // Start seq at current timestamp to ensure monotony across complete wipes if key is kept
+        fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
+    }
+
     console.log('--- Identidad RevelNest Inicializada ---');
     console.log('RevelNest ID:', revelnestId);
+    console.log('DHT Sequence:', dhtSeq);
 }
 
 function generateNewKeypair(keyPath: string) {
@@ -71,6 +90,20 @@ export function verify(message: Buffer, signature: Buffer, senderPublicKey: Buff
 
 export function getMyEphemeralPublicKeyHex() {
     return ephemeralPublicKey.toString('hex');
+}
+
+export function getMyDhtSeq() {
+    return dhtSeq;
+}
+
+export function incrementMyDhtSeq() {
+    dhtSeq++;
+    try {
+        fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
+    } catch (e) {
+        console.error('Failed to save DHT state', e);
+    }
+    return dhtSeq;
 }
 
 /**

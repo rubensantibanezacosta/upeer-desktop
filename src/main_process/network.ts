@@ -11,10 +11,12 @@ import {
     deleteContact,
     updateContactLocation,
     updateContactPublicKey,
-    updateContactEphemeralPublicKey
+    updateContactEphemeralPublicKey,
+    updateContactDhtLocation,
+    getContacts
 } from './database.js';
 import crypto from 'node:crypto';
-import { getMyPublicKeyHex, getMyRevelNestId, sign, verify, encrypt, decrypt, getMyEphemeralPublicKeyHex } from './identity.js';
+import { getMyPublicKeyHex, getMyRevelNestId, sign, verify, encrypt, decrypt, getMyEphemeralPublicKeyHex, getMyDhtSeq, incrementMyDhtSeq } from './identity.js';
 
 /**
  * Ensures JSON keys are always in the same order for consistent signatures.
@@ -22,6 +24,21 @@ import { getMyPublicKeyHex, getMyRevelNestId, sign, verify, encrypt, decrypt, ge
 function canonicalStringify(obj: any): string {
     const allKeys = Object.keys(obj).sort();
     return JSON.stringify(obj, allKeys);
+}
+
+export function generateSignedLocationBlock(address: string, dhtSeq: number) {
+    const data = { revelnestId: getMyRevelNestId(), address, dhtSeq };
+    const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
+    return { address, dhtSeq, signature: sig };
+}
+
+export function verifyLocationBlock(revelnestId: string, block: { address: string, dhtSeq: number, signature: string }, publicKeyHex: string): boolean {
+    const data = { revelnestId, address: block.address, dhtSeq: block.dhtSeq };
+    return verify(
+        Buffer.from(canonicalStringify(data)),
+        Buffer.from(block.signature, 'hex'),
+        Buffer.from(publicKeyHex, 'hex')
+    );
 }
 
 const YGG_PORT = 50005;
@@ -120,8 +137,58 @@ export function startUDPServer(win: BrowserWindow) {
             updateLastSeen(revelnestId);
             mainWindow?.webContents.send('contact-presence', { revelnestId: revelnestId, lastSeen: nowIso });
 
-            // 4. CHAT LOGIC
-            if (data.type === 'PING') {
+            // 4. CHAT & DHT LOGIC
+            if (data.type === 'DHT_UPDATE') {
+                const block = data.locationBlock;
+                if (!block || typeof block.dhtSeq !== 'number' || !block.address || !block.signature) return;
+
+                // Zero-Trust Validation: verify the signature using contact's public key
+                const isValid = verifyLocationBlock(revelnestId, block, contact.publicKey);
+                if (!isValid) {
+                    console.error(`[DHT Security] Invalid DHT_UPDATE signature from ${revelnestId}`);
+                    return;
+                }
+
+                if (block.dhtSeq > (contact.dhtSeq || 0)) {
+                    console.log(`[DHT] Actualizando ubicación de ${revelnestId} a ${block.address} (Seq: ${block.dhtSeq})`);
+                    updateContactDhtLocation(revelnestId, block.address, block.dhtSeq, block.signature);
+                } else {
+                    console.log(`[DHT] Ignorando actualización obsoleta o inválida de ${revelnestId} (Seq: ${block.dhtSeq} <= ${contact.dhtSeq})`);
+                }
+                return;
+            } else if (data.type === 'DHT_EXCHANGE') {
+                if (!Array.isArray(data.peers)) return;
+                console.log(`[DHT PEEREX] Recibiendo ${data.peers.length} ubicaciones de ${revelnestId}`);
+
+                for (const peer of data.peers) {
+                    if (!peer.revelnestId || !peer.publicKey || !peer.locationBlock) continue;
+                    if (peer.revelnestId === getMyRevelNestId()) continue; // Ignore myself
+
+                    const existing = await getContactByRevelnestId(peer.revelnestId);
+                    if (!existing) continue; // Roaming only updates existing contacts
+
+                    const block = peer.locationBlock;
+                    if (typeof block.dhtSeq !== 'number' || !block.address || !block.signature) continue;
+
+                    // Zero-Trust Validation from the final owner
+                    const isValid = verifyLocationBlock(peer.revelnestId, block, existing.publicKey);
+                    if (!isValid) {
+                        console.error(`[DHT Security] Invalid PEEREX signature for ${peer.revelnestId}`);
+                        continue;
+                    }
+
+                    if (block.dhtSeq > (existing.dhtSeq || 0)) {
+                        console.log(`[DHT] Actualizada IP de ${peer.revelnestId} a ${block.address} via PEEREX (Seq: ${block.dhtSeq})`);
+                        updateContactDhtLocation(
+                            peer.revelnestId,
+                            block.address,
+                            block.dhtSeq,
+                            block.signature
+                        );
+                    }
+                }
+                return;
+            } else if (data.type === 'PING') {
                 sendSecureUDPMessage(rinfo.address, { type: 'PONG' });
             } else if (data.type === 'CHAT') {
                 const msgId = data.id || crypto.randomUUID();
@@ -283,6 +350,34 @@ export function checkHeartbeat(contacts: any[]) {
     for (const contact of contacts) {
         if (contact.status === 'connected') {
             sendSecureUDPMessage(contact.address, { type: 'PING' });
+
+            // Periodically ping with our routing tables
+            sendDhtExchange(contact.revelnestId);
+        }
+    }
+}
+
+let lastKnownIp: string | null = null;
+
+export function broadcastDhtUpdate() {
+    const currentIp = getNetworkAddress();
+    if (!currentIp) return;
+
+    // Check if IP changed or we just started up up
+    if (currentIp !== lastKnownIp) {
+        lastKnownIp = currentIp;
+        const newSeq = incrementMyDhtSeq();
+
+        console.log(`[DHT] IP propia detectada/cambiada a ${currentIp}. Propagando DHT_UPDATE (Seq: ${newSeq})...`);
+        const locBlock = generateSignedLocationBlock(currentIp, newSeq);
+        const contacts = getContacts();
+        for (const contact of contacts) {
+            if (contact.status === 'connected') {
+                sendSecureUDPMessage(contact.address, {
+                    type: 'DHT_UPDATE',
+                    locationBlock: locBlock
+                });
+            }
         }
     }
 }
@@ -317,6 +412,48 @@ export function sendContactCard(targetRevelnestId: string, contact: any) {
 
     sendSecureUDPMessage(targetContact.address, data);
     return msgId;
+}
+
+export async function sendDhtExchange(targetRevelnestId: string) {
+    const targetContact = await getContactByRevelnestId(targetRevelnestId);
+    if (!targetContact || targetContact.status !== 'connected') return;
+
+    const allContacts = getContacts() as any[];
+
+    // Kademlia DHT estructurada: XOR distance
+    const distanceXOR = (idA: string, idB: string) => {
+        try {
+            return BigInt('0x' + idA) ^ BigInt('0x' + idB);
+        } catch {
+            return BigInt(0);
+        }
+    };
+
+    const payload = allContacts
+        .filter(c => c.status === 'connected' && c.dhtSignature && c.revelnestId !== targetRevelnestId)
+        .map(c => ({
+            revelnestId: c.revelnestId,
+            publicKey: c.publicKey,
+            locationBlock: {
+                address: c.address,
+                dhtSeq: c.dhtSeq,
+                signature: c.dhtSignature
+            },
+            dist: distanceXOR(c.revelnestId, targetRevelnestId)
+        }))
+        // Kademlia: Enviamos los nodos más "cercanos" matemáticamente a nuestro objetivo (XOR distance)
+        .sort((a, b) => (a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0))
+        .map(({ dist, ...data }) => data);
+
+    // Limit size to avoid UDP fragmentation (only top 5 closest nearest neighbors in ID geometry)
+    const limitedPayload = payload.slice(0, 5);
+
+    if (limitedPayload.length > 0) {
+        sendSecureUDPMessage(targetContact.address, {
+            type: 'DHT_EXCHANGE',
+            peers: limitedPayload
+        });
+    }
 }
 
 export function closeUDPServer() {

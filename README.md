@@ -57,6 +57,12 @@ El objetivo es construir una aplicación "Zero-Config" para usuarios no técnico
 - **Secreto Perfectamente Adelantado (PFS):** Integración de intercambio de Llaves Efímeras (Ephemeral Key Exchange) durante la configuración de cada sesión.
 - **Verificación de Seguridad:** Sistema de visualización de "Safety Numbers" y comprobación de huellas dactilares para prevenir ataques _Man-in-the-Middle_.
 
+#### Fase 8: Red de Descubrimiento Escalar (Kademlia DHT & Roaming)
+
+- **Kademlia DHT Estructurada:** Soluciona el problema de descubrimiento en redes de hiper-escala sin servidores cruzando fronteras matemáticas. El motor usa la "Distancia XOR" entre IDs criptográficos (`idA ^ idB`) para enrutar los bloques de localización de IP.
+- **Protocolo de Intercambio P2P (PEEREX):** Los nodos comparten conocimiento emitiendo listas ordenadas matemáticamente de forma autónoma. Un nodo A que entra ciego, puede descubrir la IP del nodo D a través de la intermediación y propagación Kademlia de B y C.
+- **Zero-Trust Roaming:** Si un usuario cambia de conexión, su IP muta. Los bloques de ubicación portan firmas criptográficas de la llave anfitriona Ed25519 y un contador secuencial (`dhtSeq`), evitando falsificaciones (envenenamiento DHT) o ecos antiguos de red. Nadie depende de resolutores estáticos (DNS o Supernodos).
+
 ---
 
 ## 🛠️ Instrucciones de Inicio Rápido (Devs)

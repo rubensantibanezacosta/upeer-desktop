@@ -4822,6 +4822,8 @@ const contacts = sqliteTable("contacts", {
   name: text("name").notNull(),
   publicKey: text("public_key"),
   ephemeralPublicKey: text("ephemeral_public_key"),
+  dhtSeq: integer("dht_seq").notNull().default(0),
+  dhtSignature: text("dht_signature"),
   status: text("status").notNull().default("connected"),
   lastSeen: text("last_seen").default(sql`CURRENT_TIMESTAMP`)
 });
@@ -4854,6 +4856,8 @@ function initDB() {
       name TEXT NOT NULL,
       public_key TEXT,
       ephemeral_public_key TEXT,
+      dht_seq INTEGER NOT NULL DEFAULT 0,
+      dht_signature TEXT,
       status TEXT NOT NULL DEFAULT 'connected',
       last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -4881,6 +4885,9 @@ function getContactByAddress(address) {
 }
 function updateContactLocation(revelnestId2, address) {
   return db.update(contacts).set({ address, lastSeen: (/* @__PURE__ */ new Date()).toISOString() }).where(eq(contacts.revelnestId, revelnestId2)).run();
+}
+function updateContactDhtLocation(revelnestId2, address, dhtSeq2, dhtSignature) {
+  return db.update(contacts).set({ address, dhtSeq: dhtSeq2, dhtSignature, lastSeen: (/* @__PURE__ */ new Date()).toISOString() }).where(eq(contacts.revelnestId, revelnestId2)).run();
 }
 function updateContactPublicKey(revelnestId2, publicKey2) {
   return db.update(contacts).set({ publicKey: publicKey2, status: "connected" }).where(eq(contacts.revelnestId, revelnestId2)).run();
@@ -4937,6 +4944,8 @@ let secretKey;
 let revelnestId;
 let ephemeralPublicKey;
 let ephemeralSecretKey;
+let dhtSeq = 0;
+let dhtStatePath;
 function initIdentity() {
   const keyPath = path.join(app.getPath("userData"), "identity.key");
   if (fs.existsSync(keyPath)) {
@@ -4957,8 +4966,23 @@ function initIdentity() {
   ephemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
   ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
   sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
+  dhtStatePath = path.join(app.getPath("userData"), "dht_state.json");
+  if (fs.existsSync(dhtStatePath)) {
+    try {
+      const dhtData = JSON.parse(fs.readFileSync(dhtStatePath, "utf8"));
+      if (typeof dhtData.seq === "number") {
+        dhtSeq = dhtData.seq;
+      }
+    } catch (e) {
+      console.error("Error reading DHT state:", e);
+    }
+  } else {
+    dhtSeq = Date.now();
+    fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
+  }
   console.log("--- Identidad RevelNest Inicializada ---");
   console.log("RevelNest ID:", revelnestId);
+  console.log("DHT Sequence:", dhtSeq);
 }
 function generateNewKeypair(keyPath) {
   publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
@@ -4982,6 +5006,15 @@ function verify(message, signature, senderPublicKey) {
 }
 function getMyEphemeralPublicKeyHex() {
   return ephemeralPublicKey.toString("hex");
+}
+function incrementMyDhtSeq() {
+  dhtSeq++;
+  try {
+    fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
+  } catch (e) {
+    console.error("Failed to save DHT state", e);
+  }
+  return dhtSeq;
 }
 function encrypt(message, recipientPublicKey, useEphemeral = false) {
   let recipientCurvePK;
@@ -5021,6 +5054,19 @@ function decrypt(ciphertext, nonce, senderPublicKey, useEphemeral = false) {
 function canonicalStringify(obj) {
   const allKeys = Object.keys(obj).sort();
   return JSON.stringify(obj, allKeys);
+}
+function generateSignedLocationBlock(address, dhtSeq2) {
+  const data = { revelnestId: getMyRevelNestId(), address, dhtSeq: dhtSeq2 };
+  const sig = sign(Buffer.from(canonicalStringify(data))).toString("hex");
+  return { address, dhtSeq: dhtSeq2, signature: sig };
+}
+function verifyLocationBlock(revelnestId2, block, publicKeyHex) {
+  const data = { revelnestId: revelnestId2, address: block.address, dhtSeq: block.dhtSeq };
+  return verify(
+    Buffer.from(canonicalStringify(data)),
+    Buffer.from(block.signature, "hex"),
+    Buffer.from(publicKeyHex, "hex")
+  );
 }
 const YGG_PORT = 50005;
 let udpSocket = null;
@@ -5097,7 +5143,48 @@ function startUDPServer(win) {
       const nowIso = (/* @__PURE__ */ new Date()).toISOString();
       updateLastSeen(revelnestId2);
       mainWindow$1 == null ? void 0 : mainWindow$1.webContents.send("contact-presence", { revelnestId: revelnestId2, lastSeen: nowIso });
-      if (data.type === "PING") {
+      if (data.type === "DHT_UPDATE") {
+        const block = data.locationBlock;
+        if (!block || typeof block.dhtSeq !== "number" || !block.address || !block.signature) return;
+        const isValid = verifyLocationBlock(revelnestId2, block, contact.publicKey);
+        if (!isValid) {
+          console.error(`[DHT Security] Invalid DHT_UPDATE signature from ${revelnestId2}`);
+          return;
+        }
+        if (block.dhtSeq > (contact.dhtSeq || 0)) {
+          console.log(`[DHT] Actualizando ubicación de ${revelnestId2} a ${block.address} (Seq: ${block.dhtSeq})`);
+          updateContactDhtLocation(revelnestId2, block.address, block.dhtSeq, block.signature);
+        } else {
+          console.log(`[DHT] Ignorando actualización obsoleta o inválida de ${revelnestId2} (Seq: ${block.dhtSeq} <= ${contact.dhtSeq})`);
+        }
+        return;
+      } else if (data.type === "DHT_EXCHANGE") {
+        if (!Array.isArray(data.peers)) return;
+        console.log(`[DHT PEEREX] Recibiendo ${data.peers.length} ubicaciones de ${revelnestId2}`);
+        for (const peer of data.peers) {
+          if (!peer.revelnestId || !peer.publicKey || !peer.locationBlock) continue;
+          if (peer.revelnestId === getMyRevelNestId()) continue;
+          const existing = await getContactByRevelnestId(peer.revelnestId);
+          if (!existing) continue;
+          const block = peer.locationBlock;
+          if (typeof block.dhtSeq !== "number" || !block.address || !block.signature) continue;
+          const isValid = verifyLocationBlock(peer.revelnestId, block, existing.publicKey);
+          if (!isValid) {
+            console.error(`[DHT Security] Invalid PEEREX signature for ${peer.revelnestId}`);
+            continue;
+          }
+          if (block.dhtSeq > (existing.dhtSeq || 0)) {
+            console.log(`[DHT] Actualizada IP de ${peer.revelnestId} a ${block.address} via PEEREX (Seq: ${block.dhtSeq})`);
+            updateContactDhtLocation(
+              peer.revelnestId,
+              block.address,
+              block.dhtSeq,
+              block.signature
+            );
+          }
+        }
+        return;
+      } else if (data.type === "PING") {
         sendSecureUDPMessage(rinfo.address, { type: "PONG" });
       } else if (data.type === "CHAT") {
         const msgId = data.id || crypto$1.randomUUID();
@@ -5233,6 +5320,27 @@ function checkHeartbeat(contacts2) {
   for (const contact of contacts2) {
     if (contact.status === "connected") {
       sendSecureUDPMessage(contact.address, { type: "PING" });
+      sendDhtExchange(contact.revelnestId);
+    }
+  }
+}
+let lastKnownIp = null;
+function broadcastDhtUpdate() {
+  const currentIp = getNetworkAddress();
+  if (!currentIp) return;
+  if (currentIp !== lastKnownIp) {
+    lastKnownIp = currentIp;
+    const newSeq = incrementMyDhtSeq();
+    console.log(`[DHT] IP propia detectada/cambiada a ${currentIp}. Propagando DHT_UPDATE (Seq: ${newSeq})...`);
+    const locBlock = generateSignedLocationBlock(currentIp, newSeq);
+    const contacts2 = getContacts();
+    for (const contact of contacts2) {
+      if (contact.status === "connected") {
+        sendSecureUDPMessage(contact.address, {
+          type: "DHT_UPDATE",
+          locationBlock: locBlock
+        });
+      }
     }
   }
 }
@@ -5262,6 +5370,35 @@ function sendContactCard(targetRevelnestId, contact) {
   sendSecureUDPMessage(targetContact.address, data);
   return msgId;
 }
+async function sendDhtExchange(targetRevelnestId) {
+  const targetContact = await getContactByRevelnestId(targetRevelnestId);
+  if (!targetContact || targetContact.status !== "connected") return;
+  const allContacts = getContacts();
+  const distanceXOR = (idA, idB) => {
+    try {
+      return BigInt("0x" + idA) ^ BigInt("0x" + idB);
+    } catch {
+      return BigInt(0);
+    }
+  };
+  const payload = allContacts.filter((c) => c.status === "connected" && c.dhtSignature && c.revelnestId !== targetRevelnestId).map((c) => ({
+    revelnestId: c.revelnestId,
+    publicKey: c.publicKey,
+    locationBlock: {
+      address: c.address,
+      dhtSeq: c.dhtSeq,
+      signature: c.dhtSignature
+    },
+    dist: distanceXOR(c.revelnestId, targetRevelnestId)
+  })).sort((a, b) => a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0).map(({ dist, ...data }) => data);
+  const limitedPayload = payload.slice(0, 5);
+  if (limitedPayload.length > 0) {
+    sendSecureUDPMessage(targetContact.address, {
+      type: "DHT_EXCHANGE",
+      peers: limitedPayload
+    });
+  }
+}
 function closeUDPServer() {
   if (udpSocket) udpSocket.close();
 }
@@ -5289,6 +5426,7 @@ app.on("ready", () => {
   createWindow();
   if (mainWindow) startUDPServer(mainWindow);
   setInterval(() => {
+    broadcastDhtUpdate();
     const contacts2 = getContacts();
     checkHeartbeat(contacts2.map((c) => ({ address: c.address, status: c.status })));
   }, 3e4);

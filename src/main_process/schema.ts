@@ -19,6 +19,8 @@ export const contacts = sqliteTable('contacts', {
     name: text('name').notNull(),
     publicKey: text('public_key'),
     ephemeralPublicKey: text('ephemeral_public_key'),
+    dhtSeq: integer('dht_seq').notNull().default(0),
+    dhtSignature: text('dht_signature'),
     status: text('status').notNull().default('connected'),
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
 });

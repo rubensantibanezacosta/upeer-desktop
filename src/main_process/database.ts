@@ -32,6 +32,8 @@ export function initDB() {
       name TEXT NOT NULL,
       public_key TEXT,
       ephemeral_public_key TEXT,
+      dht_seq INTEGER NOT NULL DEFAULT 0,
+      dht_signature TEXT,
       status TEXT NOT NULL DEFAULT 'connected',
       last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -73,6 +75,13 @@ export function getContactByAddress(address: string) {
 export function updateContactLocation(revelnestId: string, address: string) {
     return db.update(schema.contacts)
         .set({ address, lastSeen: new Date().toISOString() })
+        .where(eq(schema.contacts.revelnestId, revelnestId))
+        .run();
+}
+
+export function updateContactDhtLocation(revelnestId: string, address: string, dhtSeq: number, dhtSignature: string) {
+    return db.update(schema.contacts)
+        .set({ address, dhtSeq, dhtSignature, lastSeen: new Date().toISOString() })
         .where(eq(schema.contacts.revelnestId, revelnestId))
         .run();
 }

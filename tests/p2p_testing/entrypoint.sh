@@ -1,4 +1,6 @@
 #!/bin/bash
+yggdrasil -genconf > /etc/yggdrasil.conf
+python3 gen_config.py
 yggdrasil -useconffile /etc/yggdrasil.conf &
 # Esperar y renombrar interfaz para consistencia con README
 for i in {1..10}; do
