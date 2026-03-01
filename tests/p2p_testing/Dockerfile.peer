@@ -23,6 +23,7 @@ WORKDIR /app
 COPY peer_bot.py .
 COPY gen_config.py .
 COPY entrypoint.sh .
+COPY perf_metric.py .
 RUN chmod +x entrypoint.sh
 
 # Inicializar configuración de Yggdrasil e inyectar pares públicos
