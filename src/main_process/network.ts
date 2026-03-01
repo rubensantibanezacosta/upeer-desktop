@@ -188,6 +188,81 @@ export function startUDPServer(win: BrowserWindow) {
                     }
                 }
                 return;
+            } else if (data.type === 'DHT_QUERY') {
+                console.log(`[DHT Query] Buscando ${data.targetId} a petición de ${revelnestId}`);
+                const target = await getContactByRevelnestId(data.targetId);
+
+                let responseData: any = { type: 'DHT_RESPONSE', targetId: data.targetId };
+
+                if (target && target.status === 'connected' && target.dhtSignature) {
+                    // Tenemos la ubicación firmada del contacto buscado
+                    responseData.locationBlock = {
+                        address: target.address,
+                        dhtSeq: target.dhtSeq,
+                        signature: target.dhtSignature
+                    };
+                    responseData.publicKey = target.publicKey;
+                } else {
+                    // No lo tenemos, pero enviamos nuestros N contactos más "cercanos" matemáticamente a ese ID
+                    const allContacts = getContacts() as any[];
+                    const distanceXOR = (idA: string, idB: string) => {
+                        try { return BigInt('0x' + idA) ^ BigInt('0x' + idB); }
+                        catch { return BigInt(0); }
+                    };
+
+                    const closest = allContacts
+                        .filter(c => c.status === 'connected' && c.revelnestId !== revelnestId)
+                        .map(c => ({
+                            revelnestId: c.revelnestId,
+                            publicKey: c.publicKey,
+                            locationBlock: { address: c.address, dhtSeq: c.dhtSeq, signature: c.dhtSignature },
+                            dist: distanceXOR(c.revelnestId, data.targetId)
+                        }))
+                        .sort((a, b) => (a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0))
+                        .slice(0, 5)
+                        .map(({ dist, ...d }) => d);
+
+                    responseData.neighbors = closest;
+                }
+                sendSecureUDPMessage(rinfo.address, responseData);
+                return;
+
+            } else if (data.type === 'DHT_RESPONSE') {
+                if (data.locationBlock) {
+                    const block = data.locationBlock;
+                    const existing = await getContactByRevelnestId(data.targetId);
+                    if (!existing) return;
+
+                    // Zero-Trust Validation
+                    const isValid = verifyLocationBlock(data.targetId, block, existing.publicKey || data.publicKey);
+                    if (isValid && block.dhtSeq > (existing.dhtSeq || 0)) {
+                        console.log(`[DHT Search] ¡ENCONTRADO! Nueva IP para ${data.targetId}: ${block.address}`);
+                        updateContactDhtLocation(data.targetId, block.address, block.dhtSeq, block.signature);
+
+                        // Opcional: Re-enviar mensajes pendientes si la IP cambió
+                        // Para simplificar, el usuario re-intentará o el próximo latido lo hará.
+                    }
+                } else if (data.neighbors) {
+                    console.log(`[DHT Search] Recibidos ${data.neighbors.length} referidos de ${revelnestId} para buscar a ${data.targetId}`);
+                    // Iterar: preguntamos a los referidos
+                    for (const peer of data.neighbors) {
+                        if (peer.revelnestId === getMyRevelNestId()) continue;
+                        // Opción: consultar recursivamente (limitado por TTL o lógica de búsqueda)
+                        // Por ahora los añadimos como potenciales si no existen
+                        const existing = await getContactByRevelnestId(peer.revelnestId);
+                        if (!existing) {
+                            // Si no conocemos al referido, lo guardamos para el roaming (opcional)
+                            // Pero para la búsqueda actual, simplemente le enviamos la query si tiene IP
+                            if (peer.locationBlock?.address) {
+                                sendSecureUDPMessage(peer.locationBlock.address, { type: 'DHT_QUERY', targetId: data.targetId });
+                            }
+                        } else if (peer.locationBlock?.dhtSeq > (existing.dhtSeq || 0)) {
+                            updateContactDhtLocation(peer.revelnestId, peer.locationBlock.address, peer.locationBlock.dhtSeq, peer.locationBlock.signature);
+                            sendSecureUDPMessage(peer.locationBlock.address, { type: 'DHT_QUERY', targetId: data.targetId });
+                        }
+                    }
+                }
+                return;
             } else if (data.type === 'PING') {
                 sendSecureUDPMessage(rinfo.address, { type: 'PONG' });
             } else if (data.type === 'CHAT') {
@@ -343,6 +418,17 @@ export async function sendUDPMessage(revelnestId: string, message: string | { [k
     saveMessage(msgId, revelnestId, true, content, replyTo, signature.toString('hex'));
 
     sendSecureUDPMessage(contact.address, data);
+
+    // Auto-Discovery Fallback: si en 5 segundos no hay ACK, iniciamos búsqueda activa en la DHT
+    setTimeout(async () => {
+        const { getMessageStatus } = await import('./database.js');
+        const status = await getMessageStatus(msgId);
+        if (status === 'sent') {
+            console.warn(`[Network] Mensaje ${msgId} no entregado a ${revelnestId}. Iniciando búsqueda reactiva...`);
+            startDhtSearch(revelnestId);
+        }
+    }, 5000);
+
     return msgId;
 }
 
@@ -452,6 +538,38 @@ export async function sendDhtExchange(targetRevelnestId: string) {
         sendSecureUDPMessage(targetContact.address, {
             type: 'DHT_EXCHANGE',
             peers: limitedPayload
+        });
+    }
+}
+
+/**
+ * Inicia una búsqueda activa en la red para un RevelNestId específico.
+ * Se utiliza cuando la comunicación directa falla (el contacto cambió de IP y no nos avisó).
+ */
+export async function startDhtSearch(revelnestId: string) {
+    console.log(`[DHT Search] Iniciando búsqueda activa para: ${revelnestId}`);
+    const allContacts = getContacts() as any[];
+
+    // Matemática XOR para encontrar a quién preguntar (nodos más cercanos al objetivo)
+    const distanceXOR = (idA: string, idB: string) => {
+        try { return BigInt('0x' + idA) ^ BigInt('0x' + idB); }
+        catch { return BigInt(0); }
+    };
+
+    const queryTargets = allContacts
+        .filter(c => c.status === 'connected' && c.revelnestId !== revelnestId)
+        .map(c => ({
+            revelnestId: c.revelnestId,
+            address: c.address,
+            dist: distanceXOR(c.revelnestId, revelnestId)
+        }))
+        .sort((a, b) => (a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0))
+        .slice(0, 3); // Preguntamos a los 3 más cercanos
+
+    for (const target of queryTargets) {
+        sendSecureUDPMessage(target.address, {
+            type: 'DHT_QUERY',
+            targetId: revelnestId
         });
     }
 }

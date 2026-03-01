@@ -114,6 +114,14 @@ export function updateMessageStatus(id: string, status: 'sent' | 'delivered' | '
         .run();
 }
 
+export function getMessageStatus(id: string) {
+    const msg = db.select({ status: schema.messages.status })
+        .from(schema.messages)
+        .where(eq(schema.messages.id, id))
+        .get();
+    return msg ? (msg as any).status : null;
+}
+
 export function getContacts() {
     const contactsList = db.select().from(schema.contacts).all();
     const result = contactsList.map(c => {

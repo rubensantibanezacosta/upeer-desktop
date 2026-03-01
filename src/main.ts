@@ -26,6 +26,7 @@ import {
   broadcastDhtUpdate
 } from './main_process/network.js';
 import { initIdentity, getMyRevelNestId, getMyPublicKeyHex } from './main_process/identity.js';
+import { manageYggdrasilInstance, stopYggdrasil } from './main_process/yggdrasil.js';
 
 if (started) {
   app.quit();
@@ -55,7 +56,14 @@ const createWindow = () => {
   }
 };
 
-app.on('ready', () => {
+app.on('ready', async () => {
+  // Inicializamos Yggdrasil antes de levantar los servicios locales y la interfaz
+  try {
+    await manageYggdrasilInstance();
+  } catch (err) {
+    console.error('[Yggdrasil] Error inicializando sidecar:', err);
+  }
+
   initIdentity();
   initDB();
   createWindow();
@@ -114,5 +122,6 @@ ipcMain.handle('get-my-identity', () => ({
 app.on('window-all-closed', () => {
   closeDB();
   closeUDPServer();
+  stopYggdrasil();
   if (process.platform !== 'darwin') app.quit();
 });

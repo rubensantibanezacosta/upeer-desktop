@@ -64,6 +64,12 @@ El objetivo es construir una aplicación "Zero-Config" para usuarios no técnico
 - **Zero-Trust Roaming:** Si un usuario cambia de conexión, su IP muta. Los bloques de ubicación portan firmas criptográficas de la llave anfitriona Ed25519 y un contador secuencial (`dhtSeq`), evitando falsificaciones (envenenamiento DHT) o ecos antiguos de red. Nadie depende de resolutores estáticos (DNS o Supernodos).
 - **Rendimiento Verificado (RTT P2P sobre VPN Mesh):** 0% Packet Loss comprobado cruzando NAT estricto, con promedios de latencia constantes de ~119ms, haciendo indistinguible la red estructurada matemática de un servidor centralizado (WhatsApp/Telegram).
 
+#### Fase 9: Sidecar Yggdrasil Integrado (¡NUEVO OBJETIVO PRIORITARIO!)
+
+- **Ejecución Nativa:** En lugar de requerir que el usuario instale Yggdrasil como un servicio global del sistema operativo, Yggdrasil vivirá y será orquestado dentro del proceso de Electron como un subproceso (Sidecar).
+- **Descarga y Configuración Automática:** El proyecto descarga el binario en `userData`, genera el `yggdrasil.conf` y hace el bootstrap con peers públicos automáticamente.
+- **Gestión de Ciclo de Vida:** El proceso de Electron controlará el arranque y la finalización (start/stop) del demonio Yggdrasil, gestionándolo como un componente nativo y transparente de la UI.
+
 ---
 
 ## 🛠️ Instrucciones de Inicio Rápido (Devs)
