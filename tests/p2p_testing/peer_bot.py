@@ -13,8 +13,19 @@ import nacl.utils
 YGG_PORT = int(os.environ.get("YGG_PORT", 50005))
 MY_NAME = "RevelNest_Bot_Test"
 
-# Identity Generation
-signing_key = nacl.signing.SigningKey.generate()
+# Identity Persistence
+KEY_FILE = os.environ.get("KEY_FILE")
+if KEY_FILE and os.path.exists(KEY_FILE):
+    with open(KEY_FILE, "rb") as f:
+        signing_key_seed = f.read()
+    signing_key = nacl.signing.SigningKey(signing_key_seed)
+    print(f"[Identity] Cargada identidad de {KEY_FILE}")
+else:
+    signing_key = nacl.signing.SigningKey.generate()
+    if KEY_FILE:
+        with open(KEY_FILE, "wb") as f:
+            f.write(bytes(signing_key))
+        print(f"[Identity] Generada y guardada identidad en {KEY_FILE}")
 verify_key = signing_key.verify_key
 public_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
 
@@ -58,7 +69,7 @@ def verify_location_block(revelnest_id, block, pubkey_hex):
 
 def heartbeat(sock, known_peers):
     while True:
-        time.sleep(15)
+        time.sleep(5)
         # Send PING and DHT_EXCHANGE to all connected peers
         peers_list = []
         for rid, info in known_peers.items():
@@ -98,6 +109,7 @@ def listen_with_sock(s, known_peers):
     global my_dht_seq
     print(f"[{MY_NAME}] Escuchando en el puerto {YGG_PORT}...")
     print(f"[{MY_NAME}] Mi RevelNest-ID es: {my_revelnest_id}")
+    print(f"[{MY_NAME}] Mi Public-Key es: {public_key_hex}")
     
     while True:
         data, addr = s.recvfrom(4096)
@@ -105,6 +117,9 @@ def listen_with_sock(s, known_peers):
             full_packet = json.loads(data.decode())
             p_type = full_packet.get('type')
             print(f"[{MY_NAME}] RECIBIDO [{p_type}] de {addr[0]}")
+
+            sender_revelnest = full_packet.get('senderRevelnestId')
+            block = full_packet.get('locationBlock')
 
             if p_type == 'HANDSHAKE_REQ':
                 sender_revelnest = full_packet.get('revelnestId')
@@ -146,16 +161,69 @@ def listen_with_sock(s, known_peers):
 
                     full_msg = { **reply, "senderRevelnestId": my_revelnest_id, "signature": sign_data(reply) }
                     s.sendto(json.dumps(full_msg, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                    
+                    # Enviar ubicación firmada inmediatamente para que el otro nos tenga en su DHT
+                    my_ip = get_ygg_ip()
+                    my_loc = generate_location_block(my_ip, my_dht_seq)
+                    update = { "type": "DHT_UPDATE", "senderRevelnestId": my_revelnest_id, "locationBlock": my_loc }
+                    full_update = { **update, "signature": sign_data(update) }
+                    s.sendto(json.dumps(full_update, separators=(',', ':'), ensure_ascii=False).encode(), addr)
 
             elif p_type == 'DHT_UPDATE':
-                sender_revelnest = full_packet.get('senderRevelnestId')
-                block = full_packet.get('locationBlock')
                 if sender_revelnest in known_peers and block:
                     if verify_location_block(sender_revelnest, block, known_peers[sender_revelnest]['pk']):
                         seq = block.get('dhtSeq', 0)
                         if seq > known_peers[sender_revelnest]['dht_seq']:
                             print(f"[{MY_NAME}] DHT Update: {sender_revelnest} moved to {block['address']} (seq: {seq})")
                             known_peers[sender_revelnest].update({'dht_seq': seq, 'address': block['address'], 'signature': block['signature']})
+
+            elif p_type == 'DHT_QUERY':
+                target_id = full_packet.get('targetId')
+                sender_id = full_packet.get('senderRevelnestId')
+                print(f"[{MY_NAME}] Query recibida de {sender_id} buscando a {target_id}")
+                
+                response = { "type": "DHT_RESPONSE", "targetId": target_id }
+                
+                if target_id in known_peers and 'address' in known_peers[target_id]:
+                    t = known_peers[target_id]
+                    response["locationBlock"] = {
+                        "address": t["address"],
+                        "dhtSeq": t["dht_seq"],
+                        "signature": t["signature"]
+                    }
+                    response["publicKey"] = t["pk"]
+                    print(f"[{MY_NAME}] Enviando respuesta con ubicación de {target_id}")
+                else:
+                    # Referidos (Neighbors)
+                    response["neighbors"] = [] # Por ahora vacío o simplificado
+                
+                full_resp = { **response, "senderRevelnestId": my_revelnest_id, "signature": sign_data(response) }
+                s.sendto(json.dumps(full_resp, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+
+            elif p_type == 'DHT_RESPONSE':
+                target_id = full_packet.get('targetId')
+                block = full_packet.get('locationBlock')
+                if target_id and block:
+                    # En el bot, asumimos que si recibimos respuesta es porque preguntamos
+                    # Validar bloque (Zero-Trust)
+                    pk = full_packet.get('publicKey')
+                    # Si ya conocemos al peer, usamos SU PK guardada para validar
+                    if target_id in known_peers:
+                        pk = known_peers[target_id]['pk']
+                    
+                    if pk and verify_location_block(target_id, block, pk):
+                        seq = block.get('dhtSeq', 0)
+                        if target_id not in known_peers or seq > known_peers[target_id].get('dht_seq', 0):
+                            print(f"[{MY_NAME}] DISCOVERY: Nueva ubicación para {target_id}: {block['address']} (seq: {seq})")
+                            if target_id not in known_peers:
+                                known_peers[target_id] = {'pk': pk}
+                            known_peers[target_id].update({'dht_seq': seq, 'address': block['address'], 'signature': block['signature']})
+                            
+                            # Re-enviar mensaje si había uno esperando búsqueda
+                            if target_id in pending_discovery_msgs:
+                                msg_data = pending_discovery_msgs.pop(target_id)
+                                print(f"[{MY_NAME}] DISCOVERY: Re-enviando mensaje pendiente a {target_id}")
+                                s.sendto(msg_data, (block['address'], 50005))
 
             elif p_type == 'DHT_EXCHANGE':
                 peers = full_packet.get('peers', [])
@@ -198,37 +266,43 @@ def listen_with_sock(s, known_peers):
 
                     print(f"[{MY_NAME}] Mensaje de {sender_revelnest}: {msg_content}")
                     
-                    # ACK
+                    # ACK (siempre enviamos ACK)
                     if 'id' in full_packet:
                         ack = { "type": "ACK", "id": full_packet['id'] }
                         full_ack = { **ack, "senderRevelnestId": my_revelnest_id, "signature": sign_data(ack) }
                         s.sendto(json.dumps(full_ack, separators=(',', ':'), ensure_ascii=False).encode(), addr)
-                    
-                    # Reply
-                    time.sleep(1)
-                    reply_text = f"Bot: Recibido. Tu ID es {sender_revelnest}."
-                    reply = { "type": "CHAT", "content": reply_text }
-                    
-                    # Encrypt Reply PFS
-                    target_ephemeral = known_peers[sender_revelnest]['ephemeral_pk']
-                    target_pk_hex = target_ephemeral if target_ephemeral else known_peers[sender_revelnest]['pk']
-                    target_pk = nacl.public.PublicKey(target_pk_hex, encoder=nacl.encoding.HexEncoder)
-                    target_curve_pk = target_pk if target_ephemeral else target_pk.to_curve25519_public_key()
-                    box = nacl.public.Box(my_private_key, target_curve_pk)
-                    nonce = nacl.utils.random(nacl.public.Box.NONCE_SIZE)
-                    encrypted = box.encrypt(reply_text.encode(), nonce)
-                    reply['content'] = encrypted.ciphertext.hex()
-                    reply['nonce'] = nonce.hex()
-                    reply['ephemeralPublicKey'] = my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode()
-                    reply['useRecipientEphemeral'] = bool(target_ephemeral)
 
-                    full_reply = { **reply, "senderRevelnestId": my_revelnest_id, "signature": sign_data(reply) }
-                    s.sendto(json.dumps(full_reply, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                    if not msg_content.startswith("Bot:"):
+                        # Reply
+                        time.sleep(1)
+                        reply_text = f"Bot: Recibido. Tu ID es {sender_revelnest}."
+                        reply = { "type": "CHAT", "content": reply_text }
+                        
+                        # Encrypt Reply PFS
+                        target_ephemeral = known_peers[sender_revelnest]['ephemeral_pk']
+                        target_pk_hex = target_ephemeral if target_ephemeral else known_peers[sender_revelnest]['pk']
+                        target_pk = nacl.public.PublicKey(target_pk_hex, encoder=nacl.encoding.HexEncoder)
+                        target_curve_pk = target_pk if target_ephemeral else target_pk.to_curve25519_public_key()
+                        box = nacl.public.Box(my_private_key, target_curve_pk)
+                        nonce = nacl.utils.random(nacl.public.Box.NONCE_SIZE)
+                        encrypted = box.encrypt(reply_text.encode(), nonce)
+                        reply['content'] = encrypted.ciphertext.hex()
+                        reply['nonce'] = nonce.hex()
+                        reply['ephemeralPublicKey'] = my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode()
+                        reply['useRecipientEphemeral'] = bool(target_ephemeral)
+
+                        full_reply = { **reply, "senderRevelnestId": my_revelnest_id, "signature": sign_data(reply) }
+                        s.sendto(json.dumps(full_reply, separators=(',', ':'), ensure_ascii=False).encode(), addr)
 
             elif p_type == 'PING':
                 pong = { "type": "PONG" }
                 full_pong = { **pong, "senderRevelnestId": my_revelnest_id, "signature": sign_data(pong) }
                 s.sendto(json.dumps(full_pong, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+
+            elif p_type == 'ACK':
+                if 'id' in full_packet:
+                    delivered_msgs.add(full_packet['id'])
+                    print(f"[{MY_NAME}] ACK recibido para {full_packet['id']}")
 
         except Exception as e:
             print(f"[{MY_NAME}] Error procesando: {e}")
@@ -237,6 +311,7 @@ def auto_connect(target_id_at_ip, sock):
     if not target_id_at_ip or '@' not in target_id_at_ip:
         return
     target_revelnest_id, target_ip = target_id_at_ip.split('@')
+    print(f"[{MY_NAME}] Auto-conectando a {target_revelnest_id} en {target_ip}...")
     while True:
         try:
             handshake_req = {
@@ -250,6 +325,47 @@ def auto_connect(target_id_at_ip, sock):
             time.sleep(30) # Retry every 30s if not connected
         except:
             time.sleep(5)
+
+def start_dht_search(sock, target_id, known_peers, last_packet=None):
+    print(f"[{MY_NAME}] !!! Iniciando búsqueda reactiva para {target_id}...")
+    if last_packet:
+        pending_discovery_msgs[target_id] = last_packet
+    
+    # Preguntamos a los contactos conocidos
+    query = { "type": "DHT_QUERY", "targetId": target_id }
+    full_q = { **query, "senderRevelnestId": my_revelnest_id, "signature": sign_data(query) }
+    
+    for rid, info in known_peers.items():
+        if rid != target_id and 'address' in info:
+            print(f"[{MY_NAME}] DHT Query -> {rid} ({info['address']})")
+            sock.sendto(json.dumps(full_q, separators=(',', ':'), ensure_ascii=False).encode(), (info['address'], 50005))
+
+def send_chat_with_retry(sock, target_rid, content, known_peers):
+    if target_rid not in known_peers or 'address' not in known_peers[target_rid]:
+        return
+    
+    msg_id = hashlib.md5(f"{time.time()}".encode()).hexdigest()
+    chat = { "type": "CHAT", "id": msg_id, "content": content }
+    
+    # Simple (No E2EE for this test specific helper to keep it clean, or use peer_bot's logic)
+    # Actually, peer_bot usually sends E2EE. Let's just use a plain one for the test helper.
+    full_chat = { **chat, "senderRevelnestId": my_revelnest_id, "signature": sign_data(chat) }
+    
+    print(f"[{MY_NAME}] Enviando mensaje {msg_id} a {target_rid}...")
+    sock.sendto(json.dumps(full_chat, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers[target_rid]['address'], 50005))
+    
+    # Verificador de ACK (Fallback)
+    def check_ack():
+        time.sleep(5)
+        if msg_id not in delivered_msgs:
+            print(f"[{MY_NAME}] Timeout de ACK para {msg_id}. El peer {target_rid} parece haber cambiado de IP.")
+            packet_bytes = json.dumps(full_chat, separators=(',', ':'), ensure_ascii=False).encode()
+            start_dht_search(sock, target_rid, known_peers, last_packet=packet_bytes)
+            
+    threading.Thread(target=check_ack, daemon=True).start()
+
+delivered_msgs = set()
+pending_discovery_msgs = {}
 
 if __name__ == "__main__":
     ip = get_ygg_ip()
@@ -272,7 +388,27 @@ if __name__ == "__main__":
         if target_id_at_ip:
             threading.Thread(target=auto_connect, args=(target_id_at_ip, sock), daemon=True).start()
         
+        # Command Listener for external control (Testing)
+        cmd_file = f"/shared/{node_name}.cmd" if node_name else None
+        
         while True:
+            if cmd_file and os.path.exists(cmd_file):
+                try:
+                    with open(cmd_file, "r") as f:
+                        cmd = json.load(f)
+                    os.remove(cmd_file)
+                    print(f"[{MY_NAME}] Procesando comando: {cmd}")
+                    
+                    if cmd.get("type") == "SEND_CHAT":
+                        send_chat_with_retry(sock, cmd["target_rid"], cmd["content"], known_peers_dict)
+                    elif cmd.get("type") == "ADD_CONTACT":
+                        rid = cmd["rid"]
+                        known_peers_dict[rid] = { "pk": cmd["pk"], "dht_seq": 0, "address": cmd["address"], "signature": cmd.get("signature") }
+                        print(f"[{MY_NAME}] Contacto {rid} añadido manualmente.")
+
+                except Exception as e:
+                    print(f"[{MY_NAME}] Error en comando: {e}")
+
             time.sleep(1)
     else:
         print("No se encontró ubicación de red.")
