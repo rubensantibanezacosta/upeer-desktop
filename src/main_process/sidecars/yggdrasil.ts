@@ -7,14 +7,118 @@ import { getNetworkAddress } from '../network/utils.js';
 
 const YGG_VERSION = 'v0.5.12';
 
-export async function manageYggdrasilInstance(): Promise<void> {
-    // Verificar si ya existe una instancia de Yggdrasil corriendo en el sistema
+/**
+ * Verifica si existe un servicio Yggdrasil de sistema activo
+ * Esto puede ser un servicio systemd o una instancia global ya corriendo
+ */
+export async function isSystemYggdrasilAvailable(): Promise<boolean> {
+    // Primero verificar si ya hay una interfaz ygg0 activa
     const existingAddress = getNetworkAddress();
     if (existingAddress) {
-        console.log(`[Yggdrasil] Instancia global detectada con IPv6: ${existingAddress}. Omitiendo lanzamiento del Sidecar interno.`);
+        console.log(`[Yggdrasil] Instancia global detectada con IPv6: ${existingAddress}`);
+        return true;
+    }
+    
+    // Para Linux, verificar si el servicio systemd está activo
+    if (process.platform === 'linux') {
+        try {
+            const checkService = () => {
+                return new Promise<boolean>((resolve) => {
+                    exec('systemctl is-active revelnest-yggdrasil.service', (error, stdout) => {
+                        if (!error && stdout.toString().trim() === 'active') {
+                            console.log('[Yggdrasil] Servicio systemd revelnest-yggdrasil está activo');
+                            resolve(true);
+                        } else {
+                            // También verificar si el servicio existe aunque no esté activo
+                            exec('systemctl list-unit-files | grep revelnest-yggdrasil', (err) => {
+                                if (!err) {
+                                    console.log('[Yggdrasil] Servicio systemd instalado pero no activo');
+                                    resolve(false);
+                                } else {
+                                    resolve(false);
+                                }
+                            });
+                        }
+                    });
+                });
+            };
+            
+            return await checkService();
+        } catch (error) {
+            console.log('[Yggdrasil] Error verificando servicio systemd:', error);
+            return false;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Intenta activar el servicio systemd si está instalado pero no activo
+ */
+export async function activateSystemYggdrasil(): Promise<boolean> {
+    if (process.platform !== 'linux') {
+        return false;
+    }
+    
+    try {
+        return new Promise<boolean>((resolve) => {
+            console.log('[Yggdrasil] Intentando activar servicio systemd...');
+            exec('sudo systemctl start revelnest-yggdrasil.service', (error) => {
+                if (error) {
+                    console.log('[Yggdrasil] No se pudo activar el servicio systemd:', error.message);
+                    resolve(false);
+                } else {
+                    // Esperar un momento para que el servicio se inicie
+                    setTimeout(async () => {
+                        const isActive = await isSystemYggdrasilAvailable();
+                        if (isActive) {
+                            console.log('[Yggdrasil] Servicio systemd activado correctamente');
+                        }
+                        resolve(isActive);
+                    }, 2000);
+                }
+            });
+        });
+    } catch (error) {
+        console.log('[Yggdrasil] Error activando servicio systemd:', error);
+        return false;
+    }
+}
+
+export async function manageYggdrasilInstance(): Promise<void> {
+    // Estrategia mejorada: primero verificar servicios del sistema
+    console.log('[Yggdrasil] Preparando conexión a la red descentralizada RevelNest...');
+    
+    // 1. Verificar si ya hay una instancia activa (interfaz ygg0)
+    const existingAddress = getNetworkAddress();
+    if (existingAddress) {
+        console.log(`[Yggdrasil] Red mesh ya activa con IPv6: ${existingAddress}`);
         return;
     }
-
+    
+    // 2. Verificar servicios systemd (solo Linux)
+    if (process.platform === 'linux') {
+        const systemServiceAvailable = await isSystemYggdrasilAvailable();
+        if (systemServiceAvailable) {
+            console.log('[Yggdrasil] Usando servicio de sistema para red mesh');
+            return;
+        }
+        
+        // Intentar activar el servicio si está instalado
+        const activated = await activateSystemYggdrasil();
+        if (activated) {
+            console.log('[Yggdrasil] Servicio de sistema activado correctamente');
+            return;
+        }
+        
+        console.log('[Yggdrasil] No hay servicio de sistema disponible. Usando modo aplicación.');
+        console.log('[Yggdrasil] Nota: Para mejor experiencia, instale el paquete completo del sistema.');
+    }
+    
+    // 3. Fallback al sidecar embebido
+    console.log('[Yggdrasil] Configurando red mesh en modo aplicación...');
+    
     const userDataPath = app.getPath('userData');
     const confPath = path.join(userDataPath, 'yggdrasil.conf');
     const pidPath = path.join(userDataPath, 'ygg.pid');
@@ -48,7 +152,7 @@ export async function manageYggdrasilInstance(): Promise<void> {
 
         // Personalización de la configuración para asegurar estabilidad
         let modConf = genconf.replace(
-            /(Peers: \[)(.*?)(\])/s,
+            /(Peers: \[)([\s\S]*?)(\])/,
             `$1\n    "tls://ygg.mkg20001.io:443",\n    "tcp://ygg.tomasgl.ru:10526"\n  $3`
         );
 

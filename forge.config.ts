@@ -2,25 +2,96 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
-import { MakerRpm } from '@electron-forge/maker-rpm';
+// import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import * as path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: [
       './resources/bin',
-      './drizzle'
-    ]
+      './drizzle',
+      './install-scripts',
+      './assets'
+    ],
+    // Configuración adicional para el nombre de la aplicación
+    name: 'revelnest-chat',
+    executableName: 'revelnest-chat',
+    icon: './assets/icon'
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    // Debian para x64
+    new MakerDeb({
+      // @ts-ignore
+      options: {
+        name: 'revelnest-chat',
+        productName: 'RevelNest Chat P2P',
+        icon: './resources/icon.png',
+        categories: ['Network', 'Utility'],
+        maintainer: 'RevelNest Team',
+        description: 'Chat descentralizado P2P con red mesh Yggdrasil',
+        productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
+        bin: 'revelnest-chat',
+        scripts: {
+          postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
+          postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
+          prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
+        },
+        // extraFiles no está soportado por electron-installer-debian
+        // Usamos scripts postinst para copiar archivos necesarios
+        mimeType: [
+          'x-scheme-handler/revelnest'
+        ],
+        section: 'net'
+      }
+    }),
+    // Debian para arm64
+    new MakerDeb({
+      // @ts-ignore
+      options: {
+        name: 'revelnest-chat',
+        productName: 'RevelNest Chat P2P',
+        icon: './resources/icon.png',
+        categories: ['Network', 'Utility'],
+        maintainer: 'RevelNest Team',
+        description: 'Chat descentralizado P2P con red mesh Yggdrasil',
+        productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
+        bin: 'revelnest-chat',
+        scripts: {
+          postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
+          postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
+          prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
+        },
+        // extraFiles no está soportado por electron-installer-debian
+        // Usamos scripts postinst para copiar archivos necesarios
+        mimeType: [
+          'x-scheme-handler/revelnest'
+        ],
+        section: 'net'
+      }
+    }),
+    // MakerDeb para arm64 (comentado - usar el mismo paquete para ambas arquitecturas)
+    // new MakerDeb({
+    //   options: {
+    //     name: 'revelnest-chat',
+    //     productName: 'RevelNest Chat P2P',
+    //     icon: './resources/icon.png',
+    //     maintainer: 'RevelNest Team',
+    //     homepage: 'https://revelnest.chat',
+    //     categories: ['Network', 'InstantMessaging'],
+    //     mimeTypes: [
+    //       'x-scheme-handler/revelnest'
+    //     ],
+    //     section: 'net'
+    //   },
+    //   arch: 'arm64'
+    // }),
   ],
   plugins: [
     new VitePlugin({

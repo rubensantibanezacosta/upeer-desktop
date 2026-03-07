@@ -5,6 +5,8 @@ import ShieldIcon from '@mui/icons-material/Shield';
 export const EmptyChat: React.FC = () => (
     <Box sx={{
         flexGrow: 1,
+        width: '100%',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',

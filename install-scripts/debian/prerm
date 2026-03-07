@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+# RevelNest Chat P2P - Script de pre-remoción para Debian/Ubuntu
+
+echo "Deteniendo servicios de RevelNest antes de la desinstalación..."
+
+# Detener el servicio si está corriendo
+if systemctl is-active --quiet revelnest-yggdrasil.service 2>/dev/null; then
+    echo "Deteniendo servicio revelnest-yggdrasil..."
+    systemctl stop revelnest-yggdrasil.service
+fi
+
+# Deshabilitar el servicio si está habilitado
+if systemctl is-enabled --quiet revelnest-yggdrasil.service 2>/dev/null; then
+    echo "Deshabilitando servicio revelnest-yggdrasil..."
+    systemctl disable revelnest-yggdrasil.service
+fi
+
+# Limpiar socket directory
+if [ -d "/var/run/revelnest" ]; then
+    echo "Limpiando directorio de sockets..."
+    rm -rf /var/run/revelnest
+fi
+
+exit 0

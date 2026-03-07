@@ -34,6 +34,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import { getFileIcon } from '../../utils/fileIcons.js';
 
 interface ContactItemProps {
     contact: {
@@ -165,10 +166,27 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                                 verticalAlign: 'bottom'
                                             }}
                                         >
-                                            {c.lastMessage}
+                                            {(() => {
+                                                if (c.lastMessage && c.lastMessage.startsWith('{') && c.lastMessage.endsWith('}')) {
+                                                    try {
+                                                        const parsed = JSON.parse(c.lastMessage);
+                                                        if (parsed.type === 'file') {
+                                                            return (
+                                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                                    <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
+                                                                        {getFileIcon(parsed.mimeType || '', parsed.fileName || '')}
+                                                                    </Box>
+                                                                    <span>{parsed.fileName}</span>
+                                                                </Box>
+                                                            );
+                                                        }
+                                                    } catch (e) { /* ignore */ }
+                                                }
+                                                return c.lastMessage;
+                                            })()}
                                         </Typography>
                                     </Box>
-                                ) : (isOnline ? '🟢 En línea' : 'Desconectado'))
+                                ) : (isOnline ? 'En línea' : 'Desconectado'))
                             )}
                         </Typography>
 

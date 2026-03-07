@@ -15,6 +15,9 @@ electron.contextBridge.exposeInMainWorld("revelnest", {
   sendChatUpdate: (revelnestId, msgId, newContent) => electron.ipcRenderer.invoke("send-chat-update", { revelnestId, msgId, newContent }),
   sendChatDelete: (revelnestId, msgId) => electron.ipcRenderer.invoke("send-chat-delete", { revelnestId, msgId }),
   getMyIdentity: () => electron.ipcRenderer.invoke("get-my-identity"),
+  openFileDialog: (options) => electron.ipcRenderer.invoke("open-file-dialog", options || {}),
+  readFileAsBase64: (filePath, maxSizeMB) => electron.ipcRenderer.invoke("read-file-as-base64", { filePath, maxSizeMB }),
+  getPathForFile: (file) => electron.webUtils.getPathForFile(file),
   onReceive: (callback) => {
     electron.ipcRenderer.removeAllListeners("receive-p2p-message");
     electron.ipcRenderer.on("receive-p2p-message", (event, data) => callback(data));
@@ -27,6 +30,9 @@ electron.contextBridge.exposeInMainWorld("revelnest", {
   },
   onHandshakeFinished: (callback) => {
     electron.ipcRenderer.on("contact-handshake-finished", (event, data) => callback(data));
+  },
+  onContactUntrustworthy: (callback) => {
+    electron.ipcRenderer.on("contact-untrustworthy", (event, data) => callback(data));
   },
   onMessageDelivered: (callback) => {
     electron.ipcRenderer.on("message-delivered", (event, data) => callback(data));
@@ -45,5 +51,30 @@ electron.contextBridge.exposeInMainWorld("revelnest", {
   },
   onTyping: (callback) => {
     electron.ipcRenderer.on("peer-typing", (event, data) => callback(data));
+  },
+  // File transfer API (Phase 16)
+  startFileTransfer: (revelnestId, filePath, thumbnail) => electron.ipcRenderer.invoke("start-file-transfer", { revelnestId, filePath, thumbnail }),
+  cancelFileTransfer: (fileId, reason) => electron.ipcRenderer.invoke("cancel-file-transfer", { fileId, reason: reason || "User cancelled" }),
+  getFileTransfers: () => electron.ipcRenderer.invoke("get-file-transfers"),
+  saveTransferredFile: (fileId, destinationPath) => electron.ipcRenderer.invoke("save-transferred-file", { fileId, destinationPath }),
+  onFileTransferStarted: (callback) => {
+    electron.ipcRenderer.removeAllListeners("file-transfer-started");
+    electron.ipcRenderer.on("file-transfer-started", (event, data) => callback(data));
+  },
+  onFileTransferProgress: (callback) => {
+    electron.ipcRenderer.removeAllListeners("file-transfer-progress");
+    electron.ipcRenderer.on("file-transfer-progress", (event, data) => callback(data));
+  },
+  onFileTransferCompleted: (callback) => {
+    electron.ipcRenderer.removeAllListeners("file-transfer-completed");
+    electron.ipcRenderer.on("file-transfer-completed", (event, data) => callback(data));
+  },
+  onFileTransferCancelled: (callback) => {
+    electron.ipcRenderer.removeAllListeners("file-transfer-cancelled");
+    electron.ipcRenderer.on("file-transfer-cancelled", (event, data) => callback(data));
+  },
+  onFileTransferFailed: (callback) => {
+    electron.ipcRenderer.removeAllListeners("file-transfer-failed");
+    electron.ipcRenderer.on("file-transfer-failed", (event, data) => callback(data));
   }
 });

@@ -9,6 +9,7 @@ export const NavigationRail: React.FC<{ myIp: string }> = ({ myIp }) => (
     <Box sx={{
         width: '64px',
         minWidth: '64px',
+        flexShrink: 0,
         backgroundColor: 'background.surface',
         borderRight: '1px solid',
         borderColor: 'divider',

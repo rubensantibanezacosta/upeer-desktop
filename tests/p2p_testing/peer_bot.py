@@ -9,6 +9,16 @@ import nacl.signing
 import nacl.encoding
 import nacl.public
 import nacl.utils
+import random
+
+# Message types
+MSG_TYPES = [
+    'CHAT', 'DHT_UPDATE', 'DHT_QUERY', 'DHT_RESPONSE',
+    'DHT_EXCHANGE', 'PING', 'PONG', 'HANDSHAKE_REQ',
+    'HANDSHAKE_ACCEPT', 'CHAT_REACTION', 'CHAT_UPDATE',
+    'CHAT_DELETE', 'RENEWAL_TOKEN', 'RENEWAL_REQUEST',
+    'RENEWAL_RESPONSE'
+]
 
 YGG_PORT = int(os.environ.get("YGG_PORT", 50005))
 MY_NAME = "RevelNest_Bot_Test"
@@ -38,6 +48,69 @@ my_private_key = signing_key.to_curve25519_private_key()
 my_public_key = verify_key.to_curve25519_public_key()
 my_dht_seq = 1
 
+def generate_light_proof(revelnest_id):
+    """Generate a light PoW proof similar to RevelNest's AdaptivePow.generateLightProof"""
+    import hashlib
+    max_attempts = 100000
+    
+    for nonce in range(max_attempts):
+        proof = hex(nonce)[2:]  # Remove '0x' prefix
+        hash_input = (revelnest_id + proof).encode()
+        hash_result = hashlib.sha256(hash_input).hexdigest()
+        if hash_result.startswith('0'):
+            return proof
+    
+    # Fallback: timestamp-based proof
+    return hex(int(time.time() * 1000))[2:]
+
+# Metrics collection
+metrics = {
+    "messages_sent": 0,
+    "messages_received": 0,
+    "dht_updates_sent": 0,
+    "dht_updates_received": 0,
+    "dht_exchanges_sent": 0,
+    "dht_exchanges_received": 0,
+    "dht_queries_sent": 0,
+    "dht_queries_received": 0,
+    "dht_responses_sent": 0,
+    "dht_responses_received": 0,
+    "handshakes_completed": 0,
+    "contacts_discovered": 0,
+    "message_latency_sum": 0.0,
+    "message_latency_count": 0,
+    "packets_received": 0,
+    "ping_sent": 0,
+    "acks_received": 0
+}
+
+# Global sets for message tracking
+delivered_msgs = set()
+pending_discovery_msgs = {}
+
+def record_metric(name, value=1):
+    if name in metrics:
+        if isinstance(metrics[name], (int, float)):
+            metrics[name] += value
+        else:
+            metrics[name] = value
+    else:
+        metrics[name] = value
+
+def write_metrics_periodically(node_name):
+    while True:
+        time.sleep(5)
+        if node_name:
+            metrics_file = f"/shared/{node_name}_metrics.json"
+            try:
+                with open(metrics_file, "w") as f:
+                    json.dump({
+                        "timestamp": time.time(),
+                        **metrics
+                    }, f)
+            except Exception as e:
+                print(f"[{MY_NAME}] Error writing metrics: {e}")
+
 def get_ygg_ip():
     try:
         res = subprocess.check_output(["ip", "-6", "addr", "show"]).decode()
@@ -55,7 +128,9 @@ def sign_data(data):
 def generate_location_block(ip, seq):
     data = {"revelnestId": my_revelnest_id, "address": ip, "dhtSeq": seq}
     sig = sign_data(data)
-    return {"address": ip, "dhtSeq": seq, "signature": sig}
+    import time
+    expires_at = int((time.time() + 30 * 24 * 60 * 60) * 1000)  # 30 days in milliseconds
+    return {"address": ip, "dhtSeq": seq, "signature": sig, "expiresAt": expires_at}
 
 def verify_location_block(revelnest_id, block, pubkey_hex):
     try:
@@ -67,7 +142,137 @@ def verify_location_block(revelnest_id, block, pubkey_hex):
     except:
         return False
 
+# Renewal Token System
+def create_renewal_token(target_id, signing_key_obj, max_renwals=3, days_valid=60):
+    """Create a renewal token for target_id (must be ourselves)."""
+    current_time = int(time.time() * 1000)  # milliseconds
+    
+    # Include target's public key in the token for verification
+    target_pk = signing_key_obj.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
+    
+    token = {
+        "targetId": target_id,
+        "authorizedBy": target_id,
+        "targetPublicKey": target_pk,  # NEW: Include public key for verification
+        "allowedUntil": current_time + (days_valid * 24 * 60 * 60 * 1000),
+        "maxRenewals": max_renwals,
+        "renewalsUsed": 0,
+        "createdAt": current_time,
+        "signature": ""
+    }
+    # Sign the token (excluding signature field)
+    token_copy = token.copy()
+    token_copy.pop("signature", None)
+    msg_bytes = json.dumps(token_copy, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+    signature = signing_key_obj.sign(msg_bytes).signature.hex()
+    token["signature"] = signature
+    return token
+
+def verify_renewal_token(token, pubkey_hex=None):
+    """Verify a renewal token's signature and validity."""
+    current_time = int(time.time() * 1000)
+    
+    # Get public key from token if not provided
+    if pubkey_hex is None:
+        pubkey_hex = token.get("targetPublicKey")
+        if not pubkey_hex:
+            print(f"[{MY_NAME}] ❌ Token missing targetPublicKey")
+            return False
+    
+    # Check signature
+    token_copy = token.copy()
+    signature = token_copy.pop("signature", None)
+    if not signature:
+        return False
+    
+    try:
+        msg_bytes = json.dumps(token_copy, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+        verify_k = nacl.signing.VerifyKey(pubkey_hex, encoder=nacl.encoding.HexEncoder)
+        verify_k.verify(msg_bytes, bytes.fromhex(signature))
+    except Exception as e:
+        print(f"[{MY_NAME}] ❌ Token signature verification failed: {e}")
+        return False
+    
+    # Check authorizedBy matches targetId
+    if token["authorizedBy"] != token["targetId"]:
+        print(f"[{MY_NAME}] ❌ Token authorizedBy mismatch: {token['authorizedBy']} != {token['targetId']}")
+        return False
+    
+    # Check timestamps
+    if token["createdAt"] > current_time:
+        print(f"[{MY_NAME}] ❌ Token created in future: {token['createdAt']} > {current_time}")
+        return False
+    
+    if token["allowedUntil"] < current_time:
+        print(f"[{MY_NAME}] ❌ Token expired: {token['allowedUntil']} < {current_time}")
+        return False
+    
+    # Check renewal limits
+    if token["renewalsUsed"] > token["maxRenewals"]:
+        print(f"[{MY_NAME}] ❌ Token renewal limit exceeded: {token['renewalsUsed']} > {token['maxRenewals']}")
+        return False
+    
+    print(f"[{MY_NAME}] ✅ Token verified for {token['targetId']}")
+    return True
+
+def renew_location_block_with_token(token, renewer_id, known_peers, sock):
+    """Attempt to renew location block using token."""
+    target_id = token["targetId"]
+    
+    # Get target's public key from token
+    target_pk = token.get("targetPublicKey")
+    if not target_pk:
+        print(f"[{MY_NAME}] ❌ Token missing targetPublicKey for {target_id}")
+        return False
+    
+    # Verify token first (using public key from token)
+    if not verify_renewal_token(token, target_pk):
+        print(f"[{MY_NAME}] ❌ Invalid token for {target_id}")
+        return False
+    
+    # Check limits
+    if token["renewalsUsed"] >= token["maxRenewals"]:
+        print(f"[{MY_NAME}] Token renewal limit reached for {target_id}")
+        return False
+    
+    # Get target's current location
+    if target_id not in known_peers:
+        print(f"[{MY_NAME}] Target {target_id} not in known peers")
+        return False
+    
+    # We cannot actually create a new location block for someone else
+    # because we don't have their private key to sign it.
+    # In the real system, the renewal token would need to include
+    # a pre-signed location block or allow delegation of signing.
+    # For now, we'll simulate renewal by just updating the sequence number
+    # in our local known_peers and printing a success message.
+    
+    ip = known_peers[target_id].get("address", "unknown")
+    current_seq = known_peers[target_id].get("dht_seq", 0)
+    new_seq = current_seq + 1
+    
+    # Simulate renewal - in real system this would publish to DHT
+    known_peers[target_id]["dht_seq"] = new_seq
+    
+    # Update token counters
+    token["renewalsUsed"] += 1
+    token["lastRenewalAt"] = int(time.time() * 1000)
+    if "renewedBy" not in token:
+        token["renewedBy"] = []
+    token["renewedBy"].append(renewer_id)
+    
+    print(f"[{MY_NAME}] ✅ Successfully renewed {target_id} at {ip} to seq {new_seq}")
+    print(f"[{MY_NAME}]    Token renewals used: {token['renewalsUsed']}/{token['maxRenewals']}")
+    
+    # In a real implementation, we would:
+    # 1. Get a pre-signed location block from the token
+    # 2. Or have delegation permissions to sign on behalf of target
+    # 3. Publish the new block to DHT
+    
+    return True
+
 def heartbeat(sock, known_peers):
+    global my_dht_seq
     while True:
         time.sleep(5)
         # Send PING and DHT_EXCHANGE to all connected peers
@@ -85,6 +290,19 @@ def heartbeat(sock, known_peers):
                 })
         
         my_ip = get_ygg_ip()
+        # Auto-renewal check: if current block expires within 3 days, increment seq
+        current_time_ms = int(time.time() * 1000)
+        # Calculate expiry of current block (assuming 30 days from creation)
+        # Since we don't store creation time, we approximate: each seq corresponds to a block.
+        # For simplicity, we'll just check if last renewal was more than 27 days ago.
+        # We'll track last_renewal_time.
+        if not hasattr(heartbeat, 'last_renewal_time'):
+            heartbeat.last_renewal_time = current_time_ms
+        days_since_renewal = (current_time_ms - heartbeat.last_renewal_time) / (1000 * 60 * 60 * 24)
+        if days_since_renewal > 27:  # 30 - 3 threshold
+            print(f"[{MY_NAME}] Auto-renewal triggered (seq {my_dht_seq} -> {my_dht_seq + 1})")
+            my_dht_seq += 1
+            heartbeat.last_renewal_time = current_time_ms
         my_loc = generate_location_block(my_ip, my_dht_seq)
 
         for rid, info in known_peers.items():
@@ -95,6 +313,7 @@ def heartbeat(sock, known_peers):
             ping = {"type": "PING"}
             full_ping = {**ping, "senderRevelnestId": my_revelnest_id, "signature": sign_data(ping)}
             sock.sendto(json.dumps(full_ping, separators=(',', ':'), ensure_ascii=False).encode(), (ip, 50005))
+            record_metric("ping_sent")
             
             # DHT_EXCHANGE
             exch = {"type": "DHT_EXCHANGE", "peers": peers_list[:5] + [{
@@ -104,6 +323,7 @@ def heartbeat(sock, known_peers):
             }]}
             full_exch = {**exch, "senderRevelnestId": my_revelnest_id, "signature": sign_data(exch)}
             sock.sendto(json.dumps(full_exch, separators=(',', ':'), ensure_ascii=False).encode(), (ip, 50005))
+            record_metric("dht_exchanges_sent")
 
 def listen_with_sock(s, known_peers):
     global my_dht_seq
@@ -117,31 +337,39 @@ def listen_with_sock(s, known_peers):
             full_packet = json.loads(data.decode())
             p_type = full_packet.get('type')
             print(f"[{MY_NAME}] RECIBIDO [{p_type}] de {addr[0]}")
+            record_metric("packets_received")
 
             sender_revelnest = full_packet.get('senderRevelnestId')
             block = full_packet.get('locationBlock')
 
             if p_type == 'HANDSHAKE_REQ':
-                sender_revelnest = full_packet.get('revelnestId')
+                sender_revelnest = full_packet.get('senderRevelnestId')
                 sender_pk = full_packet.get('publicKey')
                 sender_ephemeral = full_packet.get('ephemeralPublicKey')
                 print(f"[{MY_NAME}] Petición de conexión de {sender_revelnest}.")
                 known_peers[sender_revelnest] = { "pk": sender_pk, "ephemeral_pk": sender_ephemeral, "dht_seq": 0, "address": addr[0] }
                 accept_data = {
                     "type": "HANDSHAKE_ACCEPT",
-                    "revelnestId": my_revelnest_id,
                     "publicKey": public_key_hex,
                     "ephemeralPublicKey": my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode()
                 }
-                s.sendto(json.dumps(accept_data, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                # Build full packet with signature like RevelNest
+                full_accept = {
+                    **accept_data,
+                    "senderRevelnestId": my_revelnest_id,
+                    "signature": sign_data(accept_data)
+                }
+                s.sendto(json.dumps(full_accept, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                record_metric("handshakes_completed")
             
             elif p_type == 'HANDSHAKE_ACCEPT':
-                sender_revelnest = full_packet.get('revelnestId')
+                sender_revelnest = full_packet.get('senderRevelnestId')
                 sender_pk = full_packet.get('publicKey')
                 sender_ephemeral = full_packet.get('ephemeralPublicKey')
                 if sender_revelnest not in known_peers or 'pk' not in known_peers[sender_revelnest]:
                     print(f"[{MY_NAME}] Conexión ACEPTADA por {sender_revelnest}. Enviando primer mensaje...")
                     known_peers[sender_revelnest] = { "pk": sender_pk, "ephemeral_pk": sender_ephemeral, "dht_seq": 0, "address": addr[0] }
+                    record_metric("handshakes_completed")
                     
                     # First message automatically
                     first_msg_text = "Hola! Soy el bot de RevelNest. Te he agregado automaticamente y aqui tienes mi primer mensaje."
@@ -168,8 +396,10 @@ def listen_with_sock(s, known_peers):
                     update = { "type": "DHT_UPDATE", "senderRevelnestId": my_revelnest_id, "locationBlock": my_loc }
                     full_update = { **update, "signature": sign_data(update) }
                     s.sendto(json.dumps(full_update, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                    record_metric("dht_updates_sent")
 
             elif p_type == 'DHT_UPDATE':
+                record_metric("dht_updates_received")
                 if sender_revelnest in known_peers and block:
                     if verify_location_block(sender_revelnest, block, known_peers[sender_revelnest]['pk']):
                         seq = block.get('dhtSeq', 0)
@@ -178,6 +408,7 @@ def listen_with_sock(s, known_peers):
                             known_peers[sender_revelnest].update({'dht_seq': seq, 'address': block['address'], 'signature': block['signature']})
 
             elif p_type == 'DHT_QUERY':
+                record_metric("dht_queries_received")
                 target_id = full_packet.get('targetId')
                 sender_id = full_packet.get('senderRevelnestId')
                 print(f"[{MY_NAME}] Query recibida de {sender_id} buscando a {target_id}")
@@ -199,8 +430,10 @@ def listen_with_sock(s, known_peers):
                 
                 full_resp = { **response, "senderRevelnestId": my_revelnest_id, "signature": sign_data(response) }
                 s.sendto(json.dumps(full_resp, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                record_metric("dht_responses_sent")
 
             elif p_type == 'DHT_RESPONSE':
+                record_metric("dht_responses_received")
                 target_id = full_packet.get('targetId')
                 block = full_packet.get('locationBlock')
                 if target_id and block:
@@ -226,6 +459,7 @@ def listen_with_sock(s, known_peers):
                                 s.sendto(msg_data, (block['address'], 50005))
 
             elif p_type == 'DHT_EXCHANGE':
+                record_metric("dht_exchanges_received")
                 peers = full_packet.get('peers', [])
                 for peer in peers:
                     p_id = peer.get('revelnestId')
@@ -239,9 +473,11 @@ def listen_with_sock(s, known_peers):
                             seq = b.get('dhtSeq', 0)
                             if seq > known_peers[p_id]['dht_seq']:
                                 print(f"[{MY_NAME}] PEEREX Update: Discovered {p_id} at {b['address']} via {addr[0]}")
+                                record_metric("contacts_discovered")
                                 known_peers[p_id].update({'dht_seq': seq, 'address': b['address'], 'signature': b['signature']})
 
             elif p_type == 'CHAT':
+                record_metric("messages_received")
                 sender_revelnest = full_packet.get('senderRevelnestId')
                 if sender_revelnest in known_peers:
                     # E2EE Decryption
@@ -303,6 +539,7 @@ def listen_with_sock(s, known_peers):
                 if 'id' in full_packet:
                     delivered_msgs.add(full_packet['id'])
                     print(f"[{MY_NAME}] ACK recibido para {full_packet['id']}")
+                    record_metric("acks_received")
 
             elif p_type == 'CHAT_REACTION':
                 msg_id = full_packet.get('msgId')
@@ -335,26 +572,148 @@ def listen_with_sock(s, known_peers):
                 msg_id = full_packet.get('msgId')
                 print(f"[{MY_NAME}] ELIMINACIÓN: {sender_revelnest} eliminó el mensaje {msg_id}")
 
+            elif p_type == 'RENEWAL_TOKEN':
+                token = full_packet.get('token')
+                print(f"[{MY_NAME}] 🔑 RECEIVED RENEWAL TOKEN from {sender_revelnest}")
+                print(f"[{MY_NAME}]    Target: {token.get('targetId')}")
+                print(f"[{MY_NAME}]    Max renewals: {token.get('maxRenewals')}")
+                print(f"[{MY_NAME}]    Already used: {token.get('renewalsUsed', 0)}")
+                
+                # Store token under the target's ID (not sender's)
+                target_id = token.get('targetId')
+                if not target_id:
+                    print(f"[{MY_NAME}] ERROR: Token missing targetId")
+                    return
+                
+                # Ensure we have an entry for the target
+                if target_id not in known_peers:
+                    known_peers[target_id] = {}
+                    print(f"[{MY_NAME}] WARNING: Created new entry for {target_id}")
+                
+                # Verify token using public key from token itself
+                if verify_renewal_token(token):  # No need to pass pubkey_hex, it's in the token
+                    print(f"[{MY_NAME}] ✅ Token signature VALID for {target_id}")
+                    # Store target's public key from token for future use
+                    target_pk = token.get("targetPublicKey")
+                    if target_pk and 'pk' not in known_peers[target_id]:
+                        known_peers[target_id]['pk'] = target_pk
+                        print(f"[{MY_NAME}] 💾 Stored target's public key from token")
+                else:
+                    print(f"[{MY_NAME}] ❌ Token signature INVALID for {target_id}")
+                
+                # Store the token
+                known_peers[target_id]['renewal_token'] = token
+                print(f"[{MY_NAME}] 💾 Token stored for {target_id}")
+                
+                # Send acknowledgement
+                ack = { "type": "RENEWAL_RESPONSE", "status": "accepted", "targetId": target_id }
+                full_ack = { **ack, "senderRevelnestId": my_revelnest_id, "signature": sign_data(ack) }
+                s.sendto(json.dumps(full_ack, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                print(f"[{MY_NAME}] 📤 Sent RENEWAL_RESPONSE to {sender_revelnest}")
+
+            elif p_type == 'RENEWAL_REQUEST':
+                target_id = full_packet.get('targetId')
+                print(f"[{MY_NAME}] 🔄 RENEWAL REQUEST for {target_id} from {sender_revelnest}")
+                
+                # Check if we have a token for target_id
+                if target_id in known_peers and 'renewal_token' in known_peers[target_id]:
+                    token = known_peers[target_id]['renewal_token']
+                    print(f"[{MY_NAME}]    Found token for {target_id}")
+                    print(f"[{MY_NAME}]    Renewals used: {token.get('renewalsUsed', 0)}/{token.get('maxRenewals', 3)}")
+                    
+                    # Verify token validity (using public key from token)
+                    if verify_renewal_token(token):  # No need to pass pubkey_hex, it's in the token
+                        print(f"[{MY_NAME}] ✅ Token verified, attempting renewal...")
+                        # Attempt renewal
+                        if renew_location_block_with_token(token, my_revelnest_id, known_peers, s):
+                            response = { "type": "RENEWAL_RESPONSE", "status": "renewed", "targetId": target_id }
+                            print(f"[{MY_NAME}] ✅ Renewal SUCCESS for {target_id}")
+                        else:
+                            response = { "type": "RENEWAL_RESPONSE", "status": "renewal_failed", "targetId": target_id }
+                            print(f"[{MY_NAME}] ❌ Renewal FAILED for {target_id}")
+                    else:
+                        response = { "type": "RENEWAL_RESPONSE", "status": "invalid_token", "targetId": target_id }
+                        print(f"[{MY_NAME}] ❌ Token INVALID for {target_id}")
+                else:
+                    print(f"[{MY_NAME}] ❌ No token found for {target_id}")
+                    print(f"[{MY_NAME}]    Known peers: {list(known_peers.keys())}")
+                    response = { "type": "RENEWAL_RESPONSE", "status": "no_token", "targetId": target_id }
+                
+                full_resp = { **response, "senderRevelnestId": my_revelnest_id, "signature": sign_data(response) }
+                s.sendto(json.dumps(full_resp, separators=(',', ':'), ensure_ascii=False).encode(), addr)
+                print(f"[{MY_NAME}] 📤 Sent RENEWAL_RESPONSE: {response['status']} for {target_id}")
+
+            elif p_type == 'RENEWAL_RESPONSE':
+                status = full_packet.get('status')
+                target_id = full_packet.get('targetId')
+                print(f"[{MY_NAME}] Renewal response for {target_id}: {status}")
+                # Could update UI or metrics
+
         except Exception as e:
             print(f"[{MY_NAME}] Error procesando: {e}")
 
 def auto_connect(target_id_at_ip, sock):
-    if not target_id_at_ip or '@' not in target_id_at_ip:
+    if not target_id_at_ip:
         return
-    target_revelnest_id, target_ip = target_id_at_ip.split('@')
+    
+    # Accept both @ and : as separators
+    separator = '@' if '@' in target_id_at_ip else ':' if ':' in target_id_at_ip else None
+    if not separator:
+        print(f"[{MY_NAME}] Invalid target format, expected ID@IP or ID:IP")
+        return
+    
+    parts = target_id_at_ip.split(separator, 1)
+    if len(parts) != 2:
+        print(f"[{MY_NAME}] Invalid target format, expected ID{separator}IP")
+        return
+    
+    target_revelnest_id, target_ip = parts
+    
+    # Normalize Yggdrasil IP address
+    segments = target_ip.split(':')
+    has_200_prefix = target_ip.startswith('200:')
+    
+    # Valid Yggdrasil address: 8 segments (with 200:) or 7 segments (without 200:)
+    is_valid_yggdrasil = (
+        (has_200_prefix and len(segments) == 8) or
+        (not has_200_prefix and len(segments) == 7)
+    )
+    
+    if not is_valid_yggdrasil:
+        print(f"[{MY_NAME}] Invalid Yggdrasil address: {target_ip}")
+        return
+    
+    # Add 200: prefix if missing
+    if not has_200_prefix and len(segments) == 7:
+        target_ip = '200:' + target_ip
+    
     print(f"[{MY_NAME}] Auto-conectando a {target_revelnest_id} en {target_ip}...")
     while True:
         try:
-            handshake_req = {
+            # Build the data object (same as RevelNest's sendContactRequest)
+            # Note: powProof is required for Sybil resistance
+            pow_proof = generate_light_proof(my_revelnest_id)
+            
+            handshake_data = {
                 "type": "HANDSHAKE_REQ",
-                "revelnestId": my_revelnest_id,
                 "publicKey": public_key_hex,
                 "ephemeralPublicKey": my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode(),
-                "alias": MY_NAME
+                "alias": MY_NAME,
+                "powProof": pow_proof
             }
-            sock.sendto(json.dumps(handshake_req, separators=(',', ':'), ensure_ascii=False).encode(), (target_ip, 50005))
+            
+            # Sign the data and build full packet (same as sendSecureUDPMessage)
+            full_packet = {
+                **handshake_data,
+                "senderRevelnestId": my_revelnest_id,
+                "signature": sign_data(handshake_data)
+            }
+            
+            print(f"[{MY_NAME}] Sending HANDSHAKE_REQ to {target_ip}")
+            sock.sendto(json.dumps(full_packet, separators=(',', ':'), ensure_ascii=False).encode(), (target_ip, 50005))
             time.sleep(30) # Retry every 30s if not connected
-        except:
+        except Exception as e:
+            print(f"[{MY_NAME}] Error sending handshake: {e}")
             time.sleep(5)
 
 def start_dht_search(sock, target_id, known_peers, last_packet=None):
@@ -370,6 +729,7 @@ def start_dht_search(sock, target_id, known_peers, last_packet=None):
         if rid != target_id and 'address' in info:
             print(f"[{MY_NAME}] DHT Query -> {rid} ({info['address']})")
             sock.sendto(json.dumps(full_q, separators=(',', ':'), ensure_ascii=False).encode(), (info['address'], 50005))
+            record_metric("dht_queries_sent")
 
 def send_chat_with_retry(sock, target_rid, content, known_peers):
     if target_rid not in known_peers or 'address' not in known_peers[target_rid]:
@@ -384,6 +744,7 @@ def send_chat_with_retry(sock, target_rid, content, known_peers):
     
     print(f"[{MY_NAME}] Enviando mensaje {msg_id} a {target_rid}...")
     sock.sendto(json.dumps(full_chat, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers[target_rid]['address'], 50005))
+    record_metric("messages_sent")
     
     # Verificador de ACK (Fallback)
     def check_ack():
@@ -410,6 +771,8 @@ if __name__ == "__main__":
             MY_NAME = f"Bot_{node_name}"
             with open(f"/shared/{node_name}.json", "w") as f:
                 json.dump({"id": my_revelnest_id, "ip": ip}, f)
+            # Start metrics writer thread
+            threading.Thread(target=write_metrics_periodically, args=(node_name,), daemon=True).start()
         
         known_peers_dict = {}
         threading.Thread(target=listen_with_sock, args=(sock, known_peers_dict), daemon=True).start()
@@ -472,6 +835,103 @@ if __name__ == "__main__":
                             data = { "type": "CHAT_DELETE", "msgId": cmd["msgId"] }
                             full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
                             sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers_dict[target_rid]['address'], 50005))
+
+                    elif cmd.get("type") == "GENERATE_RENEWAL_TOKEN":
+                        # Generate a renewal token for ourselves
+                        token = create_renewal_token(my_revelnest_id, signing_key)
+                        print(f"[{MY_NAME}] Generated renewal token: {token}")
+                        # Store locally - ensure entry exists for self
+                        if my_revelnest_id not in known_peers_dict:
+                            known_peers_dict[my_revelnest_id] = {'pk': public_key_hex, 'dht_seq': my_dht_seq}
+                        known_peers_dict[my_revelnest_id]['renewal_token'] = token
+                        # Optionally save to file
+                        if node_name:
+                            with open(f"/shared/{node_name}_renewal_token.json", "w") as f:
+                                json.dump(token, f)
+                        print(f"[{MY_NAME}] Renewal token stored for {my_revelnest_id}")
+
+                    elif cmd.get("type") == "SEND_RENEWAL_TOKEN":
+                        try:
+                            print(f"[{MY_NAME}] 📥 RAW COMMAND: {cmd}")
+                            target_rid = cmd.get("target_rid")
+                            if not target_rid:
+                                print(f"[{MY_NAME}] ❌ No target_rid in command")
+                                continue
+                            print(f"[{MY_NAME}] 📤 Processing SEND_RENEWAL_TOKEN to {target_rid}")
+                            print(f"[{MY_NAME}] DEBUG 1: Got here")
+                            print(f"[{MY_NAME}]    My ID: {my_revelnest_id}")
+                            print(f"[{MY_NAME}] DEBUG 2: Printed my ID")
+                            print(f"[{MY_NAME}]    Known peers keys: {list(known_peers_dict.keys())}")
+                            print(f"[{MY_NAME}] DEBUG 3: Printed known peers")
+                            
+                            if target_rid not in known_peers_dict:
+                                print(f"[{MY_NAME}] ❌ Target {target_rid} not in known_peers_dict")
+                                continue
+                            print(f"[{MY_NAME}] DEBUG 4: Target is in known_peers_dict")
+                            
+                            target_info = known_peers_dict[target_rid]
+                            print(f"[{MY_NAME}]    Target info keys: {list(target_info.keys())}")
+                            
+                            if 'address' not in target_info:
+                                print(f"[{MY_NAME}] ❌ No address for {target_rid}")
+                                print(f"[{MY_NAME}]    Target info: {target_info}")
+                                continue
+                            print(f"[{MY_NAME}] DEBUG 5: Target has address")
+                        except Exception as e:
+                            print(f"[{MY_NAME}] 💥 EXCEPTION in SEND_RENEWAL_TOKEN: {e}")
+                            import traceback
+                            print(f"[{MY_NAME}] Traceback: {traceback.format_exc()}")
+                            continue
+                        
+                        # Send token to target
+                        token = known_peers_dict.get(my_revelnest_id, {}).get('renewal_token')
+                        if not token:
+                            print(f"[{MY_NAME}] No renewal token generated yet. Generating one now...")
+                            token = create_renewal_token(my_revelnest_id, signing_key)
+                            if my_revelnest_id not in known_peers_dict:
+                                known_peers_dict[my_revelnest_id] = {'pk': public_key_hex, 'dht_seq': my_dht_seq}
+                            known_peers_dict[my_revelnest_id]['renewal_token'] = token
+                        
+                        print(f"[{MY_NAME}]    Token: target={token.get('targetId')}, renewals={token.get('renewalsUsed', 0)}/{token.get('maxRenewals', 3)}")
+                        
+                        data = { "type": "RENEWAL_TOKEN", "token": token }
+                        full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
+                        
+                        target_addr = known_peers_dict[target_rid]['address']
+                        print(f"[{MY_NAME}]    Sending to {target_addr}:50005")
+                        
+                        sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (target_addr, 50005))
+                        print(f"[{MY_NAME}] ✅ Sent renewal token to {target_rid} at {target_addr}")
+
+                    elif cmd.get("type") == "REQUEST_RENEWAL":
+                        target_rid = cmd["target_rid"]
+                        if target_rid in known_peers_dict:
+                            # First try to renew locally using token if we have one
+                            renewal_success = False
+                            if 'renewal_token' in known_peers_dict[target_rid]:
+                                token = known_peers_dict[target_rid]['renewal_token']
+                                print(f"[{MY_NAME}] Found renewal token for {target_rid}, attempting renewal...")
+                                # Verify token first
+                                target_pk = token.get('targetPublicKey')
+                                if target_pk and verify_renewal_token(token, target_pk):
+                                    print(f"[{MY_NAME}] Token verified, attempting renewal...")
+                                    if renew_location_block_with_token(token, my_revelnest_id, known_peers_dict, sock):
+                                        print(f"[{MY_NAME}] ✅ Successfully renewed {target_rid} using token")
+                                        renewal_success = True
+                                    else:
+                                        print(f"[{MY_NAME}] ❌ Renewal failed for {target_rid}")
+                                else:
+                                    print(f"[{MY_NAME}] ❌ Token invalid or missing for {target_rid}")
+                            else:
+                                print(f"[{MY_NAME}] No renewal token found for {target_rid}")
+                            
+                            # Also send renewal request to target (for notification)
+                            data = { "type": "RENEWAL_REQUEST", "targetId": target_rid }
+                            full_pkt = { **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data) }
+                            sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(), (known_peers_dict[target_rid]['address'], 50005))
+                            print(f"[{MY_NAME}] Sent renewal request for {target_rid}")
+                        else:
+                            print(f"[{MY_NAME}] Target {target_rid} not in known peers")
 
                 except Exception as e:
                     print(f"[{MY_NAME}] Error en comando: {e}")

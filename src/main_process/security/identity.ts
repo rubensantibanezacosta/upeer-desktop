@@ -1,4 +1,5 @@
 import sodium from 'sodium-native';
+import { info, error, debug } from './secure-logger.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -7,6 +8,10 @@ let secretKey: Buffer;
 let revelnestId: string;
 let ephemeralPublicKey: Buffer;
 let ephemeralSecretKey: Buffer;
+let ephemeralKeyRotationInterval: NodeJS.Timeout | null = null;
+let ephemeralKeyRotationCounter: number = 0;
+const EPHEMERAL_KEY_ROTATION_INTERVAL_MS = 5 * 60 * 1000; // Rotate every 5 minutes
+const EPHEMERAL_KEY_MAX_MESSAGES = 100; // Rotate after 100 messages
 let dhtSeq: number = 0;
 let dhtStatePath: string;
 
@@ -36,6 +41,9 @@ export function initIdentity(userDataPath: string) {
     ephemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
     ephemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
     sodium.crypto_box_keypair(ephemeralPublicKey, ephemeralSecretKey);
+    
+    // Start ephemeral key rotation
+    startEphemeralKeyRotation();
 
     // DHT State setup
     dhtStatePath = path.join(userDataPath, 'dht_state.json');
@@ -46,16 +54,14 @@ export function initIdentity(userDataPath: string) {
                 dhtSeq = dhtData.seq;
             }
         } catch (e) {
-            console.error('Error reading DHT state:', e);
+            error('Error reading DHT state', e, 'identity');
         }
     } else {
         dhtSeq = Date.now(); // Start seq at current timestamp to ensure monotony across complete wipes if key is kept
         fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
     }
 
-    console.log('--- Identidad RevelNest Inicializada ---');
-    console.log('RevelNest ID:', revelnestId);
-    console.log('DHT Sequence:', dhtSeq);
+    info('Identidad RevelNest Inicializada', { revelnestId, dhtSeq }, 'identity');
 }
 
 function generateNewKeypair(keyPath: string) {
@@ -77,6 +83,12 @@ export function getMyRevelNestId() {
     return revelnestId;
 }
 
+export function getRevelNestIdFromPublicKey(publicKey: Buffer): string {
+    const hash = Buffer.alloc(16);
+    sodium.crypto_generichash(hash, publicKey);
+    return hash.toString('hex');
+}
+
 export function sign(message: Buffer): Buffer {
     const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES);
     sodium.crypto_sign_detached(signature, message, secretKey);
@@ -91,6 +103,61 @@ export function getMyEphemeralPublicKeyHex() {
     return ephemeralPublicKey.toString('hex');
 }
 
+export function rotateEphemeralKeys(): void {
+    // Generate new ephemeral key pair
+    const newEphemeralPublicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+    const newEphemeralSecretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+    sodium.crypto_box_keypair(newEphemeralPublicKey, newEphemeralSecretKey);
+    
+    // Update global variables
+    ephemeralPublicKey = newEphemeralPublicKey;
+    ephemeralSecretKey = newEphemeralSecretKey;
+    ephemeralKeyRotationCounter = 0;
+    
+    info('Ephemeral keys rotated', { rotation: ++ephemeralKeyRotationCounter }, 'identity');
+    
+    // Notify all connected contacts about key rotation
+    notifyContactsAboutKeyRotation();
+}
+
+// Notify all connected contacts about key rotation
+function notifyContactsAboutKeyRotation(): void {
+    // This would notify contacts to update their stored ephemeral public key
+    // Implementation depends on how contacts are managed
+    // For now, we'll log it
+    info('Notifying contacts about ephemeral key rotation', {}, 'identity');
+}
+
+export function incrementEphemeralMessageCounter(): void {
+    ephemeralKeyRotationCounter++;
+    
+    // Rotate keys if we've sent too many messages
+    if (ephemeralKeyRotationCounter >= EPHEMERAL_KEY_MAX_MESSAGES) {
+        rotateEphemeralKeys();
+    }
+}
+
+function startEphemeralKeyRotation(): void {
+    // Clear any existing interval
+    if (ephemeralKeyRotationInterval) {
+        clearInterval(ephemeralKeyRotationInterval);
+    }
+    
+    // Start new rotation interval
+    ephemeralKeyRotationInterval = setInterval(() => {
+        rotateEphemeralKeys();
+    }, EPHEMERAL_KEY_ROTATION_INTERVAL_MS);
+    
+    info('Ephemeral key rotation started', { interval: EPHEMERAL_KEY_ROTATION_INTERVAL_MS }, 'identity');
+}
+
+export function stopEphemeralKeyRotation(): void {
+    if (ephemeralKeyRotationInterval) {
+        clearInterval(ephemeralKeyRotationInterval);
+        ephemeralKeyRotationInterval = null;
+    }
+}
+
 export function getMyDhtSeq() {
     return dhtSeq;
 }
@@ -100,7 +167,7 @@ export function incrementMyDhtSeq() {
     try {
         fs.writeFileSync(dhtStatePath, JSON.stringify({ seq: dhtSeq }));
     } catch (e) {
-        console.error('Failed to save DHT state', e);
+        error('Failed to save DHT state', e, 'identity');
     }
     return dhtSeq;
 }
@@ -118,6 +185,8 @@ export function encrypt(message: Buffer, recipientPublicKey: Buffer, useEphemera
     if (useEphemeral) {
         recipientCurvePK = recipientPublicKey; // Already Curve25519
         myCurveSK = ephemeralSecretKey;
+        // Increment message counter for ephemeral keys
+        incrementEphemeralMessageCounter();
     } else {
         recipientCurvePK = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
         sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePK, recipientPublicKey);

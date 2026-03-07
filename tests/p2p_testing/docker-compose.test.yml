@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  revelnest-test-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.test_bot
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TARGET_IDENTITY=a169346e249181b306156c7caa265d6d@200:7704:49e5:b4cd:7910:2191:2574:351b
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - shared_data:/shared
+    restart: unless-stopped
+
+volumes:
+  shared_data:

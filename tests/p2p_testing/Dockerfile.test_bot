@@ -1,0 +1,29 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    python3 \
+    python3-pip \
+    python3-nacl \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Yggdrasil
+RUN curl -L -o ygg.deb https://github.com/yggdrasil-network/yggdrasil-go/releases/download/v0.5.12/yggdrasil-0.5.12-amd64.deb && \
+    apt-get update && apt-get install -y ./ygg.deb && \
+    rm ygg.deb
+
+RUN mkdir -p /var/run/yggdrasil
+
+COPY test_bot.py .
+COPY gen_config.py .
+COPY entrypoint_test.sh .
+RUN chmod +x entrypoint_test.sh
+
+# Generate Yggdrasil config
+RUN yggdrasil -genconf > /etc/yggdrasil.conf
+
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["./entrypoint_test.sh"]

@@ -17,18 +17,28 @@ import {
     getMyRevelNestId,
     sign,
     encrypt,
-    getMyEphemeralPublicKeyHex
+    getMyEphemeralPublicKeyHex,
+    incrementEphemeralMessageCounter
 } from '../security/identity.js';
+import { AdaptivePow } from '../security/pow.js';
+import { network, warn, error } from '../security/secure-logger.js';
 import {
     canonicalStringify,
     getNetworkAddress
 } from './utils.js';
 import { handlePacket } from './handlers.js';
-import { broadcastDhtUpdate, sendDhtExchange, startDhtSearch } from './dht.js';
+import { broadcastDhtUpdate as coreBroadcastDhtUpdate, sendDhtExchange, startDhtSearch } from './dht/core.js';
+import { app } from 'electron';
+import { KademliaDHT } from './dht/kademlia/index.js';
+import { setKademliaInstance, performDhtMaintenance } from './dht/handlers.js';
+import { fileTransferManager } from './file-transfer/index.js';
+
+
 
 const YGG_PORT = 50005;
 let udpSocket: dgram.Socket | null = null;
 let mainWindow: BrowserWindow | null = null;
+let kademliaDHT: KademliaDHT | null = null;
 
 export function startUDPServer(win: BrowserWindow) {
     mainWindow = win;
@@ -36,6 +46,25 @@ export function startUDPServer(win: BrowserWindow) {
     if (!networkAddr) return;
 
     udpSocket = dgram.createSocket({ type: 'udp6', reuseAddr: true });
+
+    // Initialize file transfer manager
+    fileTransferManager.initialize(sendSecureUDPMessage, win);
+
+    // Initialize Kademlia DHT
+    const userDataPath = app.getPath('userData');
+    kademliaDHT = new KademliaDHT(getMyRevelNestId(), sendSecureUDPMessage, getContacts, userDataPath);
+    setKademliaInstance(kademliaDHT);
+
+    // Start DHT maintenance interval (every hour)
+    setInterval(() => {
+        if (kademliaDHT) {
+            kademliaDHT.performMaintenance();
+        }
+        // performDhtMaintenance is now async, handle with catch
+        performDhtMaintenance().catch(err => {
+            console.error('DHT maintenance error:', err);
+        });
+    }, 3600000);
 
     udpSocket.on('message', async (msg, rinfo) => {
         await handlePacket(
@@ -48,13 +77,13 @@ export function startUDPServer(win: BrowserWindow) {
     });
 
     udpSocket.on('error', (err) => {
-        console.error('UDP Error:', err);
+        error('UDP Error', err, 'network');
     });
 
     try {
         udpSocket.bind(YGG_PORT, networkAddr);
     } catch (e) {
-        console.error('Failed to bind socket:', e);
+        error('Failed to bind socket', e, 'network');
     }
 }
 
@@ -62,7 +91,15 @@ export function sendSecureUDPMessage(ip: string, data: any) {
     if (!udpSocket) return;
 
     const myId = getMyRevelNestId();
-    const signature = sign(Buffer.from(canonicalStringify(data)));
+    // Exclude certain fields from signature for backward compatibility and optional metadata
+    const fieldsToExclude = ['contactCache', 'renewalToken'];
+    const dataForSignature = { ...data };
+    fieldsToExclude.forEach(field => {
+        if (field in dataForSignature) {
+            delete dataForSignature[field];
+        }
+    });
+    const signature = sign(Buffer.from(canonicalStringify(dataForSignature)));
     const fullPacket = {
         ...data,
         senderRevelnestId: myId,
@@ -70,22 +107,38 @@ export function sendSecureUDPMessage(ip: string, data: any) {
     };
 
     const buf = Buffer.from(JSON.stringify(fullPacket));
-    udpSocket.send(buf, YGG_PORT, ip);
+
+    // Debug logging for file transfers
+    if (data.type === 'FILE_CHUNK' || data.type === 'FILE_START' || data.type === 'FILE_ACK') {
+        console.log('DEBUG sendSecureUDPMessage:', {
+            type: data.type,
+            ip,
+            port: YGG_PORT,
+            fileId: data.fileId,
+            chunkIndex: data.chunkIndex,
+            timestamp: Date.now()
+        });
+    }
+
+    udpSocket.send(buf, YGG_PORT, ip, (err) => {
+        if (err) {
+            error(`UDP send error to ${ip}`, err, 'network');
+        }
+    });
 }
 
 export async function sendContactRequest(targetIp: string, alias: string) {
+    // Generate PoW proof for Sybil resistance (light proof for mobile compatibility)
+    const powProof = AdaptivePow.generateLightProof(getMyRevelNestId());
+
     const data = {
         type: 'HANDSHAKE_REQ',
-        revelnestId: getMyRevelNestId(),
         publicKey: getMyPublicKeyHex(),
         ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
-        alias: alias
+        alias: alias,
+        powProof
     };
-
-    const buf = Buffer.from(JSON.stringify(data));
-    if (udpSocket) {
-        udpSocket.send(buf, YGG_PORT, targetIp);
-    }
+    sendSecureUDPMessage(targetIp, data);
 }
 
 export async function acceptContactRequest(revelnestId: string, publicKey: string) {
@@ -96,15 +149,10 @@ export async function acceptContactRequest(revelnestId: string, publicKey: strin
 
     const data = {
         type: 'HANDSHAKE_ACCEPT',
-        revelnestId: getMyRevelNestId(),
         publicKey: getMyPublicKeyHex(),
         ephemeralPublicKey: getMyEphemeralPublicKeyHex()
     };
-
-    const buf = Buffer.from(JSON.stringify(data));
-    if (udpSocket) {
-        udpSocket.send(buf, YGG_PORT, contact.address);
-    }
+    sendSecureUDPMessage(contact.address, data);
 }
 
 export async function sendUDPMessage(revelnestId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<string | undefined> {
@@ -123,6 +171,11 @@ export async function sendUDPMessage(revelnestId: string, message: string | { [k
         useEphemeral
     );
 
+    // Increment ephemeral message counter for Perfect Forward Secrecy
+    if (useEphemeral) {
+        incrementEphemeralMessageCounter();
+    }
+
     const data = {
         type: 'CHAT',
         id: msgId,
@@ -133,8 +186,13 @@ export async function sendUDPMessage(revelnestId: string, message: string | { [k
         replyTo: replyTo
     };
 
+    // Contact cache removed for privacy reasons - use DHT and renewal tokens instead
+    // Previously: attached top contacts for extreme resilience
+    // Now: relying on DHT persistence (30 days) and renewal tokens for resilience
+
     const signature = sign(Buffer.from(canonicalStringify(data)));
-    saveMessage(msgId, revelnestId, true, content, replyTo, signature.toString('hex'));
+    const isToSelf = revelnestId === getMyRevelNestId();
+    saveMessage(msgId, revelnestId, true, content, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent');
 
     sendSecureUDPMessage(contact.address, data);
 
@@ -142,7 +200,7 @@ export async function sendUDPMessage(revelnestId: string, message: string | { [k
         const { getMessageStatus } = await import('../storage/db.js');
         const status = await getMessageStatus(msgId);
         if (status === 'sent') {
-            console.warn(`[Network] Mensaje ${msgId} no entregado a ${revelnestId}. Iniciando búsqueda reactiva...`);
+            warn('Message not delivered, starting reactive search', { msgId, revelnestId }, 'network');
             startDhtSearch(revelnestId, sendSecureUDPMessage);
         }
     }, 5000);
@@ -155,12 +213,123 @@ export function checkHeartbeat(contacts: any[]) {
         if (contact.status === 'connected') {
             sendSecureUDPMessage(contact.address, { type: 'PING' });
             sendDhtExchange(contact.revelnestId, sendSecureUDPMessage);
+
+            // Enhanced distributed heartbeat with contact cache exchange
+            distributedHeartbeat(contact, sendSecureUDPMessage).catch(err => {
+                warn('Distributed heartbeat failed', err, 'heartbeat');
+            });
         }
     }
 }
 
+// ========================
+// Distributed Heartbeat Protocol for Extreme Resilience
+// ========================
+
+async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (ip: string, data: any) => void) {
+    const myId = getMyRevelNestId();
+
+    // 1. Exchange location blocks
+    await exchangeLocationBlocks(contact, sendSecureUDPMessage);
+
+    // 2. Exchange lists of alive contacts
+    const aliveContacts = getContactsSeenLast24h();
+    await sendContactList(contact, aliveContacts, sendSecureUDPMessage);
+
+    // 3. Synchronize DHT (send blocks that need renewal)
+    const blocksToShare = getLocationBlocksForRenewal();
+    await shareBlocks(contact, blocksToShare, sendSecureUDPMessage);
+
+    network('Distributed heartbeat completed', undefined, { contact: contact.revelnestId }, 'heartbeat');
+}
+
+async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: string, data: any) => void) {
+    // Send our current location block
+    const currentIp = getNetworkAddress();
+    if (!currentIp) return;
+
+    // Get our current DHT sequence
+    const { incrementMyDhtSeq } = await import('../security/identity.js');
+    const newSeq = incrementMyDhtSeq();
+
+    // Generate location block with renewal token
+    const { generateSignedLocationBlock, generateRenewalToken } = await import('./utils.js');
+    const renewalToken = generateRenewalToken(contact.revelnestId);
+    const locBlock = generateSignedLocationBlock(currentIp, newSeq, undefined, renewalToken);
+
+    sendSecureUDPMessage(contact.address, {
+        type: 'DHT_UPDATE',
+        locationBlock: locBlock
+    });
+}
+
+function getContactsSeenLast24h(): Array<{
+    revelnestId: string;
+    lastSeen: number;
+    address: string;
+}> {
+    const allContacts = getContacts() as any[];
+    const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+
+    return allContacts
+        .filter(c => c.lastSeen && c.lastSeen > cutoff && c.address)
+        .map(c => ({
+            revelnestId: c.revelnestId,
+            lastSeen: c.lastSeen,
+            address: c.address
+        }));
+}
+
+async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDPMessage: (ip: string, data: any) => void) {
+    if (aliveContacts.length === 0) return;
+
+    sendSecureUDPMessage(contact.address, {
+        type: 'DHT_EXCHANGE',
+        peers: aliveContacts.map(c => ({
+            revelnestId: c.revelnestId,
+            address: c.address,
+            lastSeen: c.lastSeen
+        }))
+    });
+}
+
+function getLocationBlocksForRenewal(): Array<{
+    revelnestId: string;
+    locationBlock: any;
+}> {
+    const allContacts = getContacts() as any[];
+    const now = Date.now();
+    const renewalThreshold = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+    return allContacts
+        .filter(c => c.dhtSignature && c.expiresAt)
+        .filter(c => {
+            const timeToExpire = c.expiresAt - now;
+            return timeToExpire < renewalThreshold && timeToExpire > 0;
+        })
+        .map(c => ({
+            revelnestId: c.revelnestId,
+            locationBlock: {
+                address: c.address,
+                dhtSeq: c.dhtSeq,
+                signature: c.dhtSignature,
+                expiresAt: c.expiresAt
+            }
+        }));
+}
+
+async function shareBlocks(contact: any, blocksToShare: any[], sendSecureUDPMessage: (ip: string, data: any) => void) {
+    if (blocksToShare.length === 0) return;
+
+    // Share blocks that need renewal
+    sendSecureUDPMessage(contact.address, {
+        type: 'DHT_EXCHANGE',
+        peers: blocksToShare
+    });
+}
+
 export function wrappedBroadcastDhtUpdate() {
-    broadcastDhtUpdate(sendSecureUDPMessage);
+    coreBroadcastDhtUpdate(sendSecureUDPMessage);
 }
 
 export function sendTypingIndicator(revelnestId: string) {
@@ -219,6 +388,11 @@ export async function sendChatUpdate(revelnestId: string, msgId: string, newCont
         useEphemeral
     );
 
+    // Increment ephemeral message counter for Perfect Forward Secrecy
+    if (useEphemeral) {
+        incrementEphemeralMessageCounter();
+    }
+
     const data = {
         type: 'CHAT_UPDATE',
         msgId,
@@ -240,6 +414,24 @@ export async function sendChatDelete(revelnestId: string, msgId: string) {
     deleteMessageLocally(msgId);
     const data = { type: 'CHAT_DELETE', msgId };
     sendSecureUDPMessage(contact.address, data);
+}
+
+export async function sendFile(revelnestId: string, filePath: string, thumbnail?: string): Promise<string | undefined> {
+    const contact = await getContactByRevelnestId(revelnestId);
+    if (!contact || contact.status !== 'connected') return undefined;
+
+    try {
+        const fileId = await fileTransferManager.startSend(
+            revelnestId,
+            contact.address,
+            filePath,
+            thumbnail
+        );
+        return fileId;
+    } catch (error) {
+        warn('File transfer failed to start', { revelnestId, filePath, error }, 'file-transfer');
+        return undefined;
+    }
 }
 
 export function closeUDPServer() {

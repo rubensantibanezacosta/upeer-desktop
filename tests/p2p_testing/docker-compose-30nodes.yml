@@ -1,0 +1,643 @@
+version: '3.8'
+
+services:
+  # Bootstrap node (node1)
+  node1:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_1
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::1
+    restart: unless-stopped
+
+  # Layer 1: Nodes 2-6 connect to node1
+  node2:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_2
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node2
+      - TARGET_IDENTITY=${NODE1_TARGET}
+    depends_on:
+      - node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::2
+    restart: unless-stopped
+
+  node3:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_3
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node3
+      - TARGET_IDENTITY=${NODE1_TARGET}
+    depends_on:
+      - node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::3
+    restart: unless-stopped
+
+  node4:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_4
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node4
+      - TARGET_IDENTITY=${NODE1_TARGET}
+    depends_on:
+      - node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::4
+    restart: unless-stopped
+
+  node5:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_5
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node5
+      - TARGET_IDENTITY=${NODE1_TARGET}
+    depends_on:
+      - node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::5
+    restart: unless-stopped
+
+  node6:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_6
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node6
+      - TARGET_IDENTITY=${NODE1_TARGET}
+    depends_on:
+      - node1
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::6
+    restart: unless-stopped
+
+  # Layer 2: Nodes 7-15 connect to multiple nodes from Layer 1
+  node7:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_7
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node7
+      - TARGET_IDENTITY=${NODE2_TARGET}
+    depends_on:
+      - node2
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::7
+    restart: unless-stopped
+
+  node8:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_8
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node8
+      - TARGET_IDENTITY=${NODE2_TARGET}
+    depends_on:
+      - node2
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::8
+    restart: unless-stopped
+
+  node9:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_9
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node9
+      - TARGET_IDENTITY=${NODE3_TARGET}
+    depends_on:
+      - node3
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::9
+    restart: unless-stopped
+
+  node10:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_10
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node10
+      - TARGET_IDENTITY=${NODE3_TARGET}
+    depends_on:
+      - node3
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::10
+    restart: unless-stopped
+
+  node11:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_11
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node11
+      - TARGET_IDENTITY=${NODE4_TARGET}
+    depends_on:
+      - node4
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::11
+    restart: unless-stopped
+
+  node12:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_12
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node12
+      - TARGET_IDENTITY=${NODE4_TARGET}
+    depends_on:
+      - node4
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::12
+    restart: unless-stopped
+
+  node13:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_13
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node13
+      - TARGET_IDENTITY=${NODE5_TARGET}
+    depends_on:
+      - node5
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::13
+    restart: unless-stopped
+
+  node14:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_14
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node14
+      - TARGET_IDENTITY=${NODE5_TARGET}
+    depends_on:
+      - node5
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::14
+    restart: unless-stopped
+
+  node15:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_15
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node15
+      - TARGET_IDENTITY=${NODE6_TARGET}
+    depends_on:
+      - node6
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::15
+    restart: unless-stopped
+
+  # Layer 3: Nodes 16-30 connect to multiple nodes from Layer 2
+  node16:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_16
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node16
+      - TARGET_IDENTITY=${NODE7_TARGET}
+    depends_on:
+      - node7
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::16
+    restart: unless-stopped
+
+  node17:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_17
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node17
+      - TARGET_IDENTITY=${NODE7_TARGET}
+    depends_on:
+      - node7
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::17
+    restart: unless-stopped
+
+  node18:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_18
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node18
+      - TARGET_IDENTITY=${NODE8_TARGET}
+    depends_on:
+      - node8
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::18
+    restart: unless-stopped
+
+  node19:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_19
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node19
+      - TARGET_IDENTITY=${NODE8_TARGET}
+    depends_on:
+      - node8
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::19
+    restart: unless-stopped
+
+  node20:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_20
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node20
+      - TARGET_IDENTITY=${NODE9_TARGET}
+    depends_on:
+      - node9
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::20
+    restart: unless-stopped
+
+  node21:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_21
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node21
+      - TARGET_IDENTITY=${NODE9_TARGET}
+    depends_on:
+      - node9
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::21
+    restart: unless-stopped
+
+  node22:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_22
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node22
+      - TARGET_IDENTITY=${NODE10_TARGET}
+    depends_on:
+      - node10
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::22
+    restart: unless-stopped
+
+  node23:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_23
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node23
+      - TARGET_IDENTITY=${NODE10_TARGET}
+    depends_on:
+      - node10
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::23
+    restart: unless-stopped
+
+  node24:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_24
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node24
+      - TARGET_IDENTITY=${NODE11_TARGET}
+    depends_on:
+      - node11
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::24
+    restart: unless-stopped
+
+  node25:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_25
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node25
+      - TARGET_IDENTITY=${NODE11_TARGET}
+    depends_on:
+      - node11
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::25
+    restart: unless-stopped
+
+  node26:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_26
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node26
+      - TARGET_IDENTITY=${NODE12_TARGET}
+    depends_on:
+      - node12
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::26
+    restart: unless-stopped
+
+  node27:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_27
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node27
+      - TARGET_IDENTITY=${NODE12_TARGET}
+    depends_on:
+      - node12
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::27
+    restart: unless-stopped
+
+  node28:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_28
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node28
+      - TARGET_IDENTITY=${NODE13_TARGET}
+    depends_on:
+      - node13
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::28
+    restart: unless-stopped
+
+  node29:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_29
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node29
+      - TARGET_IDENTITY=${NODE14_TARGET}
+    depends_on:
+      - node14
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::29
+    restart: unless-stopped
+
+  node30:
+    build:
+      context: .
+      dockerfile: tests/p2p_testing/Dockerfile.peer
+    container_name: revelnest_node_30
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - p2p_shared_data:/shared
+    environment:
+      - NODE_ENV_NAME=node30
+      - TARGET_IDENTITY=${NODE15_TARGET}
+    depends_on:
+      - node15
+    networks:
+      revelnest_network:
+        ipv6_address: fd00:1::30
+    restart: unless-stopped
+
+networks:
+  revelnest_network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:1::/64
+
+volumes:
+  p2p_shared_data:

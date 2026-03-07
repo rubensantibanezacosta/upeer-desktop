@@ -6,13 +6,13 @@ import {
     Typography
 } from '@mui/joy';
 import SendIcon from '@mui/icons-material/Send';
-import AddIcon from '@mui/icons-material/Add';
 import MoodIcon from '@mui/icons-material/Mood';
 import MicIcon from '@mui/icons-material/Mic';
 import EditIcon from '@mui/icons-material/Edit';
 
 import CloseIcon from '@mui/icons-material/Close';
 import ReplyIcon from '@mui/icons-material/Reply';
+import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
 
 interface InputAreaProps {
     message: string;
@@ -24,6 +24,8 @@ interface InputAreaProps {
     onCancelReply?: () => void;
     editingMessage?: { id?: string; message: string } | null;
     onCancelEdit?: () => void;
+
+    onAttachFile?: (type: AttachmentType) => void;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
@@ -35,7 +37,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
     replyToMessage,
     onCancelReply,
     editingMessage,
-    onCancelEdit
+    onCancelEdit,
+    onAttachFile
 }) => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +52,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
             borderColor: 'divider',
             backgroundColor: 'background.surface',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            width: '100%',
+            boxSizing: 'border-box'
         }}>
             {replyToMessage && (
                 <Box sx={{
@@ -103,7 +108,12 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 boxSizing: 'border-box'
             }}>
                 <IconButton variant="plain" color="neutral"><MoodIcon /></IconButton>
-                <IconButton variant="plain" color="neutral"><AddIcon /></IconButton>
+                <AttachmentButton
+                    onSelect={(type) => {
+                        if (onAttachFile) onAttachFile(type);
+                    }}
+                    disabled={disabled}
+                />
                 <Input
                     placeholder={editingMessage ? "Edita tu mensaje..." : "Escribe un mensaje..."}
                     value={message}

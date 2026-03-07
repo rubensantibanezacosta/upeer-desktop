@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+
+# RevelNest Chat P2P - Script de post-remoción para Debian/Ubuntu
+
+ACTION="$1"
+
+case "$ACTION" in
+    purge)
+        echo "Purgando archivos de configuración y datos de RevelNest..."
+        
+        # Eliminar directorios de datos si existen
+        for dir in /etc/revelnest /var/lib/revelnest /var/log/revelnest; do
+            if [ -d "$dir" ]; then
+                echo "Eliminando $dir..."
+                rm -rf "$dir"
+            fi
+        done
+        
+        # Eliminar usuario y grupo si ya no son necesarios
+        # (solo si no hay otros paquetes usando estos)
+        if id yggdrasil >/dev/null 2>&1; then
+            echo "Eliminando usuario 'yggdrasil'..."
+            userdel yggdrasil 2>/dev/null || true
+        fi
+        
+        if getent group yggdrasil >/dev/null 2>&1; then
+            echo "Eliminando grupo 'yggdrasil'..."
+            groupdel yggdrasil 2>/dev/null || true
+        fi
+        
+        # Recargar systemd
+        systemctl daemon-reload 2>/dev/null || true
+        
+        echo "✅ Todos los archivos de RevelNest han sido eliminados"
+        ;;
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # Para otras acciones, solo recargar systemd
+        systemctl daemon-reload 2>/dev/null || true
+        ;;
+esac
+
+exit 0

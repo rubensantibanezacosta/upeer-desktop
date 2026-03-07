@@ -9,6 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddReactionIcon from '@mui/icons-material/AddReaction';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { Menu, MenuItem, Dropdown, MenuButton } from '@mui/joy';
+import { FileMessageItem, FileMessageData } from './FileMessageItem.js';
 
 interface MessageItemProps {
     msg: {
@@ -28,12 +29,15 @@ interface MessageItemProps {
     onEdit: (msg: any) => void;
     onDelete: (msgId: string) => void;
     originalMessage?: string;
+    activeTransfers?: any[];
+    onScrollToMessage?: (msgId: string) => void;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact, onEdit, onDelete, originalMessage }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact, onEdit, onDelete, originalMessage, activeTransfers = [], onScrollToMessage }) => {
     const isMe = msg.isMine;
     const isReply = !!msg.replyTo;
     const isContactCard = msg.message.startsWith('CONTACT_CARD|');
+    const isFileTransfer = msg.message.startsWith('FILE_TRANSFER|');
 
     let cardData = null;
     if (isContactCard) {
@@ -46,8 +50,93 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
         };
     }
 
+    let fileData = null;
+    let isJSONFile = false;
+
+    // Try to parse as JSON if it looks like one
+    if (msg.message.startsWith('{') && msg.message.endsWith('}')) {
+        try {
+            const parsed = JSON.parse(msg.message);
+            if (parsed.type === 'file') {
+                isJSONFile = true;
+                const direction = parsed.direction || (isMe ? 'sending' : 'receiving');
+                const activeTransfer = activeTransfers.find(t =>
+                    (t.fileId === parsed.transferId || t.fileId === parsed.fileId) &&
+                    t.direction === direction
+                );
+
+                const phase = activeTransfer?.phase;
+                const isFinished = activeTransfer ? (
+                    (typeof phase === 'number' && phase >= 5) ||
+                    phase === 'completing' || phase === 'done' ||
+                    activeTransfer.state === 'completed'
+                ) : false;
+
+                const transferState = activeTransfer ? (isFinished ? 'completed' : activeTransfer.state)
+                    : (parsed.state || 'completed');
+
+                fileData = {
+                    fileId: parsed.transferId || parsed.fileId,
+                    fileName: parsed.fileName,
+                    fileSize: parsed.fileSize,
+                    mimeType: parsed.mimeType,
+                    fileHash: parsed.fileHash,
+                    thumbnail: parsed.thumbnail,
+                    caption: parsed.caption,
+                    transferState: transferState,
+                    progress: activeTransfer ? (transferState === 'completed' ? 100 : activeTransfer.progress) : (parsed.state === 'completed' || !parsed.state ? 100 : 0),
+                    direction: direction,
+                    timestamp: msg.timestamp
+                };
+            }
+        } catch (e) {
+            // Not a valid JSON or not a file message
+        }
+    }
+
+    if (!fileData && isFileTransfer && !msg.isDeleted) {
+        const parts = msg.message.split('|');
+        if (parts.length >= 6) {
+            const direction = isMe ? 'sending' as const : 'receiving' as const;
+            let transferState: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled' = 'completed';
+            let progress = 100;
+
+            const activeTransfer = activeTransfers.find(t =>
+                t.fileId === parts[1] && t.direction === direction
+            );
+
+            if (activeTransfer) {
+                transferState = activeTransfer.state as 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
+                progress = activeTransfer.progress || 0;
+            } else if (msg.message.includes('|failed')) {
+                // Future-proofing if saved in string
+                transferState = 'failed';
+            } else if (msg.message.includes('|cancelled')) {
+                transferState = 'cancelled';
+            }
+
+            fileData = {
+                fileId: parts[1],
+                fileName: parts[2],
+                fileSize: parseInt(parts[3], 10),
+                mimeType: parts[4],
+                fileHash: parts[5],
+                thumbnail: parts[6] && parts[6] !== 'undefined' ? parts[6] : undefined, // Check for 'undefined' string occasionally
+                transferState,
+                progress,
+                direction,
+                timestamp: msg.timestamp
+            };
+        }
+    }
+
+    const isFile = isJSONFile || (isFileTransfer && !!fileData);
+
     const scrollToOriginal = () => {
-        if (msg.replyTo) {
+        if (msg.replyTo && onScrollToMessage) {
+            onScrollToMessage(msg.replyTo);
+        } else if (msg.replyTo) {
+            // Fallback for non-virtualized (though not likely now)
             const el = document.getElementById(`msg-${msg.replyTo}`);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -72,11 +161,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                     color={isMe ? "primary" : "neutral"}
                     invertedColors={isMe}
                     sx={{
-                        p: 1.25,
-                        px: 2,
-                        borderRadius: '18px',
-                        borderTopRightRadius: isMe ? '4px' : '18px',
-                        borderTopLeftRadius: isMe ? '18px' : '4px',
+                        p: 1,
+                        px: 1.5,
+                        pb: 0.5,
+                        borderRadius: '12px',
+                        borderTopRightRadius: isMe ? '4px' : '12px',
+                        borderTopLeftRadius: isMe ? '12px' : '4px',
                         maxWidth: isContactCard ? '320px' : '100%',
                         boxShadow: 'sm',
                         position: 'relative',
@@ -98,20 +188,41 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                             revelnestId={cardData.revelnestId}
                             isMe={isMe}
                         />
+                    ) : isFile && fileData && !msg.isDeleted ? (
+                        <FileMessageItem
+                            data={fileData as any}
+                            isMe={isMe}
+                            status={msg.status}
+                            onDownload={(fileId) => {
+                                console.log('Download file:', fileId);
+                                // TODO: Implement download logic
+                            }}
+                            onOpen={(fileId) => {
+                                console.log('Open file:', fileId);
+                                // TODO: Implement open logic
+                            }}
+                        />
                     ) : (
-                        <Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0, alignItems: 'flex-end', minWidth: '80px' }}>
                             <Typography level="body-md" sx={{
                                 wordBreak: 'break-word',
                                 whiteSpace: 'pre-wrap',
-                                fontStyle: msg.isDeleted ? 'italic' : 'normal'
+                                fontStyle: msg.isDeleted ? 'italic' : 'normal',
+                                pb: 0.5
                             }}>
                                 {msg.message}
                             </Typography>
-                            {msg.isEdited && !msg.isDeleted && (
-                                <Typography level="body-xs" sx={{ mt: 0.5, fontSize: '9px', opacity: 0.7, textAlign: 'right' }}>
-                                    (editado)
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
+                                {msg.isEdited && !msg.isDeleted && (
+                                    <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>
+                                        (editado)
+                                    </Typography>
+                                )}
+                                <Typography level="body-xs" sx={{ color: isMe ? 'rgba(255,255,255,0.7)' : 'text.tertiary', fontSize: '10px', opacity: 0.8 }}>
+                                    {msg.timestamp}
                                 </Typography>
-                            )}
+                                {isMe && <MessageStatus status={msg.status} />}
+                            </Box>
                         </Box>
                     )}
 
@@ -119,13 +230,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                     {msg.reactions && msg.reactions.length > 0 && (
                         <Box sx={{
                             display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 0.5,
-                            mt: 0.5,
+                            flexWrap: 'nowrap',
+                            width: 'max-content',
+                            gap: 0,
                             position: 'absolute',
-                            bottom: -15,
-                            [isMe ? 'right' : 'left']: 10,
-                            zIndex: 1
+                            bottom: -18,
+                            [isMe ? 'right' : 'left']: 8,
+                            zIndex: 2,
+                            backgroundColor: 'neutral.solidBg',
+                            borderRadius: '16px',
+                            border: '2px solid',
+                            borderColor: 'background.body',
+                            overflow: 'hidden'
                         }}>
                             {Object.entries(
                                 msg.reactions.reduce((acc: any, r) => {
@@ -133,26 +249,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                                     return acc;
                                 }, {})
                             ).map(([emoji, count]) => (
-                                <Sheet
+                                <Box
                                     key={emoji}
-                                    variant="outlined"
-                                    color="neutral"
                                     sx={{
-                                        px: 0.5,
-                                        py: 0.1,
-                                        borderRadius: '10px',
-                                        fontSize: '11px',
+                                        px: 0.75,
+                                        height: '22px',
+                                        minWidth: '22px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 0.3,
-                                        backgroundColor: 'background.surface',
+                                        justifyContent: 'center',
+                                        gap: 0.5,
                                         cursor: 'pointer',
-                                        '&:hover': { borderColor: 'primary.outlinedBorder' }
+                                        color: 'neutral.solidColor',
+                                        fontWeight: 600,
+                                        fontSize: '11px',
                                     }}
                                     onClick={() => onReact(msg.id!, emoji, true)}
                                 >
-                                    {emoji} {count as number > 1 ? count as number : ''}
-                                </Sheet>
+                                    <span style={{ fontSize: '14px', lineHeight: 1 }}>{emoji}</span>
+                                    {(count as number) > 1 && <span>{count as number}</span>}
+                                </Box>
                             ))}
                         </Box>
                     )}
@@ -176,14 +292,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                             </MenuButton>
                             <Menu size="sm" variant="outlined" sx={{ minWidth: 120, p: 0.5, display: 'flex', flexDirection: 'row', gap: 0.5 }}>
                                 {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(emoji => (
-                                    <IconButton
+                                    <MenuItem
                                         key={emoji}
-                                        size="sm"
-                                        variant="plain"
                                         onClick={() => onReact(msg.id!, emoji, false)}
+                                        sx={{ borderRadius: 'sm', p: 1, minHeight: 'unset', justifyContent: 'center' }}
                                     >
                                         {emoji}
-                                    </IconButton>
+                                    </MenuItem>
                                 ))}
                             </Menu>
                         </Dropdown>
@@ -207,12 +322,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({ msg, onReply, onReact,
                 </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.25, gap: 0.5, px: 0.5, pt: msg.reactions?.length ? 1 : 0 }}>
-                <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px', textTransform: 'uppercase', fontWeight: 500 }}>
-                    {msg.timestamp}
-                </Typography>
-                {isMe && <MessageStatus status={msg.status} />}
-            </Box>
+            {msg.reactions && msg.reactions.length > 0 && (
+                <Box sx={{ height: 10 }} />
+            )}
         </Box>
     );
 };

@@ -37,6 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => (
     <Box sx={{
         width: 400,
+        minWidth: 400,
+        flexShrink: 0,
         borderRight: '1px solid',
         borderColor: 'divider',
         display: 'flex',

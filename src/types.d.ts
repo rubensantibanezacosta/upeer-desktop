@@ -1,5 +1,3 @@
-export { };
-
 declare global {
     interface Window {
         revelnest: {
@@ -26,7 +24,40 @@ declare global {
             onPresence: (callback: (data: { revelnestId: string, lastSeen: string }) => void) => void;
             onContactRequest: (callback: (data: { revelnestId: string, address: string, alias?: string, publicKey: string }) => void) => void;
             onHandshakeFinished: (callback: (data: { revelnestId: string }) => void) => void;
+            onContactUntrustworthy: (callback: (data: { revelnestId: string, address: string, alias?: string, reason: string }) => void) => void;
             onTyping: (callback: (data: { revelnestId: string }) => void) => void;
+            // File transfer API (Phase 16)
+            openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
+                success: boolean;
+                canceled?: boolean;
+                files?: Array<{
+                    path: string;
+                    name: string;
+                    size: number;
+                    type: string;
+                    lastModified: number;
+                }>;
+                error?: string
+            }>;
+            readFileAsBase64: (filePath: string, maxSizeMB?: number) => Promise<{
+                success: boolean;
+                dataUrl?: string;
+                mimeType?: string;
+                size?: number;
+                error?: string;
+            }>;
+            getPathForFile: (file: File) => string;
+            startFileTransfer: (revelnestId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+            getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;
+            saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
+            onFileTransferStarted: (callback: (data: any) => void) => void;
+            onFileTransferProgress: (callback: (data: any) => void) => void;
+            onFileTransferCompleted: (callback: (data: any) => void) => void;
+            onFileTransferCancelled: (callback: (data: any) => void) => void;
+            onFileTransferFailed: (callback: (data: any) => void) => void;
         }
     }
 }
+
+export { };

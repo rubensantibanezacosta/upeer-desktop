@@ -1,0 +1,159 @@
+#!/bin/bash
+set -e
+
+# RevelNest Chat P2P - Script de post-instalación para Debian/Ubuntu
+
+echo "Configurando RevelNest Chat P2P..."
+
+# Configuración de permisos para el binario Yggdrasil
+YGGDRASIL_BIN="/usr/lib/revelnest/yggdrasil"
+APP_RESOURCES="/usr/lib/revelnest-chat/resources"
+if [ -f "$YGGDRASIL_BIN" ]; then
+    echo "Configurando capabilities para Yggdrasil..."
+    setcap cap_net_admin,cap_net_raw+ep "$YGGDRASIL_BIN" 2>/dev/null || {
+        echo "Advertencia: No se pudieron configurar capabilities. El servicio puede requerir ejecución como root."
+    }
+else
+    echo "Binario Yggdrasil no encontrado en $YGGDRASIL_BIN, buscando en recursos de la aplicación..."
+    # Intentar copiar desde los recursos de la aplicación
+    if [ -f "$APP_RESOURCES/bin/linux-x64/yggdrasil" ]; then
+        echo "Copiando binario Yggdrasil desde recursos de la aplicación..."
+        mkdir -p /usr/lib/revelnest
+        cp "$APP_RESOURCES/bin/linux-x64/yggdrasil" "$YGGDRASIL_BIN"
+        chmod 755 "$YGGDRASIL_BIN"
+        echo "Configurando capabilities para Yggdrasil..."
+        setcap cap_net_admin,cap_net_raw+ep "$YGGDRASIL_BIN" 2>/dev/null || {
+            echo "Advertencia: No se pudieron configurar capabilities. El servicio puede requerir ejecución como root."
+        }
+    else
+        echo "Advertencia: Binario Yggdrasil no encontrado en recursos de la aplicación."
+        echo "El servicio de red mesh no estará disponible hasta que se instale manualmente."
+    fi
+fi
+
+# Crear usuario y grupo dedicados si no existen
+if ! getent group yggdrasil >/dev/null; then
+    echo "Creando grupo 'yggdrasil'..."
+    groupadd --system yggdrasil || echo "Grupo 'yggdrasil' ya existe o no se pudo crear"
+fi
+
+if ! id yggdrasil >/dev/null 2>&1; then
+    echo "Creando usuario 'yggdrasil'..."
+    useradd --system --no-create-home --home-dir /var/lib/revelnest \
+            --shell /bin/false --gid yggdrasil yggdrasil || \
+            echo "Usuario 'yggdrasil' ya existe o no se pudo crear"
+fi
+
+# Crear directorios necesarios
+echo "Creando directorios del sistema..."
+for dir in /etc/revelnest /var/lib/revelnest /var/log/revelnest; do
+    if [ ! -d "$dir" ]; then
+        mkdir -p "$dir"
+    fi
+done
+
+# Configurar permisos de directorios
+chown -R yggdrasil:yggdrasil /var/lib/revelnest /var/log/revelnest
+chmod 750 /var/lib/revelnest /var/log/revelnest
+chmod 755 /etc/revelnest
+
+# Generar configuración inicial si no existe
+CONF_FILE="/etc/revelnest/yggdrasil.conf"
+if [ ! -f "$CONF_FILE" ] && [ -f "$YGGDRASIL_BIN" ]; then
+    echo "Generando configuración inicial de Yggdrasil..."
+    # Ejecutar en modo background temporal para generar configuración
+    timeout 5 "$YGGDRASIL_BIN" -genconf > "$CONF_FILE.tmp" 2>/dev/null || true
+    
+    if [ -s "$CONF_FILE.tmp" ]; then
+        # Personalizar la configuración
+        echo "Personalizando configuración..."
+        cat "$CONF_FILE.tmp" | \
+            sed 's/^  Peers: \[\]/  Peers: [\n    "tls:\/\/ygg.mkg20001.io:443",\n    "tcp:\/\/ygg.tomasgl.ru:10526"\n  ]/' | \
+            sed 's/^  AdminListen: .*/  AdminListen: unix:\/\/\/var\/run\/revelnest\/yggdrasil.sock/' | \
+            sed 's/^  IfName: .*/  IfName: ygg0/' > "$CONF_FILE"
+        rm -f "$CONF_FILE.tmp"
+        
+        chown yggdrasil:yggdrasil "$CONF_FILE"
+        chmod 640 "$CONF_FILE"
+        
+        echo "Configuración generada en $CONF_FILE"
+    else
+        echo "Usando configuración por defecto..."
+        cat > "$CONF_FILE" << 'EOF'
+{
+  PrivateKey: ""
+  Peers: [
+    "tls://ygg.mkg20001.io:443",
+    "tcp://ygg.tomasgl.ru:10526"
+  ]
+  Listen: []
+  AdminListen: "unix:///var/run/revelnest/yggdrasil.sock"
+  IfName: ygg0
+  MulticastInterfaces: [
+    {
+      Regex: .*
+      Beacon: true
+      Listen: true
+    }
+  ]
+}
+EOF
+        chown yggdrasil:yggdrasil "$CONF_FILE"
+        chmod 640 "$CONF_FILE"
+    fi
+fi
+
+# Configurar servicio systemd
+echo "Configurando servicio systemd..."
+# Copiar servicio systemd si no existe
+SERVICE_SOURCE="$APP_RESOURCES/install-scripts/systemd/revelnest-yggdrasil.service"
+if [ ! -f /lib/systemd/system/revelnest-yggdrasil.service ] && [ -f "$SERVICE_SOURCE" ]; then
+    echo "Copiando servicio systemd desde recursos..."
+    mkdir -p /lib/systemd/system
+    cp "$SERVICE_SOURCE" /lib/systemd/system/revelnest-yggdrasil.service
+    chmod 644 /lib/systemd/system/revelnest-yggdrasil.service
+fi
+
+if [ -f /lib/systemd/system/revelnest-yggdrasil.service ]; then
+    systemctl daemon-reload
+    systemctl enable revelnest-yggdrasil.service --now || {
+        echo "Advertencia: No se pudo iniciar el servicio revelnest-yggdrasil"
+        echo "Puede iniciarlo manualmente con: systemctl start revelnest-yggdrasil"
+    }
+    
+    # Esperar un momento para que el servicio se inicie
+    sleep 2
+    
+    if systemctl is-active --quiet revelnest-yggdrasil.service; then
+        echo "✅ Servicio de red RevelNest iniciado correctamente"
+        echo "📡 Dirección IPv6 asignada:"
+        ip -6 addr show ygg0 2>/dev/null | grep "inet6 200:" || echo "   (La interfaz se configurará en unos segundos)"
+    else
+        echo "⚠️  El servicio no se pudo iniciar automáticamente"
+        echo "   Revise los logs con: journalctl -u revelnest-yggdrasil"
+    fi
+else
+    echo "Advertencia: Archivo de servicio systemd no encontrado"
+fi
+
+# Crear socket directory para AdminListen
+if [ ! -d "/var/run/revelnest" ]; then
+    mkdir -p /var/run/revelnest
+    chown yggdrasil:yggdrasil /var/run/revelnest
+    chmod 755 /var/run/revelnest
+fi
+
+echo ""
+echo "🎉 RevelNest Chat P2P instalado correctamente"
+echo ""
+echo "Para iniciar la aplicación, ejecute:"
+echo "  revelnest-chat"
+echo ""
+echo "Para ver el estado del servicio de red:"
+echo "  systemctl status revelnest-yggdrasil"
+echo ""
+echo "Para ver los logs:"
+echo "  journalctl -u revelnest-yggdrasil -f"
+echo ""
+
+exit 0

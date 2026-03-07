@@ -1,8 +1,13 @@
 {
-  "name": "new-p2p-app",
-  "productName": "new-p2p-app",
+  "name": "revelnest-chat",
+  "productName": "RevelNest Chat",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Chat descentralizado P2P con red mesh Yggdrasil",
+  "homepage": "https://revelnest.chat",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/revelnest/chat-p2p"
+  },
   "main": ".vite/build/main.js",
   "type": "module",
   "private": true,
@@ -12,7 +17,9 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "test-phase11": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --import tsx tests/test_phase11.ts"
+    "test-phase11": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --import tsx tests/test_phase11.ts",
+    "test-file-transfer": "for f in tests/file-transfer-*.test.ts; do npx tsx $f; done",
+    "test": "npm run test-file-transfer"
   },
   "keywords": [],
   "author": {
@@ -58,6 +65,7 @@
     "node-fetch": "^3.3.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-virtuoso": "^4.18.3",
     "sodium-native": "^5.0.10"
   }
 }

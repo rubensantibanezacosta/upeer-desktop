@@ -83,10 +83,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                         color={isTyping ? "primary" : "neutral"}
                         sx={{ fontWeight: isTyping ? 500 : 400 }}
                     >
-                        {isTyping ? 'escribiendo...' : (
+                        {isTyping ? 'Escribiendo...' : (
                             status === 'pending' ? 'Esperando que acepte...' :
                                 status === 'incoming' ? 'Solicitud de contacto' :
-                                    (isOnline ? 'en línea' : (lastSeen ? `visto a las ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'desconectado'))
+                                    (isOnline ? 'En línea' : (lastSeen ? `Conectado a las ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Desconectado'))
                         )}
                     </Typography>
                 )}
@@ -94,7 +94,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-            {status === 'incoming' && (
+            {status === 'incoming' && onAccept && (
                 <Button
                     size="sm"
                     variant="solid"

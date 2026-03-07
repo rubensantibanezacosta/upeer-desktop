@@ -33,19 +33,42 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!id.includes('@')) {
-            setError('Formato inválido. Usa: RevelNestID@IP');
+        // Único formato válido: RevelNestID@IP (separador @)
+        const separator = '@';
+        if (!id.includes(separator)) {
+            setError('Formato inválido. Usa: RevelNestID@IP (ej: fc33aa0e...@200:7704:49e5:...)');
             return;
         }
 
-        const [revelnestId, ip] = id.split('@');
+        const [revelnestId, ip] = id.split(separator);
         if (!revelnestId || !ip) {
             setError('Formato incompleto. Asegúrate de incluir el ID y la IP.');
             return;
         }
 
-        if (id && name) {
-            onAdd(id, name);
+        // Normalizar dirección IP Yggdrasil
+        let normalizedIp = ip.trim();
+        
+        // Validar formato de dirección - Requerir formato completo con 200:
+        const segments = normalizedIp.split(':');
+        const has200Prefix = normalizedIp.startsWith('200:');
+        
+        // Dirección Yggdrasil válida: debe comenzar con 200: y tener 8 segmentos
+        const isValidYggdrasil = has200Prefix && segments.length === 8;
+        
+        if (!isValidYggdrasil) {
+            setError('Dirección Yggdrasil inválida. Debe tener 8 segmentos comenzando con 200: (ej: 200:7704:49e5:b4cd:7910:2191:2574:351b)');
+            return;
+        }
+        
+        // Ya tiene prefijo 200: y 8 segmentos, usar tal cual
+        // (no se necesita normalización adicional)
+
+        // Construir el formato final para el backend (ID@IP)
+        const finalAddress = `${revelnestId}@${normalizedIp}`;
+
+        if (revelnestId && name) {
+            onAdd(finalAddress, name);
             setId('');
             setName('');
             setError('');
@@ -74,7 +97,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                 <Divider />
                 <DialogContent sx={{ p: 3 }}>
                     <Typography level="body-sm" sx={{ mb: 2.5 }}>
-                        Para añadir a alguien, necesitas su <b>Identidad RevelNest</b> completa (ID@IP). Este formato garantiza que conectas de forma segura y directa.
+                        Para añadir a alguien, necesitas su <b>Identidad RevelNest</b> completa en formato ID@IP. Una vez conectado, el sistema DHT mantendrá actualizada su dirección automáticamente, incluso si cambia.
                     </Typography>
 
                     {error && (
@@ -94,7 +117,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                                 <FormLabel sx={{ fontWeight: 600 }}>Identidad RevelNest (ID@IP)</FormLabel>
                                 <Input
                                     autoFocus
-                                    placeholder="fc33aa0e...@200:..."
+                                    placeholder="fc33aa0e...@200:7704:49e5:b4cd:7910:2191:2574:351b" 
                                     value={id}
                                     onChange={(e) => {
                                         setId(e.target.value);
@@ -110,7 +133,8 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                                     }}
                                 />
                                 <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.7 }}>
-                                    Ejemplo: bdc2...48b3@200:155d:b29a...
+                                    Ejemplo válido:
+                                    • fc33aa0e...@200:7704:49e5:b4cd:7910:2191:2574:351b
                                 </Typography>
                             </FormControl>
 

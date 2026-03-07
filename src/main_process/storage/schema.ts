@@ -31,6 +31,19 @@ export const contacts = sqliteTable('contacts', {
     ephemeralPublicKey: text('ephemeral_public_key'),
     dhtSeq: integer('dht_seq').notNull().default(0),
     dhtSignature: text('dht_signature'),
+    dhtExpiresAt: integer('dht_expires_at'),
+    renewalToken: text('renewal_token'),
     status: text('status').notNull().default('connected'),
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const backupSurvivalKit = sqliteTable('backup_survival_kit', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    kitId: text('kit_id').unique().notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    data: text('data').notNull(), // JSON string with contacts and location blocks
+    created: text('created').default(sql`CURRENT_TIMESTAMP`),
+    expires: integer('expires'), // Timestamp when kit expires
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 });

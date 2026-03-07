@@ -1,1 +1,11 @@
 node_modules
+dist
+dist-electron
+release
+.env
+.DS_Store
+__pycache__
+*.pyc
+logs/
+*.log
+coverage/

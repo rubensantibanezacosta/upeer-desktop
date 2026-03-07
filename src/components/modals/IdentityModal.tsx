@@ -34,7 +34,23 @@ export const IdentityModal: React.FC<IdentityModalProps> = ({ open, onClose, ide
 
     if (!identity) return null;
 
-    const fullIdentity = `${identity.revelnestId}@${identity.address || '?'}`;
+    const formatFullIdentity = (id: string, addr: string | null) => {
+        if (!addr) return `${id}@?`;
+        // Asegurar que la dirección tenga prefijo 200: para formato completo
+        let normalizedAddr = addr;
+        const parts = addr.split(':');
+        if (parts.length === 7 && !addr.startsWith('200:')) {
+            // Añadir prefijo 200: si tiene 7 segmentos y no empieza con 200:
+            normalizedAddr = '200:' + addr;
+        } else if (parts.length >= 8 && parts[0] === '200') {
+            // Ya tiene prefijo 200:, usar tal cual
+            normalizedAddr = addr;
+        }
+        // Separador @ para formato canónico
+        return `${id}@${normalizedAddr}`;
+    };
+
+    const fullIdentity = formatFullIdentity(identity.revelnestId, identity.address);
 
     return (
         <Modal open={open} onClose={onClose}>
