@@ -13,9 +13,9 @@ const LOCAL_SEEDS_FILE = 'seednodes.json';
 
 // Bootstrap manager for Kademlia DHT
 export class BootstrapManager {
-    private bootstrapped: boolean = false;
-    private lastBootstrapAttempt: number = 0;
-    private totalContacts: number = 0;
+    private bootstrapped = false;
+    private lastBootstrapAttempt = 0;
+    private totalContacts = 0;
     private stats = {
         bootstrapAttempts: 0,
         bootstrapSuccesses: 0

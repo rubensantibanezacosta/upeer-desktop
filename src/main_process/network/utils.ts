@@ -190,7 +190,7 @@ export async function verifyLocationBlockWithDHT(
     return validWithoutExpires;
 }
 
-export function generateRenewalToken(targetId: string, maxRenewals: number = 3): RenewalToken {
+export function generateRenewalToken(targetId: string, maxRenewals = 3): RenewalToken {
     const allowedUntil = Date.now() + RENEWAL_TOKEN_ALLOWED_UNTIL_MS;
     // BUG AF fix: renewalsUsed es mutable (se incrementa en cada renovación por
     // cualquier peer de la red). Incluirlo en la firma hace que la firma quede

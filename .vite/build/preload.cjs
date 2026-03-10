@@ -22,7 +22,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   sendMessage: (upeerId, message, replyTo) => electron.ipcRenderer.invoke("send-p2p-message", { upeerId, message, replyTo }),
   sendTypingIndicator: (upeerId) => electron.ipcRenderer.invoke("send-typing-indicator", { upeerId }),
   sendReadReceipt: (upeerId, id) => electron.ipcRenderer.invoke("send-read-receipt", { upeerId, id }),
-  sendContactCard: (targetRevelnestId, contact) => electron.ipcRenderer.invoke("send-contact-card", { targetRevelnestId, contact }),
+  sendContactCard: (targetUpeerId, contact) => electron.ipcRenderer.invoke("send-contact-card", { targetUpeerId, contact }),
   sendChatReaction: (upeerId, msgId, emoji, remove) => electron.ipcRenderer.invoke("send-chat-reaction", { upeerId, msgId, emoji, remove }),
   sendChatUpdate: (upeerId, msgId, newContent) => electron.ipcRenderer.invoke("send-chat-update", { upeerId, msgId, newContent }),
   sendChatDelete: (upeerId, msgId) => electron.ipcRenderer.invoke("send-chat-delete", { upeerId, msgId }),
@@ -30,7 +30,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   getContacts: () => electron.ipcRenderer.invoke("get-contacts"),
   // Group API
   getGroups: () => electron.ipcRenderer.invoke("get-groups"),
-  createGroup: (name, memberRevelnestIds, avatar) => electron.ipcRenderer.invoke("create-group", { name, memberRevelnestIds, avatar }),
+  createGroup: (name, memberUpeerIds, avatar) => electron.ipcRenderer.invoke("create-group", { name, memberUpeerIds, avatar }),
   updateGroupAvatar: (groupId, avatar) => electron.ipcRenderer.invoke("update-group-avatar", { groupId, avatar }),
   sendGroupMessage: (groupId, message, replyTo) => electron.ipcRenderer.invoke("send-group-message", { groupId, message, replyTo }),
   inviteToGroup: (groupId, upeerId) => electron.ipcRenderer.invoke("invite-to-group", { groupId, upeerId }),

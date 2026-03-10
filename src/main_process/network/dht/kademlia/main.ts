@@ -4,7 +4,7 @@ import { ValueStore } from './store.js';
 import { BootstrapManager } from './bootstrap.js';
 import { ProtocolHandler } from './protocol.js';
 import { KademliaContact, KademliaStats } from './types.js';
-import { REFRESH_INTERVAL_MS, REPUBLISH_INTERVAL_MS, BOOTSTRAP_RETRY_MS } from './types.js';
+import { BOOTSTRAP_RETRY_MS } from './types.js';
 import { network, info, debug, warn } from '../../../security/secure-logger.js';
 
 // Main Kademlia DHT implementation

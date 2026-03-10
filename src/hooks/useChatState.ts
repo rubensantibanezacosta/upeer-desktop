@@ -397,7 +397,7 @@ export function useChatState() {
         fileHash: string,
         thumbnail?: string,
         caption?: string,
-        isMine: boolean = true
+        isMine = true
     ) => {
         // BUG EG fix: eliminados console.log que exponían fileId/fileName en prod.
         if (!upeerId) return;

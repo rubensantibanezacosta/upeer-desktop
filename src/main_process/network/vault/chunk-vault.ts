@@ -1,6 +1,6 @@
 import { ErasureCoder } from './redundancy/erasure.js';
 import { trackDistributedAsset } from '../../storage/vault/index.js';
-import { sendSecureUDPMessage } from '../server.js';
+import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getContacts } from '../../storage/db.js';
 import { info, error, debug } from '../../security/secure-logger.js';

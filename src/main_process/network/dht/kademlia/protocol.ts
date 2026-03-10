@@ -50,7 +50,7 @@ export class ProtocolHandler {
         senderUpeerId: string,
         senderAddress: string
     ): Promise<void> {
-        let contact = this.routingTable.findContact(senderUpeerId);
+        const contact = this.routingTable.findContact(senderUpeerId);
         if (contact) {
             // Update existing contact
             contact.lastSeen = Date.now();
@@ -72,11 +72,11 @@ export class ProtocolHandler {
         }
     }
 
-    private handlePing(senderUpeerId: string, data: any): any {
+    private handlePing(_senderUpeerId: string, _data: any): any {
         return { type: 'DHT_PONG', nodeId: this.nodeId.toString('hex') };
     }
 
-    private handleFindNode(senderUpeerId: string, data: any): any {
+    private handleFindNode(_senderUpeerId: string, data: any): any {
         const targetId = Buffer.from(data.targetId, 'hex');
         const closestContacts = this.routingTable.findClosestContacts(targetId.toString('hex'), K);
 

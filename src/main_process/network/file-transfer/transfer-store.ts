@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { FileTransfer, TransferState, TransferPhase } from './types.js';
+import { FileTransfer, TransferPhase } from './types.js';
 
 export class FileTransferStore {
     private transfers = new Map<string, FileTransfer>();

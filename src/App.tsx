@@ -19,6 +19,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { useChatState } from './hooks/useChatState.js';
+import { useAppSetup } from './hooks/useAppSetup.js';
 import { useNavigationStore } from './store/useNavigationStore.js';
 import { AttachmentType } from './features/chat/input/index.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';

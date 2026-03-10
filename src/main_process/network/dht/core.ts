@@ -1,7 +1,6 @@
 import {
     getContacts,
-    getContactByUpeerId,
-    updateContactDhtLocation
+    getContactByUpeerId
 } from '../../storage/db.js';
 import {
     getMyUPeerId,
@@ -12,7 +11,7 @@ import {
     getNetworkAddress
 } from '../utils.js';
 import { getKademliaInstance, publishLocationBlock, findNodeLocation, iterativeFindNode } from './handlers.js';
-import { network, warn, info, error } from '../../security/secure-logger.js';
+import { network, warn, error } from '../../security/secure-logger.js';
 
 let lastKnownIp: string | null = null;
 
@@ -125,7 +124,7 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                 dist: distanceXOR(c.upeerId, targetUpeerId)
             }))
             .sort((a, b) => (a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0))
-            .map(({ dist, ...data }) => data);
+            .map(({ dist: _dist, ...data }) => data);
 
         const limitedPayload = payload.slice(0, 5);
 
@@ -258,22 +257,22 @@ function getRecentContacts(days: number): Array<{
         .sort((a, b) => b.lastSeen - a.lastSeen); // Most recent first
 }
 
-async function pingContact(ip: string, sendSecureUDPMessage: (ip: string, data: any) => void): Promise<boolean> {
+async function pingContact(ip: string, _sendSecureUDPMessage: (ip: string, data: any) => void): Promise<boolean> {
     return new Promise((resolve) => {
         // BUG AT fix: el código anterior sobreescribía el timeout de 5s (false) con un
         // setTimeout de 1s que siempre resolvía true, ignorando la reachability real.
         // pingContact no puede recibir el PONG (la integración con el handler UDP no
         // está implementada), por lo que lo correcto es resolver false tras el timeout.
-        sendSecureUDPMessage(ip, { type: 'PING' });
+        _sendSecureUDPMessage(ip, { type: 'PING' });
         // Note: In a full implementation, we would need to hook into the UDP response
         // handler to actually receive PONG before this timeout fires.
         setTimeout(() => resolve(false), 5000);
     });
 }
 
-async function askAboutContact(contact: any, targetId: string, sendSecureUDPMessage: (ip: string, data: any) => void): Promise<{ newIp?: string }> {
+async function askAboutContact(contact: any, targetId: string, _sendSecureUDPMessage: (ip: string, data: any) => void): Promise<{ newIp?: string }> {
     return new Promise((resolve) => {
-        sendSecureUDPMessage(contact.lastKnownIp, {
+        _sendSecureUDPMessage(contact.lastKnownIp, {
             type: 'DHT_QUERY',
             targetId: targetId
         });
@@ -284,15 +283,15 @@ async function askAboutContact(contact: any, targetId: string, sendSecureUDPMess
     });
 }
 
-async function scanLanForUpeer(hours: number, sendSecureUDPMessage: (ip: string, data: any) => void): Promise<Array<{ upeerId: string, address: string }>> {
+async function scanLanForUpeer(hours: number, _sendSecureUDPMessage: (ip: string, data: any) => void): Promise<Array<{ upeerId: string, address: string }>> {
     // Simplified LAN scanning - in practice would use multicast/broadcast
     network('Starting LAN scan', undefined, { duration: `${hours}h` }, 'lan-discovery');
     return []; // Placeholder - would return discovered peers
 }
 
-async function queryPeerForContact(peer: any, targetId: string, sendSecureUDPMessage: (ip: string, data: any) => void): Promise<string | null> {
+async function queryPeerForContact(peer: any, targetId: string, _sendSecureUDPMessage: (ip: string, data: any) => void): Promise<string | null> {
     return new Promise((resolve) => {
-        sendSecureUDPMessage(peer.address, {
+        _sendSecureUDPMessage(peer.address, {
             type: 'DHT_QUERY',
             targetId: targetId
         });
@@ -322,13 +321,14 @@ function startBeaconMode(durationMs: number, sendSecureUDPMessage: (ip: string, 
     }, durationMs);
 }
 
-async function sendBeaconBroadcast(sendSecureUDPMessage: (ip: string, data: any) => void) {
+async function sendBeaconBroadcast(_sendSecureUDPMessage: (ip: string, data: any) => void) {
     const myId = getMyUPeerId();
+
     // Import getMyPublicKeyHex dynamically to avoid circular dependency
     const { getMyPublicKeyHex } = await import('../../security/identity.js');
     const myPublicKey = getMyPublicKeyHex();
 
-    const beaconData = {
+    const _beaconData = {
         type: 'BEACON_NEW_NODE',
         upeerId: myId,
         publicKey: myPublicKey,
@@ -356,7 +356,7 @@ async function sendBeaconBroadcast(sendSecureUDPMessage: (ip: string, data: any)
 export function startEnhancedBeaconMode(durationMs: number, sendSecureUDPMessage: (ip: string, data: any) => void) {
     network('Starting enhanced beacon mode', undefined, { duration: `${durationMs}ms` }, 'beacon-enhanced');
 
-    const myId = getMyUPeerId();
+    const _myId = getMyUPeerId();
     // BUG AS fix: calcular el endTime absoluto una sola vez para que el inner
     // setTimeout use el tiempo *restante* en lugar de durationMs adicionales.
     // Sin esta corrección, el beacon corría min(durationMs,24h) + durationMs ms

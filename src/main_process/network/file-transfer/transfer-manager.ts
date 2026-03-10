@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import { FileTransfer, TransferState, TransferPhase, DEFAULT_CONFIG, TransferConfig } from './types.js';
+import { FileTransfer, TransferPhase, DEFAULT_CONFIG, TransferConfig } from './types.js';
 import { FileTransferStore } from './transfer-store.js';
 import { FileChunker } from './chunker.js';
 import { TransferValidator } from './validator.js';
@@ -211,7 +211,7 @@ export class TransferManager {
     /**
      * Cancel a transfer
      */
-    cancelTransfer(fileId: string, reason: string = 'Cancelled by user') {
+    cancelTransfer(fileId: string, reason = 'Cancelled by user') {
         const directions: ('sending' | 'receiving')[] = ['sending', 'receiving'];
         directions.forEach(dir => {
             const transfer = this.store.getTransfer(fileId, dir);
@@ -439,7 +439,9 @@ export class TransferManager {
             const chunksSentTimes = (updatedTransfer as any)._chunksSentTimes as Map<number, number>;
             if (chunksSentTimes && chunksSentTimes.has(data.chunkIndex)) {
                 const now = Date.now();
-                const rtt = now - chunksSentTimes.get(data.chunkIndex)!;
+                const sentTime = chunksSentTimes.get(data.chunkIndex);
+                if (sentTime === undefined) return;
+                const rtt = now - sentTime;
 
                 // Update Smothed RTT and Retransmission Timeout (RTO)
                 const currentSrtt = updatedTransfer.srtt || 250;
@@ -448,7 +450,7 @@ export class TransferManager {
 
                 // Window size update (Simplified TCP Tahoe/Reno style)
                 let newWindowSize = updatedTransfer.windowSize || 64;
-                let newSsthresh = updatedTransfer.ssthresh || 128;
+                const newSsthresh = updatedTransfer.ssthresh || 128;
                 let consecutiveAcks = (updatedTransfer.consecutiveAcks || 0) + 1;
 
                 if (newWindowSize < newSsthresh) {

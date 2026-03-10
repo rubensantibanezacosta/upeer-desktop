@@ -1,5 +1,5 @@
 import { getContacts } from '../../storage/db.js';
-import { sendSecureUDPMessage } from '../server.js';
+import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { info, warn, debug } from '../../security/secure-logger.js';
 import crypto from 'node:crypto';

@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
-import { KademliaDHT } from './kademlia/index.js';
+
 import { getContactByUpeerId, updateContactDhtLocation } from '../../storage/db.js';
-import { verifyLocationBlock, verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock, verifyRenewalToken } from '../utils.js';
+import { verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock, verifyRenewalToken } from '../utils.js';
 import { network, security, warn, error } from '../../security/secure-logger.js';
 import { setKademliaInstance, getKademliaInstance } from './shared.js';
 
@@ -15,7 +15,7 @@ export async function handleDhtPacket(
     senderUpeerId: string,
     senderAddress: string,
     win: BrowserWindow | null,
-    sendResponse: (ip: string, data: any) => void
+    _sendResponse: (ip: string, data: any) => void
 ): Promise<boolean> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return false;
@@ -58,7 +58,7 @@ export async function handleDhtPacket(
 }
 
 // Legacy DHT handlers (for backward compatibility during migration)
-async function handleLegacyDhtUpdate(senderUpeerId: string, data: any, win: BrowserWindow | null) {
+async function handleLegacyDhtUpdate(senderUpeerId: string, data: any, _win: BrowserWindow | null) {
     const block = data.locationBlock;
     if (!block || typeof block.dhtSeq !== 'number' || !block.address || !block.signature) return;
 
@@ -185,7 +185,7 @@ async function handleLegacyDhtQuery(
     }, 'dht-legacy');
     const target = await getContactByUpeerId(data.targetId);
 
-    let responseData: any = { type: 'DHT_RESPONSE', targetId: data.targetId };
+    const responseData: any = { type: 'DHT_RESPONSE', targetId: data.targetId };
 
     if (target && target.dhtSignature) {
         responseData.locationBlock = {
@@ -231,7 +231,7 @@ async function handleLegacyDhtQuery(
 async function handleLegacyDhtResponse(
     senderUpeerId: string,
     data: any,
-    sendResponse: (ip: string, data: any) => void
+    _sendResponse: (ip: string, data: any) => void
 ) {
     if (data.locationBlock) {
         const block = data.locationBlock;

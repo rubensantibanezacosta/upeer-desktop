@@ -1,11 +1,9 @@
+import { eq } from 'drizzle-orm';
+import { debug, info, warn } from '../../security/secure-logger.js';
+import { distributedAssets, redundancyHealth } from '../../storage/schema.js';
 import { getDb } from '../../storage/shared.js';
-import { redundancyHealth, distributedAssets } from '../../storage/schema.js';
-import { eq, sql } from 'drizzle-orm';
-import { info, debug, warn } from '../../security/secure-logger.js';
-import { ChunkVault } from './chunk-vault.js';
-import { VAULT_TTL_MS, VAULT_RENEW_MS } from './manager.js';
 import { getExpiringSoonEntries, renewVaultEntry } from '../../storage/vault/operations.js';
-import fs from 'node:fs/promises';
+import { VAULT_RENEW_MS, VAULT_TTL_MS } from './manager.js';
 
 /**
  * RepairWorker ensures the long-term health of distributed files.
@@ -46,7 +44,7 @@ export class RepairWorker {
 
             info('Renewing expiring vault entries', { count: expiringSoon.length }, 'vault');
 
-            const { sendSecureUDPMessage } = await import('../server.js');
+            const { sendSecureUDPMessage } = await import('../server/index.js');
             const { getContacts } = await import('../../storage/db.js');
             const { getMyUPeerId } = await import('../../security/identity.js');
             const allContacts = await getContacts();
