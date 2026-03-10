@@ -6,7 +6,7 @@ export class FileTransferStore {
 
     createTransfer(data: {
         fileId?: string;
-        revelnestId: string;
+        upeerId: string;
         peerAddress: string;
         fileName: string;
         fileSize: number;
@@ -23,7 +23,7 @@ export class FileTransferStore {
 
         const transfer: FileTransfer = {
             fileId,
-            revelnestId: data.revelnestId,
+            upeerId: data.upeerId,
             peerAddress: data.peerAddress,
             fileName: data.fileName,
             fileSize: data.fileSize,

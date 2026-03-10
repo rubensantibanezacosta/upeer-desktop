@@ -1,180 +1,87 @@
 /**
  * Adaptive Proof-of-Work for Sybil resistance
  * Mobile-friendly with adjustable difficulty based on device capabilities or reputation
+ *
+ * PoW scheme: Argon2id (memory-hard) — replaces SHA-256 to defeat GPU/ASIC botnets.
+ * Each proof requires ~8 MB of RAM per attempt, making GPU parallelism ineffective.
+ * Proof format: JSON string { s: saltHex, t: timestampSeconds }
  */
 
+import sodium from 'sodium-native';
 import crypto from 'node:crypto';
 
-export interface PowChallenge {
-    difficulty: number;      // Number of leading zero bits required
-    timestamp: number;       // Challenge issuance time
-    data: string;           // Additional data (e.g., revelnestId)
-    nonce?: string;         // Solution nonce
-}
-
-export interface PowSolution {
-    nonce: string;
-    difficulty: number;
-    timestamp: number;
-}
+// ── Argon2id parameters ──────────────────────────────────────────────────────
+// OPSLIMIT_MIN (1 pass) + MEMLIMIT_MIN (8 MiB) → ~20-50 ms on a modern CPU.
+// Difficulty: first 4 bits of hash must be zero → 1/16 probability → ~16 attempts
+// Expected total time: ~400-800 ms on CPU; GPU clusters are memory-bound.
+const ARGON2_OPSLIMIT = sodium.crypto_pwhash_OPSLIMIT_MIN;   // 1
+const ARGON2_MEMLIMIT = sodium.crypto_pwhash_MEMLIMIT_MIN;   // 8 MiB
+const ARGON2_ALG = sodium.crypto_pwhash_ALG_ARGON2ID13;
+const DIFFICULTY_MASK = 0xF0; // top nibble == 0 → 4 leading zero bits (1/16 chance)
+const PROOF_VALIDITY_S = 300; // 5 minutes
 
 export class AdaptivePow {
-    // Difficulty levels
-    static readonly DIFFICULTY_LOW = 12;     // Mobile devices, low-power
-    static readonly DIFFICULTY_MEDIUM = 16;  // Standard desktop
-    static readonly DIFFICULTY_HIGH = 20;    // High-security scenarios
-    
-    // Time window for challenge validity (milliseconds)
-    static readonly CHALLENGE_VALIDITY = 300000; // 5 minutes
-    
     /**
-     * Generate a new PoW challenge
-     * @param revelnestId The ID of the requester (to prevent precomputation)
-     * @param difficultyOverride Optional custom difficulty
+     * Generate a memory-hard Argon2id light proof.
+     * Proof format: JSON string { s: saltHex, t: timestampSeconds }
+     *
+     * Each attempt allocates 8 MiB — GPU botnets are memory-bus limited.
+     * Expected: ~16 attempts × ~30 ms/attempt = ~480 ms on desktop CPU.
      */
-    static generateChallenge(revelnestId: string, difficultyOverride?: number): PowChallenge {
-        const difficulty = difficultyOverride || this.DIFFICULTY_MEDIUM;
-        return {
-            difficulty,
-            timestamp: Date.now(),
-            data: revelnestId
-        };
-    }
-    
-    /**
-     * Solve a PoW challenge (client-side)
-     * @param challenge The challenge to solve
-     * @returns Solution with nonce
-     */
-    static solveChallenge(challenge: PowChallenge): PowSolution | null {
-        const { difficulty, timestamp, data } = challenge;
-        const target = BigInt(1) << BigInt(256 - difficulty);
-        
-        let nonce = 0;
-        const maxAttempts = 1000000; // Safety limit
-        
-        while (nonce < maxAttempts) {
-            const hash = crypto.createHash('sha256')
-                .update(data + timestamp.toString() + nonce.toString())
-                .digest();
-            
-            const hashValue = BigInt('0x' + hash.toString('hex'));
-            
-            if (hashValue < target) {
-                return {
-                    nonce: nonce.toString(),
-                    difficulty,
-                    timestamp
-                };
+    static generateLightProof(upeerId: string): string {
+        const t = Math.floor(Date.now() / 1000);
+        const password = Buffer.from(upeerId + t.toString());
+        const hash = Buffer.alloc(32);
+        const salt = Buffer.allocUnsafe(sodium.crypto_pwhash_SALTBYTES);
+        const MAX_ATTEMPTS = 512;
+
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            sodium.randombytes_buf(salt);
+            sodium.crypto_pwhash(hash, password, salt, ARGON2_OPSLIMIT, ARGON2_MEMLIMIT, ARGON2_ALG);
+
+            // Difficulty: top nibble of first byte must be 0 (4 leading zero bits → 1/16)
+            if ((hash[0] & DIFFICULTY_MASK) === 0) {
+                return JSON.stringify({ s: salt.toString('hex'), t });
             }
-            
-            nonce++;
         }
-        
-        return null; // Could not find solution within limit
+
+        // Should statistically never happen (512 >> 16 expected attempts)
+        // Return last attempt — verifier will reject, contact simply won't connect
+        return JSON.stringify({ s: salt.toString('hex'), t });
     }
-    
+
     /**
-     * Verify a PoW solution
-     * @param solution The solution to verify
-     * @param revelnestId Expected revelnestId
-     * @returns true if valid
+     * Verify a light proof. Supports both the new Argon2id format (JSON) and
+     * the legacy SHA-256 format (plain hex) for backward compatibility.
      */
-    static verifySolution(solution: PowSolution, revelnestId: string): boolean {
-        const { nonce, difficulty, timestamp } = solution;
-        
-        // Check timestamp freshness
-        if (Date.now() - timestamp > this.CHALLENGE_VALIDITY) {
-            return false; // Challenge expired
-        }
-        
-        // Verify difficulty meets minimum
-        if (difficulty < this.DIFFICULTY_LOW) {
-            return false; // Difficulty too low
-        }
-        
-        const target = BigInt(1) << BigInt(256 - difficulty);
-        
-        const hash = crypto.createHash('sha256')
-            .update(revelnestId + timestamp.toString() + nonce)
-            .digest();
-        
-        const hashValue = BigInt('0x' + hash.toString('hex'));
-        
-        return hashValue < target;
-    }
-    
-    /**
-     * Adjust difficulty based on device type or reputation
-     * @param deviceType 'mobile', 'desktop', or 'server'
-     * @param reputationScore 0.0 to 1.0 (higher = more trusted)
-     */
-    static adjustDifficulty(deviceType: string, reputationScore: number = 0.5): number {
-        let baseDifficulty: number;
-        
-        switch (deviceType) {
-            case 'mobile':
-                baseDifficulty = this.DIFFICULTY_LOW;
-                break;
-            case 'desktop':
-                baseDifficulty = this.DIFFICULTY_MEDIUM;
-                break;
-            case 'server':
-                baseDifficulty = this.DIFFICULTY_HIGH;
-                break;
-            default:
-                baseDifficulty = this.DIFFICULTY_MEDIUM;
-        }
-        
-        // Adjust based on reputation: higher reputation = lower difficulty
-        // Scale from 0.5x to 1.5x of base difficulty
-        const reputationFactor = 1.5 - reputationScore; // 1.5 to 0.5
-        const adjusted = Math.floor(baseDifficulty * reputationFactor);
-        
-        // Clamp to valid range
-        return Math.max(this.DIFFICULTY_LOW, Math.min(this.DIFFICULTY_HIGH, adjusted));
-    }
-    
-    /**
-     * Quick verification for rate-limited endpoints
-     * Simpler than full PoW, just checks that some work was done
-     */
-    static verifyLightProof(proof: string, revelnestId: string): boolean {
-        // Light proof: just verify it's a valid hex string of reasonable length
+    static verifyLightProof(proof: string, upeerId: string): boolean {
         if (!proof || typeof proof !== 'string') return false;
-        if (!/^[0-9a-f]+$/i.test(proof)) return false;
-        if (proof.length > 64) return false;
-        
-        // Optional: do a single hash verification
-        const hash = crypto.createHash('sha256')
-            .update(revelnestId + proof)
-            .digest('hex');
-        
-        // Require at least 1 leading zero hex digit (4 bits)
-        return hash.startsWith('0');
-    }
-    
-    /**
-     * Generate a light proof (for mobile devices)
-     */
-    static generateLightProof(revelnestId: string): string {
-        let nonce = 0;
-        const maxAttempts = 100000; // Increased for reliability
-        
-        while (nonce < maxAttempts) {
-            const proof = nonce.toString(16);
-            const hash = crypto.createHash('sha256')
-                .update(revelnestId + proof)
-                .digest('hex');
-            
-            if (hash.startsWith('0')) {
-                return proof;
+
+        // ── New Argon2id format ─────────────────────────────────────────────
+        if (proof.startsWith('{')) {
+            try {
+                const { s: saltHex, t } = JSON.parse(proof);
+                if (typeof saltHex !== 'string' || typeof t !== 'number') return false;
+
+                // Timestamp freshness (±5 min)
+                if (Math.abs(Date.now() / 1000 - t) > PROOF_VALIDITY_S) return false;
+
+                const salt = Buffer.from(saltHex, 'hex');
+                if (salt.length !== sodium.crypto_pwhash_SALTBYTES) return false;
+
+                const password = Buffer.from(upeerId + t.toString());
+                const hash = Buffer.alloc(32);
+                sodium.crypto_pwhash(hash, password, salt, ARGON2_OPSLIMIT, ARGON2_MEMLIMIT, ARGON2_ALG);
+
+                return (hash[0] & DIFFICULTY_MASK) === 0;
+            } catch {
+                return false;
             }
-            
-            nonce++;
         }
-        
-        // Fallback: simple timestamp-based proof
-        return Date.now().toString(16);
+
+        // ── Legacy SHA-256 format (backward compat, remove after all peers upgrade) ──
+        if (!/^[0-9a-f]+$/i.test(proof) || proof.length > 64) return false;
+        const hash = crypto.createHash('sha256').update(upeerId + proof).digest('hex');
+        return hash.startsWith('0');
     }
 }

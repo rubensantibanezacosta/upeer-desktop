@@ -23,7 +23,7 @@ export class KBucket {
     // Add or update a contact (LRU)
     add(contact: KademliaContact): boolean {
         const index = this.contacts.findIndex(c => 
-            c.revelnestId === contact.revelnestId
+            c.upeerId === contact.upeerId
         );
 
         if (index !== -1) {
@@ -43,8 +43,8 @@ export class KBucket {
         return true;
     }
 
-    remove(revelnestId: string): boolean {
-        const index = this.contacts.findIndex(c => c.revelnestId === revelnestId);
+    remove(upeerId: string): boolean {
+        const index = this.contacts.findIndex(c => c.upeerId === upeerId);
         if (index !== -1) {
             this.contacts.splice(index, 1);
             return true;

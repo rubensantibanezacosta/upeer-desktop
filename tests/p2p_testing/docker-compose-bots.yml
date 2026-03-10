@@ -1,0 +1,85 @@
+version: "3.8"
+
+# 3 bots avanzados para upeer con comportamiento realista
+#
+# Características por bot:
+#   alice  — personalidad friendly  (emojis, responde rápido, reacciones)
+#   bob    — personalidad formal    (técnico, responde lento, preciso)
+#   carlos — personalidad casual    (humor, memes, impredecible)
+#
+# Todos los bots:
+#   - Envían HANDSHAKE_REQ automáticamente al arrancar
+#   - Responden con indicador de escritura (TYPING) antes del mensaje
+#   - Envían READ receipt al recibir mensajes
+#   - Reaccionan con emojis ~30% de las veces
+#   - Mandan mensajes proactivos cada 3-10 minutos
+#   - Simulan archivos completados periódicamente
+#   - Se ponen OFFLINE durante 1-5 minutos aleatoriamente
+#
+# Uso:
+#   cd tests/p2p_testing
+#   docker compose -f docker-compose-bots.yml up --build
+#
+# Para ver logs de un bot:
+#   docker logs -f bot-alice
+#
+# TARGET: Actualiza TARGET_IDENTITY con tu ID@IP de upeer
+# (puedes verlo en Ajustes > Conexión > Tu dirección de red)
+
+x-bot-common: &bot-common
+  build:
+    context: .
+    dockerfile: Dockerfile.bot
+  privileged: true
+  cap_add:
+    - NET_ADMIN
+  devices:
+    - /dev/net/tun:/dev/net/tun
+  volumes:
+    - bot_keys:/shared
+  restart: unless-stopped
+  networks:
+    - botnet
+
+services:
+
+  bot-alice:
+    <<: *bot-common
+    container_name: bot-alice
+    environment:
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - BOT_ALIAS=Alice
+      - BOT_COLOR=#e91e8c
+      - BOT_PERSONALITY=friendly
+      - NODE_ENV_NAME=alice
+      - KEY_FILE=/shared/alice.key
+
+  bot-bob:
+    <<: *bot-common
+    container_name: bot-bob
+    environment:
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - BOT_ALIAS=Bob
+      - BOT_COLOR=#1565c0
+      - BOT_PERSONALITY=formal
+      - NODE_ENV_NAME=bob
+      - KEY_FILE=/shared/bob.key
+
+  bot-carlos:
+    <<: *bot-common
+    container_name: bot-carlos
+    environment:
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - BOT_ALIAS=Carlos
+      - BOT_COLOR=#e65100
+      - BOT_PERSONALITY=casual
+      - NODE_ENV_NAME=carlos
+      - KEY_FILE=/shared/carlos.key
+
+volumes:
+  bot_keys:
+    # Las claves persisten entre reinicios → identidades estables
+
+networks:
+  botnet:
+    driver: bridge

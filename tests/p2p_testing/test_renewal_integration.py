@@ -16,7 +16,7 @@ import sys
 # Mock de funciones de peer_bot.py
 MY_NAME = "Test_Integration"
 
-def get_revelnest_id(pk_bytes):
+def get_upeer_id(pk_bytes):
     return hashlib.blake2b(pk_bytes, digest_size=16).hexdigest()
 
 def sign_data(data, signing_key):
@@ -134,13 +134,13 @@ class MockNode:
         self.signing_key = nacl.signing.SigningKey.generate()
         self.verify_key = self.signing_key.verify_key
         self.public_key_hex = self.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
-        self.revelnest_id = get_revelnest_id(self.verify_key.encode())
+        self.upeer_id = get_upeer_id(self.verify_key.encode())
         self.known_peers = {}  # rid -> {pk, dht_seq, address, etc}
         self.renewal_tokens = {}  # target_id -> token
         
     def add_peer(self, peer_node):
         """Add another node as known peer."""
-        self.known_peers[peer_node.revelnest_id] = {
+        self.known_peers[peer_node.upeer_id] = {
             'pk': peer_node.public_key_hex,
             'dht_seq': 1,
             'address': f'200::1:{self.name}'
@@ -148,7 +148,7 @@ class MockNode:
         
     def create_renewal_token_for_self(self):
         """Create a renewal token for this node."""
-        token = create_renewal_token(self.revelnest_id, self.signing_key)
+        token = create_renewal_token(self.upeer_id, self.signing_key)
         print(f'[{self.name}] 🔑 Created renewal token for myself')
         return token
     
@@ -201,7 +201,7 @@ class MockNode:
             if verify_renewal_token(token):
                 print(f'[{self.name}] ✅ Token verified, attempting renewal...')
                 # Attempt renewal
-                if renew_location_block_with_token(token, self.revelnest_id, self.known_peers):
+                if renew_location_block_with_token(token, self.upeer_id, self.known_peers):
                     print(f'[{self.name}] ✅ Renewal SUCCESS for {target_id}')
                     return True
                 else:
@@ -225,9 +225,9 @@ def run_integration_test():
     bob = MockNode("Bob")
     charlie = MockNode("Charlie")
     
-    print(f"   Alice ID: {alice.revelnest_id}")
-    print(f"   Bob ID: {bob.revelnest_id}")
-    print(f"   Charlie ID: {charlie.revelnest_id}")
+    print(f"   Alice ID: {alice.upeer_id}")
+    print(f"   Bob ID: {bob.upeer_id}")
+    print(f"   Charlie ID: {charlie.upeer_id}")
     
     # Phase 1: Alice and Bob connect and exchange public keys
     print("\n2. Fase 1: Alice y Bob se conectan...")
@@ -241,7 +241,7 @@ def run_integration_test():
     alice.send_renewal_token(alice_token, bob)
     
     # Verify Bob received and stored the token
-    if alice.revelnest_id in bob.renewal_tokens:
+    if alice.upeer_id in bob.renewal_tokens:
         print("   ✅ Bob recibió y almacenó el token de Alice")
     else:
         print("   ❌ Bob NO recibió el token de Alice")
@@ -257,7 +257,7 @@ def run_integration_test():
     
     # Phase 5: Bob uses renewal token to renew Alice's location block
     print("\n6. Fase 5: Bob usa renewal token para renovar location block de Alice...")
-    renewal_success = bob.request_renewal(alice.revelnest_id)
+    renewal_success = bob.request_renewal(alice.upeer_id)
     
     if not renewal_success:
         print("   ❌ Renovación FALLÓ")
@@ -274,10 +274,10 @@ def run_integration_test():
     print("\n8. Fase 7: Día 46 - Charlie descubre a Alice a través de Bob...")
     # In a real system, Bob would share Alice's renewed location via DHT_EXCHANGE
     # For this test, we'll simulate Charlie learning about Alice
-    if alice.revelnest_id in bob.known_peers:
+    if alice.upeer_id in bob.known_peers:
         # Bob shares Alice's info with Charlie
-        alice_info = bob.known_peers[alice.revelnest_id].copy()
-        charlie.known_peers[alice.revelnest_id] = alice_info
+        alice_info = bob.known_peers[alice.upeer_id].copy()
+        charlie.known_peers[alice.upeer_id] = alice_info
         print(f"   ✅ Charlie descubrió a Alice a través de Bob")
         print(f"   Alice seq: {alice_info.get('dht_seq', 'unknown')}")
     else:
@@ -286,10 +286,10 @@ def run_integration_test():
     
     # Phase 8: Simulate Alice returning after 60 days with same identity
     print("\n9. Fase 8: Día 60 - Alice vuelve a conectarse después de 60 días...")
-    print(f"   Alice regresó con ID: {alice.revelnest_id}")
+    print(f"   Alice regresó con ID: {alice.upeer_id}")
     
     # Verify Alice still has the same identity
-    if alice.revelnest_id in bob.known_peers and alice.revelnest_id in charlie.known_peers:
+    if alice.upeer_id in bob.known_peers and alice.upeer_id in charlie.known_peers:
         print("   ✅ Misma identidad preservada gracias a renewal tokens")
         print("   ✅ Alice puede ser redescubierta después de 60 días offline")
     else:
@@ -298,12 +298,12 @@ def run_integration_test():
     
     # Final verification
     print("\n📊 VERIFICACIÓN FINAL:")
-    print(f"   - Alice conocida por Bob: {alice.revelnest_id in bob.known_peers}")
-    print(f"   - Alice conocida por Charlie: {alice.revelnest_id in charlie.known_peers}")
-    print(f"   - Token almacenado por Bob: {alice.revelnest_id in bob.renewal_tokens}")
+    print(f"   - Alice conocida por Bob: {alice.upeer_id in bob.known_peers}")
+    print(f"   - Alice conocida por Charlie: {alice.upeer_id in charlie.known_peers}")
+    print(f"   - Token almacenado por Bob: {alice.upeer_id in bob.renewal_tokens}")
     
-    if alice.revelnest_id in bob.known_peers:
-        token = bob.known_peers[alice.revelnest_id].get('renewal_token', {})
+    if alice.upeer_id in bob.known_peers:
+        token = bob.known_peers[alice.upeer_id].get('renewal_token', {})
         renewals_used = token.get('renewalsUsed', 0)
         max_renewals = token.get('maxRenewals', 3)
         print(f"   - Renewals usados: {renewals_used}/{max_renewals}")

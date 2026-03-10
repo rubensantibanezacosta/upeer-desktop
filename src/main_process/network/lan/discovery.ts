@@ -1,9 +1,11 @@
 import dgram from 'node:dgram';
 import os from 'node:os';
-import { getMyRevelNestId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify } from '../../security/identity.js';
+import { getMyUPeerId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { getNetworkAddress, canonicalStringify } from '../utils.js';
 import { addOrUpdateContact } from '../../storage/db.js';
+import { isContactBlocked } from '../../storage/contacts/operations.js';
 import { network, info, warn } from '../../security/secure-logger.js';
+import { RateLimiter } from '../../security/rate-limiter.js';
 
 // LAN discovery constants
 const LAN_DISCOVERY_PORT = 50006;
@@ -14,7 +16,7 @@ const LAN_DISCOVERY_TIMEOUT = 60000; // 60 seconds
 // LAN discovery message types
 export interface LanDiscoveryMessage {
     type: 'LAN_DISCOVERY_ANNOUNCE' | 'LAN_DISCOVERY_RESPONSE';
-    revelnestId: string;
+    upeerId: string;
     publicKey: string;
     ephemeralPublicKey?: string;
     address: string;
@@ -22,29 +24,37 @@ export interface LanDiscoveryMessage {
     signature: string;
 }
 
+// Yggdrasil 200::/7 range: first segment starts with 2xx or 3xx in hex (not fe80:: link-local)
+const YGG_REGEX = /^[23][0-9a-f]{2}:/i;
+
 export class LanDiscovery {
     private socket: dgram.Socket | null = null;
     private discoveryInterval: NodeJS.Timeout | null = null;
     private discoveredPeers = new Map<string, { address: string; timestamp: number }>();
     private isRunning = false;
+    // BUG CU fix: rate-limiter por IP de origen para bloquear floods de multicast.
+    // Límite conservador: 10 anuncios/min por IP (el propio nodo anuncia cada 30 s).
+    private lanRateLimiter = new RateLimiter({
+        'LAN_DISCOVERY': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+    });
 
-    constructor() {}
+    constructor() { }
 
     // Start LAN discovery
     async start(): Promise<void> {
         if (this.isRunning) return;
-        
+
         try {
             this.socket = dgram.createSocket({ type: 'udp6', reuseAddr: true });
-            
+
             this.socket.on('message', (msg, rinfo) => {
                 this.handleLanMessage(msg, rinfo);
             });
-            
+
             this.socket.on('error', (err) => {
                 warn('LAN discovery socket error', err, 'lan');
             });
-            
+
             // Bind to all interfaces on LAN discovery port
             await new Promise<void>((resolve, reject) => {
                 this.socket!.bind(LAN_DISCOVERY_PORT, '::', () => {
@@ -58,18 +68,18 @@ export class LanDiscovery {
                     }
                 });
             });
-            
+
             // Start periodic announcements
             this.discoveryInterval = setInterval(() => {
                 this.announcePresence();
                 this.cleanupOldPeers();
             }, LAN_BROADCAST_INTERVAL);
-            
+
             // Initial announcement
             setTimeout(() => this.announcePresence(), 1000);
-            
+
             this.isRunning = true;
-            
+
         } catch (error) {
             warn('Failed to start LAN discovery', error, 'lan');
             this.stop();
@@ -82,7 +92,7 @@ export class LanDiscovery {
             clearInterval(this.discoveryInterval);
             this.discoveryInterval = null;
         }
-        
+
         if (this.socket) {
             try {
                 this.socket.dropMembership(LAN_MULTICAST_GROUP);
@@ -92,7 +102,7 @@ export class LanDiscovery {
             }
             this.socket = null;
         }
-        
+
         this.discoveredPeers.clear();
         this.isRunning = false;
         info('LAN discovery stopped', {}, 'lan');
@@ -101,73 +111,91 @@ export class LanDiscovery {
     // Announce presence on LAN
     private announcePresence(): void {
         if (!this.socket) return;
-        
+
         const myAddress = getNetworkAddress();
         if (!myAddress) return;
-        
+
+        // Guard: no intentar firmar si la identidad no está lista
+        let upeerId: string;
+        let publicKey: string;
+        let ephemeralPublicKey: string;
+        try {
+            upeerId = getMyUPeerId();
+            publicKey = getMyPublicKeyHex();
+            ephemeralPublicKey = getMyEphemeralPublicKeyHex();
+            if (!upeerId || !publicKey) return;
+        } catch {
+            return;
+        }
+
         // Create message data without signature
         const messageData = {
             type: 'LAN_DISCOVERY_ANNOUNCE' as const,
-            revelnestId: getMyRevelNestId(),
-            publicKey: getMyPublicKeyHex(),
-            ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
+            upeerId,
+            publicKey,
+            ephemeralPublicKey,
             address: myAddress,
             timestamp: Date.now()
         };
-        
+
         // Sign the message
         const signature = sign(Buffer.from(canonicalStringify(messageData))).toString('hex');
-        
+
         // Add signature to final message
         const message: LanDiscoveryMessage = {
             ...messageData,
             signature
         };
-        
+
         const buffer = Buffer.from(JSON.stringify(message));
-        
+
         // Send to multicast group
         this.socket.send(buffer, 0, buffer.length, LAN_DISCOVERY_PORT, LAN_MULTICAST_GROUP, (err) => {
             if (err) {
                 warn('Failed to send LAN announcement', err, 'lan');
             }
         });
-        
+
         network('LAN announcement sent', undefined, { address: myAddress }, 'lan');
     }
 
     // Handle incoming LAN messages
     private handleLanMessage(msg: Buffer, rinfo: any): void {
         try {
+            // BUG CU fix: rate-limit por IP de origen ANTES de parsear/verificar criptografía.
+            // Sin esto, un atacante en la LAN puede inundar el socket multicast generando
+            // keypairs masivamente y saturar la DB de contactos y el Map discoveredPeers.
+            if (!this.lanRateLimiter.check(rinfo.address, 'LAN_DISCOVERY')) {
+                warn('LAN discovery rate limit exceeded', { sourceIp: rinfo.address }, 'lan');
+                return;
+            }
+
             const message: LanDiscoveryMessage = JSON.parse(msg.toString());
-            
+
             // Validate message
             if (!this.validateLanMessage(message, rinfo)) {
                 return;
             }
-            
-            // TODO: Add rate limiting per IP to prevent DoS attacks
-            // Consider using the global RateLimiter with LAN_DISCOVERY message type
-            
+
             // Check if message is from ourselves
-            if (message.revelnestId === getMyRevelNestId()) {
+            if (message.upeerId === getMyUPeerId()) {
                 return;
             }
-            
+
             // Record peer
-            this.discoveredPeers.set(message.revelnestId, {
+            this.discoveredPeers.set(message.upeerId, {
                 address: message.address,
                 timestamp: Date.now()
             });
-            
+
             // Add to contacts
             this.addDiscoveredPeer(message);
-            
+
             // Respond to announcements
             if (message.type === 'LAN_DISCOVERY_ANNOUNCE') {
-                this.sendResponse(message.revelnestId, message.address);
+                this.sendResponse(message.upeerId, message.address);
             }
-            
+
         } catch (error) {
             warn('Failed to parse LAN message', error, 'lan');
         }
@@ -175,15 +203,48 @@ export class LanDiscovery {
 
     // Validate LAN message
     private validateLanMessage(message: LanDiscoveryMessage, rinfo: any): boolean {
-        if (!message.revelnestId || !message.publicKey || !message.address || !message.timestamp || !message.signature) {
+        if (!message.upeerId || !message.publicKey || !message.address || !message.timestamp || !message.signature) {
             return false;
         }
-        
-        // Check if message is recent (within 5 minutes)
-        if (Date.now() - message.timestamp > 5 * 60 * 1000) {
+
+        // BUG CV fix: rechazar timestamps futuros (> 5 min adelante) además de los muy antiguos.
+        // La condición original sólo comprobaba Date.now() - ts > 5min, que es negativa para
+        // timestamps futuros → pasan como válidos.
+        const now = Date.now();
+        const tsDelta = now - message.timestamp;
+        if (tsDelta > 5 * 60 * 1000 || tsDelta < -(5 * 60 * 1000)) {
             return false;
         }
-        
+
+        // BUG CT fix parte 1: validar formato de publicKey (64 hex = 32 bytes Ed25519)
+        // antes de pasarlo a libsodium; evita que la verificación falle con error opaco.
+        if (typeof message.publicKey !== 'string' || !/^[0-9a-f]{64}$/i.test(message.publicKey)) {
+            warn('LAN message: invalid publicKey format', {}, 'lan');
+            return false;
+        }
+
+        // BUG FT fix: ephemeralPublicKey opcional no se validaba → un peer en LAN con clave
+        // legítima podía firmar un paquete con ephemeralPublicKey='garbage' (o un string de
+        // 30 KB) que pasaba la verificación de firma y quedaba almacenado en la DB.
+        // Consecuencia: las operaciones X3DH posteriores con ese contacto fallaban
+        // (DoS dirigido a un contacto concreto) porque Buffer.from(key, 'hex') produce
+        // un buffer de longitud incorrecta que libsodium rechaza.
+        if (message.ephemeralPublicKey !== undefined &&
+            (typeof message.ephemeralPublicKey !== 'string' || !/^[0-9a-f]{64}$/i.test(message.ephemeralPublicKey))) {
+            warn('LAN message: invalid ephemeralPublicKey format', {}, 'lan');
+            return false;
+        }
+
+        // BUG CT fix parte 2: validar que message.address es una dirección Yggdrasil válida
+        // (rango 200::/7, 8 segmentos). Sin esto, un peer con clave legítima puede firmar un
+        // paquete con address='127.0.0.1' o cualquier IP y la firma pasaría; esa dirección
+        // quedaría almacenada en contactos y redigiría conexiones futuras a localhost.
+        const addrSegments = message.address.split(':');
+        if (!YGG_REGEX.test(message.address) || addrSegments.length !== 8) {
+            warn('LAN message: address is not a valid Yggdrasil IPv6 address', { address: message.address }, 'lan');
+            return false;
+        }
+
         // Verify signature
         try {
             // Extract message data without signature for verification
@@ -191,75 +252,92 @@ export class LanDiscovery {
             const messageBuffer = Buffer.from(canonicalStringify(messageData));
             const signatureBuffer = Buffer.from(signature, 'hex');
             const publicKeyBuffer = Buffer.from(message.publicKey, 'hex');
-            
+
             const isValid = verify(messageBuffer, signatureBuffer, publicKeyBuffer);
             if (!isValid) {
-                warn('Invalid LAN message signature', { revelnestId: message.revelnestId }, 'lan');
+                warn('Invalid LAN message signature', { upeerId: message.upeerId }, 'lan');
+                return false;
+            }
+
+            // BUG AQ fix: verificar que upeerId realmente deriva de publicKey.
+            // Sin esta comprobación, un peer puede firmar con su propia clave pero
+            // reclamar el upeerId de otra persona → suplantación de identidad en LAN.
+            const derivedId = getUPeerIdFromPublicKey(publicKeyBuffer);
+            if (derivedId !== message.upeerId) {
+                warn('LAN message: upeerId does not match publicKey (identity spoofing attempt)', { claimed: message.upeerId }, 'lan');
                 return false;
             }
         } catch (error) {
             warn('Failed to verify LAN message signature', error, 'lan');
             return false;
         }
-        
+
         return true;
     }
 
     // Send response to discovered peer
-    private sendResponse(targetRevelnestId: string, targetAddress: string): void {
+    private sendResponse(targetUpeerId: string, targetAddress: string): void {
         if (!this.socket) return;
-        
+
         const myAddress = getNetworkAddress();
         if (!myAddress) return;
-        
+
         // Create response data without signature
         const responseData: Omit<LanDiscoveryMessage, 'signature'> = {
             type: 'LAN_DISCOVERY_RESPONSE' as const,
-            revelnestId: getMyRevelNestId(),
+            upeerId: getMyUPeerId(),
             publicKey: getMyPublicKeyHex(),
             ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
             address: myAddress,
             timestamp: Date.now()
         };
-        
+
         // Sign the response
         const signature = sign(Buffer.from(canonicalStringify(responseData))).toString('hex');
-        
+
         // Add signature to final response
         const response: LanDiscoveryMessage = {
             ...responseData,
             signature
         };
-        
+
         const buffer = Buffer.from(JSON.stringify(response));
-        
+
         // Send directly to the peer
         this.socket.send(buffer, 0, buffer.length, LAN_DISCOVERY_PORT, targetAddress, (err) => {
             if (err) {
                 warn('Failed to send LAN response', err, 'lan');
             }
         });
-        
-        network('LAN response sent', undefined, { target: targetRevelnestId }, 'lan');
+
+        network('LAN response sent', undefined, { target: targetUpeerId }, 'lan');
     }
 
     // Add discovered peer to contacts
     private async addDiscoveredPeer(message: LanDiscoveryMessage): Promise<void> {
         try {
+            // BUG AR fix: verificar que el peer no está bloqueado antes de añadirlo.
+            // Sin esta comprobación, contactos bloqueados podían reaparecer como 'connected'
+            // mediante anuncios LAN multicast, saltándose el bloqueo.
+            if (isContactBlocked(message.upeerId)) {
+                warn('LAN: ignoring announcement from blocked contact', { upeerId: message.upeerId }, 'lan');
+                return;
+            }
+
             await addOrUpdateContact(
-                message.revelnestId,
+                message.upeerId,
                 message.address,
-                `LAN Peer ${message.revelnestId.slice(0, 4)}`,
+                `LAN Peer ${message.upeerId.slice(0, 4)}`,
                 message.publicKey,
                 'connected',
                 message.ephemeralPublicKey
             );
-            
-            info('LAN peer discovered', { 
-                revelnestId: message.revelnestId, 
-                address: message.address 
+
+            info('LAN peer discovered', {
+                upeerId: message.upeerId,
+                address: message.address
             }, 'lan');
-            
+
         } catch (error) {
             warn('Failed to add LAN peer to contacts', error, 'lan');
         }
@@ -268,17 +346,17 @@ export class LanDiscovery {
     // Cleanup old peers
     private cleanupOldPeers(): void {
         const now = Date.now();
-        for (const [revelnestId, data] of this.discoveredPeers.entries()) {
+        for (const [upeerId, data] of this.discoveredPeers.entries()) {
             if (now - data.timestamp > LAN_DISCOVERY_TIMEOUT) {
-                this.discoveredPeers.delete(revelnestId);
+                this.discoveredPeers.delete(upeerId);
             }
         }
     }
 
     // Get discovered peers
-    getDiscoveredPeers(): Array<{ revelnestId: string; address: string; timestamp: number }> {
-        return Array.from(this.discoveredPeers.entries()).map(([revelnestId, data]) => ({
-            revelnestId,
+    getDiscoveredPeers(): Array<{ upeerId: string; address: string; timestamp: number }> {
+        return Array.from(this.discoveredPeers.entries()).map(([upeerId, data]) => ({
+            upeerId,
             address: data.address,
             timestamp: data.timestamp
         }));

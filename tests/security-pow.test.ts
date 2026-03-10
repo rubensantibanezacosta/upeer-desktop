@@ -5,12 +5,12 @@ import { AdaptivePow } from '../src/main_process/security/pow.js';
 
 describe('Adaptive Proof-of-Work', () => {
     it('should generate and verify PoW challenge', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
-        const challenge = AdaptivePow.generateChallenge(revelnestId);
+        const upeerId = 'test1234567890abcdef1234567890abcd';
+        const challenge = AdaptivePow.generateChallenge(upeerId);
         
         assert.strictEqual(typeof challenge.difficulty, 'number');
         assert.strictEqual(typeof challenge.timestamp, 'number');
-        assert.strictEqual(challenge.data, revelnestId);
+        assert.strictEqual(challenge.data, upeerId);
         
         // Difficulty should be within bounds
         assert.ok(challenge.difficulty >= AdaptivePow.DIFFICULTY_LOW);
@@ -18,11 +18,11 @@ describe('Adaptive Proof-of-Work', () => {
     });
     
     it('should solve and verify PoW challenge', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
+        const upeerId = 'test1234567890abcdef1234567890abcd';
         const challenge = {
             difficulty: AdaptivePow.DIFFICULTY_LOW, // Use low difficulty for faster tests
             timestamp: Date.now(),
-            data: revelnestId
+            data: upeerId
         };
         
         const solution = AdaptivePow.solveChallenge(challenge);
@@ -35,32 +35,32 @@ describe('Adaptive Proof-of-Work', () => {
             assert.strictEqual(solution.timestamp, challenge.timestamp);
             
             // Should verify correctly
-            const isValid = AdaptivePow.verifySolution(solution, revelnestId);
+            const isValid = AdaptivePow.verifySolution(solution, upeerId);
             assert.strictEqual(isValid, true);
         }
     });
     
     it('should reject expired challenges', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
+        const upeerId = 'test1234567890abcdef1234567890abcd';
         const solution = {
             nonce: '123',
             difficulty: AdaptivePow.DIFFICULTY_LOW,
             timestamp: Date.now() - (AdaptivePow.CHALLENGE_VALIDITY + 1000) // Expired
         };
         
-        const isValid = AdaptivePow.verifySolution(solution, revelnestId);
+        const isValid = AdaptivePow.verifySolution(solution, upeerId);
         assert.strictEqual(isValid, false);
     });
     
     it('should reject solutions with insufficient difficulty', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
+        const upeerId = 'test1234567890abcdef1234567890abcd';
         const solution = {
             nonce: '123',
             difficulty: AdaptivePow.DIFFICULTY_LOW - 1, // Too low
             timestamp: Date.now()
         };
         
-        const isValid = AdaptivePow.verifySolution(solution, revelnestId);
+        const isValid = AdaptivePow.verifySolution(solution, upeerId);
         assert.strictEqual(isValid, false);
     });
     
@@ -93,17 +93,17 @@ describe('Adaptive Proof-of-Work', () => {
     });
     
     it('should generate and verify light proofs', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
+        const upeerId = 'test1234567890abcdef1234567890abcd';
         
         // Generate light proof
-        const proof = AdaptivePow.generateLightProof(revelnestId);
+        const proof = AdaptivePow.generateLightProof(upeerId);
         assert.strictEqual(typeof proof, 'string');
         // Proof can be shorter than 8 chars if it's a timestamp fallback
         assert.ok(proof.length > 0);
         assert.ok(proof.length <= 64);
         
         // Should verify
-        const isValid = AdaptivePow.verifyLightProof(proof, revelnestId);
+        const isValid = AdaptivePow.verifyLightProof(proof, upeerId);
         assert.strictEqual(isValid, true);
         
         // Invalid proofs should fail
@@ -115,14 +115,14 @@ describe('Adaptive Proof-of-Work', () => {
         ];
         
         for (const invalidProof of invalidProofs) {
-            const result = AdaptivePow.verifyLightProof(invalidProof, revelnestId);
+            const result = AdaptivePow.verifyLightProof(invalidProof, upeerId);
             assert.strictEqual(result, false);
         }
     });
     
     it('should solve challenge with custom difficulty', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
-        const challenge = AdaptivePow.generateChallenge(revelnestId, AdaptivePow.DIFFICULTY_LOW);
+        const upeerId = 'test1234567890abcdef1234567890abcd';
+        const challenge = AdaptivePow.generateChallenge(upeerId, AdaptivePow.DIFFICULTY_LOW);
         
         assert.strictEqual(challenge.difficulty, AdaptivePow.DIFFICULTY_LOW);
         
@@ -131,12 +131,12 @@ describe('Adaptive Proof-of-Work', () => {
     });
     
     it('should handle null solution when challenge is too hard', () => {
-        const revelnestId = 'test1234567890abcdef1234567890abcd';
+        const upeerId = 'test1234567890abcdef1234567890abcd';
         // Create an impossible challenge (very high difficulty)
         const challenge = {
             difficulty: 255, // Essentially impossible
             timestamp: Date.now(),
-            data: revelnestId
+            data: upeerId
         };
         
         const solution = AdaptivePow.solveChallenge(challenge);

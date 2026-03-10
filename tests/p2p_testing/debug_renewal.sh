@@ -12,7 +12,7 @@ mkdir -p /tmp/debug_renewal
 docker rm -f debug_alice debug_bob 2>/dev/null || true
 
 # Build image
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
 
 # Start Alice
 echo "1. Starting Alice..."
@@ -20,7 +20,7 @@ docker run -d --name debug_alice --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/debug_renewal:/shared \
   -e NODE_ENV_NAME=alice \
   -e KEY_FILE=/shared/alice.key \
-  revelnest-bot
+  upeer-bot
 sleep 8
 
 # Get Alice info
@@ -35,7 +35,7 @@ docker run -d --name debug_bob --cap-add=NET_ADMIN --device=/dev/net/tun \
   -e NODE_ENV_NAME=bob \
   -e KEY_FILE=/shared/bob.key \
   -e TARGET_IDENTITY="${ALICE_ID}@${ALICE_IP}" \
-  revelnest-bot
+  upeer-bot
 sleep 12
 
 # Get Bob info

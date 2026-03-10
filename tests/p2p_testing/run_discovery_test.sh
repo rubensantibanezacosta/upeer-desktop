@@ -1,6 +1,6 @@
 #!/bin/bash
 # Rebuild the docker image
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
 
 # Cleanup
 rm -rf /tmp/p2p_shared
@@ -8,7 +8,7 @@ mkdir -p /tmp/p2p_shared
 docker rm -f p2p_relay p2p_victim p2p_prober 2>/dev/null || true
 
 echo "1. Levantando Relay (Nodo que sabrá las IPs)..."
-docker run -d --name p2p_relay --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=relay revelnest-bot
+docker run -d --name p2p_relay --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=relay upeer-bot
 sleep 5
 
 RELAY_DATA=$(cat /tmp/p2p_shared/relay.json)
@@ -18,7 +18,7 @@ TARGET_RELAY="${RELAY_ID}@${RELAY_IP}"
 
 echo "2. Levantando Víctima (Nodo que cambiará de IP)..."
 # Usamos un archivo de llaves para mantener la identidad
-docker run -d --name p2p_victim --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=victim -e KEY_FILE=/shared/victim.key -e TARGET_IDENTITY=$TARGET_RELAY revelnest-bot
+docker run -d --name p2p_victim --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=victim -e KEY_FILE=/shared/victim.key -e TARGET_IDENTITY=$TARGET_RELAY upeer-bot
 sleep 5
 
 VICTIM_DATA=$(cat /tmp/p2p_shared/victim.json)
@@ -30,7 +30,7 @@ echo "Víctima ID: $VICTIM_ID"
 echo "Víctima PK: $VICTIM_PK_HEX"
 
 echo "3. Levantando Prober (Nodo que lanzará la búsqueda reactiva)..."
-docker run -d --name p2p_prober --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=prober -e TARGET_IDENTITY=$TARGET_RELAY revelnest-bot
+docker run -d --name p2p_prober --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=prober -e TARGET_IDENTITY=$TARGET_RELAY upeer-bot
 sleep 10
 
 # Añadimos a la Víctima manualmente al Prober con su IP INICIAL
@@ -42,7 +42,7 @@ echo "4. Matando Víctima y re-apareciendo en una nueva interfaz/contenedor (Nue
 docker rm -f p2p_victim
 sleep 2
 # La identidad se carga del archivo victim.key
-docker run -d --name p2p_victim --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=victim -e KEY_FILE=/shared/victim.key -e TARGET_IDENTITY=$TARGET_RELAY revelnest-bot
+docker run -d --name p2p_victim --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared:/shared -e NODE_ENV_NAME=victim -e KEY_FILE=/shared/victim.key -e TARGET_IDENTITY=$TARGET_RELAY upeer-bot
 echo "Víctima ha vuelto. Esperando 20s para que se anuncie al Relay..."
 sleep 20
 

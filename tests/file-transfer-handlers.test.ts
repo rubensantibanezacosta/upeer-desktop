@@ -16,21 +16,21 @@ const mockSendResponse = mock.fn((address: string, data: any) => {
     console.log(`[MOCK SEND] to ${address}:`, data.type);
 });
 
-const mockStartDhtSearch = mock.fn((revelnestId: string) => {
-    console.log(`[MOCK DHT SEARCH] for ${revelnestId}`);
+const mockStartDhtSearch = mock.fn((upeerId: string) => {
+    console.log(`[MOCK DHT SEARCH] for ${upeerId}`);
 });
 
 // Mock the file transfer manager methods
-const mockHandleFileStart = mock.fn(async (revelnestId: string, address: string, data: any, signature: string) => {
-    console.log(`[MOCK] handleFileStart called for ${revelnestId}`);
+const mockHandleFileStart = mock.fn(async (upeerId: string, address: string, data: any, signature: string) => {
+    console.log(`[MOCK] handleFileStart called for ${upeerId}`);
 });
 
-const mockHandleFileChunk = mock.fn(async (revelnestId: string, address: string, data: any, signature: string) => {
-    console.log(`[MOCK] handleFileChunk called for ${revelnestId}`);
+const mockHandleFileChunk = mock.fn(async (upeerId: string, address: string, data: any, signature: string) => {
+    console.log(`[MOCK] handleFileChunk called for ${upeerId}`);
 });
 
-const mockHandleFileAck = mock.fn(async (revelnestId: string, address: string, data: any, signature: string) => {
-    console.log(`[MOCK] handleFileAck called for ${revelnestId}`);
+const mockHandleFileAck = mock.fn(async (upeerId: string, address: string, data: any, signature: string) => {
+    console.log(`[MOCK] handleFileAck called for ${upeerId}`);
 });
 
 // Mock other dependencies
@@ -77,7 +77,7 @@ describe('File Transfer Handlers Integration', () => {
             // Create a signed packet (simplified for test)
             const fullPacket = {
                 ...packet,
-                senderRevelnestId: 'peer-123',
+                senderUpeerId: 'peer-123',
                 signature: 'mock-signature-123'
             };
 

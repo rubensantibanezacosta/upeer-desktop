@@ -13,7 +13,7 @@ import {
 } from '../src/main_process/network/utils.js';
 import { KademliaDHT } from '../src/main_process/network/dht/kademlia/index.js';
 import { getKademliaInstance, setKademliaInstance } from '../src/main_process/network/dht/shared.js';
-// getMyRevelNestId not needed for mock tests
+// getMyUPeerId not needed for mock tests
 
 // Helper to generate mock identity
 function generateMockIdentity() {
@@ -22,8 +22,8 @@ function generateMockIdentity() {
         .export({ type: 'spki', format: 'der' })
         .toString('hex')
         .slice(-64); // Simplified
-    const revelnestId = crypto.randomBytes(16).toString('hex');
-    return { keyPair, publicKeyHex, revelnestId };
+    const upeerId = crypto.randomBytes(16).toString('hex');
+    return { keyPair, publicKeyHex, upeerId };
 }
 
 // Mock sendMessage function

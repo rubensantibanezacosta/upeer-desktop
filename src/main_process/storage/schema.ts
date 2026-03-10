@@ -1,9 +1,19 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+export const groups = sqliteTable('groups', {
+    groupId: text('group_id').primaryKey(),
+    name: text('name').notNull(),
+    adminUpeerId: text('admin_upeer_id').notNull(),
+    members: text('members').notNull().default('[]'), // JSON array of upeerIds
+    status: text('status').notNull().default('active'), // 'active' | 'invited'
+    avatar: text('avatar'), // base64 data URL, local only
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const messages = sqliteTable('messages', {
     id: text('id').primaryKey(),
-    chatRevelnestId: text('chat_revelnest_id').notNull(),
+    chatUpeerId: text('chat_upeer_id').notNull(),
     isMine: integer('is_mine', { mode: 'boolean' }).notNull(),
     message: text('message').notNull(),
     replyTo: text('reply_to'),
@@ -17,23 +27,32 @@ export const messages = sqliteTable('messages', {
 export const reactions = sqliteTable('reactions', {
     id: integer('id').primaryKey({ autoIncrement: true }),
     messageId: text('message_id').notNull(),
-    revelnestId: text('revelnest_id').notNull(),
+    upeerId: text('upeer_id').notNull(),
     emoji: text('emoji').notNull(),
     timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const contacts = sqliteTable('contacts', {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    revelnestId: text('revelnest_id').unique(),
+    upeerId: text('upeer_id').unique(),
     address: text('address').notNull(),
     name: text('name').notNull(),
     publicKey: text('public_key'),
     ephemeralPublicKey: text('ephemeral_public_key'),
+    ephemeralPublicKeyUpdatedAt: text('ephemeral_public_key_updated_at'), // ISO timestamp of last eph key update
+    // ── Double Ratchet: Signed PreKey del contacto (X25519) ──────────────────
+    // Se recibe en el HANDSHAKE y se usa para X3DH al enviar el primer mensaje ratchet.
+    signedPreKey: text('signed_pre_key'),              // hex X25519 public key
+    signedPreKeySignature: text('signed_pre_key_sig'), // hex Ed25519 signature de SPK por IK
+    signedPreKeyId: integer('signed_pre_key_id'),      // ID correlativo del SPK
     dhtSeq: integer('dht_seq').notNull().default(0),
     dhtSignature: text('dht_signature'),
     dhtExpiresAt: integer('dht_expires_at'),
     renewalToken: text('renewal_token'),
-    status: text('status').notNull().default('connected'),
+    knownAddresses: text('known_addresses').notNull().default('[]'), // JSON: string[] — one IP per device
+    avatar: text('avatar'), // Base64 data URL del avatar, nullable
+    status: text('status').notNull().default('connected'), // 'pending'|'incoming'|'connected'|'offline'|'blocked'
+    blockedAt: text('blocked_at'), // ISO timestamp cuando fue bloqueado
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -46,4 +65,71 @@ export const backupSurvivalKit = sqliteTable('backup_survival_kit', {
     created: text('created').default(sql`CURRENT_TIMESTAMP`),
     expires: integer('expires'), // Timestamp when kit expires
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+});
+export const vaultStorage = sqliteTable('vault_storage', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    payloadHash: text('payload_hash').unique().notNull(),
+    recipientSid: text('recipient_sid').notNull(), // Social ID del destinatario
+    senderSid: text('sender_sid').notNull(),    // Social ID del emisor original
+    priority: integer('priority').notNull().default(1), // 1: msg, 2: meta, 3: chunk
+    data: text('data').notNull(),               // BLOB/Encrypted data (as hex)
+    expiresAt: integer('expires_at').notNull(), // TTL (Timestamp)
+    timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const distributedAssets = sqliteTable('distributed_assets', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    fileHash: text('file_hash').notNull(),
+    cid: text('cid').unique().notNull(),        // Content ID del fragmento
+    shardIndex: integer('shard_index').notNull(),
+    totalShards: integer('total_shards').notNull(),
+    custodianSid: text('custodian_sid').notNull(), // Amigo que lo tiene
+    status: text('status').notNull().default('active'), // 'active' | 'lost'
+    lastVerified: integer('last_verified'),
+});
+
+export const redundancyHealth = sqliteTable('redundancy_health', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    assetHash: text('asset_hash').unique().notNull(),
+    availableShards: integer('available_shards').notNull(),
+    requiredShards: integer('required_shards').notNull(), // k (datos)
+    healthStatus: text('health_status').notNull(), // 'perfect' | 'degraded' | 'critical' | 'lost'
+    lastCheck: integer('last_check'),
+});
+
+// G-Set CRDT de vouches firmados para reputación distribuida
+export const reputationVouches = sqliteTable('reputation_vouches', {
+    id: text('id').primaryKey(),                             // sha256 determinista
+    fromId: text('from_id').notNull(),                       // upeerId emisor
+    toId: text('to_id').notNull(),                           // upeerId sujeto
+    type: text('type').notNull(),                            // VouchType
+    positive: integer('positive', { mode: 'boolean' }).notNull(),
+    timestamp: integer('timestamp').notNull(),               // ms epoch
+    signature: text('signature').notNull(),                  // hex Ed25519
+    receivedAt: integer('received_at').notNull(),            // cuando lo recibimos
+});
+
+// ── Double Ratchet: estado de sesión por contacto ─────────────────────────────
+// Protegido por SQLCipher. Contiene material de clave sensible (dhsSk).
+export const ratchetSessions = sqliteTable('ratchet_sessions', {
+    upeerId: text('upeer_id').primaryKey(),   // un estado por contacto
+    state: text('state').notNull(),                   // JSON SerializedRatchetState
+    // Nuestro SPK que se usó para establecer esta sesión (para poder rotar)
+    spkIdUsed: integer('spk_id_used'),
+    establishedAt: integer('established_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+});
+
+// ── Pending Outbox: mensajes en espera de clave pública del destinatario ───────
+// Cuando Alice quiere escribir a Bob pero aún no tiene su clave pública
+// (contacto 'pending' que nunca ha conectado), el mensaje se guarda aquí,
+// protegido por SQLCipher, hasta que llegue el primer HANDSHAKE de Bob.
+// En ese momento se re-cifra con su clave y se vaultea automáticamente.
+export const pendingOutbox = sqliteTable('pending_outbox', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    msgId: text('msg_id').notNull(),                // UUID original de saveMessage() — evita duplicados
+    recipientSid: text('recipient_sid').notNull(),  // upeerId del destinatario
+    plaintext: text('plaintext').notNull(),          // contenido del mensaje (SQLCipher lo protege)
+    replyTo: text('reply_to'),                       // id del mensaje al que se responde (opcional)
+    createdAt: integer('created_at').notNull(),      // epoch ms
 });

@@ -1,6 +1,6 @@
 export interface ChatMessage {
     id?: string;
-    revelnestId: string;
+    upeerId: string;
     isMine: boolean;
     message: string;
     status: string;
@@ -10,17 +10,28 @@ export interface ChatMessage {
     isDeleted?: boolean;
     isEdited?: boolean;
     reactions?: Array<{
-        revelnestId: string;
+        upeerId: string;
         emoji: string;
     }>;
+    // Group message extras
+    senderUpeerId?: string;
+    senderName?: string;
+    groupId?: string;
+    isSystem?: boolean;
+}
+
+export interface ReputationData {
+    vouchScore: number;
+    connectionCount: number;
 }
 
 export interface Contact {
-    revelnestId: string;
+    upeerId: string;
     address: string;
     name: string;
-    status: 'pending' | 'incoming' | 'connected';
+    status: 'pending' | 'incoming' | 'connected' | 'blocked';
     publicKey?: string;
+    avatar?: string;
     lastSeen?: string;
     lastMessage?: string;
     lastMessageTime?: string;
@@ -28,3 +39,17 @@ export interface Contact {
     lastMessageStatus?: string;
     isTyping?: boolean;
 }
+
+export interface Group {
+    groupId: string;
+    name: string;
+    adminUpeerId: string;
+    members: string[];
+    status: 'active' | 'invited';
+    avatar?: string | null;
+    createdAt?: string;
+    // UI extras
+    lastMessage?: string;
+    lastMessageTime?: string;
+}
+

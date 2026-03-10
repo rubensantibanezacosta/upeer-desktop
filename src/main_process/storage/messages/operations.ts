@@ -1,12 +1,12 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 
-export function saveMessage(id: string, chatRevelnestId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' = 'sent') {
+export function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent') {
     const db = getDb();
     const schema = getSchema();
 
     return db.insert(schema.messages).values({
         id,
-        chatRevelnestId,
+        chatUpeerId,
         isMine,
         message,
         replyTo,
@@ -15,12 +15,12 @@ export function saveMessage(id: string, chatRevelnestId: string, isMine: boolean
     }).onConflictDoNothing().run();
 }
 
-export function getMessages(chatRevelnestId: string) {
+export function getMessages(chatUpeerId: string) {
     const db = getDb();
     const schema = getSchema();
 
     const msgs = db.select().from(schema.messages)
-        .where(eq(schema.messages.chatRevelnestId, chatRevelnestId))
+        .where(eq(schema.messages.chatUpeerId, chatUpeerId))
         .orderBy(desc(schema.messages.timestamp))
         .limit(100)
         .all();
@@ -60,9 +60,32 @@ export function deleteMessageLocally(id: string) {
         .run();
 }
 
+export function deleteMessagesByChatId(chatUpeerId: string): void {
+    const db = getDb();
+    const schema = getSchema();
+    // Delete reactions for all messages in this chat
+    const msgIds = db.select({ id: schema.messages.id }).from(schema.messages)
+        .where(eq(schema.messages.chatUpeerId, chatUpeerId))
+        .all()
+        .map(m => m.id);
+    for (const id of msgIds) {
+        db.delete(schema.reactions).where(eq(schema.reactions.messageId, id)).run();
+    }
+    db.delete(schema.messages).where(eq(schema.messages.chatUpeerId, chatUpeerId)).run();
+}
+
+export function getMessageById(id: string) {
+    const db = getDb();
+    const schema = getSchema();
+
+    return db.select().from(schema.messages)
+        .where(eq(schema.messages.id, id))
+        .get();
+}
+
 export function saveFileMessage(
     id: string,
-    chatRevelnestId: string,
+    chatUpeerId: string,
     isMine: boolean,
     fileInfo: {
         fileName: string;
@@ -77,7 +100,7 @@ export function saveFileMessage(
         state?: string;
     },
     signature?: string,
-    status: 'sent' | 'delivered' | 'read' = 'sent'
+    status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent'
 ) {
     const db = getDb();
     const schema = getSchema();
@@ -90,7 +113,7 @@ export function saveFileMessage(
 
     return db.insert(schema.messages).values({
         id,
-        chatRevelnestId,
+        chatUpeerId,
         isMine,
         message: JSON.stringify(fileMessage),
         replyTo: undefined,

@@ -1,8 +1,13 @@
 /// <reference types="vite/client" />
+declare module 'react-simple-maps';
+declare module 'world-atlas/countries-110m.json' {
+    const value: object;
+    export default value;
+}
 
 declare global {
     interface Window {
-        revelnest: {
+        upeer: {
             getMyNetworkAddress: () => Promise<string>;
             getMessages: (revelnestId: string) => Promise<any[]>;
             getContacts: () => Promise<any[]>;
@@ -30,7 +35,7 @@ declare global {
             onTyping: (callback: (data: { revelnestId: string }) => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
-                success: boolean; 
+                success: boolean;
                 canceled?: boolean;
                 files?: Array<{
                     path: string;
@@ -38,13 +43,13 @@ declare global {
                     size: number;
                     type: string;
                     lastModified: number;
-                }>; 
+                }>;
                 error?: string
             }>;
-            startFileTransfer: (revelnestId: string, filePath: string, thumbnail?: string) => Promise<{success: boolean; fileId?: string; error?: string}>;
-            cancelFileTransfer: (fileId: string, reason?: string) => Promise<{success: boolean; error?: string}>;
-            getFileTransfers: () => Promise<{success: boolean; transfers?: any[]; error?: string}>;
-            saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{success: boolean; error?: string}>;
+            startFileTransfer: (revelnestId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+            getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;
+            saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
             onFileTransferStarted: (callback: (data: any) => void) => void;
             onFileTransferProgress: (callback: (data: any) => void) => void;
             onFileTransferCompleted: (callback: (data: any) => void) => void;

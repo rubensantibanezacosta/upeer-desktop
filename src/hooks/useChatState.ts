@@ -1,35 +1,86 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatMessage, Contact } from '../types/chat.js';
 
 export function useChatState() {
     const [networkAddress, setNetworkAddress] = useState<string>('');
-    const [targetRevelnestId, setTargetRevelnestId] = useState('');
+    const [targetUpeerId, setTargetUpeerId] = useState('');
     const [message, setMessage] = useState('');
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [typingStatus, setTypingStatus] = useState<Record<string, NodeJS.Timeout>>({});
     const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
     const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
-    const [myIdentity, setMyIdentity] = useState<{ address: string | null, revelnestId: string, publicKey: string } | null>(null);
-    const [incomingRequests, setIncomingRequests] = useState<Record<string, { publicKey: string, untrustworthy?: any }>>({});
+    const [myIdentity, setMyIdentity] = useState<{ address: string | null, upeerId: string, publicKey: string, alias?: string | null, avatar?: string | null } | null>(null);
+    const [incomingRequests, setIncomingRequests] = useState<Record<string, { publicKey: string, avatar?: string, receivedAt?: number, untrustworthy?: any, vouchScore?: number }>>({});
     const [untrustworthyAlert, setUntrustworthyAlert] = useState<null | any>(null);
     const [untrustworthyAlerts, setUntrustworthyAlerts] = useState<Record<string, any>>({});
 
-    const refreshContacts = () => {
-        window.revelnest.getContacts().then(setContacts);
-    };
+    // BUG DV fix: usar ref en lugar de window global para evitar polución de scope
+    const lastTypingSentRef = useRef<number>(0);
 
+    // BUG DP fix: ref que siempre apunta al targetUpeerId actual, accesible
+    // desde listeners IPC registrados una sola vez sin stale-closure.
+    const targetUpeerIdRef = useRef('');
     useEffect(() => {
-        window.revelnest.getMyNetworkAddress().then(setNetworkAddress);
-        window.revelnest.getMyIdentity().then(setMyIdentity);
-        refreshContacts();
+        targetUpeerIdRef.current = targetUpeerId;
+    }, [targetUpeerId]);
 
-        window.revelnest.onReceive((data: any) => {
+    // BUG EH fix: ref para myIdentity, evita stale-closure en addFileTransferMessage.
+    // myIdentity se carga de forma asíncrona; si addFileTransferMessage capturara
+    // el valor directamente lo vería siempre como null hasta el próximo render.
+    const myIdentityRef = useRef(myIdentity);
+    useEffect(() => {
+        myIdentityRef.current = myIdentity;
+    }, [myIdentity]);
+
+    const refreshContacts = useCallback(() => {
+        window.upeer.getContacts().then(setContacts);
+    }, []);
+
+    /** Refresca toda la información del usuario — usar tras cambio de cuenta. */
+    const refreshData = useCallback(() => {
+        window.upeer.getMyNetworkAddress().then(setNetworkAddress);
+        window.upeer.getMyIdentity().then(setMyIdentity);
+        window.upeer.getContacts().then(setContacts);
+        setTargetUpeerId('');
+        setChatHistory([]);
+        setIncomingRequests({});
+    }, []);
+
+    // BUG DP fix: todos los listeners IPC se registran UNA SOLA VEZ en useEffect([]).
+    // El ref targetUpeerIdRef se usa para acceder al ID actual sin stale-closure.
+    // El intervalo de refresco también vive aquí para no re-crearse en cada cambio de contacto.
+    useEffect(() => {
+        window.upeer.getMyNetworkAddress().then(setNetworkAddress);
+        window.upeer.getMyIdentity().then(setMyIdentity);
+
+        // Cargar contactos y pre-poblar incomingRequests para solicitudes ya persistidas en BD
+        window.upeer.getContacts().then((loaded: any[]) => {
+            setContacts(loaded);
+            const persisted: Record<string, any> = {};
+            for (const c of loaded) {
+                if (c.status === 'incoming') {
+                    persisted[c.upeerId] = {
+                        publicKey: c.publicKey || '',
+                        avatar: c.avatar || undefined,
+                        receivedAt: c.lastSeen ? new Date(c.lastSeen).getTime() : Date.now(),
+                        untrustworthy: null,
+                        vouchScore: c.vouchScore,
+                    };
+                }
+            }
+            if (Object.keys(persisted).length > 0) {
+                setIncomingRequests(prev => ({ ...persisted, ...prev }));
+            }
+        });
+
+        window.upeer.onReceive((data: any) => {
             refreshContacts();
             setChatHistory(prev => {
-                if (data.revelnestId === targetRevelnestId) {
+                const currentId = targetUpeerIdRef.current;
+                if (data.upeerId === currentId) {
                     if (data.id && prev.some(m => m.id === data.id)) return prev;
-                    if (data.id) window.revelnest.sendReadReceipt(targetRevelnestId, data.id);
+                    if (data.id) window.upeer.sendReadReceipt(currentId, data.id);
                     return [...prev, {
                         ...data,
                         status: 'read',
@@ -40,44 +91,46 @@ export function useChatState() {
             });
         });
 
-        window.revelnest.onContactRequest(async (data: any) => {
+        window.upeer.onContactRequest(async (data: any) => {
             // Check if contact already exists and is connected
-            const currentContacts = await window.revelnest.getContacts();
-            const existingContact = currentContacts.find((c: any) => c.revelnestId === data.revelnestId);
+            const currentContacts = await window.upeer.getContacts();
+            const existingContact = currentContacts.find((c: any) => c.upeerId === data.upeerId);
 
             // Only add request if contact doesn't exist or is not already connected
             if (!existingContact || existingContact.status !== 'connected') {
                 setIncomingRequests(prev => ({
                     ...prev,
-                    [data.revelnestId]: {
+                    [data.upeerId]: {
                         publicKey: data.publicKey,
-                        untrustworthy: null // Will be set if onContactUntrustworthy arrives
+                        avatar: data.avatar || prev[data.upeerId]?.avatar || undefined,
+                        receivedAt: prev[data.upeerId]?.receivedAt ?? Date.now(),
+                        untrustworthy: null,
+                        vouchScore: data.vouchScore ?? prev[data.upeerId]?.vouchScore,
                     }
                 }));
             }
             refreshContacts();
         });
 
-        window.revelnest.onHandshakeFinished((data: any) => {
+        window.upeer.onHandshakeFinished((data: any) => {
             refreshContacts();
-            setTargetRevelnestId(prev => {
-                if (prev.startsWith('pending-')) return data.revelnestId;
+            setTargetUpeerId(prev => {
+                if (prev.startsWith('pending-')) return data.upeerId;
                 return prev;
             });
         });
 
-        window.revelnest.onContactUntrustworthy((data: any) => {
-            console.warn('Contacto no confiable detectado:', data);
+        window.upeer.onContactUntrustworthy((data: any) => {
             setUntrustworthyAlert(data);
             // Store alert for this specific contact
-            setUntrustworthyAlerts(prev => ({ ...prev, [data.revelnestId]: data }));
+            setUntrustworthyAlerts(prev => ({ ...prev, [data.upeerId]: data }));
             // Also update incoming request if it exists
             setIncomingRequests(prev => {
-                if (prev[data.revelnestId]) {
+                if (prev[data.upeerId]) {
                     return {
                         ...prev,
-                        [data.revelnestId]: {
-                            ...prev[data.revelnestId],
+                        [data.upeerId]: {
+                            ...prev[data.upeerId],
                             untrustworthy: data
                         }
                     };
@@ -86,84 +139,97 @@ export function useChatState() {
             });
         });
 
-        window.revelnest.onMessageDelivered((data: any) => {
+        window.upeer.onMessageDelivered((data: any) => {
             refreshContacts();
             setChatHistory(prev => prev.map(msg =>
                 msg.id === data.id && msg.status !== 'read' ? { ...msg, status: 'delivered' } : msg
             ));
         });
 
-        window.revelnest.onMessageRead((data: any) => {
+        window.upeer.onMessageRead((data: any) => {
             refreshContacts();
             setChatHistory(prev => prev.map(msg =>
                 msg.id === data.id ? { ...msg, status: 'read' } : msg
             ));
         });
 
-        window.revelnest.onMessageReactionUpdated((data: any) => {
+        window.upeer.onMessageReactionUpdated((data: any) => {
             setChatHistory(prev => prev.map(msg => {
                 if (msg.id === data.msgId) {
                     const reactions = msg.reactions || [];
                     if (data.remove) {
-                        return { ...msg, reactions: reactions.filter((r: any) => !(r.revelnestId === data.revelnestId && r.emoji === data.emoji)) };
+                        return { ...msg, reactions: reactions.filter((r: any) => !(r.upeerId === data.upeerId && r.emoji === data.emoji)) };
                     } else {
                         // Avoid duplicates in UI
-                        if (reactions.some((r: any) => r.revelnestId === data.revelnestId && r.emoji === data.emoji)) return msg;
-                        return { ...msg, reactions: [...reactions, { revelnestId: data.revelnestId, emoji: data.emoji }] };
+                        if (reactions.some((r: any) => r.upeerId === data.upeerId && r.emoji === data.emoji)) return msg;
+                        return { ...msg, reactions: [...reactions, { upeerId: data.upeerId, emoji: data.emoji }] };
                     }
                 }
                 return msg;
             }));
         });
 
-        window.revelnest.onMessageUpdated((data: any) => {
+        window.upeer.onMessageUpdated((data: any) => {
             setChatHistory(prev => prev.map(msg =>
                 msg.id === data.id ? { ...msg, message: data.content, isEdited: true } : msg
             ));
         });
 
-        window.revelnest.onMessageDeleted((data: any) => {
+        window.upeer.onMessageDeleted((data: any) => {
             setChatHistory(prev => prev.map(msg =>
                 msg.id === data.id ? { ...msg, message: "Mensaje eliminado", isDeleted: true } : msg
             ));
         });
 
-        window.revelnest.onTyping((data: any) => {
-            const { revelnestId } = data;
+        window.upeer.onMessageStatusUpdated((data: any) => {
+            setChatHistory(prev => prev.map(msg =>
+                msg.id === data.id ? { ...msg, status: data.status } : msg
+            ));
+        });
+
+        window.upeer.onTyping((data: any) => {
+            const { upeerId } = data;
             setTypingStatus(prev => {
-                if (prev[revelnestId]) clearTimeout(prev[revelnestId]);
+                if (prev[upeerId]) clearTimeout(prev[upeerId]);
                 const timeout = setTimeout(() => {
                     setTypingStatus(curr => {
                         const newState = { ...curr };
-                        delete newState[revelnestId];
+                        delete newState[upeerId];
                         return newState;
                     });
                 }, 3000);
-                return { ...prev, [revelnestId]: timeout };
+                return { ...prev, [upeerId]: timeout };
             });
         });
 
-        window.revelnest.onPresence((data: any) => {
-            setContacts(prev => prev.map(c =>
-                c.revelnestId === data.revelnestId ? { ...c, lastSeen: data.lastSeen } : c
-            ));
+        window.upeer.onPresence((data: any) => {
+            setContacts(prev => prev.map(c => {
+                if (c.upeerId !== data.upeerId) return c;
+                return {
+                    ...c,
+                    lastSeen: data.lastSeen,
+                    ...(data.alias ? { name: data.alias } : {}),
+                    ...(data.avatar ? { avatar: data.avatar } : {}),
+                };
+            }));
         });
 
         const interval = setInterval(refreshContacts, 10000);
         return () => clearInterval(interval);
-    }, [targetRevelnestId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
-        if (targetRevelnestId) {
-            window.revelnest.getMessages(targetRevelnestId).then(msgs => {
+        if (targetUpeerId) {
+            window.upeer.getMessages(targetUpeerId).then(msgs => {
                 setChatHistory(msgs.reverse().map((m: any) => {
                     if (!m.isMine && m.status !== 'read') {
-                        window.revelnest.sendReadReceipt(targetRevelnestId, m.id);
+                        window.upeer.sendReadReceipt(targetUpeerId, m.id);
                         m.status = 'read';
                     }
                     return {
                         id: m.id,
-                        revelnestId: m.chatRevelnestId,
+                        upeerId: m.chatUpeerId,
                         isMine: !!m.isMine,
                         message: m.message,
                         status: m.status,
@@ -178,19 +244,19 @@ export function useChatState() {
         } else {
             setChatHistory([]);
         }
-    }, [targetRevelnestId]);
+    }, [targetUpeerId]);
 
     const handleSend = async () => {
-        if (!targetRevelnestId || !message) return;
-        const sentMessageId = await window.revelnest.sendMessage(targetRevelnestId, message, replyToMessage?.id);
+        if (!targetUpeerId || !message) return;
+        const sentMessageId = await window.upeer.sendMessage(targetUpeerId, message, replyToMessage?.id);
 
         if (sentMessageId) {
             setChatHistory(prev => [...prev, {
                 id: sentMessageId,
-                revelnestId: targetRevelnestId,
+                upeerId: targetUpeerId,
                 isMine: true,
                 message: message,
-                status: targetRevelnestId === myIdentity?.revelnestId ? 'read' : 'sent',
+                status: targetUpeerId === myIdentity?.upeerId ? 'read' : 'sent',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 replyTo: replyToMessage?.id
             }]);
@@ -201,42 +267,43 @@ export function useChatState() {
         setMessage('');
     };
 
+    // BUG DV fix: ref en lugar de window global para no contaminar el scope global
     const handleTyping = () => {
-        if (!targetRevelnestId) return;
+        if (!targetUpeerId) return;
         const now = Date.now();
-        if (now - (window as any).lastTypingSentTime > 2500 || !(window as any).lastTypingSentTime) {
-            window.revelnest.sendTypingIndicator(targetRevelnestId);
-            (window as any).lastTypingSentTime = now;
+        if (now - lastTypingSentRef.current > 2500) {
+            window.upeer.sendTypingIndicator(targetUpeerId);
+            lastTypingSentRef.current = now;
         }
     };
 
     const handleAddContact = (idAtAddress: string, name: string) => {
-        window.revelnest.addContact(idAtAddress, name).then((res) => {
+        window.upeer.addContact(idAtAddress, name).then((res) => {
             refreshContacts();
-            if (res.revelnestId) setTargetRevelnestId(res.revelnestId);
+            if (res.upeerId) setTargetUpeerId(res.upeerId);
         });
     };
 
     const handleAcceptContact = () => {
-        const request = incomingRequests[targetRevelnestId];
+        const request = incomingRequests[targetUpeerId];
         if (request?.publicKey) {
-            window.revelnest.acceptContactRequest(targetRevelnestId, request.publicKey).then(() => {
+            window.upeer.acceptContactRequest(targetUpeerId, request.publicKey).then(() => {
                 refreshContacts();
                 // Remove from incoming requests after accepting
                 setIncomingRequests(prev => {
                     const newRequests = { ...prev };
-                    delete newRequests[targetRevelnestId];
+                    delete newRequests[targetUpeerId];
                     return newRequests;
                 });
                 // Also remove from untrustworthy alerts
                 setUntrustworthyAlerts((prev: Record<string, any>) => {
                     const newAlerts = { ...prev };
-                    delete newAlerts[targetRevelnestId];
+                    delete newAlerts[targetUpeerId];
                     return newAlerts;
                 });
                 // Clear global alert if it's for this contact
                 setUntrustworthyAlert((prev: any) => {
-                    if (prev && prev.revelnestId === targetRevelnestId) {
+                    if (prev && prev.upeerId === targetUpeerId) {
                         return null;
                     }
                     return prev;
@@ -246,30 +313,57 @@ export function useChatState() {
     };
 
     const handleDeleteContact = (id?: string) => {
-        const targetId = id || targetRevelnestId;
+        const targetId = id || targetUpeerId;
         if (!targetId) return;
 
-        window.revelnest.deleteContact(targetId).then(() => {
+        window.upeer.deleteContact(targetId).then(() => {
+            setIncomingRequests(prev => {
+                const next = { ...prev };
+                delete next[targetId];
+                return next;
+            });
             refreshContacts();
-            if (targetId === targetRevelnestId) {
-                setTargetRevelnestId('');
+            if (targetId === targetUpeerId) {
+                setTargetUpeerId('');
+            }
+        });
+    };
+
+    const handleBlockContact = (id?: string) => {
+        const targetId = id || targetUpeerId;
+        if (!targetId) return;
+
+        window.upeer.blockContact(targetId).then(() => {
+            setIncomingRequests(prev => {
+                const next = { ...prev };
+                delete next[targetId];
+                return next;
+            });
+            setUntrustworthyAlerts(prev => {
+                const next = { ...prev };
+                delete next[targetId];
+                return next;
+            });
+            refreshContacts();
+            if (targetId === targetUpeerId) {
+                setTargetUpeerId('');
             }
         });
     };
 
     const handleReaction = (msgId: string, emoji: string, remove: boolean) => {
-        if (!targetRevelnestId) return;
-        window.revelnest.sendChatReaction(targetRevelnestId, msgId, emoji, remove);
+        if (!targetUpeerId) return;
+        window.upeer.sendChatReaction(targetUpeerId, msgId, emoji, remove);
         // Optimistic update
         setChatHistory(prev => prev.map(msg => {
             if (msg.id === msgId) {
                 const reactions = msg.reactions || [];
-                const myId = myIdentity?.revelnestId || 'me';
+                const myId = myIdentity?.upeerId || 'me';
                 if (remove) {
-                    return { ...msg, reactions: reactions.filter((r: any) => !(r.revelnestId === myId && r.emoji === emoji)) };
+                    return { ...msg, reactions: reactions.filter((r: any) => !(r.upeerId === myId && r.emoji === emoji)) };
                 } else {
-                    if (reactions.some((r: any) => r.revelnestId === myId && r.emoji === emoji)) return msg;
-                    return { ...msg, reactions: [...reactions, { revelnestId: myId, emoji }] };
+                    if (reactions.some((r: any) => r.upeerId === myId && r.emoji === emoji)) return msg;
+                    return { ...msg, reactions: [...reactions, { upeerId: myId, emoji }] };
                 }
             }
             return msg;
@@ -277,8 +371,8 @@ export function useChatState() {
     };
 
     const handleUpdateMessage = (msgId: string, newContent: string) => {
-        if (!targetRevelnestId) return;
-        window.revelnest.sendChatUpdate(targetRevelnestId, msgId, newContent);
+        if (!targetUpeerId) return;
+        window.upeer.sendChatUpdate(targetUpeerId, msgId, newContent);
         setChatHistory(prev => prev.map(msg =>
             msg.id === msgId ? { ...msg, message: newContent, isEdited: true } : msg
         ));
@@ -287,15 +381,15 @@ export function useChatState() {
     };
 
     const handleDeleteMessage = (msgId: string) => {
-        if (!targetRevelnestId) return;
-        window.revelnest.sendChatDelete(targetRevelnestId, msgId);
+        if (!targetUpeerId) return;
+        window.upeer.sendChatDelete(targetUpeerId, msgId);
         setChatHistory(prev => prev.map(msg =>
             msg.id === msgId ? { ...msg, message: "Mensaje eliminado", isDeleted: true } : msg
         ));
     };
 
     const addFileTransferMessage = useCallback((
-        revelnestId: string,
+        upeerId: string,
         fileId: string,
         fileName: string,
         fileSize: number,
@@ -305,8 +399,8 @@ export function useChatState() {
         caption?: string,
         isMine: boolean = true
     ) => {
-        console.log('addFileTransferMessage called:', { revelnestId, fileId, fileName, fileSize, isMine });
-        if (!revelnestId) return;
+        // BUG EG fix: eliminados console.log que exponían fileId/fileName en prod.
+        if (!upeerId) return;
 
         // Create structured JSON message consistent with backend
         const fileMessage = {
@@ -325,13 +419,14 @@ export function useChatState() {
         const msgId = fileId; // Support stable ID to match backend DB and prevent duplicates
 
         setChatHistory(prev => {
-            console.log('Adding file transfer message to chat history:', msgId);
+            // BUG EH fix: usar myIdentityRef.current en vez de myIdentity capturado
+            // en el cierre — evita el stale-closure cuando myIdentity carga async.
             return [...prev, {
                 id: msgId,
-                revelnestId: revelnestId,
+                upeerId: upeerId,
                 isMine,
                 message: messageContent,
-                status: (isMine && revelnestId === myIdentity?.revelnestId) ? 'read' : 'sent',
+                status: (isMine && upeerId === myIdentityRef.current?.upeerId) ? 'read' : 'sent',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }];
         });
@@ -373,8 +468,8 @@ export function useChatState() {
 
     return {
         networkAddress,
-        targetRevelnestId,
-        setTargetRevelnestId,
+        targetUpeerId,
+        setTargetUpeerId,
         message,
         setMessage,
         chatHistory,
@@ -394,11 +489,13 @@ export function useChatState() {
         handleAddContact,
         handleAcceptContact,
         handleDeleteContact,
+        handleBlockContact,
         handleReaction,
         handleUpdateMessage,
         handleDeleteMessage,
         addFileTransferMessage,
         updateFileTransferMessage,
-        refreshContacts
+        refreshContacts,
+        refreshData
     };
 }

@@ -1,1 +1,0 @@
-ALTER TABLE `contacts` ADD `dht_expires_at` integer;

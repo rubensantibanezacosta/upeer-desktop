@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script para ejecutar 30 nodos RevelNest en una topología escalable
+# Script para ejecutar 30 nodos upeer en una topología escalable
 # Basado en run_15_nodes.sh pero extendido a 30 nodos
 
 set -e
@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}🚀 INICIANDO TEST DE 30 NODOS REVELNEST${NC}"
+echo -e "${YELLOW}🚀 INICIANDO TEST DE 30 NODOS upeer${NC}"
 echo "Escalabilidad extrema: 30 nodos en topología jerárquica..."
 echo
 
@@ -34,11 +34,11 @@ except Exception as e:
 echo "1. Limpiando contenedores anteriores..."
 rm -rf /tmp/p2p_shared_30
 mkdir -p /tmp/p2p_shared_30
-docker rm -f $(docker ps -a -q --filter ancestor=revelnest-bot) 2>/dev/null || true
+docker rm -f $(docker ps -a -q --filter ancestor=upeer-bot) 2>/dev/null || true
 
 # Rebuild the docker image
 echo "2. Construyendo imagen Docker..."
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
 echo "   ✅ Imagen construida"
 
 # Node 1 (Bootstrap)
@@ -46,7 +46,7 @@ echo "3. Iniciando Node 1 (Bootstrap)..."
 docker run -d --name p2p_node_1 --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/p2p_shared_30:/shared \
   -e NODE_ENV_NAME=node1 \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 10
 
 # Get Node 1 info
@@ -73,7 +73,7 @@ start_node() {
       -v /tmp/p2p_shared_30:/shared \
       -e NODE_ENV_NAME=node$node_num \
       -e TARGET_IDENTITY="$target_env" \
-      revelnest-bot > /dev/null 2>&1
+      upeer-bot > /dev/null 2>&1
     sleep $delay
     
     local json_file="/tmp/p2p_shared_30/node${node_num}.json"

@@ -1,13 +1,13 @@
 import { initDB, saveMessage, getMessages, getContacts, addOrUpdateContact } from '../src/main_process/storage/db.js';
 import { handlePacket } from '../src/main_process/network/handlers.js';
-import { initIdentity, sign, getMyRevelNestId, getMyPublicKeyHex } from '../src/main_process/security/identity.js';
+import { initIdentity, sign, getMyUPeerId, getMyPublicKeyHex } from '../src/main_process/security/identity.js';
 import { canonicalStringify } from '../src/main_process/network/utils.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
 // Test directory
-const tempDir = path.join(os.tmpdir(), 'revelnest-test-' + Date.now());
+const tempDir = path.join(os.tmpdir(), 'upeer-test-' + Date.now());
 fs.mkdirSync(tempDir, { recursive: true });
 
 async function runTest() {
@@ -17,7 +17,7 @@ async function runTest() {
     initIdentity(tempDir);
     await initDB(tempDir);
 
-    const myId = getMyRevelNestId();
+    const myId = getMyUPeerId();
     const myPk = getMyPublicKeyHex();
 
     // 2. Crear un contacto de prueba (Simulamos que ya hubo handshake)
@@ -53,7 +53,7 @@ async function runTest() {
         const signature = sign(Buffer.from(canonicalStringify(data))).toString('hex');
         const packet = {
             ...data,
-            senderRevelnestId: peerId,
+            senderUpeerId: peerId,
             signature: signature
         };
         const buffer = Buffer.from(JSON.stringify(packet));

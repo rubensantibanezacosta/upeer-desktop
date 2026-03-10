@@ -5,7 +5,23 @@ import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
 
-export const NavigationRail: React.FC<{ myIp: string }> = ({ myIp }) => (
+interface NavigationRailProps {
+    myIp: string;
+    myAvatar?: string | null;
+    myInitial?: string;
+    onOpenSettings?: () => void;
+    onOpenIdentity?: () => void;
+    activeView?: 'chat' | 'settings';
+}
+
+export const NavigationRail: React.FC<NavigationRailProps> = ({
+    myIp,
+    myAvatar,
+    myInitial,
+    onOpenSettings,
+    onOpenIdentity,
+    activeView = 'chat',
+}) => (
     <Box sx={{
         width: '64px',
         minWidth: '64px',
@@ -23,30 +39,57 @@ export const NavigationRail: React.FC<{ myIp: string }> = ({ myIp }) => (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1 }}>
             <Tooltip title="Chats" placement="right">
                 <Box>
-                    <IconButton variant="plain" color="neutral"><ChatIcon /></IconButton>
+                    <IconButton
+                        variant={activeView === 'chat' ? 'soft' : 'plain'}
+                        color={activeView === 'chat' ? 'primary' : 'neutral'}
+                        onClick={() => onOpenSettings && activeView === 'settings' && onOpenSettings()}
+                    >
+                        <ChatIcon />
+                    </IconButton>
                 </Box>
             </Tooltip>
             <Tooltip title="Actualizaciones" placement="right">
-                <IconButton variant="plain" color="neutral"><DonutLargeIcon /></IconButton>
+                <IconButton variant="plain" color="neutral">
+                    <DonutLargeIcon />
+                </IconButton>
             </Tooltip>
             <Tooltip title="Comunidades" placement="right">
-                <IconButton variant="plain" color="neutral"><GroupsIcon /></IconButton>
+                <IconButton variant="plain" color="neutral">
+                    <GroupsIcon />
+                </IconButton>
             </Tooltip>
         </Box>
+
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Tooltip title="Ajustes" placement="right">
-                <IconButton variant="plain" color="neutral"><SettingsIcon /></IconButton>
+                <IconButton
+                    variant={activeView === 'settings' ? 'soft' : 'plain'}
+                    color={activeView === 'settings' ? 'primary' : 'neutral'}
+                    onClick={onOpenSettings}
+                >
+                    <SettingsIcon />
+                </IconButton>
             </Tooltip>
-            {/* El avatar inferior puede copiar la ubicación de red de forma discreta si es necesario */}
-            <Tooltip title="Mi Identidad" placement="right">
+            <Tooltip title="Mi perfil" placement="right">
                 <Avatar
                     size="sm"
-                    src=""
-                    onClick={() => {
-                        navigator.clipboard.writeText(myIp);
+                    src={myAvatar || undefined}
+                    onClick={onOpenIdentity}
+                    sx={{
+                        cursor: 'pointer',
+                        mt: 1,
+                        width: 32,
+                        height: 32,
+                        background: myAvatar ? 'transparent' : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        border: '2px solid',
+                        borderColor: activeView === 'settings' ? 'primary.500' : 'transparent',
+                        transition: 'border-color 0.2s',
                     }}
-                    sx={{ cursor: 'pointer', mt: 1, width: 32, height: 32 }}
-                />
+                >
+                    {!myAvatar && (myInitial || '?')}
+                </Avatar>
             </Tooltip>
         </Box>
     </Box>

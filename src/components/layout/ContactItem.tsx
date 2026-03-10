@@ -18,7 +18,9 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Button
+    Button,
+    Tooltip,
+    Badge
 } from '@mui/joy';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import DoneIcon from '@mui/icons-material/Done';
@@ -34,20 +36,16 @@ import BlockIcon from '@mui/icons-material/Block';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import SecurityIcon from '@mui/icons-material/Security';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { getFileIcon } from '../../utils/fileIcons.js';
+import { Contact } from '../../types/chat.js';
 
 interface ContactItemProps {
-    contact: {
-        revelnestId: string;
-        address: string;
-        name: string;
-        status: 'pending' | 'incoming' | 'connected';
-        lastSeen?: string;
-        lastMessage?: string;
-        lastMessageTime?: string;
-        lastMessageIsMine?: boolean;
-        lastMessageStatus?: string;
-    };
+    contact: Contact;
     isSelected: boolean;
     onSelect: (id: string) => void;
     onDelete: (id: string) => void;
@@ -58,6 +56,41 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
     const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
     const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
     const isPending = c.status === 'pending' || c.status === 'incoming';
+
+    const getTrustIndicator = (showTooltip = true) => {
+        const score: number | undefined = (c as any).vouchScore;
+        if (score === undefined) return null;
+
+        let icon = null;
+        let label = "Reputación estándar";
+
+        if (score < 40) {
+            icon = <GppMaybeIcon sx={{ fontSize: 12, color: 'danger.600' }} />;
+            label = `Baja reputación (${score}/100) - Ten cuidado`;
+        } else if (score >= 80) {
+            icon = <VerifiedUserIcon sx={{ fontSize: 12, color: 'success.600' }} />;
+            label = `Alta reputación (${score}/100) - Muy confiable`;
+        } else if (score >= 65) {
+            icon = <CheckCircleIcon sx={{ fontSize: 12, color: 'primary.600' }} />;
+            label = `Buena reputación (${score}/100) - Confiable`;
+        } else if (score === 50) {
+            icon = <NewReleasesIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
+            label = "Sin historial de red aún";
+        } else {
+            icon = <SecurityIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
+            label = `Reputación estándar (${score}/100)`;
+        }
+
+        if (!showTooltip) return icon;
+
+        return (
+            <Tooltip title={label} variant="solid" size="sm" placement="top">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {icon}
+                </Box>
+            </Tooltip>
+        );
+    };
 
     const formatTime = (iso?: string) => {
         if (!iso) return '';
@@ -70,13 +103,19 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
         return date.toLocaleDateString();
     };
 
-    const timeStr = formatTime(c.lastMessageTime);
+    const timeStr = isPending && c.status === 'incoming'
+        ? formatTime(c.lastSeen)   // para solicitudes, mostrar cuándo llegó
+        : formatTime(c.lastMessageTime);
+
+    // Negrita cuando hay solicitud entrante o mensajes sin leer
+    const hasUnread = !c.lastMessageIsMine && !!c.lastMessage && c.lastMessageStatus !== 'read';
+    const isBold = c.status === 'incoming' || hasUnread;
 
     return (
         <ListItem sx={{ p: 0 }}>
             <ListItemButton
                 selected={isSelected}
-                onClick={() => onSelect(c.revelnestId)}
+                onClick={() => onSelect(c.upeerId)}
                 sx={{
                     height: '72px',
                     px: 1.5,
@@ -86,9 +125,36 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                 }}
             >
                 <ListItemDecorator sx={{ mr: 2 }}>
-                    <Avatar size="lg" color={c.status === 'incoming' ? 'primary' : 'neutral'}>
-                        {c.name[0]}
-                    </Avatar>
+                    <Badge
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        badgeContent={getTrustIndicator()}
+                        sx={{
+                            '--Badge-paddingX': '0px',
+                            '--Badge-paddingY': '0px',
+                            '--Badge-ring': '2px',
+                            '& .MuiBadge-badge': {
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'background.surface',
+                                border: '1px solid',
+                                borderColor: 'divider',
+
+                                transform: 'translate(8%, 8%)'
+                            }
+                        }}
+                    >
+                        <Avatar
+                            size="lg"
+                            color={c.status === 'incoming' ? 'primary' : 'neutral'}
+                            src={c.avatar || undefined}
+                        >
+                            {c.name[0]}
+                        </Avatar>
+                    </Badge>
                 </ListItemDecorator>
                 <Box sx={{
                     flexGrow: 1,
@@ -96,8 +162,6 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     flexDirection: 'column',
                     height: '100%',
                     justifyContent: 'center',
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
                     pb: 1,
                     pt: 1,
                     overflow: 'hidden',
@@ -107,10 +171,10 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     }
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <Typography level="body-md" sx={{ fontWeight: 500, display: 'flex', alignItems: 'center' }} noWrap>
-                            {c.name} {c.status === 'incoming' && <NotificationsIcon color="primary" sx={{ fontSize: 18, ml: 0.5 }} />}
+                        <Typography level="body-md" sx={{ fontWeight: isBold ? 700 : 500, display: 'flex', alignItems: 'center', gap: 0.5 }} noWrap>
+                            {c.name}
                         </Typography>
-                        <Typography level="body-xs" color={isTyping ? "primary" : "neutral"} sx={{ ml: 1, minWidth: 'max-content' }}>
+                        <Typography level="body-xs" color={isTyping ? "primary" : isBold ? "primary" : "neutral"} sx={{ ml: 1, minWidth: 'max-content', fontWeight: isBold ? 700 : 400 }}>
                             {timeStr}
                         </Typography>
                     </Box>
@@ -131,9 +195,12 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                         >
                             {isPending ? (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
-                                    {c.status === 'pending' ? <HourglassEmptyIcon sx={{ fontSize: 14 }} /> : ''}
-                                    <Typography level="body-sm" noWrap sx={{ fontStyle: 'inherit', color: 'inherit' }}>
-                                        {c.status === 'pending' ? 'Esperando respuesta...' : 'Solicitud pendiente'}
+                                    {c.status === 'pending'
+                                        ? <HourglassEmptyIcon sx={{ fontSize: 14, flexShrink: 0 }} />
+                                        : <NotificationsIcon sx={{ fontSize: 14, color: 'primary.500', flexShrink: 0 }} />
+                                    }
+                                    <Typography level="body-sm" noWrap sx={{ fontStyle: 'inherit', color: c.status === 'incoming' ? 'primary.500' : 'inherit' }}>
+                                        {c.status === 'pending' ? 'Esperando respuesta...' : 'Solicitud de contacto recibida'}
                                     </Typography>
                                 </Box>
                             ) : (
@@ -167,7 +234,10 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                             }}
                                         >
                                             {(() => {
-                                                if (c.lastMessage && c.lastMessage.startsWith('{') && c.lastMessage.endsWith('}')) {
+                                                if (!c.lastMessage) return '';
+                                                if (c.lastMessage.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
+
+                                                if (c.lastMessage.startsWith('{') && c.lastMessage.endsWith('}')) {
                                                     try {
                                                         const parsed = JSON.parse(c.lastMessage);
                                                         if (parsed.type === 'file') {
@@ -182,6 +252,21 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                                         }
                                                     } catch (e) { /* ignore */ }
                                                 }
+
+                                                if (c.lastMessage.startsWith('FILE_TRANSFER|')) {
+                                                    const parts = c.lastMessage.split('|');
+                                                    if (parts.length >= 6) {
+                                                        return (
+                                                            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                                <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
+                                                                    {getFileIcon(parts[4] || '', parts[2] || '')}
+                                                                </Box>
+                                                                <span>{parts[2]}</span>
+                                                            </Box>
+                                                        );
+                                                    }
+                                                }
+
                                                 return c.lastMessage;
                                             })()}
                                         </Typography>
@@ -220,10 +305,9 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                 <Menu
                                     placement="bottom-end"
                                     size="sm"
-                                    variant="soft"
-                                    color="neutral"
                                     sx={{
                                         minWidth: 180,
+                                        borderRadius: 'lg',
                                         '--ListItem-radius': '8px',
                                         boxShadow: 'lg',
                                         zIndex: 1000
@@ -266,7 +350,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                 color="danger"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onDelete(c.revelnestId);
+                                    onDelete(c.upeerId);
                                     setConfirmDeleteOpen(false);
                                 }}
                             >

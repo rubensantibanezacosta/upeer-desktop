@@ -52,7 +52,7 @@ describe('SecureLogger', () => {
             signature: 'sig123',
             nonce: 'nonce123',
             ip: '192.168.1.1',
-            revelnestId: 'test123',
+            upeerId: 'test123',
             message: 'Hello World'  // 'message' is not in sensitive fields
         };
         
@@ -64,7 +64,7 @@ describe('SecureLogger', () => {
         assert.ok(redacted.signature.includes('[REDACTED'));
         assert.ok(redacted.nonce.includes('[REDACTED'));
         assert.ok(redacted.ip.includes('[REDACTED'));
-        assert.ok(redacted.revelnestId.includes('[REDACTED'));
+        assert.ok(redacted.upeerId.includes('[REDACTED'));
         
         // Non-sensitive fields should remain
         assert.strictEqual(redacted.message, 'Hello World');

@@ -153,7 +153,7 @@ describe('TransferManager Unit Tests', () => {
             // Verify store was called with correct data
             assert.strictEqual(mockStore.createTransfer.mock.calls.length, 1);
             const storeCall = mockStore.createTransfer.mock.calls[0];
-            assert.strictEqual(storeCall.arguments[0].revelnestId, 'peer-123');
+            assert.strictEqual(storeCall.arguments[0].upeerId, 'peer-123');
             assert.strictEqual(storeCall.arguments[0].fileName, 'test.txt');
             assert.strictEqual(storeCall.arguments[0].fileSize, 1024);
 
@@ -246,7 +246,7 @@ describe('TransferManager Unit Tests', () => {
             assert.strictEqual(mockStore.createTransfer.mock.calls.length, 1);
             const storeCall = mockStore.createTransfer.mock.calls[0];
             assert.strictEqual(storeCall.arguments[0].fileId, 'incoming-file-123');
-            assert.strictEqual(storeCall.arguments[0].revelnestId, 'peer-456');
+            assert.strictEqual(storeCall.arguments[0].upeerId, 'peer-456');
             assert.strictEqual(storeCall.arguments[0].direction, 'receiving');
 
             // Verify temp file creation
@@ -294,7 +294,7 @@ describe('TransferManager Unit Tests', () => {
         it('should cancel existing transfer', () => {
             const mockTransfer = {
                 fileId: 'test-transfer',
-                revelnestId: 'peer-123',
+                upeerId: 'peer-123',
                 fileName: 'test.txt',
                 state: 'active',
                 direction: 'sending'

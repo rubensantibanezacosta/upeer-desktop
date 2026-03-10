@@ -1,5 +1,5 @@
 /**
- * Secure logging system for RevelNest P2P
+ * Secure logging system for upeer P2P
  * Redacts sensitive information and provides structured logging
  */
 
@@ -30,7 +30,7 @@ export class SecureLogger {
         this.redactedFields = new Set([
             'privateKey', 'secretKey', 'signature', 'publicKey', 'ephemeralPublicKey',
             'nonce', 'ciphertext', 'content', 'powProof', 'address', 'ip',
-            'senderRevelnestId', 'revelnestId', 'targetId'
+            'senderUpeerId', 'upeerId', 'targetId'
         ]);
     }
 
@@ -86,7 +86,7 @@ export class SecureLogger {
             level,
             message,
             data: redactedData,
-            source: source || 'RevelNest'
+            source: source || 'upeer'
         };
     }
 
@@ -141,21 +141,26 @@ export class SecureLogger {
 
     /**
      * Special logger for network events that might need IP addresses
-     * but should still redact other sensitive data
+     * but should still redact other sensitive data.
+     *
+     * BUG BO fix: el orden anterior era incorrecto — se asignaba safeData.ip
+     * y luego redactSensitiveData() la borraba de nuevo (porque 'ip' está en
+     * redactedFields). Ahora se redacta primero el `data` genérico y sólo
+     * después se añade la IP procesada, evitando la doble redacción.
      */
     public network(message: string, ip?: string, data?: any, source?: string): void {
         if (!this.shouldLog(LogLevel.INFO)) return;
 
-        // For network logs, we keep IP but redact everything else
-        let safeData = data ? { ...data } : {};
-        if (ip && !this.isProduction) {
-            safeData.ip = ip;
-        } else if (ip) {
-            // In production, only show first part of IP
-            safeData.ip = ip.split(':')[0] + ':[REDACTED]';
+        // 1. Redactar primero los datos arbitrarios
+        const safeData: any = data ? this.redactSensitiveData({ ...data }) : {};
+
+        // 2. Añadir la IP DESPUÉS de la redacción general
+        if (ip) {
+            safeData.ip = this.isProduction
+                ? ip.split(':')[0] + ':[REDACTED]'
+                : ip;
         }
 
-        safeData = this.redactSensitiveData(safeData);
         const entry = this.formatMessage(LogLevel.INFO, message, safeData, source);
         this.logToConsole(entry);
     }

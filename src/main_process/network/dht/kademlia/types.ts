@@ -13,7 +13,7 @@ export const BOOTSTRAP_MIN_NODES = 10; // Minimum nodes to consider DHT "bootstr
 export const BOOTSTRAP_RETRY_MS = 30000; // Retry bootstrap every 30 seconds if not enough nodes
 
 export interface SeedNode {
-    revelnestId: string;
+    upeerId: string;
     address: string;
     publicKey: string;
 }
@@ -21,12 +21,12 @@ export interface SeedNode {
 export const SEED_NODES: SeedNode[] = [
     // Nodos semilla iniciales - en producción se cargarían desde:
     // 1. Configuración hardcoded en la app
-    // 2. DNS TXT records (dht-seeds.revelnest.chat)
+    // 2. DNS TXT records (dht-seeds.upeer.chat)
     // 3. Archivo de configuración local
     // 
     // Formato ejemplo:
     // {
-    //     revelnestId: "802d20068fe07d3c3c16a15491210cd2",
+    //     upeerId: "802d20068fe07d3c3c16a15491210cd2",
     //     address: "200:xxxx:xxxx:xxxx::xxxx",
     //     publicKey: "a1b2c3d4e5f6..."
     // }
@@ -35,7 +35,7 @@ export const SEED_NODES: SeedNode[] = [
 // Contact information for Kademlia
 export interface KademliaContact {
     nodeId: Buffer;           // Kademlia ID (160-bit)
-    revelnestId: string;      // Original RevelNest ID
+    upeerId: string;      // Original upeer ID
     address: string;          // Yggdrasil IPv6 address
     publicKey: string;        // Ed25519 public key
     lastSeen: number;         // Timestamp of last successful communication
@@ -45,9 +45,9 @@ export interface KademliaContact {
 
 // Stored value in DHT
 export interface StoredValue {
-    key: Buffer;              // Key (hash of the value or revelnestId)
+    key: Buffer;              // Key (hash of the value or upeerId)
     value: any;               // The stored data (LocationBlock, etc.)
-    publisher: string;        // RevelNest ID of publisher
+    publisher: string;        // upeer ID of publisher
     timestamp: number;        // Publication time
     signature?: string;       // Optional signature for verification
 }
@@ -65,11 +65,11 @@ export interface KademliaStats {
     storedValues: number;
 }
 
-// Convert RevelNest ID (128-bit hex) to Kademlia ID (160-bit Buffer)
-export function toKademliaId(revelnestId: string): Buffer {
-    // RevelNest ID is 32 hex chars = 16 bytes = 128 bits
+// Convert upeer ID (128-bit hex) to Kademlia ID (160-bit Buffer)
+export function toKademliaId(upeerId: string): Buffer {
+    // upeer ID is 32 hex chars = 16 bytes = 128 bits
     // We extend to 160 bits using SHA-256 and taking first 20 bytes
     const hash = crypto.createHash('sha256');
-    hash.update(revelnestId, 'hex');
+    hash.update(upeerId, 'hex');
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }

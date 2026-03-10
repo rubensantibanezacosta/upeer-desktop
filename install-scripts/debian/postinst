@@ -1,13 +1,50 @@
 #!/bin/bash
 set -e
 
-# RevelNest Chat P2P - Script de post-instalación para Debian/Ubuntu
+# uPeer P2P - Script de post-instalación para Debian/Ubuntu
+#
+# Arquitectura: Sidecar user-space (yggstack + proxy SOCKS5)
+# ─────────────────────────────────────────────────────────────
+# Esta versión NO instala ningún servicio de sistema ni daemon con
+# privilegios de red. El binario yggstack se ejecuta como proceso
+# hijo de la app Electron, sin necesidad de root ni capabilities.
+# El firewall del SO no necesita ninguna regla especial porque
+# yggstack solo escucha en 127.0.0.1:9050 (loopback).
 
-echo "Configurando RevelNest Chat P2P..."
+echo "Instalando uPeer P2P..."
+
+APP_RESOURCES="/usr/lib/upeer-chat/resources"
+YGGSTACK_SRC="$APP_RESOURCES/bin/linux-x64/yggstack"
+YGGSTACK_DST="/usr/lib/upeer/yggstack"
+
+# Instalar el binario yggstack en /usr/lib/upeer/ para que la app lo encuentre
+if [ -f "$YGGSTACK_SRC" ]; then
+    echo "Instalando binario yggstack (user-space sidecar)..."
+    mkdir -p /usr/lib/upeer
+    cp "$YGGSTACK_SRC" "$YGGSTACK_DST"
+    chmod 755 "$YGGSTACK_DST"
+    echo "✅ yggstack instalado en $YGGSTACK_DST"
+else
+    echo "⚠️  Binario yggstack no encontrado en $YGGSTACK_SRC"
+    echo "   La app intentará usar el binario incluido en su propio paquete."
+fi
+
+echo ""
+echo "🎉 uPeer P2P instalado correctamente"
+echo ""
+echo "Para iniciar la aplicación, ejecute:"
+echo "  upeer-chat"
+echo ""
+echo "La red Yggdrasil se gestiona automáticamente dentro de la app."
+echo "No se necesita ningún servicio de sistema adicional."
+echo ""
+
+exit 0
+
 
 # Configuración de permisos para el binario Yggdrasil
-YGGDRASIL_BIN="/usr/lib/revelnest/yggdrasil"
-APP_RESOURCES="/usr/lib/revelnest-chat/resources"
+YGGDRASIL_BIN="/usr/lib/upeer/yggdrasil"
+APP_RESOURCES="/usr/lib/upeer-chat/resources"
 if [ -f "$YGGDRASIL_BIN" ]; then
     echo "Configurando capabilities para Yggdrasil..."
     setcap cap_net_admin,cap_net_raw+ep "$YGGDRASIL_BIN" 2>/dev/null || {
@@ -18,7 +55,7 @@ else
     # Intentar copiar desde los recursos de la aplicación
     if [ -f "$APP_RESOURCES/bin/linux-x64/yggdrasil" ]; then
         echo "Copiando binario Yggdrasil desde recursos de la aplicación..."
-        mkdir -p /usr/lib/revelnest
+        mkdir -p /usr/lib/upeer
         cp "$APP_RESOURCES/bin/linux-x64/yggdrasil" "$YGGDRASIL_BIN"
         chmod 755 "$YGGDRASIL_BIN"
         echo "Configurando capabilities para Yggdrasil..."
@@ -39,26 +76,26 @@ fi
 
 if ! id yggdrasil >/dev/null 2>&1; then
     echo "Creando usuario 'yggdrasil'..."
-    useradd --system --no-create-home --home-dir /var/lib/revelnest \
+    useradd --system --no-create-home --home-dir /var/lib/upeer \
             --shell /bin/false --gid yggdrasil yggdrasil || \
             echo "Usuario 'yggdrasil' ya existe o no se pudo crear"
 fi
 
 # Crear directorios necesarios
 echo "Creando directorios del sistema..."
-for dir in /etc/revelnest /var/lib/revelnest /var/log/revelnest; do
+for dir in /etc/upeer /var/lib/upeer /var/log/upeer; do
     if [ ! -d "$dir" ]; then
         mkdir -p "$dir"
     fi
 done
 
 # Configurar permisos de directorios
-chown -R yggdrasil:yggdrasil /var/lib/revelnest /var/log/revelnest
-chmod 750 /var/lib/revelnest /var/log/revelnest
-chmod 755 /etc/revelnest
+chown -R yggdrasil:yggdrasil /var/lib/upeer /var/log/upeer
+chmod 750 /var/lib/upeer /var/log/upeer
+chmod 755 /etc/upeer
 
 # Generar configuración inicial si no existe
-CONF_FILE="/etc/revelnest/yggdrasil.conf"
+CONF_FILE="/etc/upeer/yggdrasil.conf"
 if [ ! -f "$CONF_FILE" ] && [ -f "$YGGDRASIL_BIN" ]; then
     echo "Generando configuración inicial de Yggdrasil..."
     # Ejecutar en modo background temporal para generar configuración
@@ -69,7 +106,7 @@ if [ ! -f "$CONF_FILE" ] && [ -f "$YGGDRASIL_BIN" ]; then
         echo "Personalizando configuración..."
         cat "$CONF_FILE.tmp" | \
             sed 's/^  Peers: \[\]/  Peers: [\n    "tls:\/\/ygg.mkg20001.io:443",\n    "tcp:\/\/ygg.tomasgl.ru:10526"\n  ]/' | \
-            sed 's/^  AdminListen: .*/  AdminListen: unix:\/\/\/var\/run\/revelnest\/yggdrasil.sock/' | \
+            sed 's/^  AdminListen: .*/  AdminListen: unix:\/\/\/var\/run\/upeer\/yggdrasil.sock/' | \
             sed 's/^  IfName: .*/  IfName: ygg0/' > "$CONF_FILE"
         rm -f "$CONF_FILE.tmp"
         
@@ -87,7 +124,7 @@ if [ ! -f "$CONF_FILE" ] && [ -f "$YGGDRASIL_BIN" ]; then
     "tcp://ygg.tomasgl.ru:10526"
   ]
   Listen: []
-  AdminListen: "unix:///var/run/revelnest/yggdrasil.sock"
+  AdminListen: "unix:///var/run/upeer/yggdrasil.sock"
   IfName: ygg0
   MulticastInterfaces: [
     {
@@ -106,54 +143,54 @@ fi
 # Configurar servicio systemd
 echo "Configurando servicio systemd..."
 # Copiar servicio systemd si no existe
-SERVICE_SOURCE="$APP_RESOURCES/install-scripts/systemd/revelnest-yggdrasil.service"
-if [ ! -f /lib/systemd/system/revelnest-yggdrasil.service ] && [ -f "$SERVICE_SOURCE" ]; then
+SERVICE_SOURCE="$APP_RESOURCES/install-scripts/systemd/upeer-yggdrasil.service"
+if [ ! -f /lib/systemd/system/upeer-yggdrasil.service ] && [ -f "$SERVICE_SOURCE" ]; then
     echo "Copiando servicio systemd desde recursos..."
     mkdir -p /lib/systemd/system
-    cp "$SERVICE_SOURCE" /lib/systemd/system/revelnest-yggdrasil.service
-    chmod 644 /lib/systemd/system/revelnest-yggdrasil.service
+    cp "$SERVICE_SOURCE" /lib/systemd/system/upeer-yggdrasil.service
+    chmod 644 /lib/systemd/system/upeer-yggdrasil.service
 fi
 
-if [ -f /lib/systemd/system/revelnest-yggdrasil.service ]; then
+if [ -f /lib/systemd/system/upeer-yggdrasil.service ]; then
     systemctl daemon-reload
-    systemctl enable revelnest-yggdrasil.service --now || {
-        echo "Advertencia: No se pudo iniciar el servicio revelnest-yggdrasil"
-        echo "Puede iniciarlo manualmente con: systemctl start revelnest-yggdrasil"
+    systemctl enable upeer-yggdrasil.service --now || {
+        echo "Advertencia: No se pudo iniciar el servicio upeer-yggdrasil"
+        echo "Puede iniciarlo manualmente con: systemctl start upeer-yggdrasil"
     }
     
     # Esperar un momento para que el servicio se inicie
     sleep 2
     
-    if systemctl is-active --quiet revelnest-yggdrasil.service; then
-        echo "✅ Servicio de red RevelNest iniciado correctamente"
+    if systemctl is-active --quiet upeer-yggdrasil.service; then
+        echo "✅ Servicio de red upeer iniciado correctamente"
         echo "📡 Dirección IPv6 asignada:"
         ip -6 addr show ygg0 2>/dev/null | grep "inet6 200:" || echo "   (La interfaz se configurará en unos segundos)"
     else
         echo "⚠️  El servicio no se pudo iniciar automáticamente"
-        echo "   Revise los logs con: journalctl -u revelnest-yggdrasil"
+        echo "   Revise los logs con: journalctl -u upeer-yggdrasil"
     fi
 else
     echo "Advertencia: Archivo de servicio systemd no encontrado"
 fi
 
 # Crear socket directory para AdminListen
-if [ ! -d "/var/run/revelnest" ]; then
-    mkdir -p /var/run/revelnest
-    chown yggdrasil:yggdrasil /var/run/revelnest
-    chmod 755 /var/run/revelnest
+if [ ! -d "/var/run/upeer" ]; then
+    mkdir -p /var/run/upeer
+    chown yggdrasil:yggdrasil /var/run/upeer
+    chmod 755 /var/run/upeer
 fi
 
 echo ""
-echo "🎉 RevelNest Chat P2P instalado correctamente"
+echo "🎉 uPeer P2P instalado correctamente"
 echo ""
 echo "Para iniciar la aplicación, ejecute:"
-echo "  revelnest-chat"
+echo "  upeer-chat"
 echo ""
 echo "Para ver el estado del servicio de red:"
-echo "  systemctl status revelnest-yggdrasil"
+echo "  systemctl status upeer-yggdrasil"
 echo ""
 echo "Para ver los logs:"
-echo "  journalctl -u revelnest-yggdrasil -f"
+echo "  journalctl -u upeer-yggdrasil -f"
 echo ""
 
 exit 0

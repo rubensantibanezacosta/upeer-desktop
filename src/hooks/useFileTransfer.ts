@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // Types for file transfers
 export interface FileTransfer {
   fileId: string;
-  revelnestId: string;
+  upeerId: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -37,7 +37,7 @@ export interface FileTransfer {
 
 export interface TransferProgress {
   fileId: string;
-  revelnestId: string;
+  upeerId: string;
   progress: number;
   bytesTransferred: number;
   totalBytes: number;
@@ -49,7 +49,7 @@ export interface TransferProgress {
 }
 
 export interface StartTransferParams {
-  revelnestId: string;
+  upeerId: string;
   filePath: string;
   thumbnail?: string;
 }
@@ -59,10 +59,24 @@ export interface SaveFileParams {
   destinationPath: string;
 }
 
-export function useFileTransfer() {
+export type TransferStateUpdate = {
+  fileHash?: string;
+  thumbnail?: string;
+  transferState?: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
+  direction?: 'sending' | 'receiving';
+};
+
+export function useFileTransfer(onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void) {
   const [transfers, setTransfers] = useState<FileTransfer[]>([]);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
-  const [selectedRevelnestId, setSelectedRevelnestId] = useState<string>('');
+  const [selectedUpeerId, setSelectedUpeerId] = useState<string>('');
+
+  // BUG DT fix: ref estable para el callback externo; evita que onTransferStateChange
+  // sea una dependencia del useEffect y no provoca re-registro de listeners.
+  const onTransferStateChangeRef = useRef(onTransferStateChange);
+  useEffect(() => {
+    onTransferStateChangeRef.current = onTransferStateChange;
+  });
 
   const allTransfers = useMemo(() => {
     return transfers;
@@ -74,48 +88,48 @@ export function useFileTransfer() {
   }, []);
 
   // Setup event listeners for file transfer events
+  // BUG DT fix: registro único aquí; el callback onTransferStateChange (de App.tsx)
+  // se llama vía ref para no duplicar registros ni silenciar ninguno de los dos handlers.
   useEffect(() => {
-    console.log('useFileTransfer: Setting up event listeners');
-
-    window.revelnest.onFileTransferStarted((data: any) => {
-      console.log('useFileTransfer: File transfer started event:', data);
+    window.upeer.onFileTransferStarted((_data: any) => {
       loadTransfers();
     });
 
-    window.revelnest.onFileTransferProgress((data: any) => {
-      console.log('File transfer progress event:', data);
+    window.upeer.onFileTransferProgress((data: any) => {
       updateTransferProgress(data);
     });
 
-    window.revelnest.onFileTransferCompleted((data: any) => {
-      console.log('File transfer completed:', data);
+    window.upeer.onFileTransferCompleted((data: any) => {
       // Optimistic immediate update
       setTransfers(prev => prev.map(t =>
         t.fileId === data.fileId ? { ...t, state: 'completed', progress: 100 } : t
       ));
       loadTransfers();
+      // Notifica a useChatState para actualizar el mensaje del chat
+      onTransferStateChangeRef.current?.(data.fileId, {
+        fileHash: data.fileHash,
+        transferState: 'completed'
+      });
     });
 
-    window.revelnest.onFileTransferCancelled((data: any) => {
-      console.log('File transfer cancelled:', data);
+    window.upeer.onFileTransferCancelled((data: any) => {
       loadTransfers();
+      onTransferStateChangeRef.current?.(data.fileId, { transferState: 'cancelled' });
     });
 
-    window.revelnest.onFileTransferFailed((data: any) => {
-      console.log('File transfer failed:', data);
+    window.upeer.onFileTransferFailed((data: any) => {
       loadTransfers();
+      onTransferStateChangeRef.current?.(data.fileId, { transferState: 'failed' });
     });
   }, []);
 
   const loadTransfers = async () => {
     try {
-      const result = await window.revelnest.getFileTransfers();
-      console.log('Loaded transfers result:', result);
+      const result = await window.upeer.getFileTransfers();
       if (result.success && result.transfers) {
         const transfersList = Array.isArray(result.transfers)
           ? result.transfers
           : Object.values(result.transfers);
-        console.log('Setting transfers list:', transfersList.length, transfersList.map(t => ({ fileId: t.fileId, direction: t.direction, state: t.state, progress: t.progress })));
         setTransfers(transfersList);
       }
     } catch (error) {
@@ -124,7 +138,6 @@ export function useFileTransfer() {
   };
 
   const updateTransferProgress = (progress: TransferProgress) => {
-    console.log('File transfer progress received:', progress);
     setTransfers(prev => {
       const exists = prev.some(t => t.fileId === progress.fileId && t.direction === progress.direction);
 
@@ -158,8 +171,8 @@ export function useFileTransfer() {
 
   const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string }> => {
     try {
-      const result = await window.revelnest.startFileTransfer(
-        params.revelnestId,
+      const result = await window.upeer.startFileTransfer(
+        params.upeerId,
         params.filePath,
         params.thumbnail
       );
@@ -180,7 +193,7 @@ export function useFileTransfer() {
 
   const cancelTransfer = async (fileId: string, reason?: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const result = await window.revelnest.cancelFileTransfer(fileId, reason);
+      const result = await window.upeer.cancelFileTransfer(fileId, reason);
       if (result.success) {
         await loadTransfers();
       }
@@ -196,7 +209,7 @@ export function useFileTransfer() {
 
   const saveFile = async (params: SaveFileParams): Promise<{ success: boolean; error?: string }> => {
     try {
-      const result = await window.revelnest.saveTransferredFile(params.fileId, params.destinationPath);
+      const result = await window.upeer.saveTransferredFile(params.fileId, params.destinationPath);
       return result;
     } catch (error) {
       console.error('Error saving file:', error);
@@ -211,18 +224,18 @@ export function useFileTransfer() {
     return transfers.find(t => t.fileId === fileId);
   };
 
-  const getTransfersForContact = (revelnestId: string): FileTransfer[] => {
-    return transfers.filter(t => t.revelnestId === revelnestId);
+  const getTransfersForContact = (upeerId: string): FileTransfer[] => {
+    return transfers.filter(t => t.upeerId === upeerId);
   };
 
-  const openFilePicker = (revelnestId: string) => {
-    setSelectedRevelnestId(revelnestId);
+  const openFilePicker = (upeerId: string) => {
+    setSelectedUpeerId(upeerId);
     setIsFilePickerOpen(true);
   };
 
   const closeFilePicker = () => {
     setIsFilePickerOpen(false);
-    setSelectedRevelnestId('');
+    setSelectedUpeerId('');
   };
 
   const formatFileSize = (bytes?: number): string => {
@@ -245,7 +258,7 @@ export function useFileTransfer() {
     transfers,
     allTransfers,
     isFilePickerOpen,
-    selectedRevelnestId,
+    selectedUpeerId,
 
     // Actions
     startTransfer,

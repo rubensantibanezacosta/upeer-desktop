@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}⏳ INICIANDO SIMULADOR DE 60 DÍAS REVELNEST${NC}"
+echo -e "${YELLOW}⏳ INICIANDO SIMULADOR DE 60 DÍAS upeer${NC}"
 echo "Simulación acelerada de persistencia a largo plazo con renewal tokens..."
 echo
 
@@ -22,7 +22,7 @@ docker rm -f 60day_alice 60day_bob 60day_charlie 2>/dev/null || true
 
 # Rebuild the docker image
 echo "2. Construyendo imagen Docker..."
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
 echo "   ✅ Imagen construida"
 
 # Start three nodes for simulation
@@ -34,7 +34,7 @@ docker run -d --name 60day_alice --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/p2p_60day_sim:/shared \
   -e NODE_ENV_NAME=alice \
   -e KEY_FILE=/shared/keys/alice.key \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 8
 
 # Get Alice's info
@@ -58,7 +58,7 @@ docker run -d --name 60day_bob --cap-add=NET_ADMIN --device=/dev/net/tun \
   -e NODE_ENV_NAME=bob \
   -e KEY_FILE=/shared/keys/bob.key \
   -e TARGET_IDENTITY="$TARGET_ALICE" \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 15
 
 # Wait for handshake to complete
@@ -132,7 +132,7 @@ docker run -d --name 60day_charlie --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/p2p_60day_sim:/shared \
   -e NODE_ENV_NAME=charlie \
   -e TARGET_IDENTITY="${BOB_ID}@${BOB_IP}" \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 10
 
 # Get Charlie's info
@@ -159,7 +159,7 @@ docker run -d --name 60day_alice_return --cap-add=NET_ADMIN --device=/dev/net/tu
   -e NODE_ENV_NAME=alice_return \
   -e KEY_FILE=/shared/keys/alice.key \
   -e TARGET_IDENTITY="${BOB_ID}@${BOB_IP}" \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 10
 
 # Get returning Alice's info (nueva identidad o misma)

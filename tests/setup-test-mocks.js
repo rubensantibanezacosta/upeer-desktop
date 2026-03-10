@@ -147,7 +147,7 @@ const mockSodium = {
 
 // Mock identity module
 const mockIdentity = {
-    getMyRevelNestId() {
+    getMyUPeerId() {
         return 'test1234567890abcdef1234567890abcd';
     },
     sign(message) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Auditoría de privacidad para RevelNest P2P.
+Auditoría de privacidad para upeer P2P.
 Verifica que los mensajes no contengan información sensible de contactos.
 """
 
@@ -10,7 +10,7 @@ import re
 from typing import Dict, List, Tuple
 
 class PrivacyAuditor:
-    """Auditor de privacidad para mensajes RevelNest."""
+    """Auditor de privacidad para mensajes upeer."""
     
     # Campos prohibidos que NUNCA deben aparecer en mensajes
     FORBIDDEN_KEYS = [
@@ -55,7 +55,7 @@ class PrivacyAuditor:
             if matches:
                 violations.append(f"Patrón sensible '{pattern}' encontrado: {matches[:3]}")
         
-        # 3. Verificar estructura de mensaje RevelNest esperada
+        # 3. Verificar estructura de mensaje upeer esperada
         expected_types = ['CHAT', 'DHT_UPDATE', 'DHT_QUERY', 'DHT_RESPONSE', 
                          'DHT_EXCHANGE', 'PING', 'PONG', 'HANDSHAKE_REQ', 
                          'HANDSHAKE_ACCEPT', 'CHAT_REACTION', 'CHAT_UPDATE', 
@@ -142,7 +142,7 @@ class PrivacyAuditor:
         stats = self.get_stats()
         
         print("\n" + "="*60)
-        print("📊 REPORTE DE AUDITORÍA DE PRIVACIDAD REVELNEST")
+        print("📊 REPORTE DE AUDITORÍA DE PRIVACIDAD upeer")
         print("="*60)
         print(f"Mensajes auditados: {stats['messages_audited']}")
         print(f"Mensajes limpios: {stats['messages_clean']} ({stats['clean_rate']:.1f}%)")

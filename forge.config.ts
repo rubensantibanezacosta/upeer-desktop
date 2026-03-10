@@ -18,8 +18,8 @@ const config: ForgeConfig = {
       './assets'
     ],
     // Configuración adicional para el nombre de la aplicación
-    name: 'revelnest-chat',
-    executableName: 'revelnest-chat',
+    name: 'upeer-chat',
+    executableName: 'upeer-chat',
     icon: './assets/icon'
   },
   rebuildConfig: {},
@@ -30,14 +30,14 @@ const config: ForgeConfig = {
     new MakerDeb({
       // @ts-ignore
       options: {
-        name: 'revelnest-chat',
-        productName: 'RevelNest Chat P2P',
+        name: 'upeer-chat',
+        productName: 'uPeer P2P',
         icon: './resources/icon.png',
         categories: ['Network', 'Utility'],
-        maintainer: 'RevelNest Team',
+        maintainer: 'upeer Team',
         description: 'Chat descentralizado P2P con red mesh Yggdrasil',
         productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
-        bin: 'revelnest-chat',
+        bin: 'upeer-chat',
         scripts: {
           postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
           postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
@@ -46,7 +46,7 @@ const config: ForgeConfig = {
         // extraFiles no está soportado por electron-installer-debian
         // Usamos scripts postinst para copiar archivos necesarios
         mimeType: [
-          'x-scheme-handler/revelnest'
+          'x-scheme-handler/upeer'
         ],
         section: 'net'
       }
@@ -55,14 +55,14 @@ const config: ForgeConfig = {
     new MakerDeb({
       // @ts-ignore
       options: {
-        name: 'revelnest-chat',
-        productName: 'RevelNest Chat P2P',
+        name: 'upeer-chat',
+        productName: 'uPeer P2P',
         icon: './resources/icon.png',
         categories: ['Network', 'Utility'],
-        maintainer: 'RevelNest Team',
+        maintainer: 'upeer Team',
         description: 'Chat descentralizado P2P con red mesh Yggdrasil',
         productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
-        bin: 'revelnest-chat',
+        bin: 'upeer-chat',
         scripts: {
           postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
           postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
@@ -71,7 +71,7 @@ const config: ForgeConfig = {
         // extraFiles no está soportado por electron-installer-debian
         // Usamos scripts postinst para copiar archivos necesarios
         mimeType: [
-          'x-scheme-handler/revelnest'
+          'x-scheme-handler/upeer'
         ],
         section: 'net'
       }
@@ -79,14 +79,14 @@ const config: ForgeConfig = {
     // MakerDeb para arm64 (comentado - usar el mismo paquete para ambas arquitecturas)
     // new MakerDeb({
     //   options: {
-    //     name: 'revelnest-chat',
-    //     productName: 'RevelNest Chat P2P',
+    //     name: 'upeer-chat',
+    //     productName: 'uPeer P2P',
     //     icon: './resources/icon.png',
-    //     maintainer: 'RevelNest Team',
-    //     homepage: 'https://revelnest.chat',
+    //     maintainer: 'upeer Team',
+    //     homepage: 'https://upeer.chat',
     //     categories: ['Network', 'InstantMessaging'],
     //     mimeTypes: [
-    //       'x-scheme-handler/revelnest'
+    //       'x-scheme-handler/upeer'
     //     ],
     //     section: 'net'
     //   },

@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1772367464118,
-      "tag": "0000_spotty_shiver_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1772543277971,
-      "tag": "0001_lethal_thunderbolt",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1772720352335,
-      "tag": "0002_cultured_odin",
+      "when": 1773141875893,
+      "tag": "0000_abnormal_umar",
       "breakpoints": true
     }
   ]

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test de escalabilidad y monitorización de red RevelNest
+# Test de escalabilidad y monitorización de red upeer
 # Permite probar con diferentes tamaños de red y topologías
 
 set -e
@@ -18,7 +18,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Test de Escalabilidad RevelNest ===${NC}"
+echo -e "${BLUE}=== Test de Escalabilidad upeer ===${NC}"
 echo -e "${GREEN}Nodos:${NC} $NUM_NODES"
 echo -e "${GREEN}Topología:${NC} $TOPOLOGY"
 echo -e "${GREEN}Duración:${NC} $TEST_DURATION segundos"
@@ -27,7 +27,7 @@ echo -e "${GREEN}Directorio compartido:${NC} $SHARED_DIR"
 # Limpieza previa
 cleanup() {
     echo -e "${YELLOW}Limpiando contenedores previos...${NC}"
-    docker rm -f $(docker ps -a -q --filter ancestor=revelnest-bot) 2>/dev/null || true
+    docker rm -f $(docker ps -a -q --filter ancestor=upeer-bot) 2>/dev/null || true
     rm -rf "$SHARED_DIR" 2>/dev/null || true
     mkdir -p "$SHARED_DIR"
 }
@@ -35,7 +35,7 @@ cleanup
 
 # Reconstruir imagen con métricas mejoradas
 echo -e "${YELLOW}Reconstruyendo imagen Docker con métricas...${NC}"
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
 
 # Función para iniciar un nodo y devolver su información
 start_node() {
@@ -52,7 +52,7 @@ start_node() {
         -v "$SHARED_DIR:/shared" \
         -e NODE_ENV_NAME="$node_name" \
         -e TARGET_IDENTITY="$target_env" \
-        revelnest-bot >/dev/null 2>&1
+        upeer-bot >/dev/null 2>&1
         
     sleep 4  # Esperar a que Yggdrasil se inicie
     
@@ -317,7 +317,7 @@ echo "]" >> "$metrics_summary"
 # Generar reporte final
 echo -e "${YELLOW}=== Generando reporte final ===${NC}"
 generate_final_report() {
-    echo -e "${BLUE}📈 REPORTE DE ESCALABILIDAD REVELNEST${NC}"
+    echo -e "${BLUE}📈 REPORTE DE ESCALABILIDAD upeer${NC}"
     echo -e "${GREEN}Configuración:${NC}"
     echo -e "  Nodos: $NUM_NODES"
     echo -e "  Topología: $TOPOLOGY"
@@ -399,11 +399,11 @@ read -p "¿Mantener contenedores ejecutándose? (s/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Ss]$ ]]; then
     echo -e "${YELLOW}Deteniendo contenedores...${NC}"
-    docker rm -f $(docker ps -a -q --filter ancestor=revelnest-bot) 2>/dev/null || true
+    docker rm -f $(docker ps -a -q --filter ancestor=upeer-bot) 2>/dev/null || true
     echo -e "${GREEN}Limpieza completada${NC}"
 else
     echo -e "${GREEN}Contenedores siguen ejecutándose${NC}"
-    echo -e "Usa 'docker rm -f \$(docker ps -a -q --filter ancestor=revelnest-bot)' para limpiar"
+    echo -e "Usa 'docker rm -f \$(docker ps -a -q --filter ancestor=upeer-bot)' para limpiar"
 fi
 
 echo -e "\n${BLUE}=== Test de escalabilidad finalizado ===${NC}"

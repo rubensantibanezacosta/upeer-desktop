@@ -13,7 +13,7 @@ export class RoutingTable {
 
     constructor(nodeId: Buffer) {
         this.nodeId = nodeId;
-        
+
         // Initialize k-buckets
         this.buckets = new Array(BUCKET_COUNT);
         for (let i = 0; i < BUCKET_COUNT; i++) {
@@ -25,39 +25,39 @@ export class RoutingTable {
     addContact(contact: KademliaContact): boolean {
         // Don't add ourselves
         if (contact.nodeId.equals(this.nodeId)) return false;
-        
+
         const bucketIndex = getBucketIndex(this.nodeId, contact.nodeId);
         return this.buckets[bucketIndex].add(contact);
     }
 
     // Remove a contact
-    removeContact(revelnestId: string): boolean {
-        const contact = this.findContact(revelnestId);
+    removeContact(upeerId: string): boolean {
+        const contact = this.findContact(upeerId);
         if (!contact) return false;
-        
+
         const bucketIndex = getBucketIndex(this.nodeId, contact.nodeId);
-        return this.buckets[bucketIndex].remove(revelnestId);
+        return this.buckets[bucketIndex].remove(upeerId);
     }
 
-    // Find a contact by RevelNest ID
-    findContact(revelnestId: string): KademliaContact | null {
-        const targetId = toKademliaId(revelnestId);
+    // Find a contact by upeer ID
+    findContact(upeerId: string): KademliaContact | null {
+        const targetId = toKademliaId(upeerId);
         const bucketIndex = getBucketIndex(this.nodeId, targetId);
-        
+
         const bucket = this.buckets[bucketIndex];
-        return bucket.all.find(c => c.revelnestId === revelnestId) || null;
+        return bucket.all.find(c => c.upeerId === upeerId) || null;
     }
 
     // Find the K closest contacts to a given ID
-    findClosestContacts(targetRevelnestId: string, limit: number = K): KademliaContact[] {
-        const targetId = toKademliaId(targetRevelnestId);
+    findClosestContacts(targetUpeerId: string, limit: number = K): KademliaContact[] {
+        const targetId = toKademliaId(targetUpeerId);
         const allContacts: KademliaContact[] = [];
-        
+
         // Collect contacts from all buckets
         for (const bucket of this.buckets) {
             allContacts.push(...bucket.all);
         }
-        
+
         // Sort by XOR distance and return closest
         return allContacts
             .sort((a, b) => compareDistance(a.nodeId, b.nodeId, targetId))

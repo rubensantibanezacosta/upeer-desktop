@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dashboard web para monitorización en tiempo real de tests RevelNest
+Dashboard web para monitorización en tiempo real de tests upeer
 """
 
 import json
@@ -225,7 +225,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RevelNest Scalability Dashboard</title>
+    <title>upeer Scalability Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -429,7 +429,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="dashboard-container">
         <div class="header">
-            <h1>🌐 RevelNest Scalability Dashboard</h1>
+            <h1>🌐 upeer Scalability Dashboard</h1>
             <p>Real-time monitoring of P2P network tests</p>
             {% if test_found %}
             <div class="status-badge">✅ TEST ACTIVE - {{ total_nodes }} Nodes Running</div>
@@ -551,7 +551,7 @@ cd /home/rubendev/Proyectos/chat-p2p
         {% endif %}
         
         <div class="footer">
-            <p>RevelNest P2P Chat • Scalability Monitoring Dashboard • Updated: <span id="updateTime"></span></p>
+            <p>upeer P2P Chat • Scalability Monitoring Dashboard • Updated: <span id="updateTime"></span></p>
             <p style="margin-top: 5px; font-size: 0.8rem;">Metrics update every {{ REFRESH_INTERVAL }} seconds</p>
         </div>
     </div>
@@ -712,7 +712,7 @@ def dashboard():
     return HTML_TEMPLATE
 
 if __name__ == '__main__':
-    print("🌐 RevelNest Scalability Dashboard")
+    print("🌐 upeer Scalability Dashboard")
     print("📊 Starting web server on http://localhost:5000")
     print("📈 Monitoring test directories in /tmp/p2p_scalability_*")
     print("🔄 Auto-refresh every 5 seconds")

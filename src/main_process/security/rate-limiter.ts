@@ -51,6 +51,7 @@ export class RateLimiter {
             'TYPING': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
 
             // Social interactions
+            'CHAT_CONTACT': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 }, // BUG CC fix: faltaba regla → ilimitado
             'CHAT_REACTION': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'CHAT_UPDATE': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
             'CHAT_DELETE': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
@@ -59,6 +60,28 @@ export class RateLimiter {
             'DHT_FIND_NODE': { windowMs: 30000, maxTokens: 30, refillRate: 30 / 30 },
             'DHT_FIND_VALUE': { windowMs: 30000, maxTokens: 30, refillRate: 30 / 30 },
             'DHT_STORE': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+
+            // Vault messages
+            // BUG BH fix: tipos VAULT_* y REPUTATION_* no tenían reglas →
+            // la llamada a check() devolvía true incondicionalmente (sin regla = ilimitado).
+            // Un peer podía inundar con VAULT_STORE/VAULT_QUERY/REPUTATION_GOSSIP sin límite.
+            'VAULT_STORE': { windowMs: 60000, maxTokens: 30, refillRate: 30 / 60 },
+            'VAULT_QUERY': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+            'VAULT_DELIVERY': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
+            'VAULT_ACK': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 },
+            'VAULT_RENEW': { windowMs: 60000, maxTokens: 30, refillRate: 30 / 60 },
+
+            // Reputation gossip
+            'REPUTATION_GOSSIP': { windowMs: 60000, maxTokens: 5, refillRate: 5 / 60 },
+            'REPUTATION_REQUEST': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+            'REPUTATION_DELIVER': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+
+            // Group messages
+            'GROUP_MSG': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 },
+            'GROUP_ACK': { windowMs: 60000, maxTokens: 200, refillRate: 200 / 60 },
+            'GROUP_INVITE': { windowMs: 60000, maxTokens: 5, refillRate: 5 / 60 },
+            'GROUP_UPDATE': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+            'GROUP_LEAVE': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
 
             // File transfer messages (supporting multiple naming conventions for consistency)
             'FILE_START': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
@@ -70,6 +93,10 @@ export class RateLimiter {
             'FILE_END': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_DONE_ACK': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_CANCEL': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
+            // BUG DJ fix: SEALED no tenía regla → operaciones DH X25519 ilimitadas por IP.
+            // 5000/s es suficiente para transferencias de archivos a máxima velocidad
+            // (los FILE_CHUNK más su overhead SEALED) y bloquea floods sin autenticar.
+            'SEALED': { windowMs: 1000, maxTokens: 5000, refillRate: 5000 },
         };
     }
 
@@ -113,25 +140,14 @@ export class RateLimiter {
         // Check if we have at least 1 token
         if (bucket.tokens >= 1) {
             bucket.tokens -= 1;
-            console.log('DEBUG RateLimiter - ALLOWED:', {
-                ip,
-                messageType,
-                remainingTokens: bucket.tokens,
-                maxTokens: rule.maxTokens,
-                timestamp: now
-            });
             return true;
         }
 
         // Rate limited
+        // BUG BE fix: eliminados console.log de depuración que se disparaban en cada paquete
+        // (allow y block), causando spam masivo de consola durante transferencias de archivos
+        // y registrando IPs en texto plano — información sensible en una app de privacidad.
         warn('Rate limited', { ip, messageType, tokens: bucket.tokens.toFixed(2) }, 'rate-limiter');
-        console.log('DEBUG RateLimiter - BLOCKED:', {
-            ip,
-            messageType,
-            remainingTokens: bucket.tokens,
-            maxTokens: rule.maxTokens,
-            timestamp: now
-        });
         return false;
     }
 

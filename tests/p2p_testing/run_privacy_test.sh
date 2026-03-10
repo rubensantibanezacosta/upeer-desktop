@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}🔍 INICIANDO TEST DE PRIVACIDAD REVELNEST${NC}"
+echo -e "${YELLOW}🔍 INICIANDO TEST DE PRIVACIDAD upeer${NC}"
 echo "Verificando que los mensajes no contengan información sensible de contactos..."
 echo
 
@@ -31,7 +31,7 @@ except Exception as e:
 
 # Rebuild the docker image
 echo "1. Construyendo imagen Docker..."
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing > /dev/null 2>&1
 echo "   ✅ Imagen construida"
 
 # Cleanup
@@ -46,7 +46,7 @@ echo "   Node 1 (Alice)..."
 docker run -d --name privacy_node1 --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/p2p_privacy_test:/shared \
   -e NODE_ENV_NAME=alice \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 5
 
 # Get Alice's info using Python JSON parsing
@@ -69,7 +69,7 @@ docker run -d --name privacy_node2 --cap-add=NET_ADMIN --device=/dev/net/tun \
   -v /tmp/p2p_privacy_test:/shared \
   -e NODE_ENV_NAME=bob \
   -e TARGET_IDENTITY="$TARGET_ALICE" \
-  revelnest-bot > /dev/null 2>&1
+  upeer-bot > /dev/null 2>&1
 sleep 10
 
 # Get Bob's info using Python JSON parsing

@@ -1,12 +1,12 @@
 {
-  "name": "revelnest-chat",
-  "productName": "RevelNest Chat",
+  "name": "upeer-chat",
+  "productName": "uPeer",
   "version": "1.0.0",
   "description": "Chat descentralizado P2P con red mesh Yggdrasil",
-  "homepage": "https://revelnest.chat",
+  "homepage": "https://upeer.chat",
   "repository": {
     "type": "git",
-    "url": "https://github.com/revelnest/chat-p2p"
+    "url": "https://github.com/upeer/chat-p2p"
   },
   "main": ".vite/build/main.js",
   "type": "module",
@@ -56,16 +56,22 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@journeyapps/sqlcipher": "^5.3.1",
     "@mui/icons-material": "^7.3.8",
     "@mui/joy": "^5.0.0-beta.52",
     "@vscode/sudo-prompt": "^9.3.2",
     "better-sqlite3": "^12.6.2",
+    "bip39": "^3.1.0",
     "drizzle-orm": "^0.45.1",
     "electron-squirrel-startup": "^1.0.1",
     "node-fetch": "^3.3.2",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-simple-maps": "^3.0.0",
     "react-virtuoso": "^4.18.3",
-    "sodium-native": "^5.0.10"
+    "sodium-native": "^5.0.10",
+    "world-atlas": "^2.0.2",
+    "zustand": "^5.0.11"
   }
 }

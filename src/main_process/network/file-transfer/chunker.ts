@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FileTransfer } from './types.js';
 import { FileChunkData } from '../types.js';
+import { warn } from '../../security/secure-logger.js';
 
 export class FileChunker {
     private chunkSize: number;
@@ -16,7 +17,7 @@ export class FileChunker {
             throw new Error('Can only create temp files for receiving transfers');
         }
 
-        const tempDir = await fs.mkdtemp(path.join(process.env.TMPDIR || '/tmp', 'revelnest-'));
+        const tempDir = await fs.mkdtemp(path.join(process.env.TMPDIR || '/tmp', 'upeer-'));
         transfer.tempPath = path.join(tempDir, transfer.fileId);
 
         // Initialize file with zeros
@@ -41,7 +42,7 @@ export class FileChunker {
         // Verify chunk hash
         const chunkBuffer = Buffer.from(chunkData.data, 'base64');
         const chunkHash = crypto.createHash('sha256').update(chunkBuffer).digest('hex');
-        
+
         if (chunkHash !== chunkData.chunkHash) {
             throw new Error(`Chunk hash mismatch for index ${chunkData.chunkIndex}`);
         }
@@ -93,7 +94,7 @@ export class FileChunker {
                 await fs.rmdir(tempDir);
             } catch (error) {
                 // Ignore cleanup errors, log silently
-                console.debug('Error cleaning up temp file:', error);
+                warn('Error cleaning up temp file', error, 'file-transfer');
             }
         }
     }

@@ -1,31 +1,58 @@
 declare global {
     interface Window {
-        revelnest: {
+        upeer: {
             getMyNetworkAddress: () => Promise<string>;
-            getMessages: (revelnestId: string) => Promise<any[]>;
+            getMessages: (upeerId: string) => Promise<any[]>;
             getContacts: () => Promise<any[]>;
-            addContact: (address: string, name: string) => Promise<{ success: boolean, revelnestId: string }>;
-            acceptContactRequest: (revelnestId: string, publicKey: string) => Promise<{ success: boolean }>;
-            deleteContact: (revelnestId: string) => Promise<any>;
-            sendMessage: (revelnestId: string, message: string, replyTo?: string) => Promise<string>;
-            sendTypingIndicator: (revelnestId: string) => Promise<void>;
-            sendReadReceipt: (revelnestId: string, id: string) => Promise<void>;
-            sendContactCard: (targetRevelnestId: string, contact: any) => Promise<string>;
-            sendChatReaction: (revelnestId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
-            sendChatUpdate: (revelnestId: string, msgId: string, newContent: string) => Promise<void>;
-            sendChatDelete: (revelnestId: string, msgId: string) => Promise<void>;
-            getMyIdentity: () => Promise<{ address: string | null, revelnestId: string, publicKey: string }>;
+            addContact: (address: string, name: string) => Promise<{ success: boolean, upeerId: string }>;
+            acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;
+            deleteContact: (upeerId: string) => Promise<any>;
+            blockContact: (upeerId: string) => Promise<any>;
+            unblockContact: (upeerId: string) => Promise<any>;
+            getBlockedContacts: () => Promise<any[]>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<string>;
+            sendTypingIndicator: (upeerId: string) => Promise<void>;
+            sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
+            sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
+            sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
+            sendChatUpdate: (upeerId: string, msgId: string, newContent: string) => Promise<void>;
+            sendChatDelete: (upeerId: string, msgId: string) => Promise<void>;
+            getMyIdentity: () => Promise<{ address: string | null, upeerId: string, publicKey: string, alias?: string | null, avatar?: string | null }>;
+            getMyReputation: () => Promise<{ vouchScore: number; connectionCount: number } | null>;
+            getVaultStats: () => Promise<{ count: number, sizeBytes: number }>;
+            setMyAlias: (alias: string) => Promise<{ success: boolean }>;
+            setMyAvatar: (dataUrl: string) => Promise<{ success: boolean }>;
+            // Identity / Wallet Auth
+            identityStatus: () => Promise<{ isMnemonicMode: boolean; isLocked: boolean; upeerId: string | null }>;
+            generateMnemonic: () => Promise<{ mnemonic: string }>;
+            createMnemonicIdentity: (mnemonic: string, alias?: string, avatar?: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;
+            unlockSession: (mnemonic: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;
+            lockSession: () => Promise<{ success: boolean }>;
+            // Group API
+            getGroups: () => Promise<any[]>;
+            createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
+            updateGroupAvatar: (groupId: string, avatar: string) => Promise<void>;
+            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<string | undefined>;
+            inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
+            updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
+            leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
+            onGroupMessage: (callback: (data: any) => void) => void;
+            onGroupInvite: (callback: (data: any) => void) => void;
+            onGroupUpdated: (callback: (data: any) => void) => void;
+            onGroupMessageDelivered: (callback: (data: { id: string, groupId: string, upeerId: string }) => void) => void;
+
             onReceive: (callback: (data: any) => void) => void;
-            onMessageDelivered: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onMessageRead: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onMessageReactionUpdated: (callback: (data: { msgId: string, revelnestId: string, emoji: string, remove: boolean }) => void) => void;
-            onMessageUpdated: (callback: (data: { id: string, revelnestId: string, content: string }) => void) => void;
-            onMessageDeleted: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onPresence: (callback: (data: { revelnestId: string, lastSeen: string }) => void) => void;
-            onContactRequest: (callback: (data: { revelnestId: string, address: string, alias?: string, publicKey: string }) => void) => void;
-            onHandshakeFinished: (callback: (data: { revelnestId: string }) => void) => void;
-            onContactUntrustworthy: (callback: (data: { revelnestId: string, address: string, alias?: string, reason: string }) => void) => void;
-            onTyping: (callback: (data: { revelnestId: string }) => void) => void;
+            onMessageDelivered: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageRead: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, emoji: string, remove: boolean }) => void) => void;
+            onMessageUpdated: (callback: (data: { id: string, upeerId: string, content: string }) => void) => void;
+            onMessageDeleted: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => void;
+            onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => void;
+            onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => void;
+            onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
+            onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
+            onTyping: (callback: (data: { upeerId: string }) => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;
@@ -47,15 +74,41 @@ declare global {
                 error?: string;
             }>;
             getPathForFile: (file: File) => string;
-            startFileTransfer: (revelnestId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;
             saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
+            // BUG EC fix: nuevos métodos para descargar y abrir archivos recibidos
+            showSaveDialog: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
+            openFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
             onFileTransferStarted: (callback: (data: any) => void) => void;
             onFileTransferProgress: (callback: (data: any) => void) => void;
             onFileTransferCompleted: (callback: (data: any) => void) => void;
             onFileTransferCancelled: (callback: (data: any) => void) => void;
             onFileTransferFailed: (callback: (data: any) => void) => void;
+            /** Estadísticas de red: peers activos, latencias, reintentos */
+            getNetworkStats: () => Promise<{
+                peerCount: number;
+                peers: Array<{
+                    host: string;
+                    country: string;
+                    latencyMs: number | null;
+                    score: number;
+                    alive: boolean;
+                    lat: number | null;
+                    lon: number | null;
+                }>;
+                restartAttempts: number;
+                maxRestartAttempts: number;
+                selfLat: number | null;
+                selfLon: number | null;
+            }>;
+            /** Fuerza un reinicio de yggstack desde la UI */
+            restartYggstack: () => Promise<void>;
+            /** Callback cuando yggstack reporta su dirección IPv6 Yggdrasil asignada */
+            onYggstackAddress: (callback: (address: string) => void) => void;
+            /** Callback para cambios de estado de la red: 'connecting'|'up'|'down'|'reconnecting' */
+            onYggstackStatus: (callback: (status: string, address?: string) => void) => void;
         }
     }
 }

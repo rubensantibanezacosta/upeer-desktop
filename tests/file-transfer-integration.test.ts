@@ -84,7 +84,7 @@ describe('TransferManager Integration', () => {
             // Verify transfer was created
             const transfer = transferManager.getTransfer(fileId);
             assert.ok(transfer);
-            assert.strictEqual(transfer.revelnestId, 'peer-123');
+            assert.strictEqual(transfer.upeerId, 'peer-123');
             assert.strictEqual(transfer.fileName, 'test-file.txt');
             assert.strictEqual(transfer.direction, 'sending');
             assert.strictEqual(transfer.state, 'active');
@@ -118,7 +118,7 @@ describe('TransferManager Integration', () => {
             // Verify transfer was created for receiving
             const transfer = transferManager.getTransfer('incoming-file-123');
             assert.ok(transfer);
-            assert.strictEqual(transfer.revelnestId, 'peer-456');
+            assert.strictEqual(transfer.upeerId, 'peer-456');
             assert.strictEqual(transfer.fileName, 'received.txt');
             assert.strictEqual(transfer.direction, 'receiving');
             assert.strictEqual(transfer.state, 'active');
@@ -210,7 +210,7 @@ describe('TransferManager Integration', () => {
             const store = new FileTransferStore();
             
             const transfer = store.createTransfer({
-                revelnestId: 'peer-123',
+                upeerId: 'peer-123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -236,7 +236,7 @@ describe('TransferManager Integration', () => {
             const store = new FileTransferStore();
             
             store.createTransfer({
-                revelnestId: 'peer-1',
+                upeerId: 'peer-1',
                 fileName: 'active.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -244,7 +244,7 @@ describe('TransferManager Integration', () => {
             });
 
             const completed = store.createTransfer({
-                revelnestId: 'peer-2',
+                upeerId: 'peer-2',
                 fileName: 'completed.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -299,7 +299,7 @@ describe('TransferManager Integration', () => {
             const store = new FileTransferStore();
             
             const transfer = store.createTransfer({
-                revelnestId: 'peer-123',
+                upeerId: 'peer-123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',

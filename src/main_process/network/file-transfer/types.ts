@@ -18,7 +18,7 @@ export enum TransferPhase {
 
 export interface FileTransfer {
     fileId: string;
-    revelnestId: string; // Peer ID
+    upeerId: string; // Peer ID
     peerAddress: string; // Current IP address of the peer
     fileName: string;
     fileSize: number;
@@ -57,7 +57,7 @@ export interface FileTransfer {
 
 export interface TransferProgress {
     fileId: string;
-    revelnestId: string;
+    upeerId: string;
     progress: number;
     bytesTransferred: number;
     totalBytes: number;
@@ -79,11 +79,11 @@ export interface TransferConfig {
 }
 
 export const DEFAULT_CONFIG: TransferConfig = {
-    maxChunkSize: 1024 * 16, // 16KB - Safe for UDP
+    maxChunkSize: 1024 * 16, // 16KB - Safe for TCP
     maxFileSize: 100 * 1024 * 1024, // 100MB
     transferTimeout: 300000,
     maxRetries: 3,
     cleanupInterval: 60000,
-    initialWindowSize: 20,
-    maxWindowSize: 1000 // Up to 16MB in flight with 16KB chunks
+    initialWindowSize: 64,  // 64 chunks concurrentes en vuelo
+    maxWindowSize: 2000
 };

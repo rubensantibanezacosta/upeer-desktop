@@ -5,9 +5,29 @@ import { FileTransfer, TransferState, TransferPhase, DEFAULT_CONFIG, TransferCon
 import { FileTransferStore } from './transfer-store.js';
 import { FileChunker } from './chunker.js';
 import { TransferValidator } from './validator.js';
-import { info, warn, error } from '../../security/secure-logger.js';
-import { getMyRevelNestId } from '../../security/identity.js';
-import { saveFileMessage } from '../../storage/db.js';
+import { info, warn, error, debug } from '../../security/secure-logger.js';
+import { getMyUPeerId, encrypt, decrypt } from '../../security/identity.js';
+import { saveFileMessage, getContactByUpeerId } from '../../storage/db.js';
+
+// ── Per-transfer AES-256-GCM helpers ──────────────────────────────────────────
+
+function generateTransferKey(): Buffer {
+    return crypto.randomBytes(32); // AES-256 key
+}
+
+function encryptChunk(chunk: Buffer, key: Buffer): { data: string; iv: string; tag: string } {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const enc = Buffer.concat([cipher.update(chunk), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return { data: enc.toString('base64'), iv: iv.toString('hex'), tag: tag.toString('hex') };
+}
+
+function decryptChunk(data: string, iv: string, tag: string, key: Buffer): Buffer {
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
+    decipher.setAuthTag(Buffer.from(tag, 'hex'));
+    return Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()]);
+}
 
 export class TransferManager {
     private store: FileTransferStore;
@@ -17,6 +37,12 @@ export class TransferManager {
     private sendFunction?: (address: string, data: any) => void;
     private window?: BrowserWindow | null;
     private fileHandles = new Map<string, any>(); // fileId -> fs.FileHandle
+    /** AES-256 keys per transfer (sender generates, receiver decrypts via NaCl box) */
+    private transferKeys = new Map<string, Buffer>(); // fileId -> AES key
+    // BUG BV fix: timers guardados en un Map propio, NO como propiedad del transfer.
+    // store.updateTransfer hace spread y crea objetos nuevos, por lo que _retryTimer
+    // en el objeto viejo es invisible para handleCancel que lee del store.
+    private retryTimers = new Map<string, ReturnType<typeof setTimeout>>(); // fileId -> timer
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -43,13 +69,13 @@ export class TransferManager {
     /**
      * Start sending a file to a peer
      */
-    async startSend(revelnestId: string, address: string, filePath: string, thumbnail?: string): Promise<string> {
+    async startSend(upeerId: string, address: string, filePath: string, thumbnail?: string): Promise<string> {
         try {
             const fileInfo = await this.validator.validateAndPrepareFile(filePath);
             const totalChunks = this.chunker.calculateChunks(fileInfo.size);
 
             const transfer = this.store.createTransfer({
-                revelnestId,
+                upeerId,
                 peerAddress: address,
                 fileName: fileInfo.name,
                 fileSize: fileInfo.size,
@@ -65,7 +91,29 @@ export class TransferManager {
 
             this.store.updateTransfer(transfer.fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });
 
-            // Send Proposal
+            // ── E2E encryption: generate AES-256 key and seal it for the peer ──
+            const contact = await getContactByUpeerId(upeerId);
+            const peerKey = contact?.ephemeralPublicKey || contact?.publicKey;
+            let encryptedKey: string | undefined;
+            let encryptedKeyNonce: string | undefined;
+            let useEphemeral = false;
+
+            if (peerKey) {
+                const aesKey = generateTransferKey();
+                this.transferKeys.set(transfer.fileId, aesKey);
+                useEphemeral = !!contact?.ephemeralPublicKey;
+                const sealed = encrypt(aesKey, Buffer.from(peerKey, 'hex'), useEphemeral);
+                encryptedKey = sealed.ciphertext.toString('hex');
+                encryptedKeyNonce = sealed.nonce.toString('hex');
+            }
+
+            // Encrypt thumbnail if present
+            let encThumb: { data: string; iv: string; tag: string } | undefined;
+            const aesKey = this.transferKeys.get(transfer.fileId);
+            if (thumbnail && aesKey) {
+                encThumb = encryptChunk(Buffer.from(thumbnail.replace(/^data:[^;]+;base64,/, ''), 'base64'), aesKey);
+            }
+
             this.send(address, {
                 type: 'FILE_PROPOSAL',
                 fileId: transfer.fileId,
@@ -75,16 +123,89 @@ export class TransferManager {
                 totalChunks: transfer.totalChunks,
                 chunkSize: transfer.chunkSize,
                 fileHash: transfer.fileHash,
-                thumbnail
+                // E2E sealed key
+                ...(encryptedKey ? { encryptedKey, encryptedKeyNonce, useRecipientEphemeral: useEphemeral } : {}),
+                // Encrypted thumbnail (optional)
+                ...(encThumb ? { thumbnail: encThumb } : {}),
             });
 
             this.notifyUIStarted(transfer);
             this.saveToDB(transfer);
+
+            // 200% resilience: vault the encrypted proposal + file shards
+            // so an offline recipient can receive the transfer when they reconnect
+            if (aesKey) {
+                // ── Vault: siempre sellar AES key con clave ESTÁTICA ──────────
+                // El paquete online puede usar ephemeral (que rotará en 5 min).
+                // Para vault usamos solo la clave estática para garantizar que el
+                // peer puede descifrar la AES key tras volver online en cualquier momento.
+                const staticPeerKey = contact?.publicKey;
+                let vaultEncKey: string | undefined;
+                let vaultEncKeyNonce: string | undefined;
+
+                if (staticPeerKey && aesKey) {
+                    const { encrypt: encStatic } = await import('../../security/identity.js');
+                    const vaultSealed = encStatic(aesKey, Buffer.from(staticPeerKey, 'hex'), false);
+                    vaultEncKey = vaultSealed.ciphertext.toString('hex');
+                    vaultEncKeyNonce = vaultSealed.nonce.toString('hex');
+                }
+
+                // BUG CL fix: senderUpeerId debe quedar FUERA del payload firmado.
+                // handleVaultDelivery hace: const { signature, senderUpeerId, ...innerData } = innerPacket
+                // y verifica canonicalStringify(innerData). Si senderUpeerId está dentro
+                // del bloque firmado, innerData lo omite → mismatch → verificación siempre falla
+                // → FILE_PROPOSAL vaultado silenciosamente descartado (igual que CHAT_DELETE/CHAT).
+                const proposalData = {
+                    type: 'FILE_PROPOSAL',
+                    fileId: transfer.fileId,
+                    fileName: transfer.fileName,
+                    fileSize: transfer.fileSize,
+                    mimeType: transfer.mimeType,
+                    totalChunks: transfer.totalChunks,
+                    chunkSize: transfer.chunkSize,
+                    fileHash: transfer.fileHash,
+                    // Vault version: AES key cifrada con clave estática (no efímera)
+                    ...(vaultEncKey ? { encryptedKey: vaultEncKey, encryptedKeyNonce: vaultEncKeyNonce, useRecipientEphemeral: false } : {}),
+                    ...(encThumb ? { thumbnail: encThumb } : {}),
+                    // senderUpeerId se añade solo en el wrapper externo (no en datos firmados)
+                };
+                import('./../../security/identity.js').then(({ sign }) => {
+                    import('../utils.js').then(({ canonicalStringify }) => {
+                        import('../vault/manager.js').then(({ VaultManager }) => {
+                            const sig = sign(Buffer.from(canonicalStringify(proposalData)));
+                            VaultManager.replicateToVaults(upeerId, {
+                                ...proposalData,
+                                senderUpeerId: getMyUPeerId(),
+                                signature: sig.toString('hex')
+                            });
+                        });
+                    });
+                }).catch(err => warn('Failed to vault file proposal', err, 'vault'));
+
+                if (transfer.fileBuffer) {
+                    const encryptedBuffer = this._encryptBuffer(transfer.fileBuffer, aesKey);
+                    import('../vault/chunk-vault.js').then(({ ChunkVault }) => {
+                        ChunkVault.replicateFile(transfer.fileHash, encryptedBuffer, upeerId);
+                    }).catch(err => warn('Failed to initiate background file replication', err, 'vault'));
+                }
+            }
+
             return transfer.fileId;
+
         } catch (err) {
             error('Error starting file transfer', err, 'file-transfer');
             throw err;
         }
+    }
+
+    /** AES-256-GCM encrypt a whole buffer (for vault storage) */
+    private _encryptBuffer(buf: Buffer, key: Buffer): Buffer {
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+        const enc = Buffer.concat([cipher.update(buf), cipher.final()]);
+        const tag = cipher.getAuthTag();
+        // Prepend iv(12) + tag(16) so receiver can reconstruct
+        return Buffer.concat([iv, tag, enc]);
     }
 
     /**
@@ -106,42 +227,80 @@ export class TransferManager {
                     handle.close().catch(() => { });
                     this.fileHandles.delete(fileId);
                 }
+                // BUG EV fix: borrar archivo temporal del receptor al cancelar.
+                // Sin esto, los archivos en /tmp/upeer-* se acumulan indefinidamente.
+                if (dir === 'receiving') {
+                    this.chunker.cleanupTempFile(transfer).catch(() => { });
+                }
+                // BUG BC fix: limpiar la clave AES-256 de memoria para evitar
+                // que el material criptográfico se acumule indefinidamente.
+                this.transferKeys.delete(fileId);
             }
         });
     }
 
     // --- MESSAGE HANDLERS ---
 
-    async handleMessage(revelnestId: string, address: string, data: any) {
+    async handleMessage(upeerId: string, address: string, data: any) {
         switch (data.type) {
             case 'FILE_PROPOSAL':
-                await this.handleProposal(revelnestId, address, data);
+                await this.handleProposal(upeerId, address, data);
                 break;
             case 'FILE_ACCEPT':
-                await this.handleAccept(revelnestId, address, data);
+                await this.handleAccept(upeerId, address, data);
                 break;
             case 'FILE_CHUNK':
-                await this.handleChunk(revelnestId, address, data);
+                await this.handleChunk(upeerId, address, data);
                 break;
             case 'FILE_CHUNK_ACK':
-                await this.handleChunkAck(revelnestId, address, data);
+                await this.handleChunkAck(upeerId, address, data);
                 break;
             case 'FILE_DONE_ACK':
-                await this.handleDoneAck(revelnestId, address, data);
+                await this.handleDoneAck(upeerId, address, data);
                 break;
             case 'FILE_CANCEL':
-                await this.handleCancel(revelnestId, address, data);
+                await this.handleCancel(upeerId, address, data);
                 break;
         }
     }
 
-    private async handleProposal(revelnestId: string, address: string, data: any) {
+    private async handleProposal(upeerId: string, address: string, data: any) {
         try {
             this.validator.validateIncomingFile(data);
 
+            // ── Decrypt the AES key sealed by the sender ──
+            if (data.encryptedKey && data.encryptedKeyNonce) {
+                try {
+                    const senderContact = await getContactByUpeerId(upeerId);
+                    const senderKey = senderContact?.publicKey;
+                    if (senderKey) {
+                        const aesKeyBuf = decrypt(
+                            Buffer.from(data.encryptedKey, 'hex'),
+                            Buffer.from(data.encryptedKeyNonce, 'hex'),
+                            Buffer.from(senderKey, 'hex'),
+                            !!data.useRecipientEphemeral
+                        );
+                        if (aesKeyBuf) this.transferKeys.set(data.fileId, aesKeyBuf);
+                    }
+                } catch {
+                    warn('Could not decrypt file transfer key', { fileId: data.fileId }, 'file-transfer');
+                }
+            }
+
+            // Decrypt thumbnail if encrypted
+            let thumbnail = data.thumbnail;
+            const aesKey = this.transferKeys.get(data.fileId);
+            if (thumbnail && typeof thumbnail === 'object' && thumbnail.iv && aesKey) {
+                try {
+                    const raw = decryptChunk(thumbnail.data, thumbnail.iv, thumbnail.tag, aesKey);
+                    const mime = data.mimeType?.startsWith('video') ? 'image/jpeg' : (data.mimeType || 'image/jpeg');
+                    thumbnail = `data:${mime};base64,${raw.toString('base64')}`;
+                } catch { thumbnail = undefined; }
+            }
+
             const transfer = this.store.createTransfer({
                 fileId: data.fileId,
-                revelnestId,
+                upeerId,
                 peerAddress: address,
                 fileName: data.fileName,
                 fileSize: data.fileSize,
@@ -149,11 +308,10 @@ export class TransferManager {
                 totalChunks: data.totalChunks,
                 chunkSize: data.chunkSize,
                 fileHash: data.fileHash || '',
-                thumbnail: data.thumbnail,
+                thumbnail,
                 direction: 'receiving' as const
             });
 
-            // Create temp file
             await this.chunker.createTempFile(transfer);
 
             this.store.updateTransfer(data.fileId, 'receiving', {
@@ -162,11 +320,7 @@ export class TransferManager {
                 tempPath: transfer.tempPath
             });
 
-            // Respond that we are ready
-            this.send(address, {
-                type: 'FILE_ACCEPT',
-                fileId: data.fileId
-            });
+            this.send(address, { type: 'FILE_ACCEPT', fileId: data.fileId });
 
             this.notifyUIStarted(transfer);
             this.saveToDB(transfer);
@@ -176,7 +330,7 @@ export class TransferManager {
         }
     }
 
-    private async handleAccept(revelnestId: string, address: string, data: any) {
+    private async handleAccept(upeerId: string, address: string, data: any) {
         const transfer = this.store.getTransfer(data.fileId, 'sending');
         if (!transfer || transfer.phase !== TransferPhase.PROPOSED) return;
 
@@ -188,9 +342,23 @@ export class TransferManager {
         this.sendNextChunks(transfer, address);
     }
 
-    private async handleChunk(revelnestId: string, address: string, data: any) {
+    private async handleChunk(upeerId: string, address: string, data: any) {
         const transfer = this.store.getTransfer(data.fileId, 'receiving');
         if (!transfer || transfer.state !== 'active') return;
+
+        // BUG CJ fix: validar chunkIndex antes de usarlo como offset de escritura.
+        // Sin esto, un peer malicioso puede enviar chunkIndex < 0 o >= totalChunks,
+        // causando escrituras en offsets inválidos o fuera del archivo pre-asignado
+        // (disk bomb: el archivo temporal crece indefinidamente).
+        if (
+            typeof data.chunkIndex !== 'number' ||
+            !Number.isInteger(data.chunkIndex) ||
+            data.chunkIndex < 0 ||
+            data.chunkIndex >= transfer.totalChunks
+        ) {
+            warn('Invalid chunk index received — dropped', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
+            return;
+        }
 
         try {
             // Write using cached handle for extreme performance
@@ -201,7 +369,14 @@ export class TransferManager {
             }
 
             if (handle) {
-                const buffer = Buffer.from(data.data, 'base64');
+                // Decrypt chunk if we have an AES key for this transfer
+                let buffer: Buffer;
+                const aesKey = this.transferKeys.get(data.fileId);
+                if (aesKey && data.iv && data.tag) {
+                    buffer = decryptChunk(data.data, data.iv, data.tag, aesKey);
+                } else {
+                    buffer = Buffer.from(data.data, 'base64');
+                }
                 const offset = data.chunkIndex * transfer.chunkSize;
                 await handle.write(buffer, 0, buffer.length, offset);
             }
@@ -233,11 +408,24 @@ export class TransferManager {
         }
     }
 
-    private async handleChunkAck(revelnestId: string, address: string, data: any) {
+    private async handleChunkAck(upeerId: string, address: string, data: any) {
         const transfer = this.store.getTransfer(data.fileId, 'sending');
         if (!transfer || transfer.state !== 'active') return;
 
-        console.log(`[Transfer] Received ACK for chunk ${data.chunkIndex}`);
+        // BUG CJ fix: validar chunkIndex en ACKs también.
+        // Un índice fuera de rango contamina pendingChunks e impide que el sender
+        // detecte correctamente la compleción de la transferencia.
+        if (
+            typeof data.chunkIndex !== 'number' ||
+            !Number.isInteger(data.chunkIndex) ||
+            data.chunkIndex < 0 ||
+            data.chunkIndex >= transfer.totalChunks
+        ) {
+            warn('Invalid chunk ACK index — dropped', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
+            return;
+        }
+
+        debug('FILE_CHUNK ACK received', { chunkIndex: data.chunkIndex, fileId: data.fileId }, 'file-transfer');
 
         transfer.pendingChunks.add(data.chunkIndex);
         const count = transfer.pendingChunks.size;
@@ -259,8 +447,8 @@ export class TransferManager {
                 const newRto = Math.max(150, Math.min(3000, newSrtt * 3)); // 3x SRTT for safety, min 150ms
 
                 // Window size update (Simplified TCP Tahoe/Reno style)
-                let newWindowSize = updatedTransfer.windowSize || 20;
-                let newSsthresh = updatedTransfer.ssthresh || 64;
+                let newWindowSize = updatedTransfer.windowSize || 64;
+                let newSsthresh = updatedTransfer.ssthresh || 128;
                 let consecutiveAcks = (updatedTransfer.consecutiveAcks || 0) + 1;
 
                 if (newWindowSize < newSsthresh) {
@@ -276,7 +464,7 @@ export class TransferManager {
                 }
 
                 // Caps
-                newWindowSize = Math.min(newWindowSize, 1000);
+                newWindowSize = Math.min(newWindowSize, 2000);
 
                 this.store.updateTransfer(data.fileId, 'sending', {
                     srtt: newSrtt,
@@ -301,9 +489,16 @@ export class TransferManager {
         }
     }
 
-    private async handleDoneAck(revelnestId: string, address: string, data: any) {
+    private async handleDoneAck(upeerId: string, address: string, data: any) {
         const transfer = this.store.getTransfer(data.fileId, 'sending');
         if (!transfer || transfer.state === 'completed') return;
+
+        // BUG BV fix: limpiar retry timer al completar la transferencia.
+        const timer = this.retryTimers.get(data.fileId);
+        if (timer) {
+            clearTimeout(timer);
+            this.retryTimers.delete(data.fileId);
+        }
 
         const updated = this.store.updateTransfer(transfer.fileId, 'sending', {
             state: 'completed',
@@ -317,33 +512,44 @@ export class TransferManager {
             // Also notify that the message is now delivered
             this.window?.webContents.send('message-delivered', {
                 id: updated.fileId, // We use fileId as messageId
-                revelnestId: updated.revelnestId
+                upeerId: updated.upeerId
             });
         }
     }
 
-    private async handleCancel(revelnestId: string, address: string, data: any) {
+    private async handleCancel(upeerId: string, address: string, data: any) {
         // Cancel both directions if they exist (could be self transfer)
-        ['sending', 'receiving'].forEach(async (dir: any) => {
+        // Bug FB fix: forEach(async) no propaga errores; usar for...of para que las
+        // excepciones síncronas dentro del bloque se conviertan en rechazos que
+        // handleCancel (async) puede capturar en lugar de quedar sin manejo.
+        for (const dir of ['sending', 'receiving'] as const) {
             const transfer = this.store.getTransfer(data.fileId, dir);
             if (transfer) {
-                if ((transfer as any)._retryTimer) {
-                    clearTimeout((transfer as any)._retryTimer);
-                    (transfer as any)._retryTimer = null;
+                // BUG BV fix: limpiar timer desde el Map centralizado, no del objeto transfer.
+                const timer = this.retryTimers.get(data.fileId);
+                if (timer) {
+                    clearTimeout(timer);
+                    this.retryTimers.delete(data.fileId);
                 }
 
                 // Close and remove file handle
                 const handle = this.fileHandles.get(data.fileId);
                 if (handle) {
-                    handle.close().catch(() => { });
+                    await handle.close().catch(() => { });
                     this.fileHandles.delete(data.fileId);
                 }
+                // BUG EV fix: borrar archivo temporal del receptor al recibir cancel remoto.
+                if (dir === 'receiving') {
+                    await this.chunker.cleanupTempFile(transfer).catch(() => { });
+                }
+                // BUG BC fix: liberar clave AES-256 al cancelar (evita key-material leak).
+                this.transferKeys.delete(data.fileId);
 
                 this.store.updateTransfer(transfer.fileId, dir, { state: 'cancelled' });
                 this.notifyUICancelled(transfer, data.reason);
                 this.saveToDB({ ...transfer, state: 'cancelled' } as any);
             }
-        });
+        }
     }
 
     // --- INTERNAL HELPERS ---
@@ -353,7 +559,7 @@ export class TransferManager {
         const chunksSentTimes = (transfer as any)._chunksSentTimes || new Map<number, number>();
         (transfer as any)._chunksSentTimes = chunksSentTimes;
 
-        const maxInFlight = Math.floor(transfer.windowSize || 20);
+        const maxInFlight = Math.floor(transfer.windowSize || 64);
         const now = Date.now();
         const retryTimeout = transfer.rto || 500;
 
@@ -378,7 +584,7 @@ export class TransferManager {
         if (needsRetransmission) {
             const currentWindow = transfer.windowSize || 20;
             const newSsthresh = Math.max(2, Math.floor(currentWindow / 2));
-            console.log(`[Transfer] CONGESTION DETECTED. Window: ${currentWindow} -> 2, ssthresh: ${newSsthresh}, RTO: ${retryTimeout}ms`);
+            debug('FILE transfer congestion detected', { window: currentWindow, newSsthresh, rto: retryTimeout }, 'file-transfer');
             this.store.updateTransfer(transfer.fileId, 'sending', {
                 windowSize: 2, // Volver a slow-start agresivo tras pérdida
                 ssthresh: newSsthresh,
@@ -400,8 +606,12 @@ export class TransferManager {
                     if (retransmissionsCount < maxRetransmissionsPerCall) {
                         chunksSentTimes.set(chunkIndex, now);
                         const chunkData = await this.chunker.createChunkData(transfer, chunkIndex);
-                        console.log(`[Transfer] Retransmitting chunk ${chunkIndex} (RTO match)`);
-                        this.send(address, { type: 'FILE_CHUNK', ...chunkData });
+                        debug('Retransmitting chunk', { chunkIndex, fileId: transfer.fileId }, 'file-transfer');
+                        const aesKeyR = this.transferKeys.get(transfer.fileId);
+                        const encR = aesKeyR
+                            ? encryptChunk(Buffer.from(chunkData.data, 'base64'), aesKeyR)
+                            : { data: chunkData.data, iv: undefined, tag: undefined };
+                        this.send(address, { type: 'FILE_CHUNK', ...chunkData, ...encR });
                         retransmissionsCount++;
                     }
                 }
@@ -425,10 +635,15 @@ export class TransferManager {
                     });
 
                     const chunkData = await this.chunker.createChunkData(transfer, currentIndex);
-                    console.log(`[Transfer] Sending chunk ${currentIndex}/${transfer.totalChunks}. Window: ${maxInFlight}`);
+                    debug('Sending chunk', { chunkIndex: currentIndex, total: transfer.totalChunks, window: maxInFlight }, 'file-transfer');
+                    const aesKey = this.transferKeys.get(transfer.fileId);
+                    const enc = aesKey
+                        ? encryptChunk(Buffer.from(chunkData.data, 'base64'), aesKey)
+                        : { data: chunkData.data, iv: undefined, tag: undefined };
                     this.send(address, {
                         type: 'FILE_CHUNK',
-                        ...chunkData
+                        ...chunkData,
+                        ...enc,
                     });
                 }
             }
@@ -438,12 +653,15 @@ export class TransferManager {
         // 3. Always ensure a retry timer is running if we have unacked chunks
         // This prevents the transfer from stalling if the last ACKs are lost or the window is full
         const unackedCount = transfer.totalChunks - transfer.pendingChunks.size;
-        if (unackedCount > 0 && !(transfer as any)._retryTimer) {
-            // console.log(`[Transfer] Scheduling retry timer (${unackedCount} unacked). Interval: ${retryTimeout + 100}ms`);
-            (transfer as any)._retryTimer = setTimeout(() => {
-                (transfer as any)._retryTimer = null;
-                if (transfer.state === 'active') this.sendNextChunks(transfer, address);
+        if (unackedCount > 0 && !this.retryTimers.has(transfer.fileId)) {
+            // BUG BV fix: guardar timer en Map separado; en el callback re-leer del store
+            // para verificar el estado actual (no el del closure que puede ser stale).
+            const timer = setTimeout(() => {
+                this.retryTimers.delete(transfer.fileId);
+                const current = this.store.getTransfer(transfer.fileId, 'sending');
+                if (current && current.state === 'active') this.sendNextChunks(current, address);
             }, retryTimeout + 100);
+            this.retryTimers.set(transfer.fileId, timer);
         }
     }
 
@@ -452,8 +670,23 @@ export class TransferManager {
         try {
             this.store.updateTransfer(transfer.fileId, 'receiving', { phase: TransferPhase.VERIFYING });
 
-            // Calculate final hash if needed (skipped for speed in small files if trusted)
-            // But let's keep the door open for security
+            // BUG AK fix: verificar integridad del archivo antes de marcarlo como completado.
+            // Sin esta verificación un peer malicioso puede enviar chunks corruptos: el receptor
+            // acumula totalChunks entries en pendingChunks y completa sin comprobar el hash,
+            // guardando un archivo corrompido o malicioso como si fuera el original.
+            if (transfer.fileHash && transfer.tempPath) {
+                try {
+                    await this.validator.verifyFileHash(transfer, transfer.fileHash);
+                } catch (hashErr) {
+                    error('File hash mismatch — transfer rejected', hashErr, 'file-transfer');
+                    this.store.updateTransfer(transfer.fileId, 'receiving', { state: 'cancelled', phase: TransferPhase.DONE });
+                    this.send(address, { type: 'FILE_CANCEL', fileId: transfer.fileId, reason: 'Hash mismatch' });
+                    this.notifyUICancelled(transfer, 'Hash de archivo no coincide — transferencia rechazada');
+                    // BUG EV fix: borrar archivo temporal tras fallo de integridad.
+                    this.chunker.cleanupTempFile(transfer).catch(() => { });
+                    return;
+                }
+            }
 
             const updated = this.store.updateTransfer(transfer.fileId, 'receiving', {
                 state: 'completed',
@@ -472,6 +705,10 @@ export class TransferManager {
                 await handle.close();
                 this.fileHandles.delete(transfer.fileId);
             }
+            // BUG BC fix: eliminar la clave AES-256 tras completar la transferencia.
+            // Sin esto, las claves (32 bytes/transferencia) se acumulan durante toda
+            // la sesión de la app en el Map transferKeys.
+            this.transferKeys.delete(transfer.fileId);
 
             if (updated) {
                 // Save to DB
@@ -493,8 +730,8 @@ export class TransferManager {
 
     private saveToDB(transfer: FileTransfer) {
         try {
-            const myId = getMyRevelNestId();
-            const isSelf = transfer.revelnestId === myId;
+            const myId = getMyUPeerId();
+            const isSelf = transfer.upeerId === myId;
 
             // For self-transfers, we only want one entry in the DB.
             // We save it when it's 'sending' (which happens at the end for self-transfer on the sender side).
@@ -505,7 +742,7 @@ export class TransferManager {
 
             saveFileMessage(
                 transfer.fileId, // Use stable transfer ID to prevent duplicates
-                transfer.revelnestId,
+                transfer.upeerId,
                 transfer.direction === 'sending' || isSelf,
                 {
                     fileName: transfer.fileName,
@@ -557,7 +794,7 @@ export class TransferManager {
     private mapToUI(transfer: FileTransfer) {
         return {
             fileId: transfer.fileId,
-            revelnestId: transfer.revelnestId,
+            upeerId: transfer.upeerId,
             fileName: transfer.fileName,
             fileSize: transfer.fileSize,
             mimeType: transfer.mimeType,

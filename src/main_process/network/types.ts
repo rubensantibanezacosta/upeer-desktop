@@ -29,14 +29,25 @@ export type MessageType =
     | 'DHT_FIND_VALUE'
     | 'DHT_FOUND_VALUE'
     | 'DHT_STORE'
-    | 'DHT_STORE_ACK';
+    | 'DHT_STORE_ACK'
+    // Vault (Offline/Resilience) messages
+    | 'VAULT_STORE'
+    | 'VAULT_QUERY'
+    | 'VAULT_DELIVERY'
+    | 'VAULT_ACK'
+    | 'VAULT_SYNC_REQ'
+    | 'VAULT_SYNC_RES'
+    | 'VAULT_RENEW';  // Custodio renueva entry próxima a expirar
+
 
 export interface LocationBlock {
-    address: string;
+    address: string;          // Primary / most-recent device IP
+    addresses?: string[];     // All known device IPs (multi-device support)
+    alias?: string;           // Sender’s display name (unsigned, informational)
     dhtSeq: number;
     signature: string;
-    expiresAt?: number; // New field for extreme resilience
-    renewalToken?: RenewalToken; // Optional renewal token
+    expiresAt?: number;
+    renewalToken?: RenewalToken;
 }
 
 export interface RenewalToken {
@@ -48,7 +59,7 @@ export interface RenewalToken {
 }
 
 export interface ContactCacheEntry {
-    revelnestId: string;
+    upeerId: string;
     locationBlock: LocationBlock;
     lastSeen: number;
 }
@@ -60,7 +71,7 @@ export interface ContactCache {
 
 // Kademlia DHT interfaces
 export interface KademliaContactInfo {
-    revelnestId: string;
+    upeerId: string;
     address: string;
     publicKey: string;
     nodeId: string; // Hex representation of 160-bit Kademlia ID
@@ -98,7 +109,32 @@ export interface DhtStoreAck {
     key: string;
 }
 
+// Vault (Offline/Resilience) interfaces
+export interface VaultStoreData {
+    payloadHash: string;
+    recipientSid: string;
+    senderSid: string;
+    priority: number;
+    data: string; // hex
+    expiresAt: number;
+    powProof?: string;
+}
+
+export interface VaultQueryData {
+    requesterSid: string;
+    timestamp: number;
+    merkleRoot?: string;
+    batchSize?: number;
+    offset?: number; // paginación: índice de inicio para la siguiente página
+}
+
+export interface VaultDeliveryData {
+    entries: VaultStoreData[];
+    hasMore: boolean;
+}
+
 // File transfer interfaces
+
 export interface FileStartData {
     fileId: string;
     fileName: string;
@@ -141,7 +177,7 @@ export interface FileCancelData {
 
 export interface NetworkPacket {
     type: MessageType;
-    senderRevelnestId?: string;
+    senderUpeerId?: string;
     signature?: string;
     [key: string]: any;
 }

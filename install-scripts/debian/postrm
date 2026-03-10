@@ -1,16 +1,47 @@
 #!/bin/bash
 set -e
 
-# RevelNest Chat P2P - Script de post-remoción para Debian/Ubuntu
+# uPeer P2P - Script de post-remoción para Debian/Ubuntu
 
 ACTION="$1"
 
 case "$ACTION" in
     purge)
-        echo "Purgando archivos de configuración y datos de RevelNest..."
+        echo "Purgando archivos de configuración y datos de upeer..."
+
+        # Eliminar directorios de datos si existen
+        for dir in /etc/upeer /var/lib/upeer /var/log/upeer; do
+            if [ -d "$dir" ]; then
+                echo "Eliminando $dir..."
+                rm -rf "$dir"
+            fi
+        done
+
+        # Eliminar el binario yggstack copiado en postinst
+        if [ -f /usr/lib/upeer/yggstack ]; then
+            rm -f /usr/lib/upeer/yggstack
+        fi
+        rmdir /usr/lib/upeer 2>/dev/null || true
+
+        # Recargar systemd para que olvide cualquier unit legacy
+        systemctl daemon-reload 2>/dev/null || true
+
+        echo "✅ Todos los archivos de upeer han sido eliminados"
+        ;;
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        systemctl daemon-reload 2>/dev/null || true
+        ;;
+esac
+
+exit 0
+
+
+case "$ACTION" in
+    purge)
+        echo "Purgando archivos de configuración y datos de upeer..."
         
         # Eliminar directorios de datos si existen
-        for dir in /etc/revelnest /var/lib/revelnest /var/log/revelnest; do
+        for dir in /etc/upeer /var/lib/upeer /var/log/upeer; do
             if [ -d "$dir" ]; then
                 echo "Eliminando $dir..."
                 rm -rf "$dir"
@@ -32,7 +63,7 @@ case "$ACTION" in
         # Recargar systemd
         systemctl daemon-reload 2>/dev/null || true
         
-        echo "✅ Todos los archivos de RevelNest han sido eliminados"
+        echo "✅ Todos los archivos de upeer han sido eliminados"
         ;;
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
         # Para otras acciones, solo recargar systemd

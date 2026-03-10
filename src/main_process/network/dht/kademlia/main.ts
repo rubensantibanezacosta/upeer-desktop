@@ -5,35 +5,36 @@ import { BootstrapManager } from './bootstrap.js';
 import { ProtocolHandler } from './protocol.js';
 import { KademliaContact, KademliaStats } from './types.js';
 import { REFRESH_INTERVAL_MS, REPUBLISH_INTERVAL_MS, BOOTSTRAP_RETRY_MS } from './types.js';
+import { network, info, debug, warn } from '../../../security/secure-logger.js';
 
 // Main Kademlia DHT implementation
 export class KademliaDHT {
     private readonly nodeId: Buffer;
-    private readonly revelnestId: string;
-    
+    private readonly upeerId: string;
+
     private routingTable: RoutingTable;
     private valueStore: ValueStore;
     private bootstrapManager: BootstrapManager;
     private protocolHandler: ProtocolHandler;
-    
+
     private stats = {
         storeOperations: 0,
         findOperations: 0
     };
 
     constructor(
-        revelnestId: string,
+        upeerId: string,
         sendMessage: (address: string, data: any) => void,
         getContacts?: () => any[],
         userDataPath?: string
     ) {
-        this.revelnestId = revelnestId;
-        this.nodeId = toKademliaId(revelnestId);
-        
+        this.upeerId = upeerId;
+        this.nodeId = toKademliaId(upeerId);
+
         // Initialize components
         this.routingTable = new RoutingTable(this.nodeId);
         this.valueStore = new ValueStore();
-        
+
         this.bootstrapManager = new BootstrapManager(
             this.routingTable,
             sendMessage,
@@ -42,18 +43,21 @@ export class KademliaDHT {
         );
         this.protocolHandler = new ProtocolHandler(
             this.nodeId,
-            this.revelnestId,
+            this.upeerId,
             this.routingTable,
             this.valueStore,
             sendMessage
         );
-        
+
         // Bootstrap from existing contacts
         const bootstrappedCount = this.bootstrapManager.bootstrapFromContacts();
-        
-        console.log(`[Kademlia] Node initialized: ${revelnestId}`);
-        console.log(`[Kademlia] Kademlia ID: ${this.nodeId.toString('hex')}`);
-        console.log(`[Kademlia] Bootstrap status: ${this.isBootstrapped() ? 'READY' : 'PENDING'} (${bootstrappedCount} contacts)`);
+
+        info('Kademlia node initialized', { upeerId }, 'kademlia');
+        debug('Kademlia ID', { nodeId: this.nodeId.toString('hex') }, 'kademlia');
+        info('Kademlia bootstrap status', {
+            ready: this.isBootstrapped(),
+            contacts: bootstrappedCount
+        }, 'kademlia');
     }
 
     // === Public API ===
@@ -80,19 +84,19 @@ export class KademliaDHT {
     }
 
     // Remove a contact
-    removeContact(revelnestId: string): void {
-        this.routingTable.removeContact(revelnestId);
+    removeContact(upeerId: string): void {
+        this.routingTable.removeContact(upeerId);
         this.bootstrapManager.updateBootstrapStatus();
     }
 
-    // Find a contact by RevelNest ID
-    findContact(revelnestId: string): KademliaContact | null {
-        return this.routingTable.findContact(revelnestId);
+    // Find a contact by upeer ID
+    findContact(upeerId: string): KademliaContact | null {
+        return this.routingTable.findContact(upeerId);
     }
 
     // Find the K closest contacts to a given ID
-    findClosestContacts(targetRevelnestId: string, limit?: number): KademliaContact[] {
-        return this.routingTable.findClosestContacts(targetRevelnestId, limit);
+    findClosestContacts(targetUpeerId: string, limit?: number): KademliaContact[] {
+        return this.routingTable.findClosestContacts(targetUpeerId, limit);
     }
 
     // Store a value in the DHT
@@ -110,40 +114,38 @@ export class KademliaDHT {
     }
 
     // Store location block in DHT
-    async storeLocationBlock(revelnestId: string, locationBlock: any): Promise<void> {
-        const key = toKademliaId(revelnestId);
+    async storeLocationBlock(upeerId: string, locationBlock: any): Promise<void> {
+        const key = toKademliaId(upeerId);
         await this.storeValue(
             key,
             locationBlock,
-            revelnestId,
+            upeerId,
             locationBlock.signature
         );
-        console.log(`[Kademlia] Stored location block for ${revelnestId} in DHT`);
+        network('Stored location block in DHT', undefined, { upeerId }, 'kademlia');
     }
 
     // Find location block in DHT
-    async findLocationBlock(revelnestId: string): Promise<any | null> {
-        const key = toKademliaId(revelnestId);
+    async findLocationBlock(upeerId: string): Promise<any | null> {
+        const key = toKademliaId(upeerId);
         const result = await this.findValue(key);
-        
+
         if (result && result.value) {
-            // Verify signature if present
-            if (result.signature) {
-                const contact = this.findContact(revelnestId);
-                if (contact) {
-                    // TODO: Implement signature verification
-                    console.log(`[Kademlia] Found location block for ${revelnestId}`);
-                    return result.value;
-                }
-            }
+            // BUG AU fix: el código anterior solo devolvía el valor si el contacto ya
+            // existía en la routing table Y tenía firma — un círculo vicioso, ya que el
+            // objetivo de buscar en DHT es precisamente encontrar contactos desconocidos.
+            // Ahora devolvemos el valor siempre que esté presente; la verificación de firma
+            // se hace en la capa superior (DHT_RESPONSE handler en network/handlers.ts).
+            network('Found location block in DHT', undefined, { upeerId }, 'kademlia');
+            return result.value;
         }
-        
+
         return null;
     }
 
     // Handle incoming DHT message
-    async handleMessage(senderRevelnestId: string, data: any, senderAddress: string): Promise<any> {
-        return this.protocolHandler.handleMessage(senderRevelnestId, data, senderAddress);
+    async handleMessage(senderUpeerId: string, data: any, senderAddress: string): Promise<any> {
+        return this.protocolHandler.handleMessage(senderUpeerId, data, senderAddress);
     }
 
     // Periodic maintenance
@@ -152,25 +154,22 @@ export class KademliaDHT {
         if (!this.isBootstrapped()) {
             const timeSinceLastAttempt = this.bootstrapManager.getTimeSinceLastAttempt();
             if (timeSinceLastAttempt >= BOOTSTRAP_RETRY_MS) {
-                console.log(`[Kademlia] Not bootstrapped (${this.getContactCount()} contacts). Retrying...`);
+                warn('Kademlia not bootstrapped, retrying', { contacts: this.getContactCount() }, 'kademlia');
                 await this.bootstrapManager.retryBootstrap();
             }
         }
-        
+
         // Refresh stale buckets
         const staleBuckets = this.routingTable.refreshStaleBuckets();
         if (staleBuckets.length > 0) {
-            console.log(`[Kademlia] Refreshing ${staleBuckets.length} stale buckets`);
+            debug('Refreshing stale Kademlia buckets', { count: staleBuckets.length }, 'kademlia');
             // In a real implementation, we would perform FIND_NODE for random IDs in each bucket
         }
-        
+
         // Clean up expired values
         const removed = this.valueStore.cleanupExpiredValues();
-        if (removed > 0) {
-            console.log(`[Kademlia] Cleaned up ${removed} expired values`);
-        }
-        
-        console.log(`[Kademlia] Maintenance completed. Stats:`, this.getStats());
+
+        debug('Kademlia maintenance completed', { removed, ...this.getStats() }, 'kademlia');
     }
 
     // Get statistics
@@ -178,7 +177,7 @@ export class KademliaDHT {
         const protocolStats = this.protocolHandler.getStats();
         const bootstrapStats = this.bootstrapManager.getStats();
         const totalContacts = this.getContactCount();
-        
+
         return {
             ...this.stats,
             ...protocolStats,

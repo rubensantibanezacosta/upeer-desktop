@@ -1,36 +1,39 @@
 ---
-title: Guía de integración de transferencia de archivos en RevelNest
-source: Implementación de componentes de transferencia de archivos para RevelNest
+title: Guía de integración de transferencia de archivos en upeer
+source: Implementación de componentes de transferencia de archivos para upeer
 tags:
   - file-transfer
   - ui-components
   - integration-guide
-  - revelnest
+  - upeer
   - phase-16
 createdAt: 2026-03-05T12:52:10.075Z
 updatedAt: 2026-03-05T12:52:10.075Z
 ---
 
-# Guía de integración de transferencia de archivos en RevelNest
+# Guía de integración de transferencia de archivos en upeer
 
-**Source:** Implementación de componentes de transferencia de archivos para RevelNest
+**Source:** Implementación de componentes de transferencia de archivos para upeer
 
 ---
 
-# Guía de integración de transferencia de archivos en RevelNest
+# Guía de integración de transferencia de archivos en upeer
 
 ## Componentes implementados
 
 ### 1. Hook `useFileTransfer`
+
 **Ubicación**: `src/hooks/useFileTransfer.ts`
 
 **Funcionalidad**:
+
 - Gestión del estado de transferencias de archivos
-- Comunicación con el backend a través de la API `window.revelnest`
+- Comunicación con el backend a través de la API `window.upeer`
 - Event listeners para progreso, finalización, cancelación
 - Utilidades para formateo de tamaños y progreso
 
 **Uso básico**:
+
 ```tsx
 const {
   transfers,
@@ -39,14 +42,16 @@ const {
   cancelTransfer,
   saveFile,
   openFilePicker,
-  closeFilePicker
+  closeFilePicker,
 } = useFileTransfer();
 ```
 
 ### 2. Modal `FilePickerModal`
+
 **Ubicación**: `src/components/modals/FilePickerModal.tsx`
 
 **Características**:
+
 - Selector de archivos con drag & drop
 - Vista previa de imágenes
 - Generación automática de thumbnails
@@ -54,6 +59,7 @@ const {
 - Diseño coherente con Joy UI
 
 **Props**:
+
 - `open`: boolean
 - `onClose`: () => void
 - `onSubmit`: (file: File, thumbnail?: string) => void
@@ -61,28 +67,34 @@ const {
 - `allowedTypes`: string[] (lista de MIME types)
 
 ### 3. Componente `TransferProgressBar`
+
 **Ubicación**: `src/components/chat/TransferProgressBar.tsx`
 
 **Variantes**:
+
 - **Compacta**: Para listas de transferencias activas
 - **Completa**: Para modales de progreso detallado
 
 **Muestra**:
+
 - Progreso en porcentaje y bytes
 - Estado de la transferencia (enviando/recibiendo)
 - Botón de cancelación
 - Iconos de estado (éxito, error, pendiente)
 
 ### 4. Botón `AttachmentButton`
+
 **Ubicación**: `src/components/chat/AttachmentButton.tsx`
 
 **Características**:
+
 - Menú desplegable con tipos de archivo
 - Iconos descriptivos para cada tipo
 - Tooltips con información
 - Integrado en `InputArea.tsx`
 
 **Tipos soportados**:
+
 - `any`: Cualquier archivo
 - `image`: Imágenes (JPG, PNG, GIF, WebP)
 - `video`: Videos (MP4, MOV, AVI)
@@ -91,9 +103,11 @@ const {
 - `file`: Otros archivos
 
 ### 5. Componente `FileMessageItem`
+
 **Ubicación**: `src/components/chat/FileMessageItem.tsx`
 
 **Características**:
+
 - Vista de archivos en el chat
 - Thumbnail para imágenes
 - Información de tamaño y tipo
@@ -101,6 +115,7 @@ const {
 - Estados de transferencia (pendiente, activa, completada, fallida)
 
 **Integración con `MessageItem`**:
+
 - Detecta mensajes con prefijo `FILE_TRANSFER|`
 - Parseo automático de metadatos
 - Renderizado condicional
@@ -114,15 +129,17 @@ FILE_TRANSFER|{fileId}|{fileName}|{fileSize}|{mimeType}|{fileHash}|{thumbnail?}
 ```
 
 **Ejemplo**:
+
 ```
 FILE_TRANSFER|abc123|foto.jpg|1048576|image/jpeg|sha256...|base64...
 ```
 
 **Parseo en `MessageItem.tsx`**:
+
 ```tsx
-const isFileTransfer = msg.message.startsWith('FILE_TRANSFER|');
+const isFileTransfer = msg.message.startsWith("FILE_TRANSFER|");
 if (isFileTransfer) {
-  const parts = msg.message.split('|');
+  const parts = msg.message.split("|");
   const fileData = {
     fileId: parts[1],
     fileName: parts[2],
@@ -130,8 +147,8 @@ if (isFileTransfer) {
     mimeType: parts[4],
     fileHash: parts[5],
     thumbnail: parts[6], // Optional
-    transferState: 'completed',
-    direction: isMe ? 'sending' : 'receiving'
+    transferState: "completed",
+    direction: isMe ? "sending" : "receiving",
   };
 }
 ```
@@ -139,27 +156,28 @@ if (isFileTransfer) {
 ## Integración en la aplicación principal
 
 ### Paso 1: Añadir estado de transferencias al contexto del chat
+
 ```tsx
 // En App.tsx o tu componente principal
-import { useFileTransfer } from './hooks/useFileTransfer';
+import { useFileTransfer } from "./hooks/useFileTransfer";
 
 function App() {
   const fileTransfer = useFileTransfer();
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
-  
+
   const handleAttachFile = (type: AttachmentType) => {
     setIsFilePickerOpen(true);
   };
-  
+
   const handleFileSubmit = async (file: File, thumbnail?: string) => {
     if (!selectedContact) return;
-    
+
     const result = await fileTransfer.startTransfer({
       revelnestId: selectedContact.revelnestId,
       filePath: file.path, // Nota: en Electron necesitas la ruta completa
-      thumbnail
+      thumbnail,
     });
-    
+
     if (result.success) {
       // Crear mensaje de archivo en el chat
       const fileMessage = `FILE_TRANSFER|${result.fileId}|${file.name}|${file.size}|${file.type}|${thumbnail}`;
@@ -170,6 +188,7 @@ function App() {
 ```
 
 ### Paso 2: Integrar el modal de selección de archivos
+
 ```tsx
 <FilePickerModal
   open={isFilePickerOpen}
@@ -179,17 +198,21 @@ function App() {
 ```
 
 ### Paso 3: Mostrar transferencias activas
+
 ```tsx
-{fileTransfer.activeTransfers.map(transfer => (
-  <TransferProgressBar
-    key={transfer.fileId}
-    transfer={transfer}
-    onCancel={fileTransfer.cancelTransfer}
-  />
-))}
+{
+  fileTransfer.activeTransfers.map((transfer) => (
+    <TransferProgressBar
+      key={transfer.fileId}
+      transfer={transfer}
+      onCancel={fileTransfer.cancelTransfer}
+    />
+  ));
+}
 ```
 
 ### Paso 4: Actualizar `InputArea`
+
 `InputArea` ya está actualizado con `AttachmentButton`. Solo necesita recibir la prop `onAttachFile`:
 
 ```tsx
@@ -202,6 +225,7 @@ function App() {
 ## Backend necesario
 
 ### Handlers UDP ya implementados
+
 Los handlers para mensajes de archivo están en `src/main_process/network/handlers.ts`:
 
 - `handleFileStart`
@@ -211,6 +235,7 @@ Los handlers para mensajes de archivo están en `src/main_process/network/handle
 - `handleFileCancel`
 
 ### TransferManager
+
 El `TransferManager` (`src/main_process/network/file-transfer/transfer-manager.ts`) contiene:
 
 - `handleFileStart()`: Valida y prepara recepción

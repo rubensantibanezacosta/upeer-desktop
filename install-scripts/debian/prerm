@@ -1,26 +1,44 @@
 #!/bin/bash
 set -e
 
-# RevelNest Chat P2P - Script de pre-remoción para Debian/Ubuntu
+# uPeer P2P - Script de pre-remoción para Debian/Ubuntu
+#
+# Con el modelo sidecar user-space no hay ningún daemon de sistema
+# que detener. El proceso yggstack lo gestiona la propia app Electron
+# y termina cuando la app se cierra.
 
-echo "Deteniendo servicios de RevelNest antes de la desinstalación..."
+echo "Preparando desinstalación de uPeer P2P..."
+
+# Por compatibilidad: si por alguna razón quedara el servicio antiguo
+# (instalación previa con TUN), lo detenemos y deshabilitamos.
+if systemctl is-active --quiet upeer-yggdrasil.service 2>/dev/null; then
+    echo "Deteniendo servicio legacy upeer-yggdrasil..."
+    systemctl stop upeer-yggdrasil.service 2>/dev/null || true
+fi
+if systemctl is-enabled --quiet upeer-yggdrasil.service 2>/dev/null; then
+    echo "Deshabilitando servicio legacy upeer-yggdrasil..."
+    systemctl disable upeer-yggdrasil.service 2>/dev/null || true
+fi
+
+exit 0
+
 
 # Detener el servicio si está corriendo
-if systemctl is-active --quiet revelnest-yggdrasil.service 2>/dev/null; then
-    echo "Deteniendo servicio revelnest-yggdrasil..."
-    systemctl stop revelnest-yggdrasil.service
+if systemctl is-active --quiet upeer-yggdrasil.service 2>/dev/null; then
+    echo "Deteniendo servicio upeer-yggdrasil..."
+    systemctl stop upeer-yggdrasil.service
 fi
 
 # Deshabilitar el servicio si está habilitado
-if systemctl is-enabled --quiet revelnest-yggdrasil.service 2>/dev/null; then
-    echo "Deshabilitando servicio revelnest-yggdrasil..."
-    systemctl disable revelnest-yggdrasil.service
+if systemctl is-enabled --quiet upeer-yggdrasil.service 2>/dev/null; then
+    echo "Deshabilitando servicio upeer-yggdrasil..."
+    systemctl disable upeer-yggdrasil.service
 fi
 
 # Limpiar socket directory
-if [ -d "/var/run/revelnest" ]; then
+if [ -d "/var/run/upeer" ]; then
     echo "Limpiando directorio de sockets..."
-    rm -rf /var/run/revelnest
+    rm -rf /var/run/upeer
 fi
 
 exit 0

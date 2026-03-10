@@ -1,16 +1,16 @@
 #!/bin/bash
 # Rebuild the docker image just in case
-docker build -t revelnest-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
+docker build -t upeer-bot -f tests/p2p_testing/Dockerfile.peer tests/p2p_testing
 
 # Cleanup old shared states / containers
 rm -rf /tmp/p2p_shared_15
 mkdir -p /tmp/p2p_shared_15
-docker rm -f $(docker ps -a -q --filter ancestor=revelnest-bot) 2>/dev/null || true
+docker rm -f $(docker ps -a -q --filter ancestor=upeer-bot) 2>/dev/null || true
 
 echo "Starting 15 nodes in a complex graph topology..."
 
 # Node 1 (Bootstrap)
-docker run -d --name p2p_node_1 --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared_15:/shared -e NODE_ENV_NAME=node1 revelnest-bot
+docker run -d --name p2p_node_1 --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared_15:/shared -e NODE_ENV_NAME=node1 upeer-bot
 echo "Node 1 (Bootstrap) started. Waiting 5s..."
 sleep 5
 
@@ -22,7 +22,7 @@ echo "Bootstrap Node 1 is at $TARGET1"
 start_node() {
     local node_num=$1
     local target_env=$2
-    docker run -d --name p2p_node_$node_num --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared_15:/shared -e NODE_ENV_NAME=node$node_num -e TARGET_IDENTITY=$target_env revelnest-bot
+    docker run -d --name p2p_node_$node_num --cap-add=NET_ADMIN --device=/dev/net/tun -v /tmp/p2p_shared_15:/shared -e NODE_ENV_NAME=node$node_num -e TARGET_IDENTITY=$target_env upeer-bot
     sleep 4
     local data=$(cat /tmp/p2p_shared_15/node$node_num.json)
     echo "$(echo $data | grep -o '"id": "[^"]*' | cut -d '"' -f 4)@$(echo $data | grep -o '"ip": "[^"]*' | cut -d '"' -f 4)"

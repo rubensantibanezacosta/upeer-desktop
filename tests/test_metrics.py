@@ -10,7 +10,7 @@ import os
 from subprocess import DEVNULL
 
 def test_two_nodes():
-    print("=== Test de 2 nodos RevelNest ===")
+    print("=== Test de 2 nodos upeer ===")
     
     # Limpiar contenedores previos
     subprocess.run(["docker", "rm", "-f", "p2p_test1", "p2p_test2"], 
@@ -28,7 +28,7 @@ def test_two_nodes():
         "--device=/dev/net/tun",
         "-v", f"{shared_dir}:/shared",
         "-e", "NODE_ENV_NAME=test1",
-        "revelnest-bot"
+        "upeer-bot"
     ], stdout=DEVNULL, stderr=DEVNULL)
     
     time.sleep(8)  # Esperar a que Yggdrasil se inicie

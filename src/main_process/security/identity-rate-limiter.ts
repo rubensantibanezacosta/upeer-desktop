@@ -4,7 +4,7 @@
  */
 
 import { RateLimiter, RateLimitRule, RateLimitConfig } from './rate-limiter.js';
-import { getReputationSystem, ReputationScore, SocialReputation } from './reputation.js';
+import { computeScore } from './reputation/vouches.js';
 import { warn } from './secure-logger.js';
 
 interface IdentityTokenBucket {
@@ -12,13 +12,32 @@ interface IdentityTokenBucket {
     lastRefill: number;
 }
 
-export class IdentityRateLimiter extends RateLimiter {
-    private identityBuckets: Map<string, Map<string, IdentityTokenBucket>> = new Map(); // revelnestId -> messageType -> bucket
-    private reputationSystem: SocialReputation;
+/** Caché de directContactIds para no consultar la DB en cada paquete */
+let _cachedDirectIds: Set<string> = new Set();
+let _cacheTs: number = 0;
+const _CACHE_TTL = 60_000; // refrescar cada 60 s
 
-    constructor(rules?: RateLimitRule, reputationSystem?: SocialReputation) {
+async function _getDirectContactIds(): Promise<Set<string>> {
+    const now = Date.now();
+    if (now - _cacheTs < _CACHE_TTL) return _cachedDirectIds;
+    try {
+        const { getContacts } = await import('../storage/db.js');
+        const contacts = (getContacts() as any[]);
+        _cachedDirectIds = new Set<string>(
+            contacts
+                .filter((c: any) => c.status === 'connected' && c.upeerId)
+                .map((c: any) => c.upeerId as string)
+        );
+        _cacheTs = now;
+    } catch { /* mantener caché anterior si falla */ }
+    return _cachedDirectIds;
+}
+
+export class IdentityRateLimiter extends RateLimiter {
+    private identityBuckets: Map<string, Map<string, IdentityTokenBucket>> = new Map(); // upeerId -> messageType -> bucket
+
+    constructor(rules?: RateLimitRule) {
         super(rules);
-        this.reputationSystem = reputationSystem || getReputationSystem();
     }
 
     /**
@@ -33,10 +52,15 @@ export class IdentityRateLimiter extends RateLimiter {
      * Check if a message from given identity is allowed (identity-based rate limiting only)
      * Uses reputation-adjusted limits
      */
-    checkIdentityOnly(revelnestId: string, messageType: string): boolean {
-        if (!revelnestId) {
+    checkIdentityOnly(upeerId: string, messageType: string): boolean {
+        if (!upeerId) {
             // No identity, cannot apply identity-based limiting
             return true;
+        }
+
+        // Refrescar caché de contactos en background si ha expirado (no bloquea)
+        if (Date.now() - _cacheTs >= _CACHE_TTL) {
+            _getDirectContactIds().catch(() => { });
         }
 
         const rule = (this as any).rules[messageType];
@@ -46,14 +70,14 @@ export class IdentityRateLimiter extends RateLimiter {
         }
 
         // Calculate reputation-adjusted limit
-        const adjustedRule = this.getAdjustedRule(revelnestId, messageType, rule);
+        const adjustedRule = this.getAdjustedRule(upeerId, messageType, rule);
 
         // Get or create identity bucket
         const now = Date.now();
-        if (!this.identityBuckets.has(revelnestId)) {
-            this.identityBuckets.set(revelnestId, new Map());
+        if (!this.identityBuckets.has(upeerId)) {
+            this.identityBuckets.set(upeerId, new Map());
         }
-        const identityBuckets = this.identityBuckets.get(revelnestId)!;
+        const identityBuckets = this.identityBuckets.get(upeerId)!;
 
         if (!identityBuckets.has(messageType)) {
             identityBuckets.set(messageType, {
@@ -80,7 +104,7 @@ export class IdentityRateLimiter extends RateLimiter {
 
         // Identity rate limited
         warn('Identity rate limited', {
-            revelnestId,
+            upeerId,
             messageType,
             tokens: bucket.tokens.toFixed(2)
         }, 'rate-limiter');
@@ -92,23 +116,25 @@ export class IdentityRateLimiter extends RateLimiter {
      * Applies both IP-based and identity-based rate limiting
      * Identity limits are adjusted based on reputation score
      */
-    checkIdentity(ip: string, revelnestId: string, messageType: string): boolean {
+    checkIdentity(ip: string, upeerId: string, messageType: string): boolean {
         // En handlers.ts ya llamamos a checkIp (super.check) antes de esto.
         // Llamar aquí a super.check de nuevo causaría que cada paquete consuma 2 tokens.
         // Solo aplicamos la lógica de identidad.
-        return this.checkIdentityOnly(revelnestId, messageType);
+        return this.checkIdentityOnly(upeerId, messageType);
     }
 
     /**
      * Get reputation-adjusted rate limit rule
+     * BUG BF fix: antes se pasaba `new Set<string>()` como directContactIds, lo que hace
+     * que computeScorePure filtre TODOS los vouches (sólo cuentan de contactos directos),
+     * devolviendo siempre 50 → multiplicador siempre 1.0 → reputación nunca ajusta límites.
+     * Ahora usamos una caché de 60s con los contactos reales para que la protección Sybil
+     * y el ajuste de cuota funcionen correctamente sin consultar la DB en cada paquete.
      */
-    private getAdjustedRule(revelnestId: string, messageType: string, baseRule: RateLimitConfig): RateLimitConfig {
-        const reputation = this.reputationSystem.calculateReputation(revelnestId);
-        const reputationMultiplier = this.calculateReputationMultiplier(reputation);
+    private getAdjustedRule(upeerId: string, _messageType: string, baseRule: RateLimitConfig): RateLimitConfig {
+        const vouchScore = computeScore(upeerId, _cachedDirectIds);
+        const reputationMultiplier = this.calculateReputationMultiplier(vouchScore);
 
-        // Apply multiplier to maxTokens and refillRate
-        // Minimum multiplier is 0.1 (10% of base limit) for very low reputation
-        // Maximum multiplier is 3.0 (300% of base limit) for high reputation
         const adjustedMaxTokens = Math.max(1, Math.floor(baseRule.maxTokens * reputationMultiplier));
         const adjustedRefillRate = baseRule.refillRate * reputationMultiplier;
 
@@ -123,9 +149,7 @@ export class IdentityRateLimiter extends RateLimiter {
      * Calculate reputation multiplier based on weightedScore (0-100)
      * Returns multiplier between 0.1 and 3.0
      */
-    private calculateReputationMultiplier(reputation: ReputationScore): number {
-        const score = reputation.weightedScore;
-
+    private calculateReputationMultiplier(score: number): number {
         // Map score to multiplier using a sigmoid-like curve
         // Score 0 -> multiplier 0.1 (very restrictive)
         // Score 50 -> multiplier 1.0 (normal)
@@ -147,8 +171,8 @@ export class IdentityRateLimiter extends RateLimiter {
     /**
      * Reset rate limits for a specific identity
      */
-    resetIdentity(revelnestId: string): void {
-        this.identityBuckets.delete(revelnestId);
+    resetIdentity(upeerId: string): void {
+        this.identityBuckets.delete(upeerId);
     }
 
     /**
@@ -162,8 +186,8 @@ export class IdentityRateLimiter extends RateLimiter {
     /**
      * Get current token count for identity (for debugging/monitoring)
      */
-    getIdentityTokenCount(revelnestId: string, messageType: string): number {
-        const identityBuckets = this.identityBuckets.get(revelnestId);
+    getIdentityTokenCount(upeerId: string, messageType: string): number {
+        const identityBuckets = this.identityBuckets.get(upeerId);
         if (!identityBuckets) return 0;
         const bucket = identityBuckets.get(messageType);
         return bucket ? bucket.tokens : 0;
@@ -176,7 +200,7 @@ export class IdentityRateLimiter extends RateLimiter {
         const now = Date.now();
         const toDelete: string[] = [];
 
-        for (const [revelnestId, identityBuckets] of this.identityBuckets.entries()) {
+        for (const [upeerId, identityBuckets] of this.identityBuckets.entries()) {
             let hasActivity = false;
             for (const bucket of identityBuckets.values()) {
                 if (now - bucket.lastRefill < maxAgeMs) {
@@ -185,12 +209,12 @@ export class IdentityRateLimiter extends RateLimiter {
                 }
             }
             if (!hasActivity) {
-                toDelete.push(revelnestId);
+                toDelete.push(upeerId);
             }
         }
 
-        for (const revelnestId of toDelete) {
-            this.identityBuckets.delete(revelnestId);
+        for (const upeerId of toDelete) {
+            this.identityBuckets.delete(upeerId);
         }
     }
 

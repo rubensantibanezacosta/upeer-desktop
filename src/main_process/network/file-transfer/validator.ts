@@ -24,7 +24,7 @@ export class TransferValidator {
 
         // Get file stats
         const stats = await fs.stat(filePath);
-        
+
         // Validate file size
         if (stats.size > this.maxFileSize) {
             throw new Error(`File too large: ${stats.size} bytes (max: ${this.maxFileSize} bytes)`);
@@ -54,6 +54,17 @@ export class TransferValidator {
             if (data[field] === undefined || data[field] === null) {
                 throw new Error(`Missing required field: ${field}`);
             }
+        }
+
+        // BUG CK fix: validar que fileId sea un UUID estándar.
+        // chunker.createTempFile() usa fileId como nombre de archivo en un directorio
+        // temporal: `path.join(tempDir, fileId)`. Sin esta validación, un peer malicioso
+        // puede enviar fileId='../../../home/user/.ssh/authorized_keys' y path.join
+        // resuelve los '..' → path traversal: el archivo temporal se crea en una ruta
+        // arbitraria del sistema de archivos del usuario.
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!UUID_REGEX.test(String(data.fileId))) {
+            throw new Error('Invalid fileId: must be a UUID');
         }
 
         // Type validation
@@ -152,38 +163,38 @@ export class TransferValidator {
         // Basic validation: no directory traversal, reasonable length
         if (!fileName || fileName.length > 255) return false;
         if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) return false;
-        
+
         // Check for dangerous characters
         const dangerousChars = ['<', '>', ':', '"', '|', '?', '*'];
         for (const char of dangerousChars) {
             if (fileName.includes(char)) return false;
         }
-        
+
         return true;
     }
 
     private isValidMimeType(mimeType: string): boolean {
         // Basic MIME type validation
         if (!mimeType || typeof mimeType !== 'string') return false;
-        
+
         // Should have format type/subtype
         const parts = mimeType.split('/');
         if (parts.length !== 2) return false;
-        
+
         const [type, subtype] = parts;
         if (!type || !subtype) return false;
-        
+
         // Allow common MIME types
         const allowedTypes = [
             'application', 'audio', 'image', 'text', 'video',
             'font', 'model', 'example', 'message', 'multipart'
         ];
-        
+
         if (!allowedTypes.includes(type)) return false;
-        
+
         // Subtype should not contain spaces or special chars
         if (!/^[a-z0-9.+*-]+$/i.test(subtype)) return false;
-        
+
         return true;
     }
 

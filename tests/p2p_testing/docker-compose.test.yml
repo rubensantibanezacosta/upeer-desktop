@@ -1,7 +1,7 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  revelnest-test-bot:
+  upeer-test-bot:
     build:
       context: .
       dockerfile: Dockerfile.test_bot

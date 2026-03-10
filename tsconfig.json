@@ -8,7 +8,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "strict": true,
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "resolveJsonModule": true
   },
   "include": ["src/**/*", "tests/**/*", "vite-env.d.ts"],
   "exclude": ["node_modules", "out", "dist", "**/*.test.ts", "**/*.test.tsx"]

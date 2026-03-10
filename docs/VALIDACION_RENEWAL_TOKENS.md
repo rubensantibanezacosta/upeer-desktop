@@ -310,6 +310,6 @@ La simulación Python (`peer_bot.py`) ha sido **corregida y ahora ejecuta renova
 
 ---
 
-**Firmado**: Agente de Validación RevelNest  
+**Firmado**: Agente de Validación upeer  
 **Fecha**: 5 de marzo de 2026  
 **Estado**: Fase 15 - Sistema de Renewal Tokens ✅ COMPLETADO Y VALIDADO

@@ -29,7 +29,7 @@ export function createSurvivalKit(name: string, description?: string): string {
         })
         .slice(0, 10)
         .map(c => ({
-            revelnestId: c.revelnestId || '',
+            upeerId: c.upeerId || '',
             name: c.name,
             publicKey: c.publicKey || '',
             locationBlock: {
@@ -48,7 +48,7 @@ export function createSurvivalKit(name: string, description?: string): string {
     
     const kitData: SurvivalKitData = {
         version: '1.0',
-        myRevelnestId: '', // Will be filled by caller
+        myUpeerId: '', // Will be filled by caller
         myPublicKey: '', // Will be filled by caller
         timestamp: now,
         contacts: topContacts,

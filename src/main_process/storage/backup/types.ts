@@ -1,10 +1,10 @@
 export interface SurvivalKitData {
     version: string;
-    myRevelnestId: string;
+    myUpeerId: string;
     myPublicKey: string;
     timestamp: number;
     contacts: Array<{
-        revelnestId: string;
+        upeerId: string;
         name: string;
         publicKey: string;
         locationBlock: {

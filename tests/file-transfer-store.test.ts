@@ -17,7 +17,7 @@ describe('FileTransferStore', () => {
     describe('createTransfer', () => {
         it('should create a new transfer with default values', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -25,7 +25,7 @@ describe('FileTransferStore', () => {
             });
 
             assert.ok(transfer.fileId);
-            assert.strictEqual(transfer.revelnestId, 'peer123');
+            assert.strictEqual(transfer.upeerId, 'peer123');
             assert.strictEqual(transfer.fileName, 'test.txt');
             assert.strictEqual(transfer.fileSize, 1024);
             assert.strictEqual(transfer.mimeType, 'text/plain');
@@ -44,7 +44,7 @@ describe('FileTransferStore', () => {
             const customId = 'custom-file-id-123';
             const transfer = store.createTransfer({
                 fileId: customId,
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -56,7 +56,7 @@ describe('FileTransferStore', () => {
 
         it('should calculate totalChunks based on fileSize and chunkSize', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 100000, // 100KB
                 mimeType: 'text/plain',
@@ -71,7 +71,7 @@ describe('FileTransferStore', () => {
 
         it('should handle receiving direction', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -86,7 +86,7 @@ describe('FileTransferStore', () => {
     describe('getTransfer', () => {
         it('should return transfer by fileId', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -106,7 +106,7 @@ describe('FileTransferStore', () => {
     describe('updateTransfer', () => {
         it('should update transfer properties', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -126,12 +126,12 @@ describe('FileTransferStore', () => {
             assert.strictEqual(retrieved?.lastActivity, newTime);
             // Other properties should remain unchanged
             assert.strictEqual(retrieved?.fileName, 'test.txt');
-            assert.strictEqual(retrieved?.revelnestId, 'peer123');
+            assert.strictEqual(retrieved?.upeerId, 'peer123');
         });
 
         it('should update Sets correctly', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -163,7 +163,7 @@ describe('FileTransferStore', () => {
     describe('getAllTransfers', () => {
         it('should return all transfers', () => {
             const transfer1 = store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'test1.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -171,7 +171,7 @@ describe('FileTransferStore', () => {
             });
 
             const transfer2 = store.createTransfer({
-                revelnestId: 'peer2',
+                upeerId: 'peer2',
                 fileName: 'test2.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -193,7 +193,7 @@ describe('FileTransferStore', () => {
     describe('getTransfersByState', () => {
         it('should filter transfers by state', () => {
             store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'active.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -201,7 +201,7 @@ describe('FileTransferStore', () => {
             });
 
             const completedTransfer = store.createTransfer({
-                revelnestId: 'peer2',
+                upeerId: 'peer2',
                 fileName: 'completed.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -222,7 +222,7 @@ describe('FileTransferStore', () => {
     describe('getTransfersByPeer', () => {
         it('should filter transfers by peer ID', () => {
             store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'test1.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -230,7 +230,7 @@ describe('FileTransferStore', () => {
             });
 
             store.createTransfer({
-                revelnestId: 'peer2',
+                upeerId: 'peer2',
                 fileName: 'test2.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -238,7 +238,7 @@ describe('FileTransferStore', () => {
             });
 
             store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'test3.txt',
                 fileSize: 4096,
                 mimeType: 'text/plain',
@@ -258,7 +258,7 @@ describe('FileTransferStore', () => {
     describe('removeTransfer', () => {
         it('should remove transfer by fileId', () => {
             const transfer = store.createTransfer({
-                revelnestId: 'peer123',
+                upeerId: 'peer123',
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -281,7 +281,7 @@ describe('FileTransferStore', () => {
     describe('clearCompletedTransfers', () => {
         it('should remove completed, cancelled, and failed transfers', () => {
             const active = store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'active.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -289,7 +289,7 @@ describe('FileTransferStore', () => {
             });
 
             const completed = store.createTransfer({
-                revelnestId: 'peer2',
+                upeerId: 'peer2',
                 fileName: 'completed.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -298,7 +298,7 @@ describe('FileTransferStore', () => {
             store.updateTransfer(completed.fileId, { state: 'completed' });
 
             const cancelled = store.createTransfer({
-                revelnestId: 'peer3',
+                upeerId: 'peer3',
                 fileName: 'cancelled.txt',
                 fileSize: 4096,
                 mimeType: 'text/plain',
@@ -307,7 +307,7 @@ describe('FileTransferStore', () => {
             store.updateTransfer(cancelled.fileId, { state: 'cancelled' });
 
             const failed = store.createTransfer({
-                revelnestId: 'peer4',
+                upeerId: 'peer4',
                 fileName: 'failed.txt',
                 fileSize: 8192,
                 mimeType: 'text/plain',
@@ -328,7 +328,7 @@ describe('FileTransferStore', () => {
         it('should return correct statistics', () => {
             // Create transfers with different states and directions
             store.createTransfer({
-                revelnestId: 'peer1',
+                upeerId: 'peer1',
                 fileName: 'active-sending.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -336,7 +336,7 @@ describe('FileTransferStore', () => {
             });
 
             const completedReceiving = store.createTransfer({
-                revelnestId: 'peer2',
+                upeerId: 'peer2',
                 fileName: 'completed-receiving.txt',
                 fileSize: 2048,
                 mimeType: 'text/plain',
@@ -345,7 +345,7 @@ describe('FileTransferStore', () => {
             store.updateTransfer(completedReceiving.fileId, { state: 'completed' });
 
             const failedSending = store.createTransfer({
-                revelnestId: 'peer3',
+                upeerId: 'peer3',
                 fileName: 'failed-sending.txt',
                 fileSize: 4096,
                 mimeType: 'text/plain',

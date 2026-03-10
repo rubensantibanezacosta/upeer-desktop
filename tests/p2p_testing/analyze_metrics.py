@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Analizador de métricas de escalabilidad RevelNest
+Analizador de métricas de escalabilidad upeer
 Lee los archivos de métricas generados por run_scalability_test.sh
 y genera reportes y visualizaciones.
 """
@@ -55,7 +55,7 @@ def generate_report(metrics_data):
     summary = metrics_data["summary"]
     
     print("\n" + "="*60)
-    print("📈 REPORTE DE ANÁLISIS REVELNEST")
+    print("📈 REPORTE DE ANÁLISIS upeer")
     print("="*60)
     
     # Estadísticas básicas
