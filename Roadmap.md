@@ -1,6 +1,6 @@
 # Roadmap uPeer
 
-_Última actualización: 10 Marzo 2026_
+_Última actualización: 12 Marzo 2026_
 
 ---
 
@@ -15,6 +15,7 @@ _Última actualización: 10 Marzo 2026_
 - [x] Detección de cambio de IP y rediscovery automático (<60 s)
 - [x] Sovereign roaming — protocolo DHT_UPDATE firmado a contactos íntimos
 - [x] Timeouts e inteligencia de ruta — fallback DHT tras 5 s sin ACK
+- [x] **Protocolo Kademlia Full-Duplex** — implementación completa de `DHT_STORE_ACK` y `DHT_PONG` para estabilidad de red
 
 ### Seguridad y privacidad
 
@@ -30,6 +31,7 @@ _Última actualización: 10 Marzo 2026_
 - [x] Path traversal bloqueado — `read-file-as-base64`, `start-file-transfer`, `save-transferred-file` restringen rutas al homeDir
 - [x] Número de seguridad real — SHA-256 sobre claves ordenadas (no prefijo crudo)
 - [x] Alertas TOFU — notificación en UI cuando cambia la clave estática de un contacto
+- [x] **Serialización Canónica Interoperable** — implementación de `canonicalStringify` en Python para compatibilidad total de firmas con el cliente TS
 
 ### Identidad y autenticación
 
@@ -47,6 +49,7 @@ _Última actualización: 10 Marzo 2026_
 - [x] Indicador "Escribiendo…" — en tiempo real con debounce (2,5 s)
 - [x] Presencia — "En línea" / "Última vez visto" por heartbeats autenticados
 - [x] Vault — almacén cifrado de mensajes para contactos offline (hasta 1 GB)
+- [x] **Social Mesh Resilience** — entrega robusta de mensajes offline via Vault + punteros DHT automáticos
 
 ### Grupos
 
@@ -101,7 +104,7 @@ _Última actualización: 10 Marzo 2026_
 
 - [x] Tests unitarios con Vitest — transferencias, vault, seguridad, Kademlia, renewal tokens
 - [x] Docker Compose para tests multi-nodo (15+ nodos)
-- [x] `peer_bot.py` para generación de tráfico realista
+- [x] **peer_bot_advanced.py** — motor de simulación con soporte para Kademlia, Vaulting y Social Mesh
 - [x] Simulador de 60 días con aceleración temporal
 - [x] Paquetes Debian/RPM con servicio systemd (`upeer-yggdrasil.service`)
 - [x] Capabilities Linux sin root (`cap_net_admin,cap_net_raw`)

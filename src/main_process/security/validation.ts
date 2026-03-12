@@ -279,6 +279,16 @@ export function validateDhtUpdate(data: any): ValidationResult {
     if (!data.locationBlock.signature || typeof data.locationBlock.signature !== 'string' || data.locationBlock.signature.length !== 128) {
         return { valid: false, error: 'Invalid locationBlock.signature' };
     }
+    // Optional powProof for large sequence jumps
+    if (data.locationBlock.powProof !== undefined) {
+        if (typeof data.locationBlock.powProof !== 'string' || data.locationBlock.powProof.length > 256) {
+            return { valid: false, error: 'Invalid powProof (too long or wrong type)' };
+        }
+        // Format validation: either JSON or hex
+        if (!data.locationBlock.powProof.startsWith('{') && !/^[0-9a-f]+$/i.test(data.locationBlock.powProof)) {
+            return { valid: false, error: 'Invalid powProof format' };
+        }
+    }
     return { valid: true };
 }
 
@@ -297,6 +307,29 @@ export function validateDhtExchange(data: any): ValidationResult {
         }
         if (!peer.publicKey || typeof peer.publicKey !== 'string' || peer.publicKey.length !== 64) {
             return { valid: false, error: 'Invalid peer publicKey' };
+        }
+        // Validate locationBlock if present
+        if (peer.locationBlock && typeof peer.locationBlock === 'object') {
+            const lb = peer.locationBlock;
+            if (!lb.address || typeof lb.address !== 'string') {
+                return { valid: false, error: 'Invalid peer locationBlock.address' };
+            }
+            if (typeof lb.dhtSeq !== 'number' || lb.dhtSeq < 0) {
+                return { valid: false, error: 'Invalid peer locationBlock.dhtSeq' };
+            }
+            if (!lb.signature || typeof lb.signature !== 'string' || lb.signature.length !== 128) {
+                return { valid: false, error: 'Invalid peer locationBlock.signature' };
+            }
+            // Optional powProof for large sequence jumps
+            if (lb.powProof !== undefined) {
+                if (typeof lb.powProof !== 'string' || lb.powProof.length > 256) {
+                    return { valid: false, error: 'Invalid powProof (too long or wrong type)' };
+                }
+                // Format validation: either JSON or hex
+                if (!lb.powProof.startsWith('{') && !/^[0-9a-f]+$/i.test(lb.powProof)) {
+                    return { valid: false, error: 'Invalid powProof format' };
+                }
+            }
         }
     }
     return { valid: true };
@@ -361,6 +394,15 @@ export function validateDhtStore(data: any): ValidationResult {
     if (data.ttl !== undefined
         && (typeof data.ttl !== 'number' || data.ttl < 0 || data.ttl > 2592000)) {
         return { valid: false, error: 'Invalid TTL' };
+    }
+    return { valid: true };
+}
+
+export function validateDhtStoreAck(data: any): ValidationResult {
+    if (!data.key || typeof data.key !== 'string'
+        || !/^[0-9a-f]+$/i.test(data.key)
+        || (data.key.length !== 40 && data.key.length !== 64)) {
+        return { valid: false, error: 'Invalid key (expected 40 or 64 hex chars)' };
     }
     return { valid: true };
 }
@@ -665,6 +707,8 @@ export function validateMessage(type: string, data: any): ValidationResult {
             return validateDhtFindValue(data);
         case 'DHT_STORE':
             return validateDhtStore(data);
+        case 'DHT_STORE_ACK':
+            return validateDhtStoreAck(data);
         case 'FILE_PROPOSAL':
         case 'FILE_START':
             return validateFileProposal(data);

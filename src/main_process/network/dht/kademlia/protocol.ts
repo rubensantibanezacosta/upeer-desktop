@@ -3,6 +3,8 @@ import { ValueStore } from './store.js';
 import { KademliaContact, K } from './types.js';
 import { toKademliaId } from './types.js';
 import { warn, network } from '../../../security/secure-logger.js';
+import { randomBytes } from 'node:crypto';
+import { pendingQueries } from '../handlers.js';
 
 // Protocol handler for Kademlia DHT messages
 export class ProtocolHandler {
@@ -39,6 +41,10 @@ export class ProtocolHandler {
                 return this.handleFindValue(senderUpeerId, data);
             case 'DHT_STORE':
                 return this.handleStore(senderUpeerId, data);
+            case 'DHT_STORE_ACK':
+            case 'DHT_PONG':
+                // Already handled by updateContactFromMessage above
+                return null;
             default:
                 warn('Unknown message type', { type: data.type }, 'kademlia');
                 return null;
@@ -80,7 +86,7 @@ export class ProtocolHandler {
         const targetId = Buffer.from(data.targetId, 'hex');
         const closestContacts = this.routingTable.findClosestContacts(targetId.toString('hex'), K);
 
-        return {
+        const response = {
             type: 'DHT_FOUND_NODES',
             nodes: closestContacts.map(c => ({
                 upeerId: c.upeerId,
@@ -89,6 +95,11 @@ export class ProtocolHandler {
                 nodeId: c.nodeId.toString('hex')
             }))
         };
+        // Include queryId if present for correlation
+        if (data.queryId) {
+            (response as any).queryId = data.queryId;
+        }
+        return response;
     }
 
     private handleFindValue(senderUpeerId: string, data: any): any {
@@ -96,7 +107,7 @@ export class ProtocolHandler {
         const value = this.valueStore.get(key);
 
         if (value) {
-            return {
+            const response = {
                 type: 'DHT_FOUND_VALUE',
                 key: data.key,
                 value: value.value,
@@ -104,6 +115,11 @@ export class ProtocolHandler {
                 timestamp: value.timestamp,
                 signature: value.signature
             };
+            // Include queryId if present for correlation
+            if (data.queryId) {
+                (response as any).queryId = data.queryId;
+            }
+            return response;
         } else {
             // BUG CR fix: data es un paquete DHT_FIND_VALUE que tiene 'key', no 'targetId'.
             // handleFindNode espera data.targetId → Buffer.from(undefined, 'hex') lanzaba TypeError.
@@ -158,8 +174,63 @@ export class ProtocolHandler {
             return localValue;
         }
 
-        // TODO: Implement iterative find with parallel queries
-        // For now, just return null
+        const ALPHA = 3; // concurrency
+        const QUERY_TIMEOUT = 5000; // 5 seconds
+        const keyHex = key.toString('hex');
+
+        // Get closest contacts to the key
+        const closestContacts = this.routingTable.findClosestContacts(keyHex, K);
+        if (closestContacts.length === 0) {
+            return null;
+        }
+
+        // Send queries to α closest contacts
+        const contactsToQuery = closestContacts.slice(0, ALPHA);
+        const promises = contactsToQuery.map(contact => {
+            return new Promise<{ value: any, senderAddress: string }>((resolve, reject) => {
+                const queryId = randomBytes(16).toString('hex');
+                const timeout = setTimeout(() => {
+                    reject(new Error(`FIND_VALUE timeout for ${contact.address}`));
+                }, QUERY_TIMEOUT);
+
+                pendingQueries.set(queryId, {
+                    resolve: (value) => {
+                        clearTimeout(timeout);
+                        resolve(value);
+                    },
+                    reject: (error) => {
+                        clearTimeout(timeout);
+                        pendingQueries.delete(queryId);
+                        reject(error);
+                    },
+                    type: 'DHT_FIND_VALUE',
+                    targetId: keyHex,
+                    timestamp: Date.now(),
+                    timeoutId: timeout
+                });
+
+                // Send FIND_VALUE query
+                this.sendMessage(contact.address, {
+                    type: 'DHT_FIND_VALUE',
+                    key: keyHex,
+                    queryId
+                });
+            });
+        });
+
+        // Wait for responses
+        const results = await Promise.allSettled(promises);
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { value } = result.value;
+                if (value) {
+                    // Found the value
+                    return value;
+                }
+            }
+        }
+
+        // Value not found
         return null;
     }
 
