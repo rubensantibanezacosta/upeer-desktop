@@ -32,11 +32,11 @@ else:
 
 verify_key = signing_key.verify_key
 public_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
-my_revelnest_id = hashlib.blake2b(verify_key.encode(), digest_size=16).hexdigest()
+my_upeer_id = hashlib.blake2b(verify_key.encode(), digest_size=16).hexdigest()
 my_private_key = signing_key.to_curve25519_private_key()
 my_public_key = verify_key.to_curve25519_public_key()
 
-known_peers = {} # revelnestId -> info
+known_peers = {} # upeerId -> info
 
 def get_ygg_ip():
     try:
@@ -52,26 +52,31 @@ def sign_data(data):
     signature = signing_key.sign(msg_bytes)
     return signature.signature.hex()
 
-def generate_light_proof(revelnest_id):
+def generate_light_proof(upeer_id):
     import hashlib
     for nonce in range(100000):
         proof = hex(nonce)[2:]
-        hash_input = (revelnest_id + proof).encode()
+        hash_input = (upeer_id + proof).encode()
         if hashlib.sha256(hash_input).hexdigest().startswith('0'):
             return proof
     return hex(int(time.time() * 1000))[2:]
 
 def generate_location_block(ip, seq=1):
-    data = {"revelnestId": my_revelnest_id, "address": ip, "dhtSeq": seq}
+    data = {"upeerId": my_upeer_id, "address": ip, "dhtSeq": seq}
     sig = sign_data(data)
     expires_at = int((time.time() + 30 * 24 * 60 * 60) * 1000)
     return {"address": ip, "dhtSeq": seq, "signature": sig, "expiresAt": expires_at}
 
 def send_packet(sock, addr, data):
-    full_packet = {
+    my_ip = get_ygg_ip() or ""
+    payload_to_sign = {
         **data,
-        "senderRevelnestId": my_revelnest_id,
-        "signature": sign_data(data)
+        "senderUpeerId": my_upeer_id,
+        "senderYggAddress": my_ip
+    }
+    full_packet = {
+        **payload_to_sign,
+        "signature": sign_data(payload_to_sign)
     }
     msg_str = json.dumps(full_packet, separators=(',', ':'), ensure_ascii=False)
     sock.sendto(msg_str.encode(), (addr, YGG_PORT))
@@ -80,7 +85,7 @@ def handle_packet(sock, data, addr):
     try:
         packet = json.loads(data.decode())
         p_type = packet.get('type')
-        sender_id = packet.get('senderRevelnestId')
+        sender_id = packet.get('senderUpeerId')
         
         print(f"[Bot] Received {p_type} from {sender_id} @ {addr[0]}")
 
@@ -219,7 +224,7 @@ received_files = {} # fileId -> {"totalChunks": int, "receivedChunks": set}
 def start_file_proposal(sock, target_rid, target_ip):
     time.sleep(2)
     file_id = hashlib.md5(f"dummy-{time.time()}".encode()).hexdigest()
-    file_name = "test_revelnest.txt"
+    file_name = "test_upeer.txt"
     content = b"Este es un archivo de prueba generado por el Bot Dockerizado.\n" * 50
     file_size = len(content)
     
@@ -236,7 +241,7 @@ def start_file_proposal(sock, target_rid, target_ip):
         "fileHash": hashlib.sha256(content).hexdigest()
     }
     send_packet(sock, target_ip, proposal)
-    print(f"[Bot] Proposed file {file_name} to {target_rid}")
+    print(f"[Bot] Proposed file {file_name} to {target_id}")
 
 def send_file_data(sock, target_ip, file_id):
     content = pending_files.pop(file_id, None)
@@ -295,7 +300,7 @@ def auto_connect(sock):
                 "publicKey": public_key_hex,
                 "ephemeralPublicKey": my_public_key.encode(encoder=nacl.encoding.HexEncoder).decode(),
                 "alias": MY_NAME,
-                "powProof": generate_light_proof(my_revelnest_id)
+                "powProof": generate_light_proof(my_upeer_id)
             }
             send_packet(sock, ip, handshake)
         time.sleep(30)
@@ -321,7 +326,7 @@ if __name__ == "__main__":
         print("[Bot] Could not find Yggdrasil IP. Make sure Yggdrasil is running.")
         exit(1)
         
-    print(f"[Bot] My Identity: {my_revelnest_id}@{my_ip}")
+    print(f"[Bot] My Identity: {my_upeer_id}@{my_ip}")
     
     sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     sock.bind(('::', YGG_PORT))

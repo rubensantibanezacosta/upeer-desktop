@@ -7,7 +7,7 @@ import { FileChunker } from './chunker.js';
 import { TransferValidator } from './validator.js';
 import { info, warn, error, debug } from '../../security/secure-logger.js';
 import { getMyUPeerId, encrypt, decrypt } from '../../security/identity.js';
-import { saveFileMessage, getContactByUpeerId } from '../../storage/db.js';
+import { saveFileMessage, getContactByUpeerId, updateMessageStatus } from '../../storage/db.js';
 
 // ── Per-transfer AES-256-GCM helpers ──────────────────────────────────────────
 
@@ -130,7 +130,7 @@ export class TransferManager {
             });
 
             this.notifyUIStarted(transfer);
-            this.saveToDB(transfer);
+            await this.saveToDB(transfer);
 
             // 200% resilience: vault the encrypted proposal + file shards
             // so an offline recipient can receive the transfer when they reconnect
@@ -177,6 +177,14 @@ export class TransferManager {
                                 ...proposalData,
                                 senderUpeerId: getMyUPeerId(),
                                 signature: sig.toString('hex')
+                            }).then((nodes) => {
+                                if (nodes > 0) {
+                                    updateMessageStatus(transfer.fileId, 'vaulted' as any);
+                                    this.window?.webContents.send('message-status-updated', {
+                                        id: transfer.fileId,
+                                        status: 'vaulted'
+                                    });
+                                }
                             });
                         });
                     });
@@ -184,8 +192,12 @@ export class TransferManager {
 
                 if (transfer.fileBuffer) {
                     const encryptedBuffer = this._encryptBuffer(transfer.fileBuffer, aesKey);
+
+                    // Mark as replicating in background
+                    this.store.updateTransfer(transfer.fileId, 'sending', { phase: TransferPhase.REPLICATING });
+
                     import('../vault/chunk-vault.js').then(({ ChunkVault }) => {
-                        ChunkVault.replicateFile(transfer.fileHash, encryptedBuffer, upeerId);
+                        ChunkVault.replicateFile(transfer.fileHash, encryptedBuffer, upeerId, transfer.fileId);
                     }).catch(err => warn('Failed to initiate background file replication', err, 'vault'));
                 }
             }
@@ -224,19 +236,28 @@ export class TransferManager {
                 // Close handles if any
                 const handle = this.fileHandles.get(fileId);
                 if (handle) {
-                    handle.close().catch(() => { });
+                    handle.close().catch((err: any) => warn('Failed to close file handle', err, 'file-transfer'));
                     this.fileHandles.delete(fileId);
                 }
                 // BUG EV fix: borrar archivo temporal del receptor al cancelar.
                 // Sin esto, los archivos en /tmp/upeer-* se acumulan indefinidamente.
                 if (dir === 'receiving') {
-                    this.chunker.cleanupTempFile(transfer).catch(() => { });
+                    this.chunker.cleanupTempFile(transfer).catch((err: any) => warn('Failed to cleanup temp file', err, 'file-transfer'));
                 }
                 // BUG BC fix: limpiar la clave AES-256 de memoria para evitar
                 // que el material criptográfico se acumule indefinidamente.
-                this.transferKeys.delete(fileId);
+                // (moved outside loop)
             }
         });
+
+        // Clean up retry timer
+        const timer = this.retryTimers.get(fileId);
+        if (timer) {
+            clearTimeout(timer);
+            this.retryTimers.delete(fileId);
+        }
+        // Clean up transfer key (once)
+        this.transferKeys.delete(fileId);
     }
 
     // --- MESSAGE HANDLERS ---
@@ -323,7 +344,7 @@ export class TransferManager {
             this.send(address, { type: 'FILE_ACCEPT', fileId: data.fileId });
 
             this.notifyUIStarted(transfer);
-            this.saveToDB(transfer);
+            await this.saveToDB(transfer);
         } catch (err) {
             error('Error handling file proposal', err, 'file-transfer');
             this.send(address, { type: 'FILE_CANCEL', fileId: data.fileId, reason: 'Rejected by receiver' });
@@ -508,7 +529,7 @@ export class TransferManager {
         });
 
         if (updated) {
-            this.saveToDB(updated);
+            await this.saveToDB(updated);
             this.notifyUIProgress(updated);
             this.notifyUICompleted(updated);
             // Also notify that the message is now delivered
@@ -537,7 +558,7 @@ export class TransferManager {
                 // Close and remove file handle
                 const handle = this.fileHandles.get(data.fileId);
                 if (handle) {
-                    await handle.close().catch(() => { });
+                    await handle.close().catch((err: any) => warn('Failed to close file handle', err, 'file-transfer'));
                     this.fileHandles.delete(data.fileId);
                 }
                 // BUG EV fix: borrar archivo temporal del receptor al recibir cancel remoto.
@@ -549,7 +570,7 @@ export class TransferManager {
 
                 this.store.updateTransfer(transfer.fileId, dir, { state: 'cancelled' });
                 this.notifyUICancelled(transfer, data.reason);
-                this.saveToDB({ ...transfer, state: 'cancelled' } as any);
+                await this.saveToDB({ ...transfer, state: 'cancelled' } as any);
             }
         }
     }
@@ -714,7 +735,7 @@ export class TransferManager {
 
             if (updated) {
                 // Save to DB
-                this.saveToDB(updated);
+                await this.saveToDB(updated);
                 this.notifyUIProgress(updated); // Send one last progress update with 'completed' state
                 this.notifyUICompleted(updated);
             }
@@ -730,7 +751,7 @@ export class TransferManager {
         }
     }
 
-    private saveToDB(transfer: FileTransfer) {
+    private async saveToDB(transfer: FileTransfer) {
         try {
             const myId = getMyUPeerId();
             const isSelf = transfer.upeerId === myId;
@@ -742,7 +763,7 @@ export class TransferManager {
                 return;
             }
 
-            saveFileMessage(
+            await saveFileMessage(
                 transfer.fileId, // Use stable transfer ID to prevent duplicates
                 transfer.upeerId,
                 transfer.direction === 'sending' || isSelf,
@@ -787,6 +808,38 @@ export class TransferManager {
 
     private notifyUICompleted(transfer: FileTransfer) {
         this.window?.webContents.send('file-transfer-completed', this.mapToUI(transfer));
+    }
+
+    /**
+     * Notify UI about background vault replication progress
+     */
+    public notifyVaultProgress(fileId: string, current: number, total: number) {
+        const transfer = this.store.getTransfer(fileId, 'sending');
+        if (!transfer) return;
+
+        const isDone = current === total;
+        const progress = Number(((current / total) * 100).toFixed(2));
+
+        const updated = this.store.updateTransfer(fileId, 'sending', {
+            chunksProcessed: current,
+            totalChunks: total, // For vaulting, totalChunks reflects shards
+            phase: isDone ? TransferPhase.VAULTED : TransferPhase.REPLICATING,
+            state: 'active'
+        });
+
+        if (updated) {
+            this.window?.webContents.send('file-transfer-progress', {
+                ...this.mapToUI(updated),
+                progress,
+                isVaulting: true
+            });
+
+            if (isDone) {
+                // When vaulted, update the DB status as well
+                updateMessageStatus(fileId, 'vaulted' as any);
+                this.window?.webContents.send('message-status-updated', { id: fileId, status: 'vaulted' });
+            }
+        }
     }
 
     private notifyUICancelled(transfer: FileTransfer, reason: string) {

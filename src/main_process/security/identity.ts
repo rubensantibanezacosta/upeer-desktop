@@ -1,5 +1,5 @@
 import sodium from 'sodium-native';
-import { info, error, debug } from './secure-logger.js';
+import { info, error, debug, warn } from './secure-logger.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as bip39 from 'bip39';
@@ -456,7 +456,7 @@ function notifyContactsAboutKeyRotation(): void {
                     });
                 }
             }
-        }).catch(() => { });
+        }).catch((err) => warn('Failed to issue vouch', err, 'reputation'));
     }).catch(() => { });
 }
 

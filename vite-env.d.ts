@@ -9,30 +9,30 @@ declare global {
     interface Window {
         upeer: {
             getMyNetworkAddress: () => Promise<string>;
-            getMessages: (revelnestId: string) => Promise<any[]>;
+            getMessages: (upeerId: string) => Promise<any[]>;
             getContacts: () => Promise<any[]>;
-            addContact: (address: string, name: string) => Promise<{ success: boolean, revelnestId: string }>;
-            acceptContactRequest: (revelnestId: string, publicKey: string) => Promise<{ success: boolean }>;
-            deleteContact: (revelnestId: string) => Promise<any>;
-            sendMessage: (revelnestId: string, message: string, replyTo?: string) => Promise<string>;
-            sendTypingIndicator: (revelnestId: string) => Promise<void>;
-            sendReadReceipt: (revelnestId: string, id: string) => Promise<void>;
-            sendContactCard: (targetRevelnestId: string, contact: any) => Promise<string>;
-            sendChatReaction: (revelnestId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
-            sendChatUpdate: (revelnestId: string, msgId: string, newContent: string) => Promise<void>;
-            sendChatDelete: (revelnestId: string, msgId: string) => Promise<void>;
-            getMyIdentity: () => Promise<{ address: string | null, revelnestId: string, publicKey: string }>;
+            addContact: (address: string, name: string) => Promise<{ success: boolean, upeerId: string }>;
+            acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;
+            deleteContact: (upeerId: string) => Promise<any>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<string>;
+            sendTypingIndicator: (upeerId: string) => Promise<void>;
+            sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
+            sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
+            sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
+            sendChatUpdate: (upeerId: string, msgId: string, newContent: string) => Promise<void>;
+            sendChatDelete: (upeerId: string, msgId: string) => Promise<void>;
+            getMyIdentity: () => Promise<{ address: string | null, upeerId: string, publicKey: string }>;
             onReceive: (callback: (data: any) => void) => void;
-            onMessageDelivered: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onMessageRead: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onMessageReactionUpdated: (callback: (data: { msgId: string, revelnestId: string, emoji: string, remove: boolean }) => void) => void;
-            onMessageUpdated: (callback: (data: { id: string, revelnestId: string, content: string }) => void) => void;
-            onMessageDeleted: (callback: (data: { id: string, revelnestId: string }) => void) => void;
-            onPresence: (callback: (data: { revelnestId: string, lastSeen: string }) => void) => void;
-            onContactRequest: (callback: (data: { revelnestId: string, address: string, alias?: string, publicKey: string }) => void) => void;
-            onHandshakeFinished: (callback: (data: { revelnestId: string }) => void) => void;
-            onContactUntrustworthy: (callback: (data: { revelnestId: string, address: string, alias?: string, reason: string }) => void) => void;
-            onTyping: (callback: (data: { revelnestId: string }) => void) => void;
+            onMessageDelivered: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageRead: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, emoji: string, remove: boolean }) => void) => void;
+            onMessageUpdated: (callback: (data: { id: string, upeerId: string, content: string }) => void) => void;
+            onMessageDeleted: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => void;
+            onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => void;
+            onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
+            onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
+            onTyping: (callback: (data: { upeerId: string }) => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;
@@ -46,7 +46,7 @@ declare global {
                 }>;
                 error?: string
             }>;
-            startFileTransfer: (revelnestId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;
             saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;

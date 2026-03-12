@@ -1,9 +1,6 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import BetterSqlite3 from 'better-sqlite3';
-// NOTA: @journeyapps/sqlcipher es la API async de sqlite3 (incompatible con drizzle-orm/better-sqlite3).
-// Se usa better-sqlite3 (sync API) que es lo que drizzle espera.
-// TODO: migrar a better-sqlite3-multiple-ciphers o @signalapp/better-sqlite3 para
-//       restaurar el cifrado SQLCipher en disco.
+import BetterSqlite3 from 'better-sqlite3-multiple-ciphers';
+// SQLCipher está disponible via better-sqlite3-multiple-ciphers (drop‑in replacement).
 import path from 'node:path';
 import fs from 'node:fs';
 import sodium from 'sodium-native';
@@ -48,25 +45,53 @@ export async function initDB(userDataPath: string) {
     sodium.sodium_memzero(deviceKey); // wipe device key from memory ASAP
 
     const sqlite = new BetterSqlite3(dbPath);
-    // Intento de configurar clave SQLCipher (solo funciona con better-sqlite3-multiple-ciphers).
-    // Con better-sqlite3 estándar este pragma es ignorado (no hay cifrado en disco).
+    
+    // Detect if database is already encrypted by trying to read without key
+    let isEncrypted = false;
     try {
-        sqlite.pragma(`key = "x'${dbKeyHex}'"`); // hex key format
-    } catch {
-        // better-sqlite3 estándar no soporta SQLCipher; la BD opera sin cifrado en disco.
+        sqlite.prepare('SELECT count(*) FROM sqlite_master').get();
+        info('Database is not encrypted, will encrypt now', {}, 'db');
+        isEncrypted = false;
+    } catch (err: any) {
+        if (err.message.includes('not a database') || err.code === 'SQLITE_NOTADB') {
+            // Likely encrypted
+            info('Database appears to be encrypted', {}, 'db');
+            isEncrypted = true;
+        } else {
+            error('Unexpected error checking database encryption', err, 'db');
+            throw err;
+        }
     }
+    
+    // Apply encryption: rekey for unencrypted DB, key for already encrypted
+    try {
+        if (!isEncrypted) {
+            sqlite.pragma(`rekey = "x'${dbKeyHex}'"`);
+            info('Database encrypted with rekey', {}, 'db');
+        } else {
+            sqlite.pragma(`key = "x'${dbKeyHex}'"`);
+            info('Encryption key applied', {}, 'db');
+        }
+    } catch (err) {
+        error('Failed to apply SQLCipher key/rekey', err, 'db');
+        throw new Error('SQLCipher initialization failed');
+    }
+    
+    // Verify encryption is active and we can read
+    try {
+        const cipherResult = sqlite.pragma('cipher_version');
+        info('SQLCipher active', { cipherResult }, 'db');
+        // Test read access
+        sqlite.prepare('SELECT count(*) FROM sqlite_master').get();
+        info('Database accessible with encryption key', {}, 'db');
+    } catch (err) {
+        error('SQLCipher not active - encryption not available', err, 'db');
+        throw new Error('SQLCipher not available');
+    }
+    
     sodium.sodium_memzero(dbKey); // wipe DB key from memory
 
     const db = drizzle(sqlite, { schema });
-
-    // Verify the key works (will throw if key is wrong)
-    try {
-        sqlite.pragma('cipher_version');
-        info('SQLCipher BD cifrada correctamente', {}, 'db');
-    } catch {
-        // Con better-sqlite3 estándar cipher_version no existe; es aceptable.
-        info('BD abierta sin cifrado SQLCipher (better-sqlite3 estándar)', {}, 'db');
-    }
 
     // Canonical Migration System
     try {
@@ -211,10 +236,28 @@ export async function initDB(userDataPath: string) {
     // Set the shared database instance
     setDatabase(db, sqlite);
 
+    // ── Backup automático de la base de datos ───────────────────────────────────
+    try {
+        // Realizar backup si no hay uno hoy
+        performDatabaseBackup(userDataPath);
+        
+        // Programar backups diarios (se ejecutará en 24 horas)
+        // Nota: el intervalo se mantiene activo mientras la app esté ejecutándose.
+        // En una app Electron, esto es aceptable porque la app puede estar días abierta.
+        // Si la app se cierra, el timer se cancela automáticamente.
+        scheduleBackups(userDataPath, 24);
+        
+        info('Database backup system initialized', {}, 'db');
+    } catch (err) {
+        // No fallar la inicialización si el backup falla
+        error('Failed to initialize backup system', err, 'db');
+    }
+
     return { db, sqlite };
 }
 
 import { closeDatabase } from './shared.js';
+import { performDatabaseBackup, scheduleBackups } from './backup.js';
 
 export function closeDB() {
     closeDatabase();

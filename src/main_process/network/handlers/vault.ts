@@ -100,7 +100,7 @@ export async function handleVaultDelivery(
                             security('Vault FILE_DATA_SMALL: fileHash inválido', { sender: entry.senderSid }, 'vault');
                             continue;
                         }
-                        saveFileMessage(innerPacket.fileHash, entry.senderSid, false, {
+                        await saveFileMessage(innerPacket.fileHash, entry.senderSid, false, {
                             fileHash: innerPacket.fileHash,
                             data: innerPacket.data,
                             state: 'completed'
@@ -129,7 +129,7 @@ export async function handleVaultDelivery(
                         // For shards, we store them as assets. The fileHash is the middle part of CID.
                         const [_, fileHash, shardIndex] = entry.payloadHash.split(':');
                         if (fileHash && shardIndex) {
-                            saveFileMessage(fileHash, entry.senderSid, false, {
+                            await saveFileMessage(fileHash, entry.senderSid, false, {
                                 fileHash,
                                 shardIndex: parseInt(shardIndex),
                                 data: entry.data,

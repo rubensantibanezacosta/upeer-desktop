@@ -5,6 +5,8 @@ import { getDb } from '../../storage/shared.js';
 import { getExpiringSoonEntries, renewVaultEntry } from '../../storage/vault/operations.js';
 import { VAULT_RENEW_MS, VAULT_TTL_MS } from './manager.js';
 
+import { ErasureCoder } from './redundancy/erasure.js';
+
 /**
  * RepairWorker ensures the long-term health of distributed files.
  * It uses "Lazy Sync" to avoid unnecessary network traffic.
@@ -13,17 +15,24 @@ export class RepairWorker {
     private static INTERVAL = 1000 * 60 * 60 * 4; // Check every 4 hours
     private static REPAIR_THRESHOLD = 6; // Repair if shards online <= 6 (RS 4+8)
     private static running = false;
+    private static interval: NodeJS.Timeout | null = null;
 
     static start() {
         if (this.running) return;
         this.running = true;
+
+        // Clear any existing interval
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
 
         info('Vault Repair Worker started (Lazy Mode)', { interval: '4h' }, 'vault');
 
         // Initial delay to avoid startup congestion
         setTimeout(() => this.runMaintenance(), 1000 * 60 * 10);
 
-        setInterval(() => this.runMaintenance(), this.INTERVAL);
+        this.interval = setInterval(() => this.runMaintenance(), this.INTERVAL);
     }
 
     /**
@@ -35,6 +44,14 @@ export class RepairWorker {
      *   2. Para cada una: actualiza expiresAt localmente + reenvía VAULT_STORE
      *      a los custodios actuales con el nuevo expiresAt.
      */
+    static stop() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        this.running = false;
+    }
+
     private static async renewExpiring(): Promise<void> {
         // Ventana: entries que expiran en < 15 días (VAULT_TTL_MS - VAULT_RENEW_MS)
         const windowMs = VAULT_TTL_MS - VAULT_RENEW_MS; // 15 días
@@ -107,24 +124,177 @@ export class RepairWorker {
 
         try {
             const db = getDb();
-            // 2. Try to find the original file locally to re-distribute
-            // (In a full implementation, we would download 4 shards if we don't have it)
+            // 1. Get existing shards for this file
             const shards = await db.select()
                 .from(distributedAssets)
                 .where(eq(distributedAssets.fileHash, fileHash));
 
             if (shards.length === 0) return;
 
-            // For MVP: We only repair if we have the file buffer or temp path recorded
-            // or if we can find it in our local storage.
-            // This is "Lazy" because it prioritizes local resources.
+            // 2. Determine missing shard indices (0-11 total)
+            const existingIndices = new Set(shards.map(s => s.shardIndex));
+            const allIndices = Array.from({ length: 12 }, (_, i) => i); // 4 data + 8 parity
+            const missingIndices = allIndices.filter(idx => !existingIndices.has(idx));
 
-            // TODO: Implementation of shard-based reconstruction for repair
-            debug('Shard-based reconstruction for repair not yet implemented', { fileHash }, 'vault');
+            // 3. If we have at least 4 shards, attempt reconstruction
+            if (shards.length >= 4) {
+                await this.reconstructFile(fileHash, shards);
+                return;
+            }
+
+            // 4. Otherwise, try to fetch missing shards from custodians
+            if (missingIndices.length > 0) {
+                await this.collectMissingShards(fileHash, missingIndices);
+                // After collection, check again if we now have enough shards
+                const updatedShards = await db.select()
+                    .from(distributedAssets)
+                    .where(eq(distributedAssets.fileHash, fileHash));
+                if (updatedShards.length >= 4) {
+                    await this.reconstructFile(fileHash, updatedShards);
+                } else {
+                    warn('Insufficient shards collected for reconstruction', 
+                        { fileHash, collected: updatedShards.length }, 'vault');
+                }
+            }
 
         } catch (err) {
             warn('Repair failed for asset', { fileHash, error: err }, 'vault');
         }
+    }
+
+    /**
+     * Reconstructs original file from shards using Reed-Solomon erasure coding.
+     */
+    private static async reconstructFile(fileHash: string, shards: any[]): Promise<void> {
+        info('Reconstructing file from shards', { fileHash, shardCount: shards.length }, 'vault');
+
+        try {
+            // Convert database shards to format expected by ErasureCoder
+            const shardObjects = shards.map(s => ({
+                index: s.shardIndex,
+                data: Buffer.from(s.data, 'hex')
+            }));
+
+            // Determine original file size (need to store this somewhere)
+            // For now, assume maximum possible size (shard size * 4)
+            const shardSize = shardObjects[0].data.length;
+            const originalSize = shardSize * 4;
+
+            const coder = new ErasureCoder(4, 8); // 4 data shards, 8 parity
+            const reconstructed = coder.decode(shardObjects, originalSize);
+            if (!reconstructed) {
+                warn('Failed to reconstruct file', { fileHash }, 'vault');
+                return;
+            }
+
+            // Save reconstructed file to local storage
+            // TODO: Implement storage to disk and update vault
+            debug('File reconstructed successfully', { fileHash, size: reconstructed.length }, 'vault');
+
+            // 5. Redistribute new shards to custodians
+            await this.redistributeShards(fileHash, reconstructed);
+
+        } catch (err) {
+            warn('File reconstruction failed', { fileHash, error: err }, 'vault');
+        }
+    }
+
+    /**
+     * Collects missing shards by querying connected custodians.
+     */
+    private static async collectMissingShards(fileHash: string, missingIndices: number[]): Promise<void> {
+        info('Collecting missing shards', { fileHash, missingCount: missingIndices.length }, 'vault');
+
+        const { sendSecureUDPMessage } = await import('../server/index.js');
+        const { getContacts } = await import('../../storage/db.js');
+        const { getMyUPeerId } = await import('../../security/identity.js');
+        const contacts = await getContacts();
+        const myId = getMyUPeerId();
+
+        const custodians = contacts
+            .filter(c => c.status === 'connected' && c.upeerId !== myId)
+            .slice(0, 8); // Query up to 8 custodians
+
+        if (custodians.length === 0) {
+            warn('No connected custodians available for shard collection', { fileHash }, 'vault');
+            return;
+        }
+
+        // Send VAULT_QUERY for each missing shard to each custodian
+        const promises = [];
+        for (const index of missingIndices) {
+            const payloadHash = `shard:${fileHash}:${index}`;
+            for (const custodian of custodians) {
+                promises.push((async () => {
+                    try {
+                        await sendSecureUDPMessage(custodian.address, {
+                            type: 'VAULT_QUERY',
+                            requesterSid: myId,
+                            payloadHash
+                        });
+                    } catch (err: any) {
+                        debug('Failed to send VAULT_QUERY', { custodian: custodian.upeerId, error: err }, 'vault');
+                    }
+                })());
+            }
+        }
+
+        // Wait for all queries to be sent (not for responses)
+        await Promise.allSettled(promises);
+
+        // Wait a bit for responses to arrive
+        await new Promise(resolve => setTimeout(resolve, 10000));
+    }
+
+    /**
+     * Redistributes new shards to custodians after reconstruction.
+     */
+    private static async redistributeShards(fileHash: string, fileData: Buffer): Promise<void> {
+        info('Redistributing shards after repair', { fileHash }, 'vault');
+
+        const coder = new ErasureCoder(4, 8);
+        const shards = coder.encode(fileData);
+
+        const { sendSecureUDPMessage } = await import('../server/index.js');
+        const { getContacts } = await import('../../storage/db.js');
+        const { getMyUPeerId } = await import('../../security/identity.js');
+        const contacts = await getContacts();
+        const myId = getMyUPeerId();
+
+        const custodians = contacts
+            .filter(c => c.status === 'connected' && c.upeerId !== myId)
+            .slice(0, 12); // Need 12 custodians total
+
+        if (custodians.length < 4) {
+            warn('Not enough custodians for redistribution', { fileHash }, 'vault');
+            return;
+        }
+
+        // Assign each shard to a custodian (round-robin)
+        for (let i = 0; i < shards.length; i++) {
+            const shard = shards[i];
+            const custodian = custodians[i % custodians.length];
+            const payloadHash = `shard:${fileHash}:${i}`;
+
+            // Send VAULT_STORE with shard data
+            (async () => {
+                try {
+                    await sendSecureUDPMessage(custodian.address, {
+                        type: 'VAULT_STORE',
+                        payloadHash,
+                        recipientSid: '*', // Available for anyone
+                        senderSid: myId,
+                        priority: 2,
+                        data: shard.toString('hex'),
+                        expiresAt: Date.now() + VAULT_TTL_MS
+                    });
+                } catch (err: any) {
+                    debug('Failed to redistribute shard', { custodian: custodian.upeerId, error: err }, 'vault');
+                }
+            })();
+        }
+
+        info('Shard redistribution completed', { fileHash, shards: shards.length, custodians: custodians.length }, 'vault');
     }
 }
 

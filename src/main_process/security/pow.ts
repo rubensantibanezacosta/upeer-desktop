@@ -9,6 +9,7 @@
 
 import sodium from 'sodium-native';
 import crypto from 'node:crypto';
+import { warn } from './secure-logger.js';
 
 // ── Argon2id parameters ──────────────────────────────────────────────────────
 // OPSLIMIT_MIN (1 pass) + MEMLIMIT_MIN (8 MiB) → ~20-50 ms on a modern CPU.
@@ -32,7 +33,7 @@ export class AdaptivePow {
         const t = Math.floor(Date.now() / 1000);
         const password = Buffer.from(upeerId + t.toString());
         const hash = Buffer.alloc(32);
-        const salt = Buffer.allocUnsafe(sodium.crypto_pwhash_SALTBYTES);
+        const salt = Buffer.alloc(sodium.crypto_pwhash_SALTBYTES);
         const MAX_ATTEMPTS = 512;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -74,7 +75,8 @@ export class AdaptivePow {
                 sodium.crypto_pwhash(hash, password, salt, ARGON2_OPSLIMIT, ARGON2_MEMLIMIT, ARGON2_ALG);
 
                 return (hash[0] & DIFFICULTY_MASK) === 0;
-            } catch {
+            } catch (err) {
+                warn('PoW verification failed', err, 'pow');
                 return false;
             }
         }

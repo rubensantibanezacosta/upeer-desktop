@@ -1,0 +1,1 @@
+import { describe, it } from 'node:test';\nimport assert from 'node:assert';\n\ndescribe('minimal', () => {\n    it('should work', () => {\n        assert.ok(true);\n    });\n});

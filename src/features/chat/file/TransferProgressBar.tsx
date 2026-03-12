@@ -56,7 +56,11 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
             case 'completed': return 'success';
             case 'failed': return 'danger';
             case 'cancelled': return 'neutral';
-            case 'active': return 'primary';
+            case 'active':
+                const phase = (transfer as any).phase;
+                if (phase === 3) return 'warning'; // Replicating
+                if (phase === 4) return 'primary'; // Vaulted
+                return 'primary';
             case 'pending': return 'warning';
             default: return 'neutral';
         }
@@ -71,6 +75,9 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
             case 'cancelled':
                 return <CloseIcon sx={{ color: 'neutral.500', fontSize: '1.2rem' }} />;
             case 'active':
+                const phase = (transfer as any).phase;
+                if (phase === 3) return <CloudUploadIcon sx={{ color: 'warning.500', fontSize: '1.2rem', animation: 'pulse 1s infinite' }} />;
+                if (phase === 4) return <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
                 return direction === 'sending'
                     ? <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />
                     : <CloudDownloadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
@@ -82,6 +89,11 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
     };
 
     const getStatusText = () => {
+        // Support for new social mesh phases (numeric values from TransferPhase enum)
+        const phase = (transfer as any).phase;
+        if (phase === 3) return 'Replicando en red social...'; // REPLICATING
+        if (phase === 4) return 'Guardado (Vaulted)'; // VAULTED
+
         switch (state) {
             case 'completed': return 'Completado';
             case 'failed': return 'Falló';

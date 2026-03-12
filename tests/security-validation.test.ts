@@ -35,7 +35,7 @@ describe('Security Validation', () => {
     it('should validate CHAT messages correctly', () => {
         const validData = {
             id: '123e4567-e89b-12d3-a456-426614174000',
-            content: 'Hello World',
+            content: 'c'.repeat(64), // ciphertext hex, at least 32 chars when nonce present
             nonce: 'a'.repeat(48),
             ephemeralPublicKey: 'b'.repeat(64),
             replyTo: '123e4567-e89b-12d3-a456-426614174001',
@@ -50,8 +50,8 @@ describe('Security Validation', () => {
         const result1 = validateMessage('CHAT', invalid1);
         assert.strictEqual(result1.valid, false);
 
-        // Test content too long
-        const invalid2 = { ...validData, content: 'a'.repeat(10001) };
+        // Test content too long (exceeds 200_000 limit)
+        const invalid2 = { ...validData, content: 'a'.repeat(200001) };
         const result2 = validateMessage('CHAT', invalid2);
         assert.strictEqual(result2.valid, false);
 

@@ -16,7 +16,7 @@ import { warn, error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
-import { EPH_FRESHNESS_MS } from '../server/constants.js';
+import { EPH_FRESHNESS_MS, MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 
 function shouldUseEphemeral(contact: any): boolean {
     if (!contact?.ephemeralPublicKey) return false;
@@ -33,6 +33,12 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     const myId = getMyUPeerId();
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
+
+    // Límite de tamaño para prevenir OOM y JSON bombs
+    if (content.length > MAX_MESSAGE_SIZE_BYTES) {
+        error(`Message size exceeds limit (${content.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { upeerId, msgId }, 'security');
+        return undefined;
+    }
 
     const contact = await getContactByUpeerId(upeerId);
     if (!contact || contact.status !== 'connected' || !contact.publicKey) {
@@ -220,10 +226,27 @@ export function sendTypingIndicator(upeerId: string) {
     if (contact && contact.status === 'connected') sendSecureUDPMessage(contact.address, { type: 'TYPING' });
 }
 
-export function sendReadReceipt(upeerId: string, id: string) {
+export async function sendReadReceipt(upeerId: string, id: string) {
     updateMessageStatus(id, 'read');
-    const contact = getContactByUpeerId(upeerId);
-    if (contact && contact.status === 'connected') sendSecureUDPMessage(contact.address, { type: 'READ', id });
+    const contact = await getContactByUpeerId(upeerId);
+    if (!contact) return;
+
+    const data = { type: 'READ', id };
+    if (contact.status === 'connected' && contact.address) {
+        sendSecureUDPMessage(contact.address, data);
+    }
+
+    // Vault fallback for recipients who are offline (so they see the double checkmark later)
+    const myId = getMyUPeerId();
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const innerPacket = {
+        ...data,
+        senderUpeerId: myId,
+        signature: signature.toString('hex')
+    };
+    import('../vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.replicateToVaults(upeerId, innerPacket);
+    }).catch(err => error('Failed to vault READ receipt', err, 'vault'));
 }
 
 export function sendContactCard(targetUpeerId: string, contact: any) {
@@ -249,16 +272,36 @@ export function sendContactCard(targetUpeerId: string, contact: any) {
 
 export async function sendChatReaction(upeerId: string, msgId: string, emoji: string, remove: boolean) {
     const contact = await getContactByUpeerId(upeerId);
-    if (!contact || contact.status !== 'connected') return;
+    if (!contact) return;
 
     if (remove) deleteReaction(msgId, getMyUPeerId(), emoji);
     else saveReaction(msgId, getMyUPeerId(), emoji);
 
     const data = { type: 'CHAT_REACTION', msgId, emoji, remove };
-    sendSecureUDPMessage(contact.address, data);
+    if (contact.status === 'connected' && contact.address) {
+        sendSecureUDPMessage(contact.address, data);
+    }
+
+    // Vault fallback for reactions
+    const myId = getMyUPeerId();
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const innerPacket = {
+        ...data,
+        senderUpeerId: myId,
+        signature: signature.toString('hex')
+    };
+    import('../vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.replicateToVaults(upeerId, innerPacket);
+    }).catch(err => error('Failed to vault reaction', err, 'vault'));
 }
 
 export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string) {
+    // Límite de tamaño para prevenir OOM y JSON bombs
+    if (newContent.length > MAX_MESSAGE_SIZE_BYTES) {
+        error(`Chat update size exceeds limit (${newContent.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { upeerId, msgId }, 'security');
+        return;
+    }
+
     const contact = await getContactByUpeerId(upeerId);
     if (!contact || contact.status !== 'connected' || !contact.publicKey) return;
 

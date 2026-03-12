@@ -143,14 +143,18 @@ export async function handlePacket(
             }
         });
         // senderUpeerId y senderYggAddress se incluyen en la firma para evitar address spoofing.
-        const payloadForVerification = { ...dataForVerification, senderUpeerId, senderYggAddress };
+        const payloadForVerification: any = { ...dataForVerification, senderUpeerId };
+        if (senderYggAddress !== undefined) {
+            payloadForVerification.senderYggAddress = senderYggAddress;
+        }
+
         let verified = verify(
             Buffer.from(canonicalStringify(payloadForVerification)),
             Buffer.from(signature, 'hex'),
             Buffer.from(contact.publicKey, 'hex')
         );
-        if (!verified) {
-            // Backward-compat: peers con firmware antiguo firman sin senderYggAddress
+        if (!verified && senderYggAddress !== undefined) {
+            // Fallback: maybe it was signed without senderYggAddress despite being present
             const legacyPayload = { ...dataForVerification, senderUpeerId };
             verified = verify(
                 Buffer.from(canonicalStringify(legacyPayload)),
@@ -160,9 +164,16 @@ export async function handlePacket(
         }
 
         if (!verified) {
-            security('Invalid signature', { upeerId, ip: rinfo.address }, 'network');
+            security('Invalid signature', {
+                upeerId,
+                ip: rinfo.address,
+                type: data.type,
+                payload: canonicalStringify(payloadForVerification),
+                fullPacket
+            }, 'network');
             return;
-        } else if (data.type === 'FILE_CHUNK') {
+        }
+        else if (data.type === 'FILE_CHUNK') {
             debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
         }
 
@@ -215,13 +226,16 @@ export async function handlePacket(
                 if (data.alias && typeof data.alias === 'string') {
                     import('../storage/db.js').then(({ updateContactName }) => {
                         updateContactName?.(upeerId, (data.alias as string).slice(0, 100));
-                    }).catch(() => { });
+                    }).catch((err) => warn('Failed to update contact name', err, 'network'));
                 }
                 if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
                     import('../storage/db.js').then(({ updateContactAvatar }) => {
                         updateContactAvatar?.(upeerId, data.avatar);
                     }).catch(() => { });
                 }
+                break;
+            case 'PONG':
+                // Presence is already updated by updateLastSeen(upeerId) above
                 break;
             case 'VAULT_STORE':
                 await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, data, rinfo.address, sendResponse);

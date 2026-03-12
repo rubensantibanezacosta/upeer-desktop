@@ -97,3 +97,11 @@ export function createLocationBlockKey(upeerId: string): Buffer {
     hash.update(`location:${upeerId}`);
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }
+
+// Helper function to create Vault Pointer key
+export function createVaultPointerKey(recipientSid: string): Buffer {
+    // Key for vault pointers: hash of "vault-ptr:" + upeerId
+    const hash = crypto.createHash('sha256');
+    hash.update(`vault-ptr:${recipientSid}`);
+    return hash.digest().slice(0, ID_LENGTH_BYTES);
+}

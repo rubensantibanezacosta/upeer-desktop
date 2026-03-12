@@ -103,11 +103,16 @@ function getContactsSeenLast24h(): Array<{
     const cutoff = Date.now() - (24 * 60 * 60 * 1000);
 
     return allContacts
-        .filter(c => c.lastSeen && c.lastSeen > cutoff && c.address)
+        .filter(c => {
+            if (!c.lastSeen || !c.address) return false;
+            const lastSeenTs = new Date(c.lastSeen).getTime();
+            return lastSeenTs > cutoff;
+        })
         .map(c => ({
             upeerId: c.upeerId,
-            lastSeen: c.lastSeen,
-            address: c.address
+            lastSeen: new Date(c.lastSeen).getTime(),
+            address: c.address,
+            publicKey: c.publicKey // Ensure publicKey is passed
         }));
 }
 

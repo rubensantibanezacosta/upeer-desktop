@@ -28,8 +28,8 @@ export function registerFileHandlers(): void {
         properties: multiSelect ? ['openFile', 'multiSelections'] : ['openFile']
       } as any;
       // Procedemos directamente sin delay artificial
-      // En Wayland, adjuntar a ventana padre a veces cuelga el portal xdg si no está bien configurado
-      const isWayland = process.env.XDG_SESSION_TYPE === 'wayland';
+      // En Wayland, adjuntar a ventana padre a veces cuelga o ralentiza el portal xdg si no está bien configurado
+      const isWayland = process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY;
 
       const result = (targetWindow && !isWayland)
         ? await dialog.showOpenDialog(targetWindow, dialogOptions)
@@ -163,7 +163,8 @@ export function registerFileHandlers(): void {
           { name: 'Todos los archivos', extensions: ['*'] },
         ],
       } as Parameters<typeof dialog.showSaveDialog>[0];
-      const result = targetWindow
+      const isWayland = process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY;
+      const result = (targetWindow && !isWayland)
         ? await dialog.showSaveDialog(targetWindow, opts)
         : await dialog.showSaveDialog(opts);
       return result; // { canceled, filePath }

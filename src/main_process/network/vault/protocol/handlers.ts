@@ -1,5 +1,5 @@
 import { VaultStoreData, VaultQueryData } from '../../types.js';
-import { saveVaultEntry, getVaultEntriesForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry } from '../../../storage/vault/index.js';
+import { saveVaultEntry, getVaultEntriesForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/index.js';
 import { security, network, warn, debug } from '../../../security/secure-logger.js';
 import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
@@ -109,6 +109,23 @@ export async function handleVaultQuery(
     }
 
     try {
+        // If a specific payloadHash is requested, return only that entry (if accessible)
+        if (data.payloadHash) {
+            const entry = await getVaultEntryByHash(data.payloadHash);
+            if (entry && (entry.recipientSid === data.requesterSid || entry.recipientSid === '*')) {
+                // Return single entry as VAULT_DELIVERY
+                sendResponse(fromAddress, {
+                    type: 'VAULT_DELIVERY',
+                    entries: [entry],
+                    hasMore: false
+                });
+                return;
+            } else {
+                // Entry not found or not accessible
+                return;
+            }
+        }
+
         const allEntries = await getVaultEntriesForRecipient(data.requesterSid);
 
         if (allEntries.length > 0) {

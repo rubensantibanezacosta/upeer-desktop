@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { AttachmentType } from '../features/chat/input/index.js';
-import type { FileTransfer as FileTransferType } from './useFileTransfer.js';
+type FileTransferType = {
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+    cancelTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+};
 
 interface PendingFile {
     path: string;

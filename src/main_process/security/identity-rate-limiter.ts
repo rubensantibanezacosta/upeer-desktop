@@ -60,7 +60,7 @@ export class IdentityRateLimiter extends RateLimiter {
 
         // Refrescar caché de contactos en background si ha expirado (no bloquea)
         if (Date.now() - _cacheTs >= _CACHE_TTL) {
-            _getDirectContactIds().catch(() => { });
+            _getDirectContactIds().catch((err) => warn('Failed to get direct contact IDs', err, 'rate-limiter'));
         }
 
         const rule = (this as any).rules[messageType];

@@ -13,7 +13,9 @@ export enum TransferPhase {
     TRANSFERRING = 3, // Chunks are flying
     VERIFYING = 4,     // All chunks received, checking hash
     COMPLETING = 5,   // Cleaning up and saving
-    DONE = 6                // Finished
+    DONE = 6,               // Finished
+    REPLICATING = 7, // Background social mesh replication (offline mode)
+    VAULTED = 8           // Fully replicated to custodians
 }
 
 export interface FileTransfer {

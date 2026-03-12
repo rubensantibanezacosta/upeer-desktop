@@ -4,6 +4,8 @@ import { TransferValidator } from '../src/main_process/network/file-transfer/val
 
 // Valid SHA-256 hash (64 hex chars)
 const VALID_HASH = '0'.repeat(64); // 64 zeros
+// Valid UUID for fileId
+const VALID_UUID = '12345678-1234-1234-1234-123456789abc';
 
 describe('TransferValidator', () => {
     let validator: TransferValidator;
@@ -15,7 +17,7 @@ describe('TransferValidator', () => {
     describe('validateIncomingFile', () => {
         it('should accept valid file data', () => {
             const validData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -47,7 +49,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid fileSize', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: -1, // Invalid
                 mimeType: 'text/plain',
@@ -64,7 +66,7 @@ describe('TransferValidator', () => {
         it('should reject fileSize exceeding max', () => {
             const smallValidator = new TransferValidator(100); // 100 bytes max
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1000, // Exceeds 100 bytes
                 mimeType: 'text/plain',
@@ -80,7 +82,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid totalChunks', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -96,7 +98,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid chunkSize', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -112,7 +114,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid fileHash format', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -128,7 +130,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid file name', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: '../etc/passwd', // Path traversal attempt
                 fileSize: 1024,
                 mimeType: 'text/plain',
@@ -144,7 +146,7 @@ describe('TransferValidator', () => {
 
         it('should reject invalid MIME type', () => {
             const invalidData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 fileName: 'test.txt',
                 fileSize: 1024,
                 mimeType: 'invalid/mime/type', // Invalid format
@@ -162,13 +164,13 @@ describe('TransferValidator', () => {
     describe('validateChunkData', () => {
         it('should validate chunk data against transfer', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
 
             const validChunkData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 chunkIndex: 5,
                 totalChunks: 10,
                 data: 'base64encodeddata',
@@ -182,7 +184,7 @@ describe('TransferValidator', () => {
 
         it('should reject chunk with wrong fileId', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
@@ -202,13 +204,13 @@ describe('TransferValidator', () => {
 
         it('should reject invalid chunk index', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
 
             const invalidChunkData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 chunkIndex: 15, // Out of bounds (totalChunks is 10)
                 totalChunks: 10,
                 data: 'base64encodeddata',
@@ -222,13 +224,13 @@ describe('TransferValidator', () => {
 
         it('should reject negative chunk index', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
 
             const invalidChunkData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 chunkIndex: -1, // Negative
                 totalChunks: 10,
                 data: 'base64encodeddata',
@@ -242,13 +244,13 @@ describe('TransferValidator', () => {
 
         it('should reject chunk with missing data', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
 
             const invalidChunkData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 chunkIndex: 5,
                 totalChunks: 10,
                 // Missing data field
@@ -262,13 +264,13 @@ describe('TransferValidator', () => {
 
         it('should reject chunk with missing chunkHash', () => {
             const mockTransfer = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 totalChunks: 10,
                 chunkSize: 1024
             };
 
             const invalidChunkData = {
-                fileId: 'file-123',
+                fileId: VALID_UUID,
                 chunkIndex: 5,
                 totalChunks: 10,
                 data: 'base64encodeddata'

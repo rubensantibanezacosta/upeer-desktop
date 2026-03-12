@@ -398,7 +398,7 @@ export default function App() {
                                             isAdmin={groups.find(g => g.groupId === activeGroupId)?.adminUpeerId === myIdentity?.upeerId}
                                             groupId={activeGroupId}
                                             onUpdateGroup={(fields) => handleUpdateGroup(activeGroupId, fields)}
-                                            onDelete={() => { }} // TODO: Leave group
+                                            onDelete={() => handleLeaveGroup(activeGroupId)}
                                         />
                                     ) : (
                                         <TopHeader

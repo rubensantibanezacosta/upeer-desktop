@@ -2,4 +2,4 @@ import "electron";
 import "node:path";
 import "node:url";
 import "electron-squirrel-startup";
-import "./main-DTZzPyGq.js";
+import "./main-BP60JCmB.js";

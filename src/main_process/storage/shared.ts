@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 // usamos any para sqlite y conservamos tipado fuerte solo para drizzle.
 import * as schema from './schema.js';
 import { eq, desc, or, and } from 'drizzle-orm';
+import { warn, error } from '../security/secure-logger.js';
 
 // Shared database instance
 let sqlite: any | null = null;
@@ -54,6 +55,31 @@ export function clearUserData(): void {
     sqlite.exec('DELETE FROM ratchet_sessions');
     sqlite.exec('DELETE FROM pending_outbox');
     sqlite.exec('DELETE FROM reputation_vouches');
+}
+
+/**
+ * Ejecuta una función dentro de una transacción SQLite.
+ * Si la función lanza un error, la transacción se revierte y el error se relanza.
+ * Devuelve el valor devuelto por la función.
+ */
+export function runTransaction<T>(fn: () => T): T {
+    const sqliteInstance = getSqlite();
+    if (!sqliteInstance) {
+        throw new Error('Database not initialized');
+    }
+    
+    // Begin transaction
+    sqliteInstance.exec('BEGIN TRANSACTION');
+    
+    try {
+        const result = fn();
+        sqliteInstance.exec('COMMIT');
+        return result;
+    } catch (err) {
+        sqliteInstance.exec('ROLLBACK');
+        error('Transaction failed, rolled back', err, 'db');
+        throw err;
+    }
 }
 
 export { eq, desc, or, and };

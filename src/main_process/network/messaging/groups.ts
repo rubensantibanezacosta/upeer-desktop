@@ -14,10 +14,10 @@ import {
     updateGroupMembers,
     updateGroupInfo,
 } from '../../storage/db.js';
-import { warn } from '../../security/secure-logger.js';
+import { warn, error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
-import { EPH_FRESHNESS_MS } from '../server/constants.js';
+import { EPH_FRESHNESS_MS, MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 
 function shouldUseEphemeral(contact: any): boolean {
     if (!contact?.ephemeralPublicKey) return false;
@@ -36,6 +36,12 @@ export async function sendGroupMessage(
     message: string,
     replyTo?: string
 ): Promise<string | undefined> {
+    // Límite de tamaño para prevenir OOM y JSON bombs
+    if (message.length > MAX_MESSAGE_SIZE_BYTES) {
+        error(`Group message size exceeds limit (${message.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { groupId }, 'security');
+        return undefined;
+    }
+    
     const group = getGroupById(groupId);
     if (!group || group.status !== 'active') return undefined;
 

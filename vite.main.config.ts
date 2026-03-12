@@ -34,9 +34,23 @@ function stubTestOnlyPackages(): Plugin {
     };
 }
 
+function resolveBetterSqlite3(): Plugin {
+    return {
+        name: 'resolve-better-sqlite3',
+        enforce: 'pre',
+        resolveId(id) {
+            const bareId = id.split('?')[0];
+            if (bareId === 'better-sqlite3') {
+                // Redirect to better-sqlite3-multiple-ciphers
+                return 'better-sqlite3-multiple-ciphers';
+            }
+        },
+    };
+}
+
 // https://vitejs.dev/config
 export default defineConfig({
-    plugins: [stubTestOnlyPackages()],
+    plugins: [stubTestOnlyPackages(), resolveBetterSqlite3()],
     build: {
         lib: {
             entry: 'src/main.ts',
@@ -60,7 +74,7 @@ export default defineConfig({
                 // en tiempo de ejecución. No se pueden bundlear porque usan
                 // require(dinamicPath) para localizar el binario .node.
                 '@journeyapps/sqlcipher', // mantenido por si se reintroduce sqlcipher
-                'better-sqlite3',
+                'better-sqlite3-multiple-ciphers',
                 'sodium-native',
                 '@vscode/sudo-prompt',
             ],

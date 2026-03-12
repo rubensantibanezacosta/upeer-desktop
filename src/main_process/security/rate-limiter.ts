@@ -31,8 +31,8 @@ export class RateLimiter {
     private getDefaultRules(): RateLimitRule {
         return {
             // Handshake messages: limited to prevent connection flooding
-            'HANDSHAKE_REQ': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 }, // 20 per minute
-            'HANDSHAKE_ACCEPT': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
+            'HANDSHAKE_REQ': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
+            'HANDSHAKE_ACCEPT': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
 
             // Heartbeat messages
             'PING': { windowMs: 10000, maxTokens: 60, refillRate: 60 / 10 }, // 60 per 10 seconds
@@ -41,8 +41,8 @@ export class RateLimiter {
             // DHT messages: limit queries to prevent amplification attacks
             'DHT_QUERY': { windowMs: 30000, maxTokens: 20, refillRate: 20 / 30 }, // 20 per 30 seconds
             'DHT_RESPONSE': { windowMs: 30000, maxTokens: 40, refillRate: 40 / 30 },
-            'DHT_UPDATE': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 }, // 10 per minute
-            'DHT_EXCHANGE': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
+            'DHT_UPDATE': { windowMs: 60000, maxTokens: 40, refillRate: 40 / 60 },
+            'DHT_EXCHANGE': { windowMs: 60000, maxTokens: 60, refillRate: 60 / 60 },
 
             // Chat messages: reasonable limits for normal usage
             'CHAT': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 }, // 100 per minute

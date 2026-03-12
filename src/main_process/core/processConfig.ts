@@ -24,8 +24,12 @@ export function setupProcessHandlers(): void {
   });
 
   // Fix for Wayland file explorer issues
-  if (process.env.XDG_SESSION_TYPE === 'wayland') {
+  const isWayland = process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY;
+  if (isWayland) {
+    // Ozone switches for native Wayland support
     app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
     app.commandLine.appendSwitch('ozone-platform', 'wayland');
+    // Para versiones modernas de Electron, esto ayuda a la autodetección
+    app.commandLine.appendSwitch('ozone-platform-hint', 'wayland');
   }
 }

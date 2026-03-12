@@ -12,11 +12,11 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status }) => {
         <Box sx={{
             display: 'flex',
             alignItems: 'center',
-            color: status === 'read' ? '#3498db' : 'text.tertiary',
+            color: status === 'read' ? '#53bdeb' : 'text.tertiary',
         }}>
             {status === 'sent' ?
-                <DoneIcon sx={{ fontSize: '14px' }} /> :
-                <DoneAllIcon sx={{ fontSize: '14px' }} />
+                <DoneIcon sx={{ fontSize: '15px' }} /> :
+                <DoneAllIcon sx={{ fontSize: '15px' }} />
             }
         </Box>
     );

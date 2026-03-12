@@ -83,7 +83,7 @@ export function getMessageById(id: string) {
         .get();
 }
 
-export function saveFileMessage(
+export async function saveFileMessage(
     id: string,
     chatUpeerId: string,
     isMine: boolean,
@@ -119,11 +119,15 @@ export function saveFileMessage(
         replyTo: undefined,
         signature,
         status
-    }).onConflictDoUpdate({
-        target: schema.messages.id,
-        set: {
-            message: JSON.stringify(fileMessage),
-            status: status
-        }
-    }).run();
+    }).onConflictDoNothing().run();
+
+    // Update message content
+    db.update(schema.messages)
+        .set({ message: JSON.stringify(fileMessage) })
+        .where(eq(schema.messages.id, id))
+        .run();
+
+    // Use specific status update logic that respects precedence
+    const { updateMessageStatus } = await import('./status.js');
+    return updateMessageStatus(id, status);
 }

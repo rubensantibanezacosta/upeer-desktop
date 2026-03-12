@@ -70,6 +70,8 @@ _Última actualización: 12 Marzo 2026_
 - [x] UI completa — `FilePreviewOverlay`, `TransferProgressBar`, `MediaFileMessage`, `DocumentFileMessage`
 - [x] Diálogo "Guardar como" nativo — `show-save-dialog` + `save-transferred-file`
 - [x] Abrir archivo con app del sistema — `open-file` vía `shell.openPath`
+- [x] **Estado 'Vaulted' para adjuntos** — actualización automática a doble tick gris tras replicación exitosa en bóvedas
+- [x] **Compatibilidad Nativa Wayland** — corrección de diálogos de archivos bloqueantes y habilitación de `--ozone-platform-hint=wayland`
 
 ### UI / UX
 

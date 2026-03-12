@@ -17,7 +17,11 @@ import {
 import { AdaptivePow } from '../../security/pow.js';
 import { canonicalStringify } from '../utils.js';
 import { issueVouch, VouchType, computeScore } from '../../security/reputation/vouches.js';
-import { network, security, error } from '../../security/secure-logger.js';
+import { network, security, error, warn } from '../../security/secure-logger.js';
+import { runTransaction } from '../../storage/shared.js';
+import { computeKeyFingerprint, updateContactSignedPreKey } from '../../storage/contacts/keys.js';
+import { updateContactName, updateContactAvatar } from '../../storage/db.js';
+import { flushPendingOutbox } from '../../storage/pending-outbox.js';
 import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
 
 // Rate limiter instance (shared with core)
@@ -108,7 +112,7 @@ export async function handleHandshakeReq(
         security('PoW verified for new contact', { upeerId: senderUpeerId, ip: rinfo.address }, 'pow');
     }
 
-    issueVouch(senderUpeerId, VouchType.HANDSHAKE).catch(() => { });
+    issueVouch(senderUpeerId, VouchType.HANDSHAKE).catch((err) => warn('Failed to issue vouch for handshake', err, 'reputation'));
 
     // Si ya tenemos vouches del nodo y su score es bajo, alertar
     const { getContacts: _gc } = await import('../../storage/db.js').catch(() => ({ getContacts: () => [] })) as any;
@@ -141,14 +145,12 @@ export async function handleHandshakeReq(
 
     // ── TOFU check: detectar si la clave estática cambió ─────────────
     if (isAlreadyConnected && existingContact?.publicKey && existingContact.publicKey !== data.publicKey) {
-        import('../../storage/contacts/keys.js').then(({ computeKeyFingerprint }) => {
-            win?.webContents.send('key-change-alert', {
-                upeerId: senderUpeerId,
-                oldFingerprint: computeKeyFingerprint(existingContact.publicKey),
-                newFingerprint: computeKeyFingerprint(data.publicKey),
-                alias: alias,
-            });
-        }).catch(() => { });
+        win?.webContents.send('key-change-alert', {
+            upeerId: senderUpeerId,
+            oldFingerprint: computeKeyFingerprint(existingContact.publicKey),
+            newFingerprint: computeKeyFingerprint(data.publicKey),
+            alias: alias,
+        });
         security('TOFU: static public key changed on re-handshake!', { upeerId: senderUpeerId, ip: rinfo.address }, 'security');
     }
 
@@ -171,11 +173,11 @@ export async function handleHandshakeReq(
                 if (spkValid) {
                     import('../../storage/contacts/keys.js').then(({ updateContactSignedPreKey }) => {
                         updateContactSignedPreKey(senderUpeerId, spkPub, spkSig, spkId);
-                    }).catch(() => { });
+                    }).catch((err) => warn('Dynamic import failed', err, 'import'));
                 } else {
                     security('HANDSHAKE_REQ: firma SPK inválida', { upeerId: senderUpeerId }, 'security');
                 }
-            } catch { /* ignorar */ }
+            } catch (err) { warn('Error in SPK verification', err, 'security'); }
         }
     }
 
@@ -183,7 +185,7 @@ export async function handleHandshakeReq(
     if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
         import('../../storage/db.js').then(({ updateContactAvatar }) => {
             updateContactAvatar?.(senderUpeerId, data.avatar);
-        }).catch(() => { });
+        }).catch((err) => warn('Failed to update contact avatar', err, 'db'));
     }
 
     if (isAlreadyConnected) {
@@ -276,59 +278,73 @@ export async function handleHandshakeAccept(
 
     const existing = await getContactByUpeerId(senderUpeerId);
     if (existing && existing.status === 'pending') {
-        const keyResult = updateContactPublicKey(senderUpeerId, data.publicKey);
-        if (keyResult.changed && keyResult.oldKey) {
-            // ⚠️ TOFU alert: la clave criptográfica de este contacto cambió
-            import('../../storage/contacts/keys.js').then(({ computeKeyFingerprint }) => {
-                win?.webContents.send('key-change-alert', {
-                    upeerId: senderUpeerId,
-                    oldFingerprint: computeKeyFingerprint(keyResult.oldKey!),
-                    newFingerprint: computeKeyFingerprint(keyResult.newKey),
-                    alias: data.alias || existing.name,
-                });
-            }).catch(() => { });
-        }
-        // Bug FI fix: misma validación hex-64 de ephemeralPublicKey.
-        if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
-            updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
-        }
-        // Guardar Signed PreKey del contacto (HANDSHAKE_ACCEPT)
-        if (data.signedPreKey && typeof data.signedPreKey === 'object') {
-            const { spkPub, spkSig, spkId } = data.signedPreKey;
-            if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
-                try {
-                    const spkValid = verify(
-                        Buffer.from(spkPub, 'hex'),
-                        Buffer.from(spkSig, 'hex'),
-                        Buffer.from(data.publicKey, 'hex')
-                    );
-                    if (spkValid) {
-                        import('../../storage/contacts/keys.js').then(({ updateContactSignedPreKey }) => {
-                            updateContactSignedPreKey(senderUpeerId, spkPub, spkSig, spkId);
-                        }).catch(() => { });
+        let keyResult: { changed: boolean; oldKey?: string; newKey: string };
+        try {
+            keyResult = runTransaction<{ changed: boolean; oldKey?: string; newKey: string }>(() => {
+                const result = updateContactPublicKey(senderUpeerId, data.publicKey);
+                
+                // Bug FI fix: misma validación hex-64 de ephemeralPublicKey.
+                if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
+                    updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
+                }
+                
+                // Guardar Signed PreKey del contacto (HANDSHAKE_ACCEPT)
+                if (data.signedPreKey && typeof data.signedPreKey === 'object') {
+                    const { spkPub, spkSig, spkId } = data.signedPreKey;
+                    if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
+                        try {
+                            const spkValid = verify(
+                                Buffer.from(spkPub, 'hex'),
+                                Buffer.from(spkSig, 'hex'),
+                                Buffer.from(data.publicKey, 'hex')
+                            );
+                            if (spkValid) {
+                                updateContactSignedPreKey(senderUpeerId, spkPub, spkSig, spkId);
+                            } else {
+                                security('HANDSHAKE_ACCEPT: firma SPK inválida', { upeerId: senderUpeerId }, 'security');
+                            }
+                        } catch (err) {
+                            warn('Error verificando signed prekey', err, 'security');
+                        }
                     }
-                } catch { /* ignorar */ }
-            }
+                }
+                
+                // Update contact name with their real alias if they provided one (Bug FA fix: ≤ 100 chars)
+                if (data.alias && typeof data.alias === 'string') {
+                    updateContactName(senderUpeerId, (data.alias as string).slice(0, 100));
+                }
+                
+                // Update contact avatar if provided (Bug FA fix: ≤ 2 MB)
+                if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
+                    updateContactAvatar(senderUpeerId, data.avatar);
+                }
+                
+                return result;
+            });
+        } catch (err) {
+            error('Transaction failed in handshake accept', err, 'db');
+            return;
         }
-        // Update contact name with their real alias if they provided one (Bug FA fix: ≤ 100 chars)
-        if (data.alias && typeof data.alias === 'string') {
-            import('../../storage/db.js').then(({ updateContactName }) => {
-                updateContactName?.(senderUpeerId, (data.alias as string).slice(0, 100));
-            }).catch(() => { });
-        }
-        // Update contact avatar if provided (Bug FA fix: ≤ 2 MB)
-        if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
-            import('../../storage/db.js').then(({ updateContactAvatar }) => {
-                updateContactAvatar?.(senderUpeerId, data.avatar);
-            }).catch(() => { });
+        
+
+        
+        // ⚠️ TOFU alert: la clave criptográfica de este contacto cambió (fuera de transacción)
+        const kr = keyResult;
+        if (kr.changed && kr.oldKey) {
+            win?.webContents.send('key-change-alert', {
+                upeerId: senderUpeerId,
+                oldFingerprint: computeKeyFingerprint(kr.oldKey),
+                newFingerprint: computeKeyFingerprint(kr.newKey),
+                alias: data.alias || existing.name,
+            });
         }
 
         // Fix 3 — Flush pending outbox: si habíamos intentado escribirle antes de
         // tener su clave pública, ahora la tenemos → cifrar + vaultear esos mensajes.
         if (data.publicKey) {
-            import('../../storage/pending-outbox.js').then(({ flushPendingOutbox }) => {
-                flushPendingOutbox(senderUpeerId, data.publicKey).catch(() => { });
-            }).catch(() => { });
+            flushPendingOutbox(senderUpeerId, data.publicKey).catch((err) => 
+                warn('Failed to flush pending outbox', err, 'storage')
+            );
         }
 
         win?.webContents.send('contact-handshake-finished', { upeerId: senderUpeerId });

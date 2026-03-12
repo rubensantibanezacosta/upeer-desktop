@@ -63,25 +63,25 @@ verify_key = signing_key.verify_key
 public_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
 
 
-def get_revelnest_id():
+def get_upeer_id():
     pk_bytes = verify_key.encode()
     return hashlib.blake2b(pk_bytes, digest_size=16).hexdigest()
 
 
-my_revelnest_id = get_revelnest_id()
+my_upeer_id = get_upeer_id()
 my_private_key = signing_key.to_curve25519_private_key()
 my_public_key = verify_key.to_curve25519_public_key()
 my_dht_seq = 1
 
 
-def generate_light_proof(revelnest_id):
+def generate_light_proof(upeer_id):
     """Generate a light PoW proof similar to upeer's AdaptivePow.generateLightProof"""
     import hashlib
     max_attempts = 100000
 
     for nonce in range(max_attempts):
         proof = hex(nonce)[2:]  # Remove '0x' prefix
-        hash_input = (revelnest_id + proof).encode()
+        hash_input = (upeer_id + proof).encode()
         hash_result = hashlib.sha256(hash_input).hexdigest()
         if hash_result.startswith('0'):
             return proof
@@ -159,18 +159,31 @@ def sign_data(data):
 
 
 def generate_location_block(ip, seq):
-    data = {"revelnestId": my_revelnest_id, "address": ip, "dhtSeq": seq}
+    expires_at = int((time.time() + 30 * 24 * 60 * 60) * 1000)
+    data = {"upeerId": my_upeer_id, "address": ip,
+            "dhtSeq": seq, "expiresAt": expires_at}
     sig = sign_data(data)
-    import time
-    expires_at = int((time.time() + 30 * 24 * 60 * 60)
-                     * 1000)  # 30 days in milliseconds
     return {"address": ip, "dhtSeq": seq, "signature": sig, "expiresAt": expires_at}
 
 
-def verify_location_block(revelnest_id, block, pubkey_hex):
+def verify_location_block(upeer_id, block, pubkey_hex):
     try:
-        data = {"revelnestId": revelnest_id,
-                "address": block["address"], "dhtSeq": block["dhtSeq"]}
+        # Intentar formato nuevo (con expiresAt en la firma)
+        data = {"upeerId": upeer_id, "address": block["address"],
+                "dhtSeq": block["dhtSeq"]}
+        if "expiresAt" in block:
+            data_modern = {**data, "expiresAt": block["expiresAt"]}
+            msg_modern = json.dumps(data_modern, sort_keys=True, separators=(
+                ',', ':'), ensure_ascii=False).encode()
+            verify_k = nacl.signing.VerifyKey(
+                pubkey_hex, encoder=nacl.encoding.HexEncoder)
+            try:
+                verify_k.verify(msg_modern, bytes.fromhex(block["signature"]))
+                return True
+            except:
+                pass
+
+        # Fallback a formato antiguo (sin expiresAt en la firma)
         msg_bytes = json.dumps(data, sort_keys=True, separators=(
             ',', ':'), ensure_ascii=False).encode()
         verify_k = nacl.signing.VerifyKey(
@@ -331,7 +344,7 @@ def heartbeat(sock, known_peers):
         for rid, info in known_peers.items():
             if 'address' in info and 'dht_seq' in info and 'signature' in info:
                 peers_list.append({
-                    "revelnestId": rid,
+                    "upeerId": rid,
                     "publicKey": info["pk"],
                     "locationBlock": {
                         "address": info["address"],
@@ -365,7 +378,7 @@ def heartbeat(sock, known_peers):
 
             # PING
             ping = {"type": "PING"}
-            full_ping = {**ping, "senderRevelnestId": my_revelnest_id,
+            full_ping = {**ping, "senderUpeerId": my_upeer_id,
                          "signature": sign_data(ping)}
             sock.sendto(json.dumps(full_ping, separators=(',', ':'),
                         ensure_ascii=False).encode(), (ip, 50005))
@@ -373,11 +386,11 @@ def heartbeat(sock, known_peers):
 
             # DHT_EXCHANGE
             exch = {"type": "DHT_EXCHANGE", "peers": peers_list[:5] + [{
-                "revelnestId": my_revelnest_id,
+                "upeerId": my_upeer_id,
                 "publicKey": public_key_hex,
                 "locationBlock": my_loc
             }]}
-            full_exch = {**exch, "senderRevelnestId": my_revelnest_id,
+            full_exch = {**exch, "senderUpeerId": my_upeer_id,
                          "signature": sign_data(exch)}
             sock.sendto(json.dumps(full_exch, separators=(',', ':'),
                         ensure_ascii=False).encode(), (ip, 50005))
@@ -387,7 +400,7 @@ def heartbeat(sock, known_peers):
 def listen_with_sock(s, known_peers):
     global my_dht_seq
     print(f"[{MY_NAME}] Escuchando en el puerto {YGG_PORT}...")
-    print(f"[{MY_NAME}] Mi upeer-ID es: {my_revelnest_id}")
+    print(f"[{MY_NAME}] Mi upeer-ID es: {my_upeer_id}")
     print(f"[{MY_NAME}] Mi Public-Key es: {public_key_hex}")
 
     while True:
@@ -398,15 +411,15 @@ def listen_with_sock(s, known_peers):
             print(f"[{MY_NAME}] RECIBIDO [{p_type}] de {addr[0]}")
             record_metric("packets_received")
 
-            sender_revelnest = full_packet.get('senderRevelnestId')
+            sender_upeer = full_packet.get('senderUpeerId')
             block = full_packet.get('locationBlock')
 
             if p_type == 'HANDSHAKE_REQ':
-                sender_revelnest = full_packet.get('senderRevelnestId')
+                sender_upeer = full_packet.get('senderUpeerId')
                 sender_pk = full_packet.get('publicKey')
                 sender_ephemeral = full_packet.get('ephemeralPublicKey')
-                print(f"[{MY_NAME}] Petición de conexión de {sender_revelnest}.")
-                known_peers[sender_revelnest] = {
+                print(f"[{MY_NAME}] Petición de conexión de {sender_upeer}.")
+                known_peers[sender_upeer] = {
                     "pk": sender_pk, "ephemeral_pk": sender_ephemeral, "dht_seq": 0, "address": addr[0]}
                 accept_data = {
                     "type": "HANDSHAKE_ACCEPT",
@@ -416,23 +429,27 @@ def listen_with_sock(s, known_peers):
                     "avatar": MY_AVATAR
                 }
                 # Build full packet with signature like upeer
-                full_accept = {
+                payload_to_sign = {
                     **accept_data,
-                    "senderRevelnestId": my_revelnest_id,
-                    "signature": sign_data(accept_data)
+                    "senderUpeerId": my_upeer_id,
+                    "senderYggAddress": my_ip
+                }
+                full_accept = {
+                    **payload_to_sign,
+                    "signature": sign_data(payload_to_sign)
                 }
                 s.sendto(json.dumps(full_accept, separators=(
                     ',', ':'), ensure_ascii=False).encode(), addr)
                 record_metric("handshakes_completed")
 
             elif p_type == 'HANDSHAKE_ACCEPT':
-                sender_revelnest = full_packet.get('senderRevelnestId')
+                sender_upeer = full_packet.get('senderUpeerId')
                 sender_pk = full_packet.get('publicKey')
                 sender_ephemeral = full_packet.get('ephemeralPublicKey')
-                if sender_revelnest not in known_peers or 'pk' not in known_peers[sender_revelnest]:
+                if sender_upeer not in known_peers or 'pk' not in known_peers[sender_upeer]:
                     print(
-                        f"[{MY_NAME}] Conexión ACEPTADA por {sender_revelnest}. Enviando primer mensaje...")
-                    known_peers[sender_revelnest] = {
+                        f"[{MY_NAME}] Conexión ACEPTADA por {sender_upeer}. Enviando primer mensaje...")
+                    known_peers[sender_upeer] = {
                         "pk": sender_pk, "ephemeral_pk": sender_ephemeral, "dht_seq": 0, "address": addr[0]}
                     record_metric("handshakes_completed")
 
@@ -454,16 +471,22 @@ def listen_with_sock(s, known_peers):
                         encoder=nacl.encoding.HexEncoder).decode()
                     reply['useRecipientEphemeral'] = bool(sender_ephemeral)
 
+                    payload_to_sign = {
+                        **reply,
+                        "senderUpeerId": my_upeer_id,
+                        "senderYggAddress": my_ip
+                    }
                     full_msg = {
-                        **reply, "senderRevelnestId": my_revelnest_id, "signature": sign_data(reply)}
+                        **payload_to_sign,
+                        "signature": sign_data(payload_to_sign)
+                    }
                     s.sendto(json.dumps(full_msg, separators=(
                         ',', ':'), ensure_ascii=False).encode(), addr)
 
                     # Enviar ubicación firmada inmediatamente para que el otro nos tenga en su DHT
-                    my_ip = get_ygg_ip()
                     my_loc = generate_location_block(my_ip, my_dht_seq)
                     update = {
-                        "type": "DHT_UPDATE", "senderRevelnestId": my_revelnest_id, "locationBlock": my_loc}
+                        "type": "DHT_UPDATE", "senderUpeerId": my_upeer_id, "locationBlock": my_loc}
                     full_update = {**update, "signature": sign_data(update)}
                     s.sendto(json.dumps(full_update, separators=(
                         ',', ':'), ensure_ascii=False).encode(), addr)
@@ -471,19 +494,24 @@ def listen_with_sock(s, known_peers):
 
             elif p_type == 'DHT_UPDATE':
                 record_metric("dht_updates_received")
-                if sender_revelnest in known_peers and block:
-                    if verify_location_block(sender_revelnest, block, known_peers[sender_revelnest]['pk']):
+                if sender_upeer in known_peers and block:
+                    if verify_location_block(sender_upeer, block, known_peers[sender_upeer]['pk']):
                         seq = block.get('dhtSeq', 0)
-                        if seq > known_peers[sender_revelnest]['dht_seq']:
+                        if seq > known_peers[sender_upeer]['dht_seq']:
                             print(
-                                f"[{MY_NAME}] DHT Update: {sender_revelnest} moved to {block['address']} (seq: {seq})")
-                            known_peers[sender_revelnest].update(
-                                {'dht_seq': seq, 'address': block['address'], 'signature': block['signature']})
+                                f"[{MY_NAME}] DHT Update: {sender_upeer} moved to {block['address']} (seq: {seq})")
+                            known_peers[sender_upeer].update({
+                                'dht_seq': seq,
+                                'address': block['address'],
+                                'signature': block.get('signature'),
+                                'expiresAt': block.get('expiresAt'),
+                                'renewalToken': block.get('renewalToken')
+                            })
 
             elif p_type == 'DHT_QUERY':
                 record_metric("dht_queries_received")
                 target_id = full_packet.get('targetId')
-                sender_id = full_packet.get('senderRevelnestId')
+                sender_id = full_packet.get('senderUpeerId')
                 print(
                     f"[{MY_NAME}] Query recibida de {sender_id} buscando a {target_id}")
 
@@ -491,21 +519,37 @@ def listen_with_sock(s, known_peers):
 
                 if target_id in known_peers and 'address' in known_peers[target_id]:
                     t = known_peers[target_id]
-                    response["locationBlock"] = {
-                        "address": t["address"],
-                        "dhtSeq": t["dht_seq"],
-                        "signature": t["signature"]
-                    }
-                    response["publicKey"] = t["pk"]
-                    print(
-                        f"[{MY_NAME}] Enviando respuesta con ubicación de {target_id}")
+                    sig = t.get("signature", "")
+                    if sig and len(sig) == 128:
+                        lb_data = {
+                            "address": t["address"],
+                            "dhtSeq": t["dht_seq"],
+                            "signature": sig,
+                        }
+                        if t.get("expiresAt"):
+                            lb_data["expiresAt"] = t["expiresAt"]
+                        if t.get("renewalToken"):
+                            lb_data["renewalToken"] = t["renewalToken"]
+                            
+                        response["locationBlock"] = lb_data
+                        response["publicKey"] = t["pk"]
+                        print(
+                            f"[{MY_NAME}] Enviando respuesta con ubicación de {target_id}")
+                    else:
+                        print(
+                            f"[{MY_NAME}] No se envía ubicación de {target_id} (sin firma válida)")
+                        response["neighbors"] = []
                 else:
                     # Referidos (Neighbors)
                     # Por ahora vacío o simplificado
                     response["neighbors"] = []
 
                 full_resp = {
-                    **response, "senderRevelnestId": my_revelnest_id, "signature": sign_data(response)}
+                    **response,
+                    "senderUpeerId": my_upeer_id,
+                    "senderYggAddress": my_ip
+                }
+                full_resp["signature"] = sign_data(full_resp)
                 s.sendto(json.dumps(full_resp, separators=(
                     ',', ':'), ensure_ascii=False).encode(), addr)
                 record_metric("dht_responses_sent")
@@ -544,10 +588,10 @@ def listen_with_sock(s, known_peers):
                 record_metric("dht_exchanges_received")
                 peers = full_packet.get('peers', [])
                 for peer in peers:
-                    p_id = peer.get('revelnestId')
+                    p_id = peer.get('upeerId')
                     p_pk = peer.get('publicKey')
                     b = peer.get('locationBlock')
-                    if p_id and p_pk and b and p_id != my_revelnest_id:
+                    if p_id and p_pk and b and p_id != my_upeer_id:
                         if p_id not in known_peers:
                             known_peers[p_id] = {'pk': p_pk, 'dht_seq': 0}
 
@@ -562,20 +606,20 @@ def listen_with_sock(s, known_peers):
 
             elif p_type == 'CHAT':
                 record_metric("messages_received")
-                sender_revelnest = full_packet.get('senderRevelnestId')
-                if sender_revelnest in known_peers:
+                sender_upeer = full_packet.get('senderUpeerId')
+                if sender_upeer in known_peers:
                     # E2EE Decryption
                     msg_content = full_packet.get('content')
 
                     if full_packet.get('ephemeralPublicKey'):
-                        known_peers[sender_revelnest]['ephemeral_pk'] = full_packet.get(
+                        known_peers[sender_upeer]['ephemeral_pk'] = full_packet.get(
                             'ephemeralPublicKey')
 
                     if 'nonce' in full_packet:
                         try:
                             use_eph = full_packet.get('useRecipientEphemeral')
-                            target_pk_hex = known_peers[sender_revelnest][
-                                'ephemeral_pk'] if use_eph else known_peers[sender_revelnest]['pk']
+                            target_pk_hex = known_peers[sender_upeer][
+                                'ephemeral_pk'] if use_eph else known_peers[sender_upeer]['pk']
                             target_pk = nacl.public.PublicKey(
                                 target_pk_hex, encoder=nacl.encoding.HexEncoder)
                             target_curve_pk = target_pk if use_eph else target_pk.to_curve25519_public_key()
@@ -589,26 +633,33 @@ def listen_with_sock(s, known_peers):
                             msg_content = f"[BOT_DECRYPT_ERROR: {dec_err}]"
 
                     print(
-                        f"[{MY_NAME}] Mensaje de {sender_revelnest}: {msg_content}")
+                        f"[{MY_NAME}] Mensaje de {sender_upeer}: {msg_content}")
 
                     # ACK (siempre enviamos ACK)
                     if 'id' in full_packet:
                         ack = {"type": "ACK", "id": full_packet['id']}
+                        payload_to_sign = {
+                            **ack,
+                            "senderUpeerId": my_upeer_id,
+                            "senderYggAddress": my_ip
+                        }
                         full_ack = {
-                            **ack, "senderRevelnestId": my_revelnest_id, "signature": sign_data(ack)}
+                            **payload_to_sign,
+                            "signature": sign_data(payload_to_sign)
+                        }
                         s.sendto(json.dumps(full_ack, separators=(
                             ',', ':'), ensure_ascii=False).encode(), addr)
 
                     if not msg_content.startswith("Bot:"):
                         # Reply
                         time.sleep(1)
-                        reply_text = f"Bot: Recibido. Tu ID es {sender_revelnest}."
+                        reply_text = f"Bot: Recibido. Tu ID es {sender_upeer}."
                         reply = {"type": "CHAT", "content": reply_text}
 
                         # Encrypt Reply PFS
-                        target_ephemeral = known_peers[sender_revelnest]['ephemeral_pk']
+                        target_ephemeral = known_peers[sender_upeer]['ephemeral_pk']
                         target_pk_hex = target_ephemeral if target_ephemeral else known_peers[
-                            sender_revelnest]['pk']
+                            sender_upeer]['pk']
                         target_pk = nacl.public.PublicKey(
                             target_pk_hex, encoder=nacl.encoding.HexEncoder)
                         target_curve_pk = target_pk if target_ephemeral else target_pk.to_curve25519_public_key()
@@ -621,15 +672,29 @@ def listen_with_sock(s, known_peers):
                             encoder=nacl.encoding.HexEncoder).decode()
                         reply['useRecipientEphemeral'] = bool(target_ephemeral)
 
+                        payload_to_sign = {
+                            **reply,
+                            "senderUpeerId": my_upeer_id,
+                            "senderYggAddress": my_ip
+                        }
                         full_reply = {
-                            **reply, "senderRevelnestId": my_revelnest_id, "signature": sign_data(reply)}
+                            **payload_to_sign,
+                            "signature": sign_data(payload_to_sign)
+                        }
                         s.sendto(json.dumps(full_reply, separators=(
                             ',', ':'), ensure_ascii=False).encode(), addr)
 
             elif p_type == 'PING':
                 pong = {"type": "PONG"}
+                payload_to_sign = {
+                    **pong,
+                    "senderUpeerId": my_upeer_id,
+                    "senderYggAddress": my_ip
+                }
                 full_pong = {
-                    **pong, "senderRevelnestId": my_revelnest_id, "signature": sign_data(pong)}
+                    **payload_to_sign,
+                    "signature": sign_data(payload_to_sign)
+                }
                 s.sendto(json.dumps(full_pong, separators=(
                     ',', ':'), ensure_ascii=False).encode(), addr)
 
@@ -645,7 +710,7 @@ def listen_with_sock(s, known_peers):
                 remove = full_packet.get('remove', False)
                 action = "ELIMINÓ" if remove else "AÑADIÓ"
                 print(
-                    f"[{MY_NAME}] REACCIÓN: {sender_revelnest} {action} {emoji} al mensaje {msg_id}")
+                    f"[{MY_NAME}] REACCIÓN: {sender_upeer} {action} {emoji} al mensaje {msg_id}")
 
             elif p_type == 'CHAT_UPDATE':
                 msg_id = full_packet.get('msgId')
@@ -655,8 +720,8 @@ def listen_with_sock(s, known_peers):
                 if content_hex and nonce_hex:
                     try:
                         use_eph = full_packet.get('useRecipientEphemeral')
-                        target_pk_hex = known_peers[sender_revelnest][
-                            'ephemeral_pk'] if use_eph else known_peers[sender_revelnest]['pk']
+                        target_pk_hex = known_peers[sender_upeer][
+                            'ephemeral_pk'] if use_eph else known_peers[sender_upeer]['pk']
                         target_pk = nacl.public.PublicKey(
                             target_pk_hex, encoder=nacl.encoding.HexEncoder)
                         target_curve_pk = target_pk if use_eph else target_pk.to_curve25519_public_key()
@@ -666,19 +731,19 @@ def listen_with_sock(s, known_peers):
                         decrypted = box.decrypt(ciphertext, nonce)
                         new_content = decrypted.decode()
                         print(
-                            f"[{MY_NAME}] EDICIÓN: {sender_revelnest} actualizó mensaje {msg_id} a: {new_content}")
+                            f"[{MY_NAME}] EDICIÓN: {sender_upeer} actualizó mensaje {msg_id} a: {new_content}")
                     except Exception as e:
                         print(f"[{MY_NAME}] EDICIÓN: Error descifrando: {e}")
 
             elif p_type == 'CHAT_DELETE':
                 msg_id = full_packet.get('msgId')
                 print(
-                    f"[{MY_NAME}] ELIMINACIÓN: {sender_revelnest} eliminó el mensaje {msg_id}")
+                    f"[{MY_NAME}] ELIMINACIÓN: {sender_upeer} eliminó el mensaje {msg_id}")
 
             elif p_type == 'RENEWAL_TOKEN':
                 token = full_packet.get('token')
                 print(
-                    f"[{MY_NAME}] 🔑 RECEIVED RENEWAL TOKEN from {sender_revelnest}")
+                    f"[{MY_NAME}] 🔑 RECEIVED RENEWAL TOKEN from {sender_upeer}")
                 print(f"[{MY_NAME}]    Target: {token.get('targetId')}")
                 print(f"[{MY_NAME}]    Max renewals: {token.get('maxRenewals')}")
                 print(
@@ -714,19 +779,19 @@ def listen_with_sock(s, known_peers):
                 known_peers[target_id]['renewal_token'] = token
                 print(f"[{MY_NAME}] 💾 Token stored for {target_id}")
 
-                # Send acknowledgement
                 ack = {"type": "RENEWAL_RESPONSE",
                        "status": "accepted", "targetId": target_id}
-                full_ack = {**ack, "senderRevelnestId": my_revelnest_id,
-                            "signature": sign_data(ack)}
+                payload_to_sign = {**ack, "senderUpeerId": my_upeer_id, "senderYggAddress": my_ip}
+                full_ack = {**payload_to_sign,
+                            "signature": sign_data(payload_to_sign)}
                 s.sendto(json.dumps(full_ack, separators=(
                     ',', ':'), ensure_ascii=False).encode(), addr)
-                print(f"[{MY_NAME}] 📤 Sent RENEWAL_RESPONSE to {sender_revelnest}")
+                print(f"[{MY_NAME}] 📤 Sent RENEWAL_RESPONSE to {sender_upeer}")
 
             elif p_type == 'RENEWAL_REQUEST':
                 target_id = full_packet.get('targetId')
                 print(
-                    f"[{MY_NAME}] 🔄 RENEWAL REQUEST for {target_id} from {sender_revelnest}")
+                    f"[{MY_NAME}] 🔄 RENEWAL REQUEST for {target_id} from {sender_upeer}")
 
                 # Check if we have a token for target_id
                 if target_id in known_peers and 'renewal_token' in known_peers[target_id]:
@@ -741,7 +806,7 @@ def listen_with_sock(s, known_peers):
                         print(
                             f"[{MY_NAME}] ✅ Token verified, attempting renewal...")
                         # Attempt renewal
-                        if renew_location_block_with_token(token, my_revelnest_id, known_peers, s):
+                        if renew_location_block_with_token(token, my_upeer_id, known_peers, s):
                             response = {"type": "RENEWAL_RESPONSE",
                                         "status": "renewed", "targetId": target_id}
                             print(
@@ -763,7 +828,11 @@ def listen_with_sock(s, known_peers):
                                 "status": "no_token", "targetId": target_id}
 
                 full_resp = {
-                    **response, "senderRevelnestId": my_revelnest_id, "signature": sign_data(response)}
+                    **response,
+                    "senderUpeerId": my_upeer_id,
+                    "senderYggAddress": my_ip
+                }
+                full_resp["signature"] = sign_data(full_resp)
                 s.sendto(json.dumps(full_resp, separators=(
                     ',', ':'), ensure_ascii=False).encode(), addr)
                 print(
@@ -794,7 +863,7 @@ def auto_connect(target_id_at_ip, sock):
         print(f"[{MY_NAME}] Invalid target format, expected ID{separator}IP")
         return
 
-    target_revelnest_id, target_ip = parts
+    target_upeer_id, target_ip = parts
 
     # Normalize Yggdrasil IP address
     segments = target_ip.split(':')
@@ -814,12 +883,12 @@ def auto_connect(target_id_at_ip, sock):
     if not has_200_prefix and len(segments) == 7:
         target_ip = '200:' + target_ip
 
-    print(f"[{MY_NAME}] Auto-conectando a {target_revelnest_id} en {target_ip}...")
+    print(f"[{MY_NAME}] Auto-conectando a {target_upeer_id} en {target_ip}...")
     while True:
         try:
             # Build the data object (same as upeer's sendContactRequest)
             # Note: powProof is required for Sybil resistance
-            pow_proof = generate_light_proof(my_revelnest_id)
+            pow_proof = generate_light_proof(my_upeer_id)
 
             handshake_data = {
                 "type": "HANDSHAKE_REQ",
@@ -830,11 +899,15 @@ def auto_connect(target_id_at_ip, sock):
                 "powProof": pow_proof
             }
 
-            # Sign the data and build full packet (same as sendSecureUDPMessage)
-            full_packet = {
+            # Sign with sender fields included as per app protocol
+            payload_to_sign = {
                 **handshake_data,
-                "senderRevelnestId": my_revelnest_id,
-                "signature": sign_data(handshake_data)
+                "senderUpeerId": my_upeer_id,
+                "senderYggAddress": ip
+            }
+            full_packet = {
+                **payload_to_sign,
+                "signature": sign_data(payload_to_sign)
             }
 
             print(f"[{MY_NAME}] Sending HANDSHAKE_REQ to {target_ip}")
@@ -853,7 +926,7 @@ def start_dht_search(sock, target_id, known_peers, last_packet=None):
 
     # Preguntamos a los contactos conocidos
     query = {"type": "DHT_QUERY", "targetId": target_id}
-    full_q = {**query, "senderRevelnestId": my_revelnest_id,
+    full_q = {**query, "senderUpeerId": my_upeer_id,
               "signature": sign_data(query)}
 
     for rid, info in known_peers.items():
@@ -873,7 +946,7 @@ def send_chat_with_retry(sock, target_rid, content, known_peers):
 
     # Simple (No E2EE for this test specific helper to keep it clean, or use peer_bot's logic)
     # Actually, peer_bot usually sends E2EE. Let's just use a plain one for the test helper.
-    full_chat = {**chat, "senderRevelnestId": my_revelnest_id,
+    full_chat = {**chat, "senderUpeerId": my_upeer_id,
                  "signature": sign_data(chat)}
 
     print(f"[{MY_NAME}] Enviando mensaje {msg_id} a {target_rid}...")
@@ -909,7 +982,7 @@ if __name__ == "__main__":
         if node_name:
             MY_NAME = f"Bot_{node_name}"
             with open(f"/shared/{node_name}.json", "w") as f:
-                json.dump({"id": my_revelnest_id, "ip": ip}, f)
+                json.dump({"id": my_upeer_id, "ip": ip}, f)
             # Start metrics writer thread
             threading.Thread(target=write_metrics_periodically,
                              args=(node_name,), daemon=True).start()
@@ -953,7 +1026,7 @@ if __name__ == "__main__":
                             data = {"type": "CHAT_REACTION", "msgId": cmd["msgId"], "emoji": cmd["emoji"], "remove": cmd.get(
                                 "remove", False)}
                             full_pkt = {
-                                **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data)}
+                                **data, "senderUpeerId": my_upeer_id, "signature": sign_data(data)}
                             sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(
                             ), (known_peers_dict[target_rid]['address'], 50005))
 
@@ -982,7 +1055,7 @@ if __name__ == "__main__":
                                 "useRecipientEphemeral": bool(known_peers_dict[target_rid].get('ephemeral_pk'))
                             }
                             full_pkt = {
-                                **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data)}
+                                **data, "senderUpeerId": my_upeer_id, "signature": sign_data(data)}
                             sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(
                             ), (known_peers_dict[target_rid]['address'], 50005))
 
@@ -992,26 +1065,26 @@ if __name__ == "__main__":
                             data = {"type": "CHAT_DELETE",
                                     "msgId": cmd["msgId"]}
                             full_pkt = {
-                                **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data)}
+                                **data, "senderUpeerId": my_upeer_id, "signature": sign_data(data)}
                             sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(
                             ), (known_peers_dict[target_rid]['address'], 50005))
 
                     elif cmd.get("type") == "GENERATE_RENEWAL_TOKEN":
                         # Generate a renewal token for ourselves
                         token = create_renewal_token(
-                            my_revelnest_id, signing_key)
+                            my_upeer_id, signing_key)
                         print(f"[{MY_NAME}] Generated renewal token: {token}")
                         # Store locally - ensure entry exists for self
-                        if my_revelnest_id not in known_peers_dict:
-                            known_peers_dict[my_revelnest_id] = {
+                        if my_upeer_id not in known_peers_dict:
+                            known_peers_dict[my_upeer_id] = {
                                 'pk': public_key_hex, 'dht_seq': my_dht_seq}
-                        known_peers_dict[my_revelnest_id]['renewal_token'] = token
+                        known_peers_dict[my_upeer_id]['renewal_token'] = token
                         # Optionally save to file
                         if node_name:
                             with open(f"/shared/{node_name}_renewal_token.json", "w") as f:
                                 json.dump(token, f)
                         print(
-                            f"[{MY_NAME}] Renewal token stored for {my_revelnest_id}")
+                            f"[{MY_NAME}] Renewal token stored for {my_upeer_id}")
 
                     elif cmd.get("type") == "SEND_RENEWAL_TOKEN":
                         try:
@@ -1024,7 +1097,7 @@ if __name__ == "__main__":
                             print(
                                 f"[{MY_NAME}] 📤 Processing SEND_RENEWAL_TOKEN to {target_rid}")
                             print(f"[{MY_NAME}] DEBUG 1: Got here")
-                            print(f"[{MY_NAME}]    My ID: {my_revelnest_id}")
+                            print(f"[{MY_NAME}]    My ID: {my_upeer_id}")
                             print(f"[{MY_NAME}] DEBUG 2: Printed my ID")
                             print(
                                 f"[{MY_NAME}]    Known peers keys: {list(known_peers_dict.keys())}")
@@ -1058,23 +1131,23 @@ if __name__ == "__main__":
 
                         # Send token to target
                         token = known_peers_dict.get(
-                            my_revelnest_id, {}).get('renewal_token')
+                            my_upeer_id, {}).get('renewal_token')
                         if not token:
                             print(
                                 f"[{MY_NAME}] No renewal token generated yet. Generating one now...")
                             token = create_renewal_token(
-                                my_revelnest_id, signing_key)
-                            if my_revelnest_id not in known_peers_dict:
-                                known_peers_dict[my_revelnest_id] = {
+                                my_upeer_id, signing_key)
+                            if my_upeer_id not in known_peers_dict:
+                                known_peers_dict[my_upeer_id] = {
                                     'pk': public_key_hex, 'dht_seq': my_dht_seq}
-                            known_peers_dict[my_revelnest_id]['renewal_token'] = token
+                            known_peers_dict[my_upeer_id]['renewal_token'] = token
 
                         print(
                             f"[{MY_NAME}]    Token: target={token.get('targetId')}, renewals={token.get('renewalsUsed', 0)}/{token.get('maxRenewals', 3)}")
 
                         data = {"type": "RENEWAL_TOKEN", "token": token}
                         full_pkt = {
-                            **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data)}
+                            **data, "senderUpeerId": my_upeer_id, "signature": sign_data(data)}
 
                         target_addr = known_peers_dict[target_rid]['address']
                         print(f"[{MY_NAME}]    Sending to {target_addr}:50005")
@@ -1098,7 +1171,7 @@ if __name__ == "__main__":
                                 if target_pk and verify_renewal_token(token, target_pk):
                                     print(
                                         f"[{MY_NAME}] Token verified, attempting renewal...")
-                                    if renew_location_block_with_token(token, my_revelnest_id, known_peers_dict, sock):
+                                    if renew_location_block_with_token(token, my_upeer_id, known_peers_dict, sock):
                                         print(
                                             f"[{MY_NAME}] ✅ Successfully renewed {target_rid} using token")
                                         renewal_success = True
@@ -1116,7 +1189,7 @@ if __name__ == "__main__":
                             data = {"type": "RENEWAL_REQUEST",
                                     "targetId": target_rid}
                             full_pkt = {
-                                **data, "senderRevelnestId": my_revelnest_id, "signature": sign_data(data)}
+                                **data, "senderUpeerId": my_upeer_id, "signature": sign_data(data)}
                             sock.sendto(json.dumps(full_pkt, separators=(',', ':'), ensure_ascii=False).encode(
                             ), (known_peers_dict[target_rid]['address'], 50005))
                             print(

@@ -59,7 +59,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   const userDataPath = app.getPath('userData');
   initIdentity(userDataPath);
   await initDB(userDataPath);
-  
+
   // Crear ventana principal
   const mainWindow = new BrowserWindow({
     width: 1000,
@@ -76,7 +76,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   }
 
   setMainWindow(mainWindow);
-  
+
   // Solo arrancar la red si ya tenemos identidad (sesión auto-restaurada).
   // En primera ejecución se arranca desde los handlers de create/unlock.
   if (!isSessionLocked() && mainWindow) startUDPServer(mainWindow);
@@ -88,7 +88,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   } catch (err) {
     logError('[Vault] Error querying offline messages', { err: String(err) }, 'vault');
   }
-  
+
   // Solo arrancar LAN discovery si hay identidad activa (igual que UDP)
   if (!isSessionLocked()) {
     try {
@@ -103,6 +103,6 @@ export async function initializeApp(baseDir: string): Promise<void> {
     if (isSessionLocked()) return;
     broadcastDhtUpdate(); // Detect IP changes and broadcast
     const contacts = getContacts();
-    checkHeartbeat(contacts.map(c => ({ address: (c as any).address, status: (c as any).status })));
+    checkHeartbeat(contacts);
   }, 30000);
 }

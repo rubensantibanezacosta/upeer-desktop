@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_1
+    container_name: upeer_node_1
     cap_add:
       - NET_ADMIN
     devices:
@@ -16,7 +16,7 @@ services:
     environment:
       - NODE_ENV_NAME=node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::1
     restart: unless-stopped
 
@@ -25,7 +25,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_2
+    container_name: upeer_node_2
     cap_add:
       - NET_ADMIN
     devices:
@@ -38,7 +38,7 @@ services:
     depends_on:
       - node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::2
     restart: unless-stopped
 
@@ -46,7 +46,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_3
+    container_name: upeer_node_3
     cap_add:
       - NET_ADMIN
     devices:
@@ -59,7 +59,7 @@ services:
     depends_on:
       - node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::3
     restart: unless-stopped
 
@@ -67,7 +67,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_4
+    container_name: upeer_node_4
     cap_add:
       - NET_ADMIN
     devices:
@@ -80,7 +80,7 @@ services:
     depends_on:
       - node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::4
     restart: unless-stopped
 
@@ -88,7 +88,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_5
+    container_name: upeer_node_5
     cap_add:
       - NET_ADMIN
     devices:
@@ -101,7 +101,7 @@ services:
     depends_on:
       - node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::5
     restart: unless-stopped
 
@@ -109,7 +109,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_6
+    container_name: upeer_node_6
     cap_add:
       - NET_ADMIN
     devices:
@@ -122,7 +122,7 @@ services:
     depends_on:
       - node1
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::6
     restart: unless-stopped
 
@@ -131,7 +131,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_7
+    container_name: upeer_node_7
     cap_add:
       - NET_ADMIN
     devices:
@@ -144,7 +144,7 @@ services:
     depends_on:
       - node2
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::7
     restart: unless-stopped
 
@@ -152,7 +152,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_8
+    container_name: upeer_node_8
     cap_add:
       - NET_ADMIN
     devices:
@@ -165,7 +165,7 @@ services:
     depends_on:
       - node2
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::8
     restart: unless-stopped
 
@@ -173,7 +173,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_9
+    container_name: upeer_node_9
     cap_add:
       - NET_ADMIN
     devices:
@@ -186,7 +186,7 @@ services:
     depends_on:
       - node3
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::9
     restart: unless-stopped
 
@@ -194,7 +194,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_10
+    container_name: upeer_node_10
     cap_add:
       - NET_ADMIN
     devices:
@@ -207,7 +207,7 @@ services:
     depends_on:
       - node3
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::10
     restart: unless-stopped
 
@@ -215,7 +215,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_11
+    container_name: upeer_node_11
     cap_add:
       - NET_ADMIN
     devices:
@@ -228,7 +228,7 @@ services:
     depends_on:
       - node4
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::11
     restart: unless-stopped
 
@@ -236,7 +236,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_12
+    container_name: upeer_node_12
     cap_add:
       - NET_ADMIN
     devices:
@@ -249,7 +249,7 @@ services:
     depends_on:
       - node4
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::12
     restart: unless-stopped
 
@@ -257,7 +257,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_13
+    container_name: upeer_node_13
     cap_add:
       - NET_ADMIN
     devices:
@@ -270,7 +270,7 @@ services:
     depends_on:
       - node5
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::13
     restart: unless-stopped
 
@@ -278,7 +278,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_14
+    container_name: upeer_node_14
     cap_add:
       - NET_ADMIN
     devices:
@@ -291,7 +291,7 @@ services:
     depends_on:
       - node5
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::14
     restart: unless-stopped
 
@@ -299,7 +299,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_15
+    container_name: upeer_node_15
     cap_add:
       - NET_ADMIN
     devices:
@@ -312,7 +312,7 @@ services:
     depends_on:
       - node6
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::15
     restart: unless-stopped
 
@@ -321,7 +321,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_16
+    container_name: upeer_node_16
     cap_add:
       - NET_ADMIN
     devices:
@@ -334,7 +334,7 @@ services:
     depends_on:
       - node7
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::16
     restart: unless-stopped
 
@@ -342,7 +342,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_17
+    container_name: upeer_node_17
     cap_add:
       - NET_ADMIN
     devices:
@@ -355,7 +355,7 @@ services:
     depends_on:
       - node7
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::17
     restart: unless-stopped
 
@@ -363,7 +363,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_18
+    container_name: upeer_node_18
     cap_add:
       - NET_ADMIN
     devices:
@@ -376,7 +376,7 @@ services:
     depends_on:
       - node8
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::18
     restart: unless-stopped
 
@@ -384,7 +384,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_19
+    container_name: upeer_node_19
     cap_add:
       - NET_ADMIN
     devices:
@@ -397,7 +397,7 @@ services:
     depends_on:
       - node8
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::19
     restart: unless-stopped
 
@@ -405,7 +405,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_20
+    container_name: upeer_node_20
     cap_add:
       - NET_ADMIN
     devices:
@@ -418,7 +418,7 @@ services:
     depends_on:
       - node9
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::20
     restart: unless-stopped
 
@@ -426,7 +426,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_21
+    container_name: upeer_node_21
     cap_add:
       - NET_ADMIN
     devices:
@@ -439,7 +439,7 @@ services:
     depends_on:
       - node9
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::21
     restart: unless-stopped
 
@@ -447,7 +447,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_22
+    container_name: upeer_node_22
     cap_add:
       - NET_ADMIN
     devices:
@@ -460,7 +460,7 @@ services:
     depends_on:
       - node10
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::22
     restart: unless-stopped
 
@@ -468,7 +468,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_23
+    container_name: upeer_node_23
     cap_add:
       - NET_ADMIN
     devices:
@@ -481,7 +481,7 @@ services:
     depends_on:
       - node10
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::23
     restart: unless-stopped
 
@@ -489,7 +489,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_24
+    container_name: upeer_node_24
     cap_add:
       - NET_ADMIN
     devices:
@@ -502,7 +502,7 @@ services:
     depends_on:
       - node11
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::24
     restart: unless-stopped
 
@@ -510,7 +510,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_25
+    container_name: upeer_node_25
     cap_add:
       - NET_ADMIN
     devices:
@@ -523,7 +523,7 @@ services:
     depends_on:
       - node11
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::25
     restart: unless-stopped
 
@@ -531,7 +531,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_26
+    container_name: upeer_node_26
     cap_add:
       - NET_ADMIN
     devices:
@@ -544,7 +544,7 @@ services:
     depends_on:
       - node12
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::26
     restart: unless-stopped
 
@@ -552,7 +552,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_27
+    container_name: upeer_node_27
     cap_add:
       - NET_ADMIN
     devices:
@@ -565,7 +565,7 @@ services:
     depends_on:
       - node12
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::27
     restart: unless-stopped
 
@@ -573,7 +573,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_28
+    container_name: upeer_node_28
     cap_add:
       - NET_ADMIN
     devices:
@@ -586,7 +586,7 @@ services:
     depends_on:
       - node13
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::28
     restart: unless-stopped
 
@@ -594,7 +594,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_29
+    container_name: upeer_node_29
     cap_add:
       - NET_ADMIN
     devices:
@@ -607,7 +607,7 @@ services:
     depends_on:
       - node14
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::29
     restart: unless-stopped
 
@@ -615,7 +615,7 @@ services:
     build:
       context: .
       dockerfile: tests/p2p_testing/Dockerfile.peer
-    container_name: revelnest_node_30
+    container_name: upeer_node_30
     cap_add:
       - NET_ADMIN
     devices:
@@ -628,12 +628,12 @@ services:
     depends_on:
       - node15
     networks:
-      revelnest_network:
+      upeer_network:
         ipv6_address: fd00:1::30
     restart: unless-stopped
 
 networks:
-  revelnest_network:
+  upeer_network:
     enable_ipv6: true
     ipam:
       config:

@@ -39,8 +39,8 @@ export function registerContactHandlers(): void {
       return { success: false, error: 'Formato UPeerID@IP requerido. Usa ID@200:xxxx:xxxx:...' };
     }
 
-    const [targetUpeerId, targetIp] = address.split(separator);
-    targetIp = targetIp.trim();
+    const [targetUpeerId, rawTargetIp] = address.split(separator);
+    const targetIp = rawTargetIp.trim();
 
     // Validar formato de dirección Yggdrasil
     // El rango real es 200::/7, que en hex cubre de 200: hasta 3fe:

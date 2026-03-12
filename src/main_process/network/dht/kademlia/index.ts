@@ -2,15 +2,15 @@
 export { KademliaDHT } from './main.js';
 export { toKademliaId } from './types.js';
 export { xorDistance } from './distance.js';
-export { createLocationBlockKey } from './store.js';
+export { createLocationBlockKey, createVaultPointerKey } from './store.js';
 export type { KademliaContact, StoredValue, KademliaStats, SeedNode } from './types.js';
 
 // Export constants for advanced usage
-export { 
-    K, 
-    ALPHA, 
-    ID_LENGTH_BITS, 
-    ID_LENGTH_BYTES, 
+export {
+    K,
+    ALPHA,
+    ID_LENGTH_BITS,
+    ID_LENGTH_BYTES,
     BUCKET_COUNT,
     REFRESH_INTERVAL_MS,
     REPUBLISH_INTERVAL_MS,

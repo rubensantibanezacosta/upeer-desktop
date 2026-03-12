@@ -193,6 +193,7 @@ export function handleAck(upeerId: string, data: any, win: BrowserWindow | null)
 export function handleReadReceipt(upeerId: string, data: any, win: BrowserWindow | null) {
     // Bug FE fix: misma protección UUID que handleAck.
     if (data.id && _UUID_RE.test(String(data.id))) {
+        network('Message read receipt processed', undefined, { id: data.id, upeerId }, 'chat');
         updateMessageStatus(data.id, 'read');
         win?.webContents.send('message-read', { id: data.id, upeerId: upeerId });
     }

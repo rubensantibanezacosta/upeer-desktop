@@ -48,6 +48,7 @@ export interface LocationBlock {
     signature: string;
     expiresAt?: number;
     renewalToken?: RenewalToken;
+    powProof?: string;        // Optional Proof-of-Work for large sequence jumps
 }
 
 export interface RenewalToken {
@@ -126,6 +127,7 @@ export interface VaultQueryData {
     merkleRoot?: string;
     batchSize?: number;
     offset?: number; // paginación: índice de inicio para la siguiente página
+    payloadHash?: string; // hash específico a consultar (para shards)
 }
 
 export interface VaultDeliveryData {

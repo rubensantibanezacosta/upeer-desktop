@@ -1,12 +1,68 @@
 import { BrowserWindow } from 'electron';
+import { randomBytes } from 'node:crypto';
 
 import { getContactByUpeerId, updateContactDhtLocation } from '../../storage/db.js';
 import { verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock, verifyRenewalToken } from '../utils.js';
 import { network, security, warn, error } from '../../security/secure-logger.js';
+import { AdaptivePow } from '../../security/pow.js';
 import { setKademliaInstance, getKademliaInstance } from './shared.js';
 
 // Re-export shared functions
 export { setKademliaInstance, getKademliaInstance };
+
+// Pending queries for iterative search
+const pendingQueries = new Map<string, {
+    resolve: (value: any) => void;
+    reject: (error: any) => void;
+    type: string;
+    targetId: string;
+    timestamp: number;
+    timeoutId?: NodeJS.Timeout;
+}>();
+
+// Cleanup old pending queries
+function cleanupPendingQueries() {
+    const now = Date.now();
+    const timeout = 30000; // 30 seconds
+    for (const [queryId, query] of pendingQueries.entries()) {
+        if (now - query.timestamp > timeout) {
+            query.reject(new Error('Query timeout'));
+            pendingQueries.delete(queryId);
+        }
+    }
+}
+
+// Handle DHT_FOUND_NODES and DHT_FOUND_VALUE responses
+export function handleDhtFoundNodes(data: any, senderAddress: string) {
+    if (data.queryId && pendingQueries.has(data.queryId)) {
+        const query = pendingQueries.get(data.queryId)!;
+        if (query.timeoutId) clearTimeout(query.timeoutId);
+        pendingQueries.delete(data.queryId);
+        query.resolve({ nodes: data.nodes, senderAddress });
+    }
+    // Also add received nodes to routing table
+    const kademlia = getKademliaInstance();
+    if (kademlia && data.nodes) {
+        const kademliaInstance = kademlia as any;
+        for (const node of data.nodes) {
+            if (node.upeerId && node.address && node.publicKey) {
+                // Add or update contact in routing table
+                kademliaInstance.updateContactFromMessage?.(node.upeerId, node.address);
+            }
+        }
+    }
+}
+
+export function handleDhtFoundValue(data: any, senderAddress: string) {
+    if (data.queryId && pendingQueries.has(data.queryId)) {
+        const query = pendingQueries.get(data.queryId)!;
+        if (query.timeoutId) clearTimeout(query.timeoutId);
+        pendingQueries.delete(data.queryId);
+        query.resolve({ value: data.value, senderAddress });
+    }
+}
+
+export { pendingQueries };
 
 // Handle incoming DHT messages (called from main packet handler)
 export async function handleDhtPacket(
@@ -21,24 +77,34 @@ export async function handleDhtPacket(
     if (!kademlia) return false;
 
     try {
-        // Handle legacy DHT messages (for backward compatibility)
+        // Handle DHT messages
         if (type === 'DHT_UPDATE') {
-            await handleLegacyDhtUpdate(senderUpeerId, data, win);
+            await handleDhtUpdate(senderUpeerId, data, win);
             return true;
         }
 
         if (type === 'DHT_EXCHANGE') {
-            await handleLegacyDhtExchange(senderUpeerId, data);
+            await handleDhtExchange(senderUpeerId, data);
             return true;
         }
 
         if (type === 'DHT_QUERY') {
-            await handleLegacyDhtQuery(senderUpeerId, data, senderAddress, sendResponse);
+            await handleDhtQuery(senderUpeerId, data, senderAddress, _sendResponse);
             return true;
         }
 
         if (type === 'DHT_RESPONSE') {
-            await handleLegacyDhtResponse(senderUpeerId, data, sendResponse);
+            await handleDhtResponse(senderUpeerId, data, _sendResponse);
+            return true;
+        }
+
+        // Handle response types
+        if (type === 'DHT_FOUND_NODES') {
+            handleDhtFoundNodes(data, senderAddress);
+            return true;
+        }
+        if (type === 'DHT_FOUND_VALUE') {
+            handleDhtFoundValue(data, senderAddress);
             return true;
         }
 
@@ -46,7 +112,7 @@ export async function handleDhtPacket(
         if (type.startsWith('DHT_')) {
             const response = await kademlia.handleMessage(senderUpeerId, data, senderAddress);
             if (response) {
-                sendResponse(senderAddress, response);
+                _sendResponse(senderAddress, response);
             }
             return true;
         }
@@ -57,8 +123,8 @@ export async function handleDhtPacket(
     return false;
 }
 
-// Legacy DHT handlers (for backward compatibility during migration)
-async function handleLegacyDhtUpdate(senderUpeerId: string, data: any, _win: BrowserWindow | null) {
+// DHT handlers
+async function handleDhtUpdate(senderUpeerId: string, data: any, _win: BrowserWindow | null) {
     const block = data.locationBlock;
     if (!block || typeof block.dhtSeq !== 'number' || !block.address || !block.signature) return;
 
@@ -76,16 +142,27 @@ async function handleLegacyDhtUpdate(senderUpeerId: string, data: any, _win: Bro
 
     if (!seqValidation.valid) {
         if (seqValidation.requiresPoW) {
-            // TODO: Implement PoW verification for large sequence jumps
-            security('Large sequence jump, PoW required', { upeerId: senderUpeerId, jump: block.dhtSeq - currentSeq }, 'dht');
-            return;
+            // PoW verification for large sequence jumps
+            if (!block.powProof || typeof block.powProof !== 'string') {
+                security('Large sequence jump requires powProof', { upeerId: senderUpeerId, jump: block.dhtSeq - currentSeq }, 'dht');
+                return;
+            }
+            if (!AdaptivePow.verifyLightProof(block.powProof, senderUpeerId)) {
+                security('Invalid PoW proof for large sequence jump', { upeerId: senderUpeerId, jump: block.dhtSeq - currentSeq }, 'dht');
+                return;
+            }
+            // PoW verified, continue processing
         } else {
             security('Invalid sequence', { upeerId: senderUpeerId, reason: seqValidation.reason }, 'dht');
             return;
         }
     }
 
-    network('Updating location (legacy)', undefined, { upeerId: senderUpeerId, address: block.address, dhtSeq: block.dhtSeq }, 'dht-legacy');
+    if (seqValidation.reason === 'Sequence identical') {
+        return; // Silent skip for identical sequence
+    }
+
+    network('Updating location', undefined, { upeerId: senderUpeerId, address: block.address, dhtSeq: block.dhtSeq }, 'dht');
     updateContactDhtLocation(senderUpeerId, block.address, block.dhtSeq, block.signature, block.expiresAt, block.renewalToken);
 
     // Store renewal token in DHT for distributed access
@@ -107,9 +184,9 @@ async function handleLegacyDhtUpdate(senderUpeerId: string, data: any, _win: Bro
     }
 }
 
-async function handleLegacyDhtExchange(senderUpeerId: string, data: any) {
+async function handleDhtExchange(senderUpeerId: string, data: any) {
     if (!Array.isArray(data.peers)) return;
-    network('Receiving locations (legacy)', undefined, { upeerId: senderUpeerId, count: data.peers.length }, 'dht-legacy');
+    network('Receiving locations', undefined, { upeerId: senderUpeerId, count: data.peers.length }, 'dht');
 
     for (const peer of data.peers) {
         if (!peer.upeerId || !peer.publicKey || !peer.locationBlock) continue;
@@ -123,7 +200,11 @@ async function handleLegacyDhtExchange(senderUpeerId: string, data: any) {
 
         const isValid = await verifyLocationBlockWithDHT(peer.upeerId, block, existing.publicKey);
         if (!isValid) {
-            security('Invalid PEEREX signature', { peerId: peer.upeerId }, 'dht');
+            security('Invalid PEEREX signature', {
+                peerId: peer.upeerId,
+                usedPublicKey: existing.publicKey?.slice(0, 10) + '...',
+                packetPublicKey: peer.publicKey?.slice(0, 10) + '...'
+            }, 'dht');
             continue;
         }
 
@@ -132,13 +213,24 @@ async function handleLegacyDhtExchange(senderUpeerId: string, data: any) {
 
         if (!seqValidation.valid) {
             if (seqValidation.requiresPoW) {
-                // TODO: Implement PoW verification for large sequence jumps
-                security('Large sequence jump, PoW required', { peerId: peer.upeerId, jump: block.dhtSeq - currentSeq }, 'dht');
-                continue;
+                // PoW verification for large sequence jumps
+                if (!block.powProof || typeof block.powProof !== 'string') {
+                    security('Large sequence jump requires powProof', { peerId: peer.upeerId, jump: block.dhtSeq - currentSeq }, 'dht');
+                    continue;
+                }
+                if (!AdaptivePow.verifyLightProof(block.powProof, peer.upeerId)) {
+                    security('Invalid PoW proof for large sequence jump', { peerId: peer.upeerId, jump: block.dhtSeq - currentSeq }, 'dht');
+                    continue;
+                }
+                // PoW verified, continue processing
             } else {
                 security('Invalid sequence', { peerId: peer.upeerId, reason: seqValidation.reason }, 'dht');
                 continue;
             }
+        }
+
+        if (seqValidation.reason === 'Sequence identical') {
+            continue; // Silent skip for identical sequence
         }
 
         let finalBlock = block;
@@ -172,17 +264,17 @@ async function handleLegacyDhtExchange(senderUpeerId: string, data: any) {
     }
 }
 
-async function handleLegacyDhtQuery(
+async function handleDhtQuery(
     senderUpeerId: string,
     data: any,
     fromAddress: string,
     sendResponse: (ip: string, data: any) => void
 ) {
-    network('Searching for target (legacy)', undefined, {
+    network('Searching for target', undefined, {
         requester: senderUpeerId,
         target: data.targetId,
         referralContext: data.referralContext
-    }, 'dht-legacy');
+    }, 'dht');
     const target = await getContactByUpeerId(data.targetId);
 
     const responseData: any = { type: 'DHT_RESPONSE', targetId: data.targetId };
@@ -228,7 +320,7 @@ async function handleLegacyDhtQuery(
     sendResponse(fromAddress, responseData);
 }
 
-async function handleLegacyDhtResponse(
+async function handleDhtResponse(
     senderUpeerId: string,
     data: any,
     _sendResponse: (ip: string, data: any) => void
@@ -240,7 +332,7 @@ async function handleLegacyDhtResponse(
 
         const isValid = await verifyLocationBlockWithDHT(data.targetId, block, existing.publicKey || data.publicKey);
         if (isValid && block.dhtSeq > (existing.dhtSeq || 0)) {
-            network('Found new IP (legacy)', undefined, { target: data.targetId, address: block.address }, 'dht-legacy');
+            network('Found new IP', undefined, { target: data.targetId, address: block.address }, 'dht');
 
             let finalBlock = block;
             let finalRenewalToken = block.renewalToken;
@@ -356,27 +448,150 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
     const kademlia = getKademliaInstance();
     if (!kademlia) return null;
 
-    // Get Kademlia instance to use its methods
     const kademliaInstance = kademlia as any;
+    const ALPHA = 3; // concurrency parameter
+    const K = 20; // bucket size
+    const QUERY_TIMEOUT = 5000; // 5 seconds per query
+    const TOTAL_TIMEOUT = 30000; // 30 seconds total
+    const MAX_ITERATIONS = 10;
 
-    // Find closest contacts to the target
-    const closestContacts = kademliaInstance.findClosestContacts(upeerId, 3);
+    const startTime = Date.now();
+    let iteration = 0;
 
-    for (const contact of closestContacts) {
+    // Set of already queried node addresses to avoid duplicates
+    const queriedAddresses = new Set<string>();
+    // List of candidate contacts (sorted by distance to target)
+    let candidates: Array<{ upeerId: string, address: string, publicKey: string, nodeId: Buffer }> = [];
+    // Map of address to contact info
+    const addressToContact = new Map<string, any>();
+
+    // Initialize candidates with closest contacts from routing table
+    const initialContacts = kademliaInstance.findClosestContacts(upeerId, K);
+    for (const contact of initialContacts) {
+        if (!contact.address || !contact.upeerId) continue;
+        candidates.push({
+            upeerId: contact.upeerId,
+            address: contact.address,
+            publicKey: contact.publicKey || '',
+            nodeId: contact.nodeId || Buffer.from(contact.upeerId, 'hex')
+        });
+        addressToContact.set(contact.address, contact);
+    }
+
+    // Helper to calculate XOR distance between two IDs (as hex strings)
+    function xorDistance(idA: string, idB: string): bigint {
         try {
-            // Send FIND_NODE query
-            sendMessage(contact.address, {
-                type: 'DHT_FIND_NODE',
-                targetId: upeerId
-            });
-
-            // TODO: Implement proper iterative find with timeout and parallel queries
-            // This is simplified for now
-        } catch (error) {
-            warn('Failed to query contact', { contactId: contact.upeerId, error }, 'kademlia');
+            return BigInt('0x' + idA) ^ BigInt('0x' + idB);
+        } catch {
+            return BigInt(0);
         }
     }
 
+    // Sort candidates by distance to target (closest first)
+    function sortCandidates() {
+        candidates.sort((a, b) => {
+            const distA = xorDistance(a.upeerId, upeerId);
+            const distB = xorDistance(b.upeerId, upeerId);
+            return distA < distB ? -1 : distA > distB ? 1 : 0;
+        });
+    }
+
+    sortCandidates();
+
+    while (iteration < MAX_ITERATIONS && Date.now() - startTime < TOTAL_TIMEOUT) {
+        iteration++;
+
+        // Select α closest candidates that haven't been queried yet
+        const toQuery = [];
+        for (const cand of candidates) {
+            if (toQuery.length >= ALPHA) break;
+            if (!queriedAddresses.has(cand.address)) {
+                toQuery.push(cand);
+                queriedAddresses.add(cand.address);
+            }
+        }
+
+        if (toQuery.length === 0) {
+            // No new candidates to query
+            break;
+        }
+
+        // Send parallel queries
+        const promises = toQuery.map(contact => {
+            return new Promise<{ nodes: any[], senderAddress: string }>((resolve, reject) => {
+                const queryId = randomBytes(16).toString('hex');
+                const timeout = setTimeout(() => {
+                    reject(new Error(`Query timeout for ${contact.address}`));
+                }, QUERY_TIMEOUT);
+
+                pendingQueries.set(queryId, {
+                    resolve: (value) => {
+                        clearTimeout(timeout);
+                        resolve(value);
+                    },
+                    reject: (error) => {
+                        clearTimeout(timeout);
+                        pendingQueries.delete(queryId);
+                        reject(error);
+                    },
+                    type: 'DHT_FIND_NODE',
+                    targetId: upeerId,
+                    timestamp: Date.now(),
+                    timeoutId: timeout
+                });
+
+                // Send FIND_NODE query with queryId
+                sendMessage(contact.address, {
+                    type: 'DHT_FIND_NODE',
+                    targetId: upeerId,
+                    queryId
+                });
+            });
+        });
+
+        // Wait for all queries to complete (or timeout)
+        const results = await Promise.allSettled(promises);
+
+        // Process successful responses
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { nodes, senderAddress } = result.value;
+                // Add new nodes to candidates
+                if (nodes && Array.isArray(nodes)) {
+                    for (const node of nodes) {
+                        if (!node.upeerId || !node.address || !node.publicKey) continue;
+                        if (node.upeerId === upeerId) {
+                            // Found the target node
+                            return node.address;
+                        }
+                        // Add to candidates if not already present
+                        const key = node.address;
+                        if (!addressToContact.has(key)) {
+                            candidates.push({
+                                upeerId: node.upeerId,
+                                address: node.address,
+                                publicKey: node.publicKey,
+                                nodeId: node.nodeId ? Buffer.from(node.nodeId, 'hex') : Buffer.from(node.upeerId, 'hex')
+                            });
+                            addressToContact.set(key, node);
+                        }
+                    }
+                }
+            } else {
+                // Query failed (timeout or error)
+                // Optionally mark contact as bad (not implemented)
+            }
+        }
+
+        // Sort candidates again (new nodes added)
+        sortCandidates();
+
+        // If we have K closest candidates and no new closer nodes found, stop
+        // For simplicity, continue until iterations or timeout
+    }
+
+    // If we found the target, would have returned earlier
+    // Otherwise, return null (not found)
     return null;
 }
 

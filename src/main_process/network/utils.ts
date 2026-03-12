@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { getMyUPeerId, sign, verify, getMyAlias } from '../security/identity.js';
 import { getKademliaInstance } from './dht/shared.js';
 import { getYggstackAddress } from '../sidecars/yggstack.js';
-import { network, warn, error } from '../security/secure-logger.js';
+import { network, security, warn, error, debug } from '../security/secure-logger.js';
 import type { RenewalToken } from './types.js';
 
 // TTL for location blocks (contact tokens) - Resiliencia extrema
@@ -19,10 +19,22 @@ export const AUTO_RENEW_THRESHOLD_MS = 3 * DAY_MS;
 
 /**
  * Ensures JSON keys are always in the same order for consistent signatures.
+ * Recursive version to match Python's sort_keys=True.
  */
 export function canonicalStringify(obj: any): string {
+    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+        if (Array.isArray(obj)) {
+            return '[' + obj.map(item => canonicalStringify(item)).join(',') + ']';
+        }
+        return JSON.stringify(obj);
+    }
     const allKeys = Object.keys(obj).sort();
-    return JSON.stringify(obj, allKeys);
+    const parts = allKeys.map(key => {
+        const val = obj[key];
+        if (val === undefined) return null;
+        return JSON.stringify(key) + ':' + canonicalStringify(val);
+    }).filter(p => p !== null);
+    return '{' + parts.join(',') + '}';
 }
 
 export function generateSignedLocationBlock(address: string, dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken) {
@@ -89,16 +101,26 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, d
     }
 
     // Try verification without expiresAt (for backward compatibility)
+    // Try verification without expiresAt (for backward compatibility)
     const dataWithoutExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq };
-    const validWithoutExpires = verify(
+    let isValid = verify(
         Buffer.from(canonicalStringify(dataWithoutExpires)),
         Buffer.from(block.signature, 'hex'),
         Buffer.from(publicKeyHex, 'hex')
     );
 
-    // If block has expiresAt but signature doesn't include it, we still accept it
-    // but enforce expiration if expiresAt is in the past
-    if (validWithoutExpires && block.expiresAt !== undefined) {
+    // Try verification WITH expiresAt if it failed and block has it
+    if (!isValid && block.expiresAt !== undefined) {
+        const dataWithExpires = { ...dataWithoutExpires, expiresAt: block.expiresAt };
+        isValid = verify(
+            Buffer.from(canonicalStringify(dataWithExpires)),
+            Buffer.from(block.signature, 'hex'),
+            Buffer.from(publicKeyHex, 'hex')
+        );
+    }
+
+    // If valid, enforce expiration if expiresAt is in the past
+    if (isValid && block.expiresAt !== undefined) {
         if (block.expiresAt < Date.now()) {
             return false; // Expired
         }
@@ -110,7 +132,7 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, d
         }
     }
 
-    return validWithoutExpires;
+    return isValid;
 }
 
 
@@ -129,25 +151,22 @@ export async function verifyLocationBlockWithDHT(
 ): Promise<boolean> {
     // First check if block is expired
     if (block.expiresAt !== undefined && block.expiresAt < Date.now()) {
-        // Check if we can renew it with renewal token (local or DHT)
-        if (block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-            // Auto-renew expired block if renewal token is valid
-            return true; // Allow renewal
-        }
-        // Try to find renewal token in DHT
+        const canRenew = block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex);
+        if (canRenew) return true;
+
         const dhtToken = await findRenewalTokenInDHT(upeerId);
-        if (dhtToken && verifyRenewalToken(dhtToken, publicKeyHex)) {
-            // Auto-renew with DHT token
-            return true;
-        }
-        return false; // Expired and cannot renew
+        if (dhtToken && verifyRenewalToken(dhtToken, publicKeyHex)) return true;
+
+        warn('Location block expired and cannot renew', { upeerId, expiresAt: block.expiresAt }, 'dht');
+        return false;
     }
 
     // Try verification with expiresAt if present
     if (block.expiresAt !== undefined) {
         const dataWithExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        const canonical = canonicalStringify(dataWithExpires);
         const validWithExpires = verify(
-            Buffer.from(canonicalStringify(dataWithExpires)),
+            Buffer.from(canonical),
             Buffer.from(block.signature, 'hex'),
             Buffer.from(publicKeyHex, 'hex')
         );
@@ -164,16 +183,30 @@ export async function verifyLocationBlockWithDHT(
             }
             return true;
         }
-        // If signature with expiresAt fails, fall through
+
+        // Debug failure
+        debug('DHT signature verification failed (with expiresAt)', {
+            upeerId,
+            canonical,
+            sig_debug: block.signature
+        }, 'dht-debug');
     }
 
     // Try verification without expiresAt (for backward compatibility)
     const dataWithoutExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq };
+    const canonicalNoExpires = canonicalStringify(dataWithoutExpires);
     const validWithoutExpires = verify(
-        Buffer.from(canonicalStringify(dataWithoutExpires)),
+        Buffer.from(canonicalNoExpires),
         Buffer.from(block.signature, 'hex'),
         Buffer.from(publicKeyHex, 'hex')
     );
+
+    if (!validWithoutExpires) {
+        debug('DHT signature verification failed (legacy mode)', {
+            upeerId,
+            canonical: canonicalNoExpires
+        }, 'dht-debug');
+    }
 
     if (validWithoutExpires && block.expiresAt !== undefined) {
         if (block.expiresAt < Date.now()) {
@@ -318,8 +351,11 @@ export function validateDhtSequence(currentSeq: number, newSeq: number): {
     requiresPoW: boolean;
     reason?: string;
 } {
-    if (newSeq <= currentSeq) {
-        return { valid: false, requiresPoW: false, reason: 'Sequence not increasing' };
+    if (newSeq < currentSeq) {
+        return { valid: false, requiresPoW: false, reason: 'Sequence rollback detected' };
+    }
+    if (newSeq === currentSeq) {
+        return { valid: true, requiresPoW: false, reason: 'Sequence identical' };
     }
 
     const jump = newSeq - currentSeq;

@@ -18,8 +18,9 @@ export class ChunkVault {
      * @param fileHash The SHA-256 hash of the original file.
      * @param data The complete file buffer.
      * @param recipientSid Optional: If this file is for a specific person offline.
+     * @param fileId Optional: The internal transfer ID to report progress back to.
      */
-    static async replicateFile(fileHash: string, data: Buffer, recipientSid: string = '*') {
+    static async replicateFile(fileHash: string, data: Buffer, recipientSid: string = '*', fileId?: string) {
         const threshold = 1024 * 1024; // 1MB
 
         if (data.length < threshold) {
@@ -44,7 +45,12 @@ export class ChunkVault {
             };
 
             const { VaultManager } = await import('./manager.js');
-            return VaultManager.replicateToVaults(recipientSid, signedPacket);
+            const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
+            if (fileId && nodes > 0) {
+                const { fileTransferManager } = await import('../file-transfer/index.js');
+                fileTransferManager.notifyVaultProgress(fileId, 1, 1);
+            }
+            return nodes;
         }
 
         try {
@@ -96,6 +102,28 @@ export class ChunkVault {
 
                 if (custodian && custodian.upeerId) {
                     await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId);
+
+                    // Report progress every shard
+                    if (fileId) {
+                        const { fileTransferManager } = await import('../file-transfer/index.js');
+                        fileTransferManager.notifyVaultProgress(fileId, i + 1, shards.length);
+                    }
+
+                    // Publish shard pointer to DHT
+                    // Key: hash(vault-ptr:%fileHash%) -> Value: custodianId
+                    // Permite que un receptor (incluso si no conoce al emisor) encuentre los trozos en la DHT.
+                    const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
+                    if (kademlia) {
+                        const { createVaultPointerKey } = await import('../dht/kademlia/index.js');
+                        const ptrKey = createVaultPointerKey(fileHash);
+                        // Para archivos, el puntero es un array acumulativo de custodios conocidos para este hash
+                        const ptrValue = {
+                            fileHash,
+                            custodians: [custodian.upeerId],
+                            type: 'file-shards'
+                        };
+                        kademlia.storeValue(ptrKey, ptrValue, myId).catch(() => { });
+                    }
                 }
             }
 
