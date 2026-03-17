@@ -11,6 +11,9 @@
   "main": ".vite/build/main.js",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "start": "electron-forge start -- --no-sandbox",
     "package": "electron-forge package",

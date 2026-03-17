@@ -1,10 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "module": "Node16",
-    "moduleResolution": "Node16",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "strict": true,
