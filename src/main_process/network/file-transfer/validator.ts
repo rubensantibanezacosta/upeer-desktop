@@ -8,7 +8,6 @@ export interface FileValidationResult {
     size: number;
     mimeType: string;
     hash: string;
-    buffer: Buffer;
 }
 
 export class TransferValidator {
@@ -30,21 +29,30 @@ export class TransferValidator {
             throw new Error(`File too large: ${stats.size} bytes (max: ${this.maxFileSize} bytes)`);
         }
 
-        // Read file
-        const fileBuffer = await fs.readFile(filePath);
         const fileName = path.basename(filePath);
         const mimeType = this.detectMimeType(fileName);
 
-        // Calculate file hash
-        const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+        // Calculate file hash using streaming to avoid memory issues
+        const fileHash = await this.calculateFileHash(filePath);
 
         return {
             name: fileName,
             size: stats.size,
             mimeType,
-            hash: fileHash,
-            buffer: fileBuffer
+            hash: fileHash
         };
+    }
+
+    private async calculateFileHash(filePath: string): Promise<string> {
+        const { createReadStream } = await import('node:fs');
+        const hash = crypto.createHash('sha256');
+        const stream = createReadStream(filePath);
+
+        return new Promise((resolve, reject) => {
+            stream.on('data', (data) => hash.update(data));
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', (err) => reject(err));
+        });
     }
 
     validateIncomingFile(data: any): void {
@@ -104,8 +112,7 @@ export class TransferValidator {
             throw new Error('No temp file to verify');
         }
 
-        const fileBuffer = await fs.readFile(transfer.tempPath);
-        const actualHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+        const actualHash = await this.calculateFileHash(transfer.tempPath);
 
         if (actualHash !== expectedHash) {
             throw new Error(`File hash mismatch: expected ${expectedHash.substring(0, 16)}..., got ${actualHash.substring(0, 16)}...`);

@@ -16,7 +16,8 @@ export function saveReaction(messageId: string, upeerId: string, emoji: string) 
         return db.insert(schema.reactions).values({
             messageId,
             upeerId,
-            emoji
+            emoji,
+            timestamp: Date.now()
         }).run();
     }
 }

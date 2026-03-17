@@ -148,7 +148,6 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
 
         // 8. Persistir
         insertVouch({ ...vouch, positive, receivedAt: now });
-        info('Vouch aceptado', { fromId: vouch.fromId, toId: vouch.toId, type: vouch.type }, 'reputation');
         return true;
     } catch (e) {
         error('saveIncomingVouch falló', e, 'reputation');

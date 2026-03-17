@@ -4,6 +4,7 @@ import { stopPeerManager } from '../sidecars/peer-manager.js';
 import { closeDB } from '../storage/db.js';
 import { closeUDPServer } from '../network/server/index.js';
 import { stopLanDiscovery } from '../network/lan/discovery.js';
+import { stopHeartbeat } from './appInitializer.js';
 
 /**
  * Configura los manejadores de eventos de ciclo de vida de la aplicación
@@ -19,6 +20,7 @@ export function setupAppLifecycleHandlers(): void {
 
   app.on('window-all-closed', () => {
     stopPeerManager();
+    stopHeartbeat();
     closeDB();
     closeUDPServer();
     stopLanDiscovery();

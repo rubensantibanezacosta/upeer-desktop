@@ -3,8 +3,52 @@ import crypto from 'node:crypto';
 import { getMyUPeerId, sign, verify, getMyAlias } from '../security/identity.js';
 import { getKademliaInstance } from './dht/shared.js';
 import { getYggstackAddress } from '../sidecars/yggstack.js';
-import { network, security, warn, error, debug } from '../security/secure-logger.js';
+import { network, security, info, warn, error, debug } from '../security/secure-logger.js';
 import type { RenewalToken } from './types.js';
+
+/**
+ * Validation utility for IP addresses (IPv4 or IPv6/Yggdrasil).
+ */
+export function validateAddress(address: string): void {
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+    if (!ipv4Regex.test(address) && !ipv6Regex.test(address)) {
+        throw new Error(`Invalid network address format: ${address}`);
+    }
+}
+
+/**
+ * Prioritizes Yggdrasil/IPv6 addresses over IPv4 for sorting.
+ * This ensures Yggdrasil is used as the 'primary' address in legacy fields.
+ */
+function prioritizeYggdrasil(a: string, b: string): number {
+    const isAYgg = a.startsWith('2') || a.startsWith('3') || a.includes(':');
+    const isBYgg = b.startsWith('2') || b.startsWith('3') || b.includes(':');
+    
+    if (isAYgg && !isBYgg) return -1;
+    if (!isAYgg && isBYgg) return 1;
+    return a.localeCompare(b);
+}
+
+/**
+ * Validation utility for hex strings to prevent malformed buffer creation.
+ */
+export function validateHex(hex: string, description: string): void {
+    if (typeof hex !== 'string' || !/^[0-9a-f]*$/i.test(hex)) {
+        throw new Error(`Invalid hex string for ${description}`);
+    }
+}
+
+/**
+ * Safe conversion from hex to Buffer with validation.
+ */
+export function safeBufferFromHex(hex: string, expectedLength?: number, description = 'buffer'): Buffer {
+    validateHex(hex, description);
+    if (expectedLength !== undefined && hex.length !== expectedLength * 2) {
+        throw new Error(`Invalid length for ${description}: expected ${expectedLength} bytes, got ${hex.length / 2}`);
+    }
+    return Buffer.from(hex, 'hex');
+}
 
 // TTL for location blocks (contact tokens) - Resiliencia extrema
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -37,20 +81,27 @@ export function canonicalStringify(obj: any): string {
     return '{' + parts.join(',') + '}';
 }
 
-export function generateSignedLocationBlock(address: string, dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken) {
+export function generateSignedLocationBlock(addressOrAddresses: string | string[], dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken) {
     const ttl = ttlMs ?? LOCATION_BLOCK_TTL_MS;
     // Cap TTL to maximum allowed
     const cappedTtl = Math.min(ttl, LOCATION_BLOCK_TTL_MAX);
     const expiresAt = Date.now() + cappedTtl;
 
+    const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+    // Security: Validation & Deterministic sorting (Prioritizing Yggdrasil)
+    addresses.forEach(addr => validateAddress(addr));
+    const sortedAddresses = [...new Set(addresses)].sort(prioritizeYggdrasil);
+
     // Generate renewal token if not provided (for extreme resilience)
     const finalRenewalToken = renewalToken || generateRenewalToken(getMyUPeerId(), 3);
 
-    // Signature includes upeerId, address, dhtSeq, expiresAt (for backward compatibility)
-    const data = { upeerId: getMyUPeerId(), address, dhtSeq, expiresAt };
+    // Signature includes upeerId, addresses (plural), dhtSeq, expiresAt
+    const data = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt };
     const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
-    // Include renewalToken and alias as optional extra fields (not part of signature)
-    return { address, dhtSeq, expiresAt, signature: sig, renewalToken: finalRenewalToken, alias: getMyAlias() || undefined };
+    
+    // For backward compatibility in object keys, we keep 'address' as the primary one (first)
+    // Thanks to prioritizeYggdrasil, addresses[0] will be Yggdrasil if available.
+    return { address: sortedAddresses[0], addresses: sortedAddresses, dhtSeq, expiresAt, signature: sig, renewalToken: finalRenewalToken, alias: getMyAlias() || undefined };
 }
 
 
@@ -65,74 +116,58 @@ export function generateSignedLocationBlock(address: string, dhtSeq: number, ttl
  */
 
 
-export function verifyLocationBlock(upeerId: string, block: { address: string, dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken }, publicKeyHex: string): boolean {
+export function verifyLocationBlock(upeerId: string, block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken }, publicKeyHex: string): boolean {
+    // Audit Note: Removed legacy fallbacks for blocks without expiresAt.
+    // Modern protocol requires expiresAt and consistent canonical serialization.
+    
+    if (block.expiresAt === undefined) {
+        warn('Rejected legacy location block (missing expiresAt)', { upeerId }, 'dht');
+        return false;
+    }
+
     // First check if block is expired
-    if (block.expiresAt !== undefined && block.expiresAt < Date.now()) {
-        // Check if we can renew it with renewal token
-        if (block.renewalToken && canRenewLocationBlock(block, publicKeyHex)) {
-            // Auto-renew expired block if renewal token is valid
-            return true; // Allow renewal
+    if (block.expiresAt < Date.now()) {
+        if (block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex)) {
+            return true; // Allow renewal path
         }
-        return false; // Expired and cannot renew
+        return false;
     }
-    // Try verification with expiresAt if present
-    if (block.expiresAt !== undefined) {
-        const dataWithExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
-        const validWithExpires = verify(
-            Buffer.from(canonicalStringify(dataWithExpires)),
-            Buffer.from(block.signature, 'hex'),
-            Buffer.from(publicKeyHex, 'hex')
+
+    try {
+        // Multi-channel support: use 'addresses' if present, fallback to 'address'
+        const inputAddresses = block.addresses || [block.address];
+        const sortedAddresses = [...new Set(inputAddresses)].sort();
+        sortedAddresses.forEach(addr => validateAddress(addr));
+
+        // Attempt verification with the modern 'addresses' array
+        const data = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        let isValid = verify(
+            Buffer.from(canonicalStringify(data)),
+            safeBufferFromHex(block.signature, 64, 'signature'),
+            safeBufferFromHex(publicKeyHex, 32, 'publicKey')
         );
-        if (validWithExpires) {
-            // Check if expired
-            if (block.expiresAt < Date.now()) {
-                return false; // Expired
-            }
-            // Verify renewal token if present
-            if (block.renewalToken) {
-                if (!verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-                    return false; // Invalid renewal token
-                }
-            }
-            return true;
+
+        if (!isValid) {
+            // Backward compatibility fallback: try verifying with single 'address' field
+            const legacyData = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+            isValid = verify(
+                Buffer.from(canonicalStringify(legacyData)),
+                safeBufferFromHex(block.signature, 64, 'signature'),
+                safeBufferFromHex(publicKeyHex, 32, 'publicKey')
+            );
         }
-        // If signature with expiresAt fails, maybe it was signed without expiresAt
-        // Fall through to try without expiresAt
-    }
 
-    // Try verification without expiresAt (for backward compatibility)
-    // Try verification without expiresAt (for backward compatibility)
-    const dataWithoutExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq };
-    let isValid = verify(
-        Buffer.from(canonicalStringify(dataWithoutExpires)),
-        Buffer.from(block.signature, 'hex'),
-        Buffer.from(publicKeyHex, 'hex')
-    );
-
-    // Try verification WITH expiresAt if it failed and block has it
-    if (!isValid && block.expiresAt !== undefined) {
-        const dataWithExpires = { ...dataWithoutExpires, expiresAt: block.expiresAt };
-        isValid = verify(
-            Buffer.from(canonicalStringify(dataWithExpires)),
-            Buffer.from(block.signature, 'hex'),
-            Buffer.from(publicKeyHex, 'hex')
-        );
-    }
-
-    // If valid, enforce expiration if expiresAt is in the past
-    if (isValid && block.expiresAt !== undefined) {
-        if (block.expiresAt < Date.now()) {
-            return false; // Expired
-        }
-        // Verify renewal token if present
-        if (block.renewalToken) {
+        if (isValid && block.renewalToken) {
             if (!verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-                return false; // Invalid renewal token
+                return false;
             }
         }
+        return isValid;
+    } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        debug('Location block verification error', { error: errorMsg }, 'dht');
+        return false;
     }
-
-    return isValid;
 }
 
 
@@ -146,11 +181,14 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, d
  */
 export async function verifyLocationBlockWithDHT(
     upeerId: string,
-    block: { address: string, dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken },
+    block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken },
     publicKeyHex: string
 ): Promise<boolean> {
+    // Pure modern protocol: reject blocks without expiration
+    if (block.expiresAt === undefined) return false;
+
     // First check if block is expired
-    if (block.expiresAt !== undefined && block.expiresAt < Date.now()) {
+    if (block.expiresAt < Date.now()) {
         const canRenew = block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex);
         if (canRenew) return true;
 
@@ -161,66 +199,39 @@ export async function verifyLocationBlockWithDHT(
         return false;
     }
 
-    // Try verification with expiresAt if present
-    if (block.expiresAt !== undefined) {
-        const dataWithExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
-        const canonical = canonicalStringify(dataWithExpires);
-        const validWithExpires = verify(
-            Buffer.from(canonical),
-            Buffer.from(block.signature, 'hex'),
-            Buffer.from(publicKeyHex, 'hex')
+    try {
+        const inputAddresses = block.addresses || [block.address];
+        const sortedAddresses = [...new Set(inputAddresses)].sort();
+        sortedAddresses.forEach(addr => validateAddress(addr));
+
+        // Modern check
+        const data = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        let isValid = verify(
+            Buffer.from(canonicalStringify(data)),
+            safeBufferFromHex(block.signature, 64, 'signature'),
+            safeBufferFromHex(publicKeyHex, 32, 'publicKey')
         );
-        if (validWithExpires) {
-            // Check if expired
-            if (block.expiresAt < Date.now()) {
-                return false; // Expired
-            }
-            // Verify renewal token if present
-            if (block.renewalToken) {
-                if (!verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-                    return false; // Invalid renewal token
-                }
-            }
-            return true;
+
+        if (!isValid) {
+            // Legacy check
+            const legacyData = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+            isValid = verify(
+                Buffer.from(canonicalStringify(legacyData)),
+                safeBufferFromHex(block.signature, 64, 'signature'),
+                safeBufferFromHex(publicKeyHex, 32, 'publicKey')
+            );
         }
 
-        // Debug failure
-        debug('DHT signature verification failed (with expiresAt)', {
-            upeerId,
-            canonical,
-            sig_debug: block.signature
-        }, 'dht-debug');
-    }
-
-    // Try verification without expiresAt (for backward compatibility)
-    const dataWithoutExpires = { upeerId, address: block.address, dhtSeq: block.dhtSeq };
-    const canonicalNoExpires = canonicalStringify(dataWithoutExpires);
-    const validWithoutExpires = verify(
-        Buffer.from(canonicalNoExpires),
-        Buffer.from(block.signature, 'hex'),
-        Buffer.from(publicKeyHex, 'hex')
-    );
-
-    if (!validWithoutExpires) {
-        debug('DHT signature verification failed (legacy mode)', {
-            upeerId,
-            canonical: canonicalNoExpires
-        }, 'dht-debug');
-    }
-
-    if (validWithoutExpires && block.expiresAt !== undefined) {
-        if (block.expiresAt < Date.now()) {
-            return false; // Expired
-        }
-        // Verify renewal token if present
-        if (block.renewalToken) {
+        if (isValid && block.renewalToken) {
             if (!verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-                return false; // Invalid renewal token
+                return false;
             }
         }
+        return isValid;
+    } catch (err: any) {
+        debug('DHT verification error', { error: err.message }, 'dht');
+        return false;
     }
-
-    return validWithoutExpires;
 }
 
 export function generateRenewalToken(targetId: string, maxRenewals = 3): RenewalToken {
@@ -309,36 +320,23 @@ export function verifyRenewalToken(token: RenewalToken, publicKeyHex: string): b
     // la verición fallaba después del primer renewal (0→1).
     // La protección real contra renovaciones infinitas es allowedUntil (60 días).
     const { signature, renewalsUsed, ...signedData } = token;
-    const isValid = verify(
-        Buffer.from(canonicalStringify(signedData)),
-        Buffer.from(signature, 'hex'),
-        Buffer.from(publicKeyHex, 'hex')
-    );
-    return isValid;
+    try {
+        const isValid = verify(
+            Buffer.from(canonicalStringify(signedData)),
+            safeBufferFromHex(signature, 64, 'renewalSignature'),
+            safeBufferFromHex(publicKeyHex, 32, 'publicKey')
+        );
+        return isValid;
+    } catch (err) {
+        return false;
+    }
 }
 
-/**
- * Generate a location block with optional renewal token
- * BUG BI fix: la versión anterior incluía `renewalToken` en los datos firmados,
- * pero verifyLocationBlock/verifyLocationBlockWithDHT nunca prueban ese formato
- * (solo prueban con/sin expiresAt). Cualquier bloque generado por esta función
- * era irrecuperable: la firma siempre fallaba en el receptor.
- * Ahora usa el mismo formato de firma que generateSignedLocationBlock.
- */
-export function generateSignedLocationBlockWithRenewal(address: string, dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken) {
-    const ttl = ttlMs ?? LOCATION_BLOCK_TTL_MS;
-    const cappedTtl = Math.min(ttl, LOCATION_BLOCK_TTL_MAX);
-    const expiresAt = Date.now() + cappedTtl;
 
-    // Firmar SIN renewalToken (idéntico a generateSignedLocationBlock) para que
-    // verifyLocationBlock pueda verificar el bloque correctamente.
-    const data = { upeerId: getMyUPeerId(), address, dhtSeq, expiresAt };
-    const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
-    return { address, dhtSeq, expiresAt, renewalToken, signature: sig };
-}
-
-// Maximum allowed jump in DHT sequence numbers without PoW
-export const MAX_DHT_SEQ_JUMP = 1000;
+// Maximum allowed jump in DHT sequence numbers without PoW (for timestamp-based sequences in ms)
+// BUG BG fix: 1000 era 1 segundo — obligaba a PoW en cada actualización tras 1s de inactividad.
+// 24 horas es un margen razonable para resincronizar IPs dinámicas sin PoW.
+export const MAX_DHT_SEQ_JUMP = 24 * 60 * 60 * 1000; // 24 horas
 
 /**
  * Validate DHT sequence number jump
@@ -358,6 +356,11 @@ export function validateDhtSequence(currentSeq: number, newSeq: number): {
         return { valid: true, requiresPoW: false, reason: 'Sequence identical' };
     }
 
+    // BUG BG fix: permitir salto inicial desde 0 sin PoW (inicialización del nodo).
+    if (currentSeq === 0) {
+        return { valid: true, requiresPoW: false };
+    }
+
     const jump = newSeq - currentSeq;
     if (jump > MAX_DHT_SEQ_JUMP) {
         return { valid: false, requiresPoW: true, reason: `Sequence jump too large: ${jump} > ${MAX_DHT_SEQ_JUMP}` };
@@ -366,27 +369,57 @@ export function validateDhtSequence(currentSeq: number, newSeq: number): {
     return { valid: true, requiresPoW: false };
 }
 
-export function getNetworkAddress() {
-    // Primario: dirección del sidecar yggstack en user-space (sin TUN/TAP, sin root).
-    // Se rellena en cuanto yggstack reporta su IPv6 al arranque.
-    const yggAddr = getYggstackAddress();
-    if (yggAddr) return yggAddr;
+/**
+ * Support for multi-channel address resolution (LAN + Yggdrasil).
+ * Returns all viable addresses for the current node.
+ */
+export function getNetworkAddresses(): string[] {
+    const addresses: string[] = [];
 
-    // Fallback: escanear interfaces de red físicas (útil con TUN clásico en dev/CI
-    // o si yggstack aún no ha detectado su dirección).
+    // 1. Primary: Yggdrasil from sidecar (preferred, zero-config)
+    const yggAddr = getYggstackAddress();
+    if (yggAddr) addresses.push(yggAddr);
+
+    // 2. Scan physical interfaces for Fallbacks & LAN
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
-        if (name.includes('ygg') || name === 'utun2' || name === 'tun0') {
-            for (const net of interfaces[name] || []) {
-                const family = net.family;
-                const isIPv6 = (family as unknown) === 'IPv6' || (family as unknown) === 6;
-                if (isIPv6 && (net.address.startsWith('200:') || net.address.startsWith('201:'))) {
-                    return net.address;
+        for (const net of interfaces[name] || []) {
+            if (net.internal) continue;
+
+            const family = net.family;
+            const isIPv6 = (family as unknown) === 'IPv6' || (family as unknown) === 6;
+
+            // Yggdrasil check (200::/7 range)
+            if (isIPv6 && (net.address.startsWith('200:') || net.address.startsWith('201:'))) {
+                if (!addresses.includes(net.address)) addresses.push(net.address);
+                continue;
+            }
+
+            // LAN Discovery support:
+            // - IPv4 (Private ranges typically)
+            // - IPv6 Link-Local (fe80::)
+            if (!isIPv6) {
+                // Simple exclusion of virtual/bridge interfaces to reduce noise
+                if (!/^(docker|br-|veth|lo)/.test(name)) {
+                    addresses.push(net.address);
                 }
+            } else if (net.address.startsWith('fe80:')) {
+                // Link-local addresses are useful for same-segment LAN discovery
+                addresses.push(net.address);
             }
         }
     }
-    return null;
+
+    return [...new Set(addresses)];
+}
+
+/**
+ * Legacy compatibility wrapper. Returns the first available address.
+ * @deprecated Use getNetworkAddresses() for multi-channel support.
+ */
+export function getNetworkAddress(): string | null {
+    const list = getNetworkAddresses();
+    return list.length > 0 ? list[0] : null;
 }
 
 /**
@@ -476,10 +509,10 @@ export async function canRenewLocationBlockWithDHT(
  * Enhanced renewLocationBlock that can use DHT tokens
  */
 export async function renewLocationBlockWithDHT(
-    block: { address: string, dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken },
+    block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken },
     publicKeyHex: string,
     targetId: string
-): Promise<{ address: string, dhtSeq: number, expiresAt: number, signature: string, renewalToken?: RenewalToken } | null> {
+): Promise<{ address: string, addresses?: string[], dhtSeq: number, expiresAt: number, signature: string, renewalToken?: RenewalToken } | null> {
     // Try local token first
     if (block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex)) {
         return renewLocationBlock(block, publicKeyHex);
@@ -502,12 +535,12 @@ export async function renewLocationBlockWithDHT(
         renewalsUsed: (token.renewalsUsed || 0) + 1
     };
 
-    // BUG BY fix: conservar expiresAt original (está en la firma del bloque).
-    // Ver comentario en renewLocationBlock para la explicación completa.
+    // Conservar datos originales
     const renewedBlock = {
         address: block.address,
+        addresses: block.addresses, // Conservar lista original de IPs
         dhtSeq: block.dhtSeq,
-        expiresAt: block.expiresAt ?? 0, // Conservar expiresAt original (ver renewLocationBlock)
+        expiresAt: block.expiresAt ?? 0, // Conservar expiresAt original
         signature: block.signature,
         renewalToken: renewedToken
     };

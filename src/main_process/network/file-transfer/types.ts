@@ -29,6 +29,7 @@ export interface FileTransfer {
     chunkSize: number;
     fileHash: string;
     thumbnail?: string;
+    caption?: string;
 
     // State machine
     state: TransferState;
@@ -46,7 +47,7 @@ export interface FileTransfer {
     // File data
     tempPath?: string;
     filePath?: string;
-    fileBuffer?: Buffer;
+    isVaulting?: boolean;
 
     // Adaptive congestion control state (sender only)
     windowSize?: number;
@@ -68,6 +69,7 @@ export interface TransferProgress {
     direction: 'sending' | 'receiving';
     state: TransferState;
     phase: TransferPhase;
+    isVaulting?: boolean;
 }
 
 export interface TransferConfig {
@@ -81,11 +83,11 @@ export interface TransferConfig {
 }
 
 export const DEFAULT_CONFIG: TransferConfig = {
-    maxChunkSize: 1024 * 16, // 16KB - Safe for TCP
-    maxFileSize: 100 * 1024 * 1024, // 100MB
+    maxChunkSize: 1024 * 32, // 16KB - Safe for TCP (User requested not to increase)
+    maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB
     transferTimeout: 300000,
-    maxRetries: 3,
+    maxRetries: 5,
     cleanupInterval: 60000,
-    initialWindowSize: 64,  // 64 chunks concurrentes en vuelo
-    maxWindowSize: 2000
+    initialWindowSize: 200,  // 40 chunks concurrentes en vuelo (was 64, but we want to match our store initial)
+    maxWindowSize: 10000
 };

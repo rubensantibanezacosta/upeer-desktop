@@ -12,7 +12,8 @@ import {
   unlockWithMnemonic,
   lockSession,
   isSessionLocked,
-  isMnemonicMode
+  isMnemonicMode,
+  sign
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/db.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
@@ -66,19 +67,73 @@ export function registerIdentityHandlers(): void {
     mnemonic: generateMnemonic(),
   }));
 
-  ipcMain.handle('set-my-alias', (event, { alias }) => {
+  ipcMain.handle('set-my-alias', async (event, { alias }) => {
     // BUG DS fix: limitar longitud del alias para evitar consumo excesivo de memoria/disco
     const sanitized = typeof alias === 'string' ? alias.slice(0, 100) : '';
     setMyAlias(sanitized);
+
+    // Propagar cambio a la flota propia y red (DHT)
+    const myId = getMyUPeerId();
+    const myPk = getMyPublicKeyHex();
+    const avatar = getMyAvatar();
+
+    const payload = { alias: sanitized, avatar, updatedAt: Date.now() };
+    const { canonicalStringify } = await import('../../network/utils.js');
+    const signature = sign(Buffer.from(canonicalStringify(payload))).toString('hex');
+
+    // 1. Guardar en DHT para que otros (amigos) lo vean al buscarnos
+    const { getKademliaInstance } = await import('../../network/dht/handlers.js');
+    const kademlia = getKademliaInstance();
+    if (kademlia) {
+      kademlia.storeLocationBlock(myId, { ...payload, publicKey: myPk, signature });
+
+      // 2. Fan-out UDP a dispositivos propios online
+      const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+      const selfNodes = kademlia.findClosestContacts(myId, 20)
+        .filter(n => n.upeerId === myId && n.address !== myYggAddress);
+
+      const syncPacket = { type: 'IDENTITY_UPDATE', ...payload, signature };
+      for (const node of selfNodes) {
+        const { sendSecureUDPMessage } = await import('../../network/server/transport.js');
+        sendSecureUDPMessage(node.address, syncPacket, myPk);
+      }
+    }
+
     return { success: true };
   });
 
-  ipcMain.handle('set-my-avatar', (event, { avatar }) => {
+  ipcMain.handle('set-my-avatar', async (event, { avatar }) => {
     // BUG DS fix: limitar a ~2 MB (base64 de imagen). >2 MB rechazado.
     if (typeof avatar === 'string' && avatar.length > 2_000_000) {
       return { success: false, error: 'Avatar demasiado grande (máx 2 MB)' };
     }
     setMyAvatar(avatar ?? '');
+
+    // Propagar cambio
+    const myId = getMyUPeerId();
+    const myPk = getMyPublicKeyHex();
+    const alias = getMyAlias();
+
+    const payload = { alias, avatar, updatedAt: Date.now() };
+    const { canonicalStringify } = await import('../../network/utils.js');
+    const signature = sign(Buffer.from(canonicalStringify(payload))).toString('hex');
+
+    const { getKademliaInstance } = await import('../../network/dht/handlers.js');
+    const kademlia = getKademliaInstance();
+    if (kademlia) {
+      kademlia.storeLocationBlock(myId, { ...payload, publicKey: myPk, signature });
+
+      const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+      const selfNodes = kademlia.findClosestContacts(myId, 20)
+        .filter(n => n.upeerId === myId && n.address !== myYggAddress);
+
+      const syncPacket = { type: 'IDENTITY_UPDATE', ...payload, signature };
+      for (const node of selfNodes) {
+        const { sendSecureUDPMessage } = await import('../../network/server/transport.js');
+        sendSecureUDPMessage(node.address, syncPacket, myPk);
+      }
+    }
+
     return { success: true };
   });
 

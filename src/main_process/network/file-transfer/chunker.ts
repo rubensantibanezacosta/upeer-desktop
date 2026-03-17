@@ -58,22 +58,36 @@ export class FileChunker {
     }
 
     async createChunkData(transfer: FileTransfer, chunkIndex: number): Promise<FileChunkData> {
-        if (!transfer.fileBuffer) {
-            throw new Error('No file buffer for sending transfer');
+        const filePath = transfer.filePath;
+        if (!filePath) {
+            throw new Error('No file path for sending transfer');
         }
 
+        const stats = await fs.stat(filePath);
         const start = chunkIndex * transfer.chunkSize;
-        const end = Math.min(start + transfer.chunkSize, transfer.fileBuffer.length);
-        const chunkBuffer = transfer.fileBuffer.slice(start, end);
+        const end = Math.min(start + transfer.chunkSize, stats.size);
+        const length = end - start;
+
+        if (length <= 0) {
+            throw new Error('Invalid chunk range or end of file reached');
+        }
+
+        const buffer = Buffer.alloc(length);
+        const fd = await fs.open(filePath, 'r');
+        try {
+            await fd.read(buffer, 0, length, start);
+        } finally {
+            await fd.close();
+        }
 
         // Calculate chunk hash
-        const chunkHash = crypto.createHash('sha256').update(chunkBuffer).digest('hex');
+        const chunkHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
         return {
             fileId: transfer.fileId,
             chunkIndex,
             totalChunks: transfer.totalChunks,
-            data: chunkBuffer.toString('base64'),
+            data: buffer.toString('base64'),
             chunkHash
         };
     }

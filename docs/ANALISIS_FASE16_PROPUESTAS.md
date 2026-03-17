@@ -110,7 +110,7 @@ uPeer P2P ha completado la **Fase 15** con las siguientes capacidades validadas:
 
 **Caso de Uso Concreto**:
 
-- Durante transferencia de video 100MB, usuario ve:
+- Durante transferencia de video 500MB, usuario ve:
   - Porcentaje completado (45%)
   - Velocidad actual (2.4 MB/s)
   - Tiempo estimado (25 segundos)

@@ -3,133 +3,206 @@ import { trackDistributedAsset } from '../../storage/vault/index.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getContacts } from '../../storage/db.js';
-import { info, error, debug } from '../../security/secure-logger.js';
+import { info, error, debug, warn } from '../../security/secure-logger.js';
 import { SHARD_TTL_MS } from './manager.js';
+import { getVouchScore } from '../../security/reputation/vouches.js';
 
 /**
  * ChunkVault handles the 200% resilience distribution for file attachments.
  */
 export class ChunkVault {
+    // Límites de segmentación dinámicos basados en reputación.
+    private static DEFAULT_SEGMENT_SIZE = 25 * 1024 * 1024; // 25MB (Base para desconocidos)
+    private static MAX_SEGMENT_SIZE = 100 * 1024 * 1024;    // 100MB (Máxima confianza)
+    private static MIN_SEGMENT_SIZE = 5 * 1024 * 1024;      // 5MB (Mínimo absoluto para nodos tóxicos)
+
     // Systematic Reed-Solomon: 4 data blocks, 8 parity blocks (Total 12)
     private static coder = new ErasureCoder(4, 8);
 
     /**
-     * Replicates a file across the social network using Erasure Coding.
-     * @param fileHash The SHA-256 hash of the original file.
-     * @param data The complete file buffer.
-     * @param recipientSid Optional: If this file is for a specific person offline.
-     * @param fileId Optional: The internal transfer ID to report progress back to.
+     * Calcula el tamaño del segmento basado en la reputación del receptor.
+     * Si el receptor es confiable, permitimos segmentos más grandes para reducir overhead 
+     * y mejorar la velocidad de transferencia. Si es poco confiable, usamos segmentos 
+     * pequeños para mitigar el impacto de fragmentos corruptos o denegaciones de servicio.
      */
-    static async replicateFile(fileHash: string, data: Buffer, recipientSid: string = '*', fileId?: string) {
-        const threshold = 1024 * 1024; // 1MB
+    private static async getDynamicSegmentSize(recipientSid: string): Promise<number> {
+        try {
+            const score = await getVouchScore(recipientSid);
+            if (score >= 80) return this.MAX_SEGMENT_SIZE;
+            if (score <= 30) return this.MIN_SEGMENT_SIZE;
 
-        if (data.length < threshold) {
-            // Use Mirroring for small files (consistent with text messages)
-            debug('Using Mirroring for small file', { fileHash, size: data.length }, 'vault');
-            const { sign } = await import('../../security/identity.js');
-            const { canonicalStringify } = await import('../utils.js');
-            const myId = getMyUPeerId();
+            // Interpolación para el rango medio (30-80)
+            const ratio = (score - 30) / (80 - 30);
+            const sizeRange = this.MAX_SEGMENT_SIZE - this.MIN_SEGMENT_SIZE;
+            return Math.floor(this.MIN_SEGMENT_SIZE + (ratio * sizeRange));
+        } catch {
+            return this.DEFAULT_SEGMENT_SIZE;
+        }
+    }
 
-            const fileDataPacket = {
-                type: 'FILE_DATA_SMALL',
-                fileHash,
-                data: data.toString('hex')
-            };
+    /**
+     * Replicates a file across the social network using Erasure Coding.
+     * Supports both direct buffers (small files) and file paths (large files with streaming).
+     */
+    static async replicateFile(fileHash: string, dataOrPath: Buffer | string, aesKey: Buffer, recipientSid: string = '*', fileId?: string) {
+        const threshold = 1024 * 1024; // 1MB for switching from mirroring to RS
 
-            const signature = sign(Buffer.from(canonicalStringify(fileDataPacket)));
-
-            const signedPacket = {
-                ...fileDataPacket,
-                senderUpeerId: myId,
-                signature: signature.toString('hex')
-            };
-
-            const { VaultManager } = await import('./manager.js');
-            const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
-            if (fileId && nodes > 0) {
-                const { fileTransferManager } = await import('../file-transfer/index.js');
-                fileTransferManager.notifyVaultProgress(fileId, 1, 1);
-            }
-            return nodes;
+        // If it's a buffer and small, use mirroring
+        if (Buffer.isBuffer(dataOrPath) && dataOrPath.length < threshold) {
+            return this._replicateSmallBuffer(fileHash, dataOrPath, recipientSid, fileId);
         }
 
         try {
-            // 1. Generate Shards (RS 4+8)
-            const shards = this.coder.encode(data);
-            const myId = getMyUPeerId();
-            const allContacts = await getContacts();
-
-            // Select up to 12 different custodians
-            const candidates = allContacts
-                .filter(c => c.status === 'connected' && c.upeerId !== myId)
-                .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
-
-            if (candidates.length === 0) {
-                debug('No custodians available for file replication', { fileHash }, 'vault');
-                return;
+            if (typeof dataOrPath === 'string') {
+                // Large File / Stream Mode
+                await this._replicateLargeFileBySegments(fileHash, dataOrPath, aesKey, recipientSid, fileId);
+            } else if (Buffer.isBuffer(dataOrPath)) {
+                // Buffer Mode (legacy or medium small files)
+                await this._replicateBufferRS(fileHash, dataOrPath, recipientSid, fileId);
             }
-
-            info('Starting distributed file replication', {
-                fileHash,
-                shards: shards.length,
-                custodians: Math.min(candidates.length, 12)
-            }, 'vault');
-
-            // 2. Distribute and Track
-            for (let i = 0; i < shards.length; i++) {
-                const shard = shards[i];
-                // Rotate candidates if we have fewer than 12
-                const custodian = candidates[i % candidates.length];
-
-                // CID: shard:fileHash:idx — legible por el receptor para ensamblado.
-                // El custodio ve el hash del archivo, pero es un peer de confianza (vouchScore ≥ 30).
-                // Cifrar los metadatos del shard (Fix 4 propuesto) requiere incluir un header
-                // cifrado con la clave del receptor dentro del campo data — trabajo futuro.
-                const cid = `shard:${fileHash}:${i}`;
-                const expiresAt = Date.now() + SHARD_TTL_MS;
-
-                const vaultPacket = {
-                    type: 'VAULT_STORE',
-                    payloadHash: cid,
-                    recipientSid, // Can be a specific ID or '*' for public-within-friends
-                    senderSid: myId,
-                    priority: 3, // Low priority (Background/Heavy)
-                    data: shard.toString('hex'),
-                    expiresAt
-                };
-
-                sendSecureUDPMessage(custodian.address, vaultPacket);
-
-                if (custodian && custodian.upeerId) {
-                    await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId);
-
-                    // Report progress every shard
-                    if (fileId) {
-                        const { fileTransferManager } = await import('../file-transfer/index.js');
-                        fileTransferManager.notifyVaultProgress(fileId, i + 1, shards.length);
-                    }
-
-                    // Publish shard pointer to DHT
-                    // Key: hash(vault-ptr:%fileHash%) -> Value: custodianId
-                    // Permite que un receptor (incluso si no conoce al emisor) encuentre los trozos en la DHT.
-                    const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
-                    if (kademlia) {
-                        const { createVaultPointerKey } = await import('../dht/kademlia/index.js');
-                        const ptrKey = createVaultPointerKey(fileHash);
-                        // Para archivos, el puntero es un array acumulativo de custodios conocidos para este hash
-                        const ptrValue = {
-                            fileHash,
-                            custodians: [custodian.upeerId],
-                            type: 'file-shards'
-                        };
-                        kademlia.storeValue(ptrKey, ptrValue, myId).catch(() => { });
-                    }
-                }
-            }
-
-            debug('File distribution complete', { fileHash }, 'vault');
         } catch (err) {
             error('Failed to replicate file to vault', err, 'vault');
         }
+    }
+
+    private static async _replicateSmallBuffer(fileHash: string, data: Buffer, recipientSid: string, fileId?: string) {
+        debug('Using Mirroring for small file', { fileHash, size: data.length }, 'vault');
+        const { sign } = await import('../../security/identity.js');
+        const { canonicalStringify } = await import('../utils.js');
+        const myId = getMyUPeerId();
+
+        const fileDataPacket = {
+            type: 'FILE_DATA_SMALL',
+            fileHash,
+            data: data.toString('hex')
+        };
+
+        const signature = sign(Buffer.from(canonicalStringify(fileDataPacket)));
+        const signedPacket = { ...fileDataPacket, senderUpeerId: myId, signature: signature.toString('hex') };
+
+        const { VaultManager } = await import('./manager.js');
+        const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
+        if (fileId && nodes > 0) {
+            const { fileTransferManager } = await import('../file-transfer/index.js');
+            fileTransferManager.notifyVaultProgress(fileId, 1, 1);
+        }
+        return nodes;
+    }
+
+    private static async _replicateBufferRS(fileHash: string, data: Buffer, recipientSid: string, fileId?: string) {
+        const shards = this.coder.encode(data);
+        return this._distributeShards(fileHash, shards, recipientSid, fileId);
+    }
+
+    /**
+     * Implements Segmented Vaulting: Reads a file in blocks, encrypts, and RS-encodes each.
+     */
+    private static async _replicateLargeFileBySegments(fileHash: string, filePath: string, aesKey: Buffer, recipientSid: string, fileId?: string) {
+        const fs = await import('node:fs/promises');
+        const crypto = await import('node:crypto');
+        const stats = await fs.stat(filePath);
+
+        const segmentSize = await this.getDynamicSegmentSize(recipientSid);
+        const totalSegments = Math.ceil(stats.size / segmentSize);
+
+        info('Starting segmented file replication', {
+            fileHash,
+            totalSegments,
+            size: stats.size,
+            segmentSize: (segmentSize / 1024 / 1024).toFixed(2) + 'MB'
+        }, 'vault');
+
+        const fd = await fs.open(filePath, 'r');
+        try {
+            const { fileTransferManager } = await import('../file-transfer/index.js');
+
+            for (let segIdx = 0; segIdx < totalSegments; segIdx++) {
+                // BUG EV fix: comprobar si el usuario canceló la transferencia durante el proceso de segmentación/vaulting.
+                // Sin esto, una vez iniciado el 'replicateFile', el bucle continúa hasta el final aunque el estado sea 'cancelled'.
+                if (fileId) {
+                    const transfer = fileTransferManager.getTransfer(fileId, 'sending');
+                    if (transfer && transfer.state === 'cancelled') {
+                        warn('File replication to vault aborted due to cancellation', { fileId, segIdx }, 'vault');
+                        return;
+                    }
+                }
+
+                const start = segIdx * segmentSize;
+                const length = Math.min(segmentSize, stats.size - start);
+                const buffer = Buffer.alloc(length);
+                await fd.read(buffer, 0, length, start);
+
+                // 1. Encrypt segment
+                const iv = crypto.randomBytes(12);
+                const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, iv);
+                const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+                const tag = cipher.getAuthTag();
+                const sealedSegment = Buffer.concat([iv, tag, encrypted]);
+
+                // 2. RS Encode (Segment as a whole)
+                const shards = this.coder.encode(sealedSegment);
+
+                // 3. Distribute WITHOUT per-shard notification (we do it once per segment below)
+                await this._distributeShards(fileHash, shards, recipientSid, undefined, segIdx, totalSegments);
+
+                // 4. Update progress once per segment (throttle IPC)
+                if (fileId) {
+                    const progress = Math.floor(((segIdx + 1) / totalSegments) * 100);
+                    fileTransferManager.notifyVaultProgress(fileId, progress, 100);
+                }
+            }
+        } finally {
+            await fd.close();
+        }
+    }
+
+    private static async _distributeShards(fileHash: string, shards: Buffer[], recipientSid: string, fileId?: string, segIdx = 0, totalSegments = 1) {
+        const myId = getMyUPeerId();
+        const allContacts = await getContacts();
+
+        const candidates = allContacts
+            .filter(c => c.status === 'connected' && c.upeerId !== myId)
+            .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
+
+        if (candidates.length === 0) return 0;
+
+        for (let i = 0; i < shards.length; i++) {
+            const shard = shards[i];
+            const custodian = candidates[i % candidates.length];
+
+            // Format: shard:fileHash:segIdx:shardIdx
+            const cid = `shard:${fileHash}:${segIdx}:${i}`;
+            const expiresAt = Date.now() + SHARD_TTL_MS;
+
+            const vaultPacket = {
+                type: 'VAULT_STORE',
+                payloadHash: cid,
+                recipientSid,
+                senderSid: myId,
+                priority: 3,
+                data: shard.toString('hex'),
+                expiresAt
+            };
+
+            sendSecureUDPMessage(custodian.address, vaultPacket);
+
+            if (custodian.upeerId) {
+                await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
+
+                if (fileId) {
+                    const { fileTransferManager } = await import('../file-transfer/index.js');
+                    const progress = Math.floor(((segIdx * shards.length + i + 1) / (totalSegments * shards.length)) * 100);
+                    fileTransferManager.notifyVaultProgress(fileId, progress, 100);
+                }
+
+                const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
+                if (kademlia) {
+                    const { createVaultPointerKey } = await import('../dht/kademlia/index.js');
+                    const ptrKey = createVaultPointerKey(fileHash);
+                    kademlia.storeValue(ptrKey, { fileHash, custodians: [custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
+                }
+            }
+        }
+        return candidates.length;
     }
 }

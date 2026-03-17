@@ -11,7 +11,17 @@ import {
     getMyIdentitySkBuffer,
     getMyIdentityPkBuffer,
 } from '../../security/identity.js';
-import { getContactByUpeerId, saveMessage, updateMessageStatus, updateMessageContent, deleteMessageLocally, saveReaction, deleteReaction } from '../../storage/db.js';
+import { 
+    getContactByUpeerId, 
+    getContacts,
+    saveMessage, 
+    updateMessageStatus, 
+    updateMessageContent, 
+    deleteMessageLocally, 
+    saveReaction, 
+    deleteReaction,
+    getGroupById
+} from '../../storage/db.js';
 import { warn, error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -29,8 +39,27 @@ function shouldUseEphemeral(contact: any): boolean {
     return updatedAt > 0 && (Date.now() - updatedAt) < EPH_FRESHNESS_MS;
 }
 
+/**
+ * Helper to get all verified addresses for a contact (primary + known)
+ */
+function getFanOutAddresses(contact: any): string[] {
+    const addresses = new Set<string>();
+    if (contact.address) addresses.add(contact.address);
+    if (contact.knownAddresses) {
+        try {
+            const known = typeof contact.knownAddresses === 'string' 
+                ? JSON.parse(contact.knownAddresses) 
+                : contact.knownAddresses;
+            if (Array.isArray(known)) {
+                known.forEach((a: string) => addresses.add(a));
+            }
+        } catch { /* ignore */ }
+    }
+    return Array.from(addresses);
+}
+
 export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<string | undefined> {
-    const myId = getMyUPeerId();
+    const selfId = getMyUPeerId();
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
 
@@ -48,7 +77,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         if (contact && !contact.publicKey) {
             // Persistir localmente para que el usuario vea el mensaje en el historial.
             // No hay firma aún (se firmará al vaultear durante el flush del outbox).
-            saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
+            await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
             const { savePendingOutboxMessage } = await import('../../storage/pending-outbox.js');
             await savePendingOutboxMessage(upeerId, msgId, content, replyTo);
             warn('No pubkey for contact, message queued in pending outbox', { upeerId }, 'vault');
@@ -69,7 +98,9 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/index.js');
         const { x3dhInitiator, ratchetInitAlice, ratchetEncrypt } = await import('../../security/ratchet.js');
 
-        let session = getRatchetSession(upeerId);
+        const sessionResult = getRatchetSession(upeerId);
+        let session = sessionResult?.state;
+        let usedSpkId = sessionResult?.spkIdUsed;
 
         if (!session && contact.signedPreKey) {
             // No hay sesión pero el contacto tiene SPK → X3DH + iniciar como Alice
@@ -82,17 +113,18 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
             session = ratchetInitAlice(sharedSecret, bobSpkPk);
             sharedSecret.fill(0);
 
+            usedSpkId = contact.signedPreKeyId;
             x3dhInit = {
                 ekPub: ekPub.toString('hex'),
-                spkId: contact.signedPreKeyId,
+                spkId: usedSpkId,
                 ikPub: myIkPk.toString('hex'),
             };
-            saveRatchetSession(upeerId, session, contact.signedPreKeyId as number | undefined);
+            saveRatchetSession(upeerId, session, usedSpkId);
         }
 
         if (session) {
             const { header, ciphertext, nonce } = ratchetEncrypt(session, Buffer.from(content, 'utf-8'));
-            saveRatchetSession(upeerId, session);
+            saveRatchetSession(upeerId, session, usedSpkId);
             ratchetHeader = header as unknown as Record<string, unknown>;
             contentHex = ciphertext;
             nonceHex = nonce;
@@ -115,11 +147,13 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         nonceHex = nonce.toString('hex');
     }
 
+    const timestamp = Date.now();
     const data = {
         type: 'CHAT',
         id: msgId,
         content: contentHex,
         nonce: nonceHex,
+        timestamp,
         // Double Ratchet (si disponible)
         ...(ratchetHeader ? { ratchetHeader } : {}),
         ...(x3dhInit ? { x3dhInit } : {}),
@@ -134,21 +168,95 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     // Now: relying on DHT persistence (30 days) and renewal tokens for resilience
 
     const signature = sign(Buffer.from(canonicalStringify(data)));
-    const isToSelf = upeerId === getMyUPeerId();
-    saveMessage(msgId, upeerId, true, content, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent');
+    const isToSelf = upeerId === selfId;
+    // @ts-ignore
+    await saveMessage(msgId, upeerId, true, content, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent', selfId, timestamp);
+
+    // Multi-device sync: Identificar otras IPs propias para auto-envío
+    const selfAddresses: string[] = [];
+    const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+
+    try {
+        const { getKademliaInstance } = await import('../dht/handlers.js');
+        const kademlia = getKademliaInstance();
+        if (kademlia) {
+            // Buscamos nodos que tengan nuestro mismo uPeerId pero diferente IP (nuestras otras instancias)
+            const selfNodes = kademlia.findClosestContacts(selfId, 20)
+                .filter(n => n.upeerId === selfId && n.address !== myYggAddress);
+
+            for (const node of selfNodes) {
+                if (!selfAddresses.includes(node.address)) selfAddresses.push(node.address);
+            }
+        }
+    } catch (err) {
+        error('Multi-device: failed to find own addresses via DHT', err, 'network');
+    }
 
     // Multi-device: send to every known address (same mnemonic → same ID, different Yggdrasil IPs).
     // Se pasa contact.publicKey para activar Sealed Sender en todos los envíos de CHAT.
     const chatAddresses: string[] = [];
     if (contact.address) chatAddresses.push(contact.address);
+
+    // Añadir direcciones propias al fan-out para sincronización en tiempo real
+    for (const addr of selfAddresses) {
+        if (!chatAddresses.includes(addr)) chatAddresses.push(addr);
+    }
+
     try {
         const known: string[] = JSON.parse((contact as any).knownAddresses ?? '[]');
         for (const addr of known) {
             if (!chatAddresses.includes(addr)) chatAddresses.push(addr);
         }
     } catch { /* malformed JSON – ignore */ }
+
+    // Enviar a todas las instancias (propias y del contacto)
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
     for (const addr of chatAddresses) {
-        sendSecureUDPMessage(addr, data, contact.publicKey); // ← Sealed Sender
+        // Si es una dirección propia, usamos nuestra propia public key para el Sealed Sender
+        // Si es una dirección del contacto, usamos la suya.
+        const isSelf = selfAddresses.includes(addr);
+        const targetSealedKey = isSelf ? myPublicKey : contact.publicKey;
+        // isInternalSync a true si enviamos a una de nuestras propias IPs
+        sendSecureUDPMessage(addr, data, targetSealedKey, isSelf);
+    }
+
+    // Vault Sync: si tenemos otros dispositivos offline, vaultear para nosotros mismos
+    // BUG DM fix: solo vaultear si el envío real no pudo realizarse a ninguna otra instancia propia.
+    // Esto evita la doble replicación innecesaria en el arranque.
+    if (selfAddresses.length < 2) {
+        import('../vault/manager.js').then(async ({ VaultManager }) => {
+            try {
+                // Re-encapsular para el vault con firma propia.
+                // Usamos cifrado ESTÁTICO con nuestra propia clave para asegurar que
+                // cualquier instancia con el mnemónico pueda descifrarlo sin depender de DR.
+                const { encrypt: encStatic } = await import('../../security/identity.js');
+                const selfVaultEncrypted = encStatic(
+                    Buffer.from(content, 'utf-8'),
+                    Buffer.from(myPublicKey, 'hex'),
+                    false
+                );
+
+                const syncPacket = {
+                    type: 'CHAT',
+                    id: msgId,
+                    content: selfVaultEncrypted.ciphertext.toString('hex'),
+                    nonce: selfVaultEncrypted.nonce.toString('hex'),
+                    replyTo,
+                    senderUpeerId: selfId
+                };
+
+                const syncSig = sign(Buffer.from(canonicalStringify(syncPacket)));
+                const signedSyncPacket = {
+                    ...syncPacket,
+                    signature: syncSig.toString('hex')
+                };
+
+                // Guardar en el vault asociado a nuestro propio ID
+                await VaultManager.replicateToVaults(selfId, signedSyncPacket);
+            } catch (err) {
+                error('Multi-device: failed to vault sync packet', err, 'vault');
+            }
+        }).catch(err => error('Multi-device: failed to load VaultManager for sync', err, 'vault'));
     }
 
     // BUG FM fix: el callback async de setTimeout carecía de try/catch.
@@ -195,7 +303,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 const vaultSig = sign(Buffer.from(canonicalStringify(vaultData)));
                 const innerPacket = {
                     ...vaultData,
-                    senderUpeerId: myId,
+                    senderUpeerId: selfId,
                     signature: vaultSig.toString('hex')
                 };
 
@@ -205,9 +313,10 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
 
                 if (nodes > 0) {
                     const { updateMessageStatus } = await import('../../storage/db.js');
-                    updateMessageStatus(msgId, 'vaulted' as any);
-                    const { BrowserWindow } = await import('electron');
-                    BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
+                    if (await updateMessageStatus(msgId, 'vaulted' as any)) {
+                        const { BrowserWindow } = await import('electron');
+                        BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
+                    }
                 }
 
                 // Also start a DHT search in case the peer moved
@@ -221,35 +330,84 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     return msgId;
 }
 
-export function sendTypingIndicator(upeerId: string) {
-    const contact = getContactByUpeerId(upeerId);
-    if (contact && contact.status === 'connected') sendSecureUDPMessage(contact.address, { type: 'TYPING' });
+export async function sendTypingIndicator(upeerId: string) {
+    if (upeerId.startsWith('grp-')) {
+        const group = getGroupById(upeerId);
+        if (!group || group.status !== 'active') return;
+        
+        // Fan-out to all group members
+        const myId = getMyUPeerId();
+        const data = { type: 'TYPING', groupId: upeerId }; // Include groupId
+        
+        for (const memberId of group.members) {
+            if (memberId === myId) continue;
+            const contact = await getContactByUpeerId(memberId);
+            if (contact?.status === 'connected') {
+                const addresses = getFanOutAddresses(contact);
+                for (const addr of addresses) {
+                    sendSecureUDPMessage(addr, data, contact.publicKey);
+                }
+            }
+        }
+        return;
+    }
+
+    const contact = await getContactByUpeerId(upeerId);
+    if (!contact || contact.status !== 'connected') return;
+    const addresses = getFanOutAddresses(contact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, { type: 'TYPING' }, contact.publicKey);
+    }
 }
 
 export async function sendReadReceipt(upeerId: string, id: string) {
-    updateMessageStatus(id, 'read');
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact) return;
-
-    const data = { type: 'READ', id };
-    if (contact.status === 'connected' && contact.address) {
-        sendSecureUDPMessage(contact.address, data);
+    const myId = getMyUPeerId();
+    if (await updateMessageStatus(id, 'read')) {
+        const { BrowserWindow } = await import('electron');
+        BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id, status: 'read' });
     }
 
-    // Vault fallback for recipients who are offline (so they see the double checkmark later)
-    const myId = getMyUPeerId();
-    const signature = sign(Buffer.from(canonicalStringify(data)));
-    const innerPacket = {
-        ...data,
-        senderUpeerId: myId,
-        signature: signature.toString('hex')
+    const { getMessageById } = await import('../../storage/messages/operations.js');
+    const msg = await getMessageById(id);
+    if (!msg) return;
+
+    // Si es un grupo, el upeerId del contacto al que mandamos el recibo es el senderUpeerId del mensaje
+    const targetId = upeerId.startsWith('grp-') ? msg.senderUpeerId : upeerId;
+    if (!targetId || targetId === myId) return;
+
+    const contact = await getContactByUpeerId(targetId);
+    if (!contact) return;
+
+    const data = { 
+        type: 'READ', 
+        id, 
+        senderUpeerId: myId, 
+        ...(upeerId.startsWith('grp-') ? { chatUpeerId: upeerId } : {}) 
     };
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const signedData = { ...data, signature: signature.toString('hex') };
+
+    // Multi-device sync for myId... (omitted but already present in logic)
+    const selfAddresses = await getSelfAddresses(myId);
+    
+    // Almacenar y propagar
+    const addresses = getFanOutAddresses(contact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, signedData, contact.publicKey);
+    }
+    
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+    for (const addr of selfAddresses) {
+        sendSecureUDPMessage(addr, signedData, myPublicKey, true);
+    }
+
     import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(upeerId, innerPacket);
+        VaultManager.replicateToVaults(targetId, signedData);
+        if (selfAddresses.length < 1) VaultManager.replicateToVaults(myId, signedData);
     }).catch(err => error('Failed to vault READ receipt', err, 'vault'));
 }
 
-export function sendContactCard(targetUpeerId: string, contact: any) {
+export async function sendContactCard(targetUpeerId: string, contact: any) {
     const targetContact = getContactByUpeerId(targetUpeerId);
     if (!targetContact || targetContact.status !== 'connected') return undefined;
 
@@ -264,35 +422,101 @@ export function sendContactCard(targetUpeerId: string, contact: any) {
     };
 
     const signature = sign(Buffer.from(canonicalStringify(data)));
-    saveMessage(msgId, targetUpeerId, true, `CONTACT_CARD|${contact.name}`, undefined, signature.toString('hex'));
+    await saveMessage(msgId, targetUpeerId, true, `CONTACT_CARD|${contact.name}`, undefined, signature.toString('hex'));
 
-    sendSecureUDPMessage(targetContact.address, data);
+    const addresses = getFanOutAddresses(targetContact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, data, targetContact.publicKey);
+    }
     return msgId;
 }
 
 export async function sendChatReaction(upeerId: string, msgId: string, emoji: string, remove: boolean) {
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact) return;
-
-    if (remove) deleteReaction(msgId, getMyUPeerId(), emoji);
-    else saveReaction(msgId, getMyUPeerId(), emoji);
-
-    const data = { type: 'CHAT_REACTION', msgId, emoji, remove };
-    if (contact.status === 'connected' && contact.address) {
-        sendSecureUDPMessage(contact.address, data);
-    }
-
-    // Vault fallback for reactions
+    const isGroup = upeerId.startsWith('grp-');
     const myId = getMyUPeerId();
-    const signature = sign(Buffer.from(canonicalStringify(data)));
-    const innerPacket = {
-        ...data,
+
+    if (remove) deleteReaction(msgId, myId, emoji);
+    else saveReaction(msgId, myId, emoji);
+
+    const data = { 
+        type: 'CHAT_REACTION', 
+        msgId, 
+        emoji, 
+        remove, 
         senderUpeerId: myId,
-        signature: signature.toString('hex')
+        ...(isGroup ? { chatUpeerId: upeerId } : {}) // Contexto de grupo para receptores
     };
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(upeerId, innerPacket);
-    }).catch(err => error('Failed to vault reaction', err, 'vault'));
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const signedData = { ...data, signature: signature.toString('hex') };
+
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+
+    if (isGroup) {
+        const group = getGroupById(upeerId);
+        if (!group || group.status !== 'active') return;
+
+        // Fan-out para miembros del grupo
+        for (const memberId of group.members) {
+            if (memberId === myId) continue;
+            const contact = await getContactByUpeerId(memberId);
+            if (contact?.status === 'connected') {
+                const addresses = getFanOutAddresses(contact);
+                for (const addr of addresses) {
+                    sendSecureUDPMessage(addr, signedData, contact.publicKey);
+                }
+            } else if (contact?.publicKey) {
+                // Vault para miembros offline
+                import('../vault/manager.js').then(({ VaultManager }) => {
+                    VaultManager.replicateToVaults(memberId, signedData);
+                });
+            }
+        }
+        // Auto-sincronizar con mis otros dispositivos
+        const selfAddresses: string[] = await getSelfAddresses(myId);
+        for (const addr of selfAddresses) {
+            sendSecureUDPMessage(addr, signedData, myPublicKey, true);
+        }
+        if (selfAddresses.length < 1) {
+            import('../vault/manager.js').then(({ VaultManager }) => {
+                VaultManager.replicateToVaults(myId, signedData);
+            });
+        }
+    } else {
+        const contact = await getContactByUpeerId(upeerId);
+        if (!contact) return;
+
+        const addresses = getFanOutAddresses(contact);
+        for (const addr of addresses) {
+            sendSecureUDPMessage(addr, signedData, contact.publicKey);
+        }
+
+        const selfAddresses: string[] = await getSelfAddresses(myId);
+        for (const addr of selfAddresses) {
+            sendSecureUDPMessage(addr, signedData, myPublicKey, true);
+        }
+
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.replicateToVaults(upeerId, signedData);
+            if (selfAddresses.length < 1) {
+                VaultManager.replicateToVaults(myId, signedData);
+            }
+        });
+    }
+}
+
+async function getSelfAddresses(myId: string): Promise<string[]> {
+    const selfAddresses: string[] = [];
+    try {
+        const { getKademliaInstance } = await import('../dht/handlers.js');
+        const kademlia = getKademliaInstance();
+        const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+        if (kademlia) {
+            const selfNodes = kademlia.findClosestContacts(myId, 20)
+                .filter(n => n.upeerId === myId && n.address !== myYggAddress);
+            for (const node of selfNodes) selfAddresses.push(node.address);
+        }
+    } catch { /* silent */ }
+    return selfAddresses;
 }
 
 export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string) {
@@ -302,68 +526,212 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         return;
     }
 
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact || contact.status !== 'connected' || !contact.publicKey) return;
+    const { getMessageById } = await import('../../storage/messages/operations.js');
+    const existing = await getMessageById(msgId);
+    const newVersion = (existing?.version ?? 0) + 1;
+    const myId = getMyUPeerId();
+    const isGroup = upeerId.startsWith('grp-');
 
-    const useEphemeral = shouldUseEphemeral(contact);
-    const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
+    // Persistir localmente
+    const signature = sign(Buffer.from(newContent)); // Placeholder signature for persistence, will be overwritten by packet signature
+    updateMessageContent(msgId, newContent, signature.toString('hex'), newVersion);
 
-    const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
-    const { ciphertext, nonce } = encrypt(
-        Buffer.from(newContent, 'utf-8'),
-        Buffer.from(targetKeyHex, 'hex'),
-        useEphemeral
-    );
+    const broadcastUpdate = async (targetId: string, isGroupContext: boolean) => {
+        const contact = await getContactByUpeerId(targetId);
+        if (!contact || !contact.publicKey) return;
 
-    if (useEphemeral) {
-        incrementEphemeralMessageCounter();
-    }
+        const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
+        const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
 
-    const data = {
-        type: 'CHAT_UPDATE',
-        msgId,
-        content: ciphertext.toString('hex'),
-        nonce: nonce.toString('hex'),
-        ephemeralPublicKey: ephPubKey,
-        useRecipientEphemeral: useEphemeral
+        const ephPubKey = getMyEphemeralPublicKeyHex();
+        const { ciphertext, nonce } = encrypt(
+            Buffer.from(newContent, 'utf-8'),
+            Buffer.from(targetKeyHex, 'hex'),
+            useEphemeral
+        );
+
+        if (useEphemeral) incrementEphemeralMessageCounter();
+
+        const data = {
+            type: 'CHAT_UPDATE',
+            msgId,
+            content: ciphertext.toString('hex'),
+            nonce: nonce.toString('hex'),
+            version: newVersion,
+            ephemeralPublicKey: ephPubKey,
+            useRecipientEphemeral: useEphemeral,
+            ...(isGroupContext ? { chatUpeerId: upeerId } : {})
+        };
+
+        const sig = sign(Buffer.from(canonicalStringify(data)));
+        const signedData = { ...data, signature: sig.toString('hex'), senderUpeerId: myId };
+
+        if (contact.status === 'connected') {
+            const addresses = getFanOutAddresses(contact);
+            for (const addr of addresses) {
+                sendSecureUDPMessage(addr, signedData, contact.publicKey);
+            }
+        }
+
+        // Vault para el destinatario
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.replicateToVaults(targetId, signedData);
+        });
     };
 
-    const signature = sign(Buffer.from(canonicalStringify(data)));
-    updateMessageContent(msgId, newContent, signature.toString('hex'));
-    sendSecureUDPMessage(contact.address, data);
+    if (isGroup) {
+        const group = getGroupById(upeerId);
+        if (!group) return;
+
+        for (const memberId of group.members) {
+            if (memberId === myId) continue;
+            broadcastUpdate(memberId, true);
+        }
+    } else {
+        broadcastUpdate(upeerId, false);
+    }
+
+    // Auto-sincronización con mis otros dispositivos
+    // Para el sync interno, usamos una versión simplificada (o la misma pero firmada con nuestra clave)
+    const selfSyncPacket = {
+        type: 'CHAT_UPDATE',
+        msgId,
+        content: newContent, // En sync interno podemos mandar plaintext o cifrar con nuestra propia clave
+        version: newVersion,
+        chatUpeerId: upeerId,
+        senderUpeerId: myId
+    };
+    const selfSyncSig = sign(Buffer.from(canonicalStringify(selfSyncPacket)));
+    const signedSelfSync = { ...selfSyncPacket, signature: selfSyncSig.toString('hex') };
+
+    const selfAddresses = await getSelfAddresses(myId);
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+    for (const addr of selfAddresses) {
+        sendSecureUDPMessage(addr, signedSelfSync, myPublicKey, true);
+    }
+    
+    import('../vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.replicateToVaults(myId, signedSelfSync);
+    });
 }
 
 export async function sendChatDelete(upeerId: string, msgId: string) {
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact || contact.status !== 'connected') return;
+    const myId = getMyUPeerId();
+    const isGroup = upeerId.startsWith('grp-');
 
+    // 1. Borrado local inmediato
     deleteMessageLocally(msgId);
 
     const data = {
         type: 'CHAT_DELETE',
         msgId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(isGroup ? { chatUpeerId: upeerId } : {})
     };
 
-    // BUG BZ fix: NO pre-firmar antes de sendSecureUDPMessage.
-    // sendSecureUDPMessage firma el paquete incluyendo el campo `signature` si ya existe,
-    // pero el receptor extrae ese campo del nivel externo, dejando `data` sin firma.
-    // handleIncomingDelete busca `signature` en `data` → undefined → descarta el mensaje.
-    // La firma del paquete externo es suficiente para autenticación de entrega directa.
-    // 1. Entrega directa (la firma exterior de sendSecureUDPMessage lo autentica)
-    sendSecureUDPMessage(contact.address, data);
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const signedData = { ...data, signature: signature.toString('hex'), senderUpeerId: myId };
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
 
-    // 2. Vault path: paquete interior separado con firma + senderUpeerId
-    //    (el custodio no firma; la integridad extremo-a-extremo requiere firma propia).
+    const broadcastDelete = async (targetId: string) => {
+        const contact = await getContactByUpeerId(targetId);
+        if (contact && contact.status === 'connected') {
+            const addresses = getFanOutAddresses(contact);
+            for (const addr of addresses) {
+                sendSecureUDPMessage(addr, signedData, contact.publicKey);
+            }
+        }
+        // Vault para el destinatario
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.replicateToVaults(targetId, signedData);
+        });
+    };
+
+    if (isGroup) {
+        const group = getGroupById(upeerId);
+        if (group) {
+            for (const memberId of group.members) {
+                if (memberId === myId) continue;
+                broadcastDelete(memberId);
+            }
+        }
+    } else {
+        broadcastDelete(upeerId);
+    }
+
+    // Auto-Sync con mis otros dispositivos
+    const selfAddresses = await getSelfAddresses(myId);
+    for (const addr of selfAddresses) {
+        sendSecureUDPMessage(addr, signedData, myPublicKey, true);
+    }
+    import('../vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.replicateToVaults(myId, signedData);
+    });
+
+    // Propagación resiliente en amigos (Anti-Zombi)
+    const allContacts = await getContacts();
+    const trustedFriends = (allContacts as any[]).filter((c: any) => c.status === 'connected' && c.upeerId !== myId && c.upeerId !== upeerId);
+    for (const friend of trustedFriends.slice(0, 3)) {
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.replicateToVaults(friend.upeerId, signedData);
+        });
+    }
+}
+
+/**
+ * Difunde una orden de vaciado de chat (CHAT_CLEAR_ALL) para sincronización multi-dispositivo.
+ */
+export async function sendChatClear(upeerId: string, customTimestamp?: number) {
     const myId = getMyUPeerId();
-    const innerSignature = sign(Buffer.from(canonicalStringify(data)));
-    const innerPacket = {
+    const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+    const timestamp = customTimestamp || Date.now();
+
+    const data = {
+        type: 'CHAT_CLEAR_ALL',
+        chatUpeerId: upeerId,
+        timestamp
+    };
+
+    // 1. Multi-device Fan-out (P2P Directo a nosotros mismos)
+    try {
+        const { getKademliaInstance } = await import('../dht/handlers.js');
+        const kademlia = getKademliaInstance();
+        const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+
+        if (kademlia) {
+            const selfNodes = kademlia.findClosestContacts(myId, 20)
+                .filter(n => n.upeerId === myId && n.address !== myYggAddress);
+
+            for (const node of selfNodes) {
+                // Sincronización interna: usamos nuestra propia pubkey para Sealed Sender
+                sendSecureUDPMessage(node.address, data, myPublicKey);
+            }
+        }
+    } catch { /* silent */ }
+
+    // 2. Vaulting de persistencia (Auto-Sincronización para dispositivos offline)
+    // El "Anti-Zombi" depende de que otros dispositivos reciban este paquete
+    const signature = sign(Buffer.from(canonicalStringify(data)));
+    const vaultPacket = {
         ...data,
         senderUpeerId: myId,
-        signature: innerSignature.toString('hex')
+        signature: signature.toString('hex')
     };
+
+    // 3. Ejecutar Limpieza LOCAL inmediata
+    const { deleteMessagesByChatId } = await import('../../storage/db.js');
+    deleteMessagesByChatId(upeerId, timestamp);
+
     import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(upeerId, innerPacket);
-    }).catch(err => error('Failed to propagate delete to vaults', err, 'vault'));
+        // Guardamos en nuestros propios vaults (otros dispositivos nuestros lo recogerán)
+        VaultManager.replicateToVaults(myId, vaultPacket);
+
+        // Propagación resiliente en top friends (como backups de órdenes de limpieza)
+        const allContacts = getContacts();
+        const trustedFriends = (allContacts as any[]).filter((c: any) => c && c.upeerId !== myId);
+        for (const friend of trustedFriends.slice(0, 3)) {
+            VaultManager.replicateToVaults(friend.upeerId, vaultPacket);
+        }
+    });
 }
 

@@ -23,7 +23,8 @@ COPY gen_config.py .
 COPY entrypoint_bot.sh .
 RUN chmod +x entrypoint_bot.sh
 
-RUN yggdrasil -genconf > /etc/yggdrasil.conf && python3 gen_config.py
+# Configuración se genera en tiempo de ejecución (entrypoint_bot.sh)
+# para que cada contenedor tenga su propia IP de Yggdrasil.
 
 ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["./entrypoint_bot.sh"]

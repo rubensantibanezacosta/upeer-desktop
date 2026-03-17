@@ -201,7 +201,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                                                         color="primary"
                                                         onClick={e => e.stopPropagation()}
                                                     />
-                                                    <Avatar size="sm" color="neutral">{c.name[0]}</Avatar>
+                                                    <Avatar size="sm" color="neutral" sx={{ borderRadius: 'md' }}>{c.name[0]}</Avatar>
                                                     <Typography level="body-sm" sx={{ fontWeight: 500 }}>{c.name}</Typography>
                                                 </Box>
                                             </ListItem>

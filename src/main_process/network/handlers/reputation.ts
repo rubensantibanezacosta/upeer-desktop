@@ -6,13 +6,30 @@ export function handleReputationGossip(
     sendResponse: (ip: string, data: any) => void,
     rinfo: { address: string; port: number }
 ) {
-    // Recibimos la lista de IDs que tiene el peer
-    // → respondemos con los que nos faltan (máx 100)
-    const ourIds = new Set(getGossipIds());
-    const theirIds: string[] = data.ids ?? [];
-    const missing = theirIds.filter(id => !ourIds.has(id)).slice(0, 100);
-    if (missing.length > 0) {
-        sendResponse(rinfo.address, { type: 'REPUTATION_REQUEST', missing });
+    // BUG REP-GOSP fix: responder con los IDs que NOSOTROS tenemos y el peer NO tiene.
+    // En un G-Set CRDT, el gossip debe ser bidireccional o permitir que ambos nodos
+    // detecten lo que falta.
+    const theirIds = new Set<string>(data.ids ?? []);
+    const ourIds = getGossipIds();
+
+    // 1. Identificar qué nos falta a nosotros del peer (ya existente)
+    const ourMissing = Array.from(theirIds).filter(id => !ourIds.includes(id)).slice(0, 50);
+    if (ourMissing.length > 0) {
+        sendResponse(rinfo.address, { type: 'REPUTATION_REQUEST', missing: ourMissing });
+    }
+
+    // 2. Identificar qué le falta al peer de nuestra base de datos e informarle
+    // Limitamos a 50 para no saturar el canal UDP. 
+    // Al enviarle un REPUTATION_GOSSIP con nuestros IDs, el peer podrá 
+    // iniciar su propio REPUTATION_REQUEST en el siguiente ciclo.
+    const theirMissing = ourIds.filter(id => !theirIds.has(id)).slice(0, 50);
+    if (theirMissing.length > 0) {
+        // BUG REP-GOSP-PUSH: Empujar activamente nuestros IDs faltantes para
+        // acelerar la convergencia del CRDT sin esperar a su heartbeat.
+        sendResponse(rinfo.address, {
+            type: 'REPUTATION_GOSSIP',
+            ids: ourIds.slice(0, 100) // Enviamos nuestra lista para que él pida
+        });
     }
 }
 

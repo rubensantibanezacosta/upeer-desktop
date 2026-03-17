@@ -10,7 +10,7 @@ import {
   getBlockedContacts,
   deleteMessagesByChatId
 } from '../../storage/db.js';
-import { sendContactRequest, acceptContactRequest } from '../../network/server/index.js';
+import { sendContactRequest, acceptContactRequest, sendChatClear } from '../../network/server/index.js';
 import { computeScore } from '../../security/reputation/vouches.js';
 
 /**
@@ -26,10 +26,22 @@ export function registerContactHandlers(): void {
         .map((c: any) => c.upeerId as string)
     );
 
-    return contacts.map(contact => ({
-      ...contact,
-      vouchScore: computeScore(contact.upeerId ?? '', directContactIds),
-    }));
+    return contacts.map(contact => {
+      let known: string[] = [];
+      if (contact.knownAddresses) {
+        try {
+          known = typeof contact.knownAddresses === 'string' 
+            ? JSON.parse(contact.knownAddresses) 
+            : contact.knownAddresses;
+        } catch { /* ignore */ }
+      }
+
+      return {
+        ...contact,
+        knownAddresses: known,
+        vouchScore: computeScore(contact.upeerId ?? '', directContactIds),
+      };
+    });
   });
 
   ipcMain.handle('add-contact', async (event, { address, name }) => {
@@ -81,6 +93,22 @@ export function registerContactHandlers(): void {
   ipcMain.handle('delete-contact', (event, { upeerId }) => {
     deleteMessagesByChatId(upeerId); // Bug EX fix: borrar mensajes huérfanos del contacto eliminado
     return deleteContact(upeerId);
+  });
+
+  ipcMain.handle('clear-chat', async (event, { upeerId }) => {
+    try {
+      // 1. Limpieza local y persistencia del timestamp Anti-Zombi
+      const now = Date.now();
+      await deleteMessagesByChatId(upeerId, now);
+
+      // 2. Propagación global: Sincroniza el vaciado con mis otros dispositivos y mis bóvedas
+      // Esto asegura que si entro desde otro PC, el chat también se vea vacío.
+      await sendChatClear(upeerId, now);
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
   });
 
   ipcMain.handle('block-contact', (event, { upeerId }) => blockContact(upeerId));

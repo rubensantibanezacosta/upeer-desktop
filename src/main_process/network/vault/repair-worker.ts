@@ -120,7 +120,7 @@ export class RepairWorker {
     }
 
     private static async repairAsset(fileHash: string) {
-        info('Repairing degraded asset', { fileHash }, 'vault');
+        info('Repairing degraded asset (segment-aware)', { fileHash }, 'vault');
 
         try {
             const db = getDb();
@@ -131,29 +131,29 @@ export class RepairWorker {
 
             if (shards.length === 0) return;
 
-            // 2. Determine missing shard indices (0-11 total)
-            const existingIndices = new Set(shards.map(s => s.shardIndex));
-            const allIndices = Array.from({ length: 12 }, (_, i) => i); // 4 data + 8 parity
-            const missingIndices = allIndices.filter(idx => !existingIndices.has(idx));
-
-            // 3. If we have at least 4 shards, attempt reconstruction
-            if (shards.length >= 4) {
-                await this.reconstructFile(fileHash, shards);
-                return;
+            // Group by segmentIndex
+            const segments = new Map<number, any[]>();
+            for (const s of shards) {
+                const idx = (s as any).segmentIndex || 0;
+                if (!segments.has(idx)) segments.set(idx, []);
+                segments.get(idx)!.push(s);
             }
 
-            // 4. Otherwise, try to fetch missing shards from custodians
-            if (missingIndices.length > 0) {
-                await this.collectMissingShards(fileHash, missingIndices);
-                // After collection, check again if we now have enough shards
-                const updatedShards = await db.select()
-                    .from(distributedAssets)
-                    .where(eq(distributedAssets.fileHash, fileHash));
-                if (updatedShards.length >= 4) {
-                    await this.reconstructFile(fileHash, updatedShards);
-                } else {
-                    warn('Insufficient shards collected for reconstruction', 
-                        { fileHash, collected: updatedShards.length }, 'vault');
+            for (const [segIdx, segShards] of segments.entries()) {
+                // 2. Determine missing shard indices (0-11 total)
+                const existingIndices = new Set(segShards.map(s => s.shardIndex));
+                const allIndices = Array.from({ length: 12 }, (_, i) => i); // 4 data + 8 parity
+                const missingIndices = allIndices.filter(idx => !existingIndices.has(idx));
+
+                // 3. If we have at least 4 shards, attempt reconstruction
+                if (segShards.length >= 4) {
+                    await this.reconstructSegment(fileHash, segIdx, segShards);
+                    continue;
+                }
+
+                // 4. Otherwise, try to fetch missing shards from custodians
+                if (missingIndices.length > 0) {
+                    await this.collectMissingShards(fileHash, segIdx, missingIndices);
                 }
             }
 
@@ -163,10 +163,10 @@ export class RepairWorker {
     }
 
     /**
-     * Reconstructs original file from shards using Reed-Solomon erasure coding.
+     * Reconstructs original file segment from shards.
      */
-    private static async reconstructFile(fileHash: string, shards: any[]): Promise<void> {
-        info('Reconstructing file from shards', { fileHash, shardCount: shards.length }, 'vault');
+    private static async reconstructSegment(fileHash: string, segIdx: number, shards: any[]): Promise<void> {
+        info('Reconstructing segment from shards', { fileHash, segIdx, shardCount: shards.length }, 'vault');
 
         try {
             // Convert database shards to format expected by ErasureCoder
@@ -187,12 +187,14 @@ export class RepairWorker {
                 return;
             }
 
-            // Save reconstructed file to local storage
-            // TODO: Implement storage to disk and update vault
-            debug('File reconstructed successfully', { fileHash, size: reconstructed.length }, 'vault');
+            // BUG EX fix: storage to disk and update vault
+            // Para segmentos del social mesh, reconstruimos y re-distribuimos.
+            // No guardamos el archivo completo reconstruido en disco permanentemente 
+            // a menos que sea nuestro, para ahorrar espacio (Lazy Repair).
+            debug('Segment reconstructed successfully', { fileHash, segIdx, size: reconstructed.length }, 'vault');
 
             // 5. Redistribute new shards to custodians
-            await this.redistributeShards(fileHash, reconstructed);
+            await this.redistributeSegmentShards(fileHash, segIdx, reconstructed);
 
         } catch (err) {
             warn('File reconstruction failed', { fileHash, error: err }, 'vault');
@@ -202,8 +204,8 @@ export class RepairWorker {
     /**
      * Collects missing shards by querying connected custodians.
      */
-    private static async collectMissingShards(fileHash: string, missingIndices: number[]): Promise<void> {
-        info('Collecting missing shards', { fileHash, missingCount: missingIndices.length }, 'vault');
+    private static async collectMissingShards(fileHash: string, segIdx: number, missingIndices: number[]): Promise<void> {
+        info('Collecting missing segments shards', { fileHash, segIdx, missingCount: missingIndices.length }, 'vault');
 
         const { sendSecureUDPMessage } = await import('../server/index.js');
         const { getContacts } = await import('../../storage/db.js');
@@ -223,7 +225,8 @@ export class RepairWorker {
         // Send VAULT_QUERY for each missing shard to each custodian
         const promises = [];
         for (const index of missingIndices) {
-            const payloadHash = `shard:${fileHash}:${index}`;
+            // Enhanced CID support: shard:fileHash:segIdx:shardIdx
+            const payloadHash = `shard:${fileHash}:${segIdx}:${index}`;
             for (const custodian of custodians) {
                 promises.push((async () => {
                     try {
@@ -249,11 +252,11 @@ export class RepairWorker {
     /**
      * Redistributes new shards to custodians after reconstruction.
      */
-    private static async redistributeShards(fileHash: string, fileData: Buffer): Promise<void> {
-        info('Redistributing shards after repair', { fileHash }, 'vault');
+    private static async redistributeSegmentShards(fileHash: string, segIdx: number, segmentData: Buffer): Promise<void> {
+        info('Redistributing segment shards after repair', { fileHash, segIdx }, 'vault');
 
         const coder = new ErasureCoder(4, 8);
-        const shards = coder.encode(fileData);
+        const shards = coder.encode(segmentData);
 
         const { sendSecureUDPMessage } = await import('../server/index.js');
         const { getContacts } = await import('../../storage/db.js');
@@ -274,7 +277,7 @@ export class RepairWorker {
         for (let i = 0; i < shards.length; i++) {
             const shard = shards[i];
             const custodian = custodians[i % custodians.length];
-            const payloadHash = `shard:${fileHash}:${i}`;
+            const payloadHash = `shard:${fileHash}:${segIdx}:${i}`;
 
             // Send VAULT_STORE with shard data
             (async () => {

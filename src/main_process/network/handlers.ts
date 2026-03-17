@@ -72,12 +72,15 @@ export async function handlePacket(
         // podría falsificarla para evadir su propio límite o degradar el de otra IP.
         const tcpSourceAddress = rinfo.address;
 
-        // Cuando el tráfico entra reenviado por yggstack (-remote-tcp), rinfo.address
-        // es 127.0.0.1. El emisor firma su dirección Yggdrasil real dentro del paquete
-        // (senderYggAddress), así que la usamos como fuente autoritativa para el routing,
-        // pero solo después de que la firma haya sido verificada (ver sección 3 más abajo).
+        // ── Anti-Spoofing & Proxy Detection ──
+        // Si el tráfico viene de localhost, es un forward de yggstack. Usamos senderYggAddress.
+        // Si viene de una IP remota, preferimos responder a la IP de transporte real 
+        // para evitar ataques de reflexión (hacer que enviemos PONG/ACCEPT a una víctima).
+        const isLocalSource = tcpSourceAddress === '127.0.0.1' || tcpSourceAddress === '::1';
         if (senderYggAddress && /^[23][0-9a-f]{2}:/i.test(senderYggAddress)) {
-            rinfo = { ...rinfo, address: senderYggAddress };
+            if (isLocalSource) {
+                rinfo = { ...rinfo, address: senderYggAddress };
+            }
         }
 
         // Special logging for FILE_CHUNK to debug missing chunk 0
@@ -276,6 +279,22 @@ export async function handlePacket(
                 break;
             case 'CHAT_DELETE':
                 handleIncomingDelete(upeerId, data, win);
+                break;
+            case 'CHAT_CLEAR_ALL':
+                {
+                    const { handleIncomingClear } = await import('./handlers/chat.js');
+                    handleIncomingClear(upeerId, data, win);
+                }
+                break;
+            case 'IDENTITY_UPDATE':
+                // Sincronización de perfil entre nuestros propios dispositivos
+                if (upeerId === (await import('../security/identity.js')).getMyUPeerId()) {
+                    const { setMyAlias, setMyAvatar } = await import('../security/identity.js');
+                    if (data.alias) setMyAlias(data.alias);
+                    if (data.avatar) setMyAvatar(data.avatar);
+                    // Notificar a la UI local que nuestra identidad cambió
+                    win?.webContents.send('identity-updated', { alias: data.alias, avatar: data.avatar });
+                }
                 break;
             case 'FILE_PROPOSAL':
             case 'FILE_START':

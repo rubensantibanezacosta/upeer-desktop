@@ -9,7 +9,7 @@ import {
     MenuButton,
 } from '@mui/joy';
 import ReplyIcon from '@mui/icons-material/Reply';
-import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
+
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import ShortcutOutlinedIcon from '@mui/icons-material/ShortcutOutlined';
@@ -24,8 +24,8 @@ interface MessageContextMenuProps {
     isFile: boolean;
     fileCompleted: boolean;
     onReply: () => void;
-    onReact: (emoji: string) => void;
     onDelete: () => void;
+    sx?: any;
 }
 
 export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
@@ -34,8 +34,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     isFile,
     fileCompleted,
     onReply,
-    onReact,
     onDelete,
+    sx,
 }) => {
     return (
         <Dropdown>
@@ -48,14 +48,19 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                         color: 'neutral' as const,
                         size: 'sm' as const,
                         sx: {
-                            position: 'absolute',
-                            top: 4,
-                            right: 4,
                             '--IconButton-size': '26px',
-                            borderRadius: '50%',
+                            borderRadius: 'sm',
+                            flexShrink: 0,
                             zIndex: 10,
-                            '&:hover': { backgroundColor: 'transparent' },
-                            '&:active': { backgroundColor: 'transparent' },
+                            opacity: 0.7,
+                            '&:hover': {
+                                backgroundColor: 'background.level1',
+                                opacity: 1,
+                            },
+                            '&:active': {
+                                backgroundColor: 'background.level2',
+                            },
+                            ...sx
                         }
                     }
                 }}
@@ -78,12 +83,6 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     <ListItemDecorator sx={{ color: 'inherit' }}><ReplyIcon /></ListItemDecorator>
                     Responder
                 </MenuItem>
-
-                <MenuItem onClick={() => onReact('❤️')}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><AddReactionOutlinedIcon /></ListItemDecorator>
-                    Reaccionar
-                </MenuItem>
-
                 {isFile && fileCompleted && (
                     <MenuItem>
                         <ListItemDecorator sx={{ color: 'inherit' }}><DownloadOutlinedIcon /></ListItemDecorator>

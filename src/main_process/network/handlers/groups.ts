@@ -72,7 +72,7 @@ export async function handleGroupMessage(
     }
 
     // BUG AB fix: igual que BUG P (ya corregido para CHAT), los mensajes de grupo\n    // entregados por múltiples custodios simultáneamente llegaban aquí dos veces\n    // con el mismo msgId. saveMessage usa onConflictDoNothing → changes=0 en la segunda\n    // llamada, pero la emit 'receive-group-message' se hacía igualmente → duplicados en UI.
-    const savedGroup = saveMessage(msgId, groupId, false, displayContent, replyTo, undefined, 'delivered');
+    const savedGroup = await saveMessage(msgId, groupId, false, displayContent, replyTo, undefined, 'delivered', upeerId);
     const isNewGroupMsg = (savedGroup as any)?.changes > 0;
 
     // Notify sender that we received the message
@@ -96,12 +96,14 @@ export async function handleGroupMessage(
     }
 }
 
-export function handleGroupAck(upeerId: string, data: any, win: BrowserWindow | null) {
+export async function handleGroupAck(upeerId: string, data: any, win: BrowserWindow | null) {
     const { id: msgId, groupId } = data;
     // Bug FE fix: misma protección UUID aplicada a los ACKs de grupo.
     if (!msgId || !_UUID_RE.test(String(msgId))) return;
-    updateMessageStatus(msgId, 'delivered');
-    win?.webContents.send('group-message-delivered', { id: msgId, groupId, upeerId });
+    if (await updateMessageStatus(msgId, 'delivered')) {
+        win?.webContents.send('group-message-delivered', { id: msgId, groupId, upeerId });
+        win?.webContents.send('message-status-updated', { id: msgId, status: 'delivered' });
+    }
 }
 
 export async function handleGroupInvite(
@@ -297,9 +299,9 @@ export async function handleGroupLeave(
 
     // Save a system message \"X dejó el grupo\" (prefixed so it can be detected when loading from DB)
     const senderName = contact.name || upeerId;
-    const systemMsgId = crypto.randomUUID();
+    const systemMsgId = randomUUID();
     const systemText = `${senderName} dejó el grupo`;
-    saveMessage(systemMsgId, groupId, false, `__SYS__|${systemText}`, undefined, undefined, 'delivered');
+    await saveMessage(systemMsgId, groupId, false, `__SYS__|${systemText}`, undefined, undefined, 'delivered');
 
     // Notify renderer: refresh members + show system message in chat
     win?.webContents.send('group-updated', { groupId, members: newMembers });

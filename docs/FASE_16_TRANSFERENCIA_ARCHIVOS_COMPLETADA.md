@@ -5,7 +5,7 @@
 
 ## 📋 Resumen Ejecutivo
 
-La Fase 16 (Transferencia de Archivos) ha sido **completamente implementada** con todos los componentes backend y frontend funcionales. El sistema permite transferencias P2P seguras de archivos hasta 100MB con fragmentación inteligente, validación de integridad y UI moderna.
+La Fase 16 (Transferencia de Archivos) ha sido **completamente implementada** con todos los componentes backend y frontend funcionales. El sistema permite transferencias P2P seguras de archivos hasta 500MB con fragmentación inteligente, validación de integridad y UI moderna.
 
 ## 🏗️ Arquitectura Implementada
 
@@ -64,7 +64,7 @@ npm run test-file-transfer
 1. **Flujo completo**: Selección → Transferencia → Visualización ✅
 2. **Cancelación**: Interrupción con limpieza adecuada ✅
 3. **Errores**: Manejo de archivos inexistentes, peers no disponibles ✅
-4. **Validación**: Límites de tamaño (100MB) y tipos MIME ✅
+4. **Validación**: Límites de tamaño (500MB) y tipos MIME ✅
 
 ### Errores Corregidos
 
@@ -124,7 +124,7 @@ npm run test-file-transfer
 1. **Envío completo**: Contacto → Adjuntar → Enviar → Ver progreso → Chat
 2. **Recepción**: Notificación → Progreso → Archivo en chat
 3. **Cancelación**: Iniciar grande → Cancelar → Estado "Cancelado"
-4. **Errores**: Archivo >100MB → Error claro con sugerencias
+4. **Errores**: Archivo >500MB → Error claro con sugerencias
 
 ### Casos Límite
 

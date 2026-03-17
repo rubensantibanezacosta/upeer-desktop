@@ -1,5 +1,8 @@
-import { session, app, BrowserWindow } from 'electron';
+import { protocol, net, session, app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
+import { Readable } from 'node:stream';
+import { pathToFileURL } from 'node:url';
 import { spawnYggstack, onYggstackAddress, onYggstackStatus } from '../sidecars/yggstack.js';
 import { initIdentity, isSessionLocked } from '../security/identity.js';
 import { initDB, getContacts } from '../storage/db.js';
@@ -10,6 +13,16 @@ import { setMainWindow, getAllWindows } from './windowManager.js';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
+
+let heartbeatInterval: NodeJS.Timeout | null = null;
+
+export function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    info('[Heartbeat] Intervalo detenido', {}, 'heartbeat');
+  }
+}
 
 /**
  * Inicializa la aplicación cuando Electron está listo
@@ -28,6 +41,118 @@ export async function initializeApp(baseDir: string): Promise<void> {
     proxyBypassRules: 'localhost',
   });
   info('[Proxy] SOCKS5 configurado', { proxy: 'socks5://127.0.0.1:9050', bypass: 'localhost' }, 'proxy');
+
+  // ── 1b. Registrar protocolo custom para media (streaming local) ────────────
+  // Evita cargar archivos grandes en memoria como base64 y permite búsqueda (seek).
+  protocol.handle('media', async (request) => {
+    try {
+      // BUG SEC-DUP fix: eliminar duplicación de declaración de url
+      const url = new URL(request.url);
+      let filePath: string;
+
+      if (process.platform === 'win32') {
+        // En Windows, 'url.hostname' suele ser la letra de unidad (C:) y 'url.pathname' el resto
+        const drive = url.hostname;
+        const remainingPath = decodeURIComponent(url.pathname);
+        filePath = path.normalize(drive + ':' + remainingPath);
+      } else {
+        // En Linux/macOS, el path suele venir en 'url.pathname'
+        filePath = path.normalize(decodeURIComponent(url.pathname));
+        if (!filePath.startsWith('/')) {
+          filePath = '/' + filePath;
+        }
+      }
+
+      // BUG SEC-MP (Multiplatform Path): Normalizar separadores y asegurar slash final para startsWith
+      const normalizeForGrant = (p: string) => {
+        const n = path.normalize(p);
+        return n.endsWith(path.sep) ? n : n + path.sep;
+      };
+
+      const homeDir = normalizeForGrant(app.getPath('home'));
+      const tempDir = normalizeForGrant(app.getPath('temp'));
+      const downloadsDir = normalizeForGrant(app.getPath('downloads'));
+      const userDataDir = normalizeForGrant(app.getPath('userData'));
+
+      // Añadir slash al final de filePath para que .startsWith() no valide "home/user2" cuando el grant es "home/user"
+      const filePathCheck = filePath.endsWith(path.sep) ? filePath : filePath + path.sep;
+
+      const isUnderHome = filePathCheck.startsWith(homeDir);
+      const isUnderTemp = filePathCheck.startsWith(tempDir);
+      const isUnderDownloads = filePathCheck.startsWith(downloadsDir);
+      const isUnderUserData = filePathCheck.startsWith(userDataDir);
+
+      if (!isUnderHome && !isUnderTemp && !isUnderDownloads && !isUnderUserData) {
+        logError('[Protocol] Bloqueado acceso fuera de directorios permitidos', { path: filePath, platform: process.platform }, 'security');
+        return new Response('Access Denied', { status: 403 });
+      }
+
+      // BUG SEC-SD (Sensitive Data): Bloquear acceso a archivos sensibles multiplataforma
+      const sensitivePatterns = [
+        /[\\\/]\.ssh[\\\/]/, /[\\\/]\.gnupg[\\\/]/, /[\\\/]\.aws[\\\/]/,
+        /\.env$/, /config\.json$/, /identity\.json$/,
+        /dht-cache\.json$/, /ratchet-state\.json$/, /\.sqlite-wal$/, /\.sqlite-shm$/
+      ];
+      if (sensitivePatterns.some(pattern => pattern.test(filePath))) {
+        logError('[Protocol] Bloqueado acceso a archivo sensible', { path: filePath }, 'security');
+        return new Response('Access Denied', { status: 403 });
+      }
+
+      console.log(`[Protocol] Requesting: ${filePath}, Range: ${request.headers.get('range') || 'none'}`);
+
+      try {
+        const stats = await fs.promises.stat(filePath);
+        const range = request.headers.get('range');
+        const ext = path.extname(filePath).toLowerCase();
+
+        const mimeMap: Record<string, string> = {
+          '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',
+          '.avi': 'video/x-msvideo', '.mov': 'video/quicktime', '.jpg': 'image/jpeg',
+          '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp'
+        };
+        const contentType = mimeMap[ext] || 'application/octet-stream';
+
+        let responseStatus = 200;
+        let start = 0;
+        let end = stats.size - 1;
+
+        if (range) {
+          const parts = range.replace(/bytes=/, "").split("-");
+          start = parseInt(parts[0], 10);
+          end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
+          responseStatus = 206;
+          console.log(`[Protocol] Serving 206 Partial Content: ${start}-${end}/${stats.size}`);
+        } else {
+          console.log(`[Protocol] Serving 200 OK (Full File): ${stats.size} bytes`);
+        }
+
+        const chunksize = (end - start) + 1;
+        const stream = fs.createReadStream(filePath, { start, end });
+
+        // Convertir el stream de Node a un ReadableStream de la Web para la Response
+        // @ts-ignore
+        const webStream = Readable.toWeb(stream);
+
+        return new Response(webStream as any, {
+          status: responseStatus,
+          statusText: responseStatus === 206 ? 'Partial Content' : 'OK',
+          headers: {
+            'Content-Type': contentType,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize.toString(),
+            'Content-Range': responseStatus === 206 ? `bytes ${start}-${end}/${stats.size}` : undefined as any,
+          }
+        });
+      } catch (e) {
+        console.error(`[Protocol] Error sirviendo ${filePath}:`, e);
+        return new Response('File error', { status: 404 });
+      }
+    } catch (err) {
+      logError('[Protocol] Error crítico en media://', { err: String(err), url: request.url }, 'app');
+      return new Response('Invalid media URL', { status: 400 });
+    }
+  });
+  info('[Protocol] media:// registrado', {}, 'app');
 
   // ── 2. Arrancar el sidecar yggstack en user-space ─────────────────────────
   //
@@ -99,7 +224,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   }
 
   // Heartbeat every 30s
-  setInterval(() => {
+  heartbeatInterval = setInterval(() => {
     if (isSessionLocked()) return;
     broadcastDhtUpdate(); // Detect IP changes and broadcast
     const contacts = getContacts();

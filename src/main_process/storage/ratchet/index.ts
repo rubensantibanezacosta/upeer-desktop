@@ -11,30 +11,35 @@ import {
 } from '../../security/ratchet.js';
 
 /** Cargar la sesión ratchet de un contacto, o null si no existe. */
-export function getRatchetSession(upeerId: string): RatchetState | null {
+export function getRatchetSession(upeerId: string): { state: RatchetState, spkIdUsed: number | null } | null {
     const db = getDb();
     const schema = getSchema();
 
     const row = db.select()
         .from(schema.ratchetSessions)
         .where(eq(schema.ratchetSessions.upeerId, upeerId))
-        .get() as { state: string } | undefined;
+        .get() as { state: string, spkIdUsed: number | null } | undefined;
 
     if (!row) return null;
     try {
-        return deserializeState(JSON.parse(row.state) as SerializedRatchetState);
+        const deserialized = deserializeState(JSON.parse(row.state) as SerializedRatchetState);
+        // Priorizar el spkId que viene de la tabla si el JSON no lo tiene (migración suave)
+        if (deserialized.spkIdUsed === null && row.spkIdUsed !== null) {
+            deserialized.spkIdUsed = row.spkIdUsed;
+        }
+        return deserialized;
     } catch {
         return null;
     }
 }
 
 /** Guardar (crear o actualizar) la sesión ratchet de un contacto. */
-export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUsed?: number): void {
+export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUsed?: number | null): void {
     const db = getDb();
     const schema = getSchema();
     const now = Date.now();
 
-    const serialized = JSON.stringify(serializeState(state));
+    const serialized = JSON.stringify(serializeState(state, spkIdUsed));
 
     db.insert(schema.ratchetSessions).values({
         upeerId,
@@ -44,7 +49,7 @@ export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUs
         updatedAt: now,
     }).onConflictDoUpdate({
         target: schema.ratchetSessions.upeerId,
-        set: { state: serialized, updatedAt: now },
+        set: { state: serialized, spkIdUsed: spkIdUsed ?? null, updatedAt: now },
     }).run();
 }
 

@@ -86,7 +86,7 @@ function WarmupOverlay({ networkStatus, address }: { networkStatus: YggNetworkSt
                     <Box sx={{
                         position: 'absolute',
                         inset: 0,
-                        borderRadius: '50%',
+                        borderRadius: 'lg',
                         border: '3px solid',
                         borderColor: 'primary.700',
                         borderTopColor: 'primary.400',

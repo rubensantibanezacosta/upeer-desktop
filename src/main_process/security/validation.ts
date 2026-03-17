@@ -237,6 +237,20 @@ export function validateChatDelete(data: any): ValidationResult {
     return { valid: true };
 }
 
+export function validateChatClear(data: any): ValidationResult {
+    if (!data.chatUpeerId || typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length !== 32) {
+        return { valid: false, error: 'Invalid chatUpeerId (expected 32 chars)' };
+    }
+    if (data.timestamp !== undefined && (typeof data.timestamp !== 'number' || data.timestamp < 0)) {
+        return { valid: false, error: 'Invalid timestamp' };
+    }
+    // Firma obligatoria para CHAT_CLEAR_ALL
+    if (!data.signature || typeof data.signature !== 'string' || data.signature.length !== 128) {
+        return { valid: false, error: 'Invalid or missing signature (expected 128 hex chars)' };
+    }
+    return { valid: true };
+}
+
 export function validateDhtQuery(data: any): ValidationResult {
     if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 32) {
         return { valid: false, error: 'Invalid targetId' };
@@ -693,6 +707,8 @@ export function validateMessage(type: string, data: any): ValidationResult {
             return validateChatUpdate(data);
         case 'CHAT_DELETE':
             return validateChatDelete(data);
+        case 'CHAT_CLEAR_ALL':
+            return validateChatClear(data);
         case 'DHT_QUERY':
             return validateDhtQuery(data);
         case 'DHT_RESPONSE':

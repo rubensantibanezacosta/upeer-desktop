@@ -28,6 +28,7 @@ interface DocumentFileMessageProps {
     safeProgress: number;
     transferState?: string;
     isDownloading: boolean;
+    isVaulting?: boolean;
     onOpen: () => void;
     onCancel: () => void;
     onRetry: () => void;
@@ -50,6 +51,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
     safeProgress,
     transferState,
     isDownloading,
+    isVaulting,
     onOpen,
     onCancel,
     onRetry,
@@ -57,7 +59,8 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
 }) => {
     const getFileExtension = () => {
         const parts = fileName.split('.');
-        return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+        const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+        return isVaulting ? `VAULT • ${ext}` : ext;
     };
 
     return (
@@ -137,18 +140,41 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
             </Box>
 
             {caption && (
-                <Typography level="body-sm" sx={{
-                    mt: 0.5, px: 0.5,
-                    wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                    color: isMe ? 'rgba(255,255,255,0.9)' : 'text.primary',
+                <Box sx={{
+                    px: 1.5,
+                    pt: 1,
+                    pb: 0.5,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    columnGap: 1.5,
+                    rowGap: 0,
+                    alignItems: 'flex-end',
+                    width: '100%',
+                    boxSizing: 'border-box'
                 }}>
-                    {caption}
-                </Typography>
+                    <Typography level="body-md" sx={{
+                        wordBreak: 'break-word',
+                        whiteSpace: 'pre-wrap',
+                        color: 'inherit',
+                        flexGrow: 1,
+                        pb: 0.5
+                    }}>
+                        {caption}
+                    </Typography>
+                    {timestamp && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.8, opacity: 0.8 }}>
+                            <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px' }}>
+                                {timestamp}
+                            </Typography>
+                            {isMe && <MessageStatus status={status} />}
+                        </Box>
+                    )}
+                </Box>
             )}
 
-            {timestamp && (
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                    <Typography level="body-xs" sx={{ color: isMe ? 'rgba(255,255,255,0.7)' : 'text.tertiary', fontSize: '10px' }}>
+            {!caption && timestamp && (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, mt: 0.5, px: 1, pb: 0.5, opacity: 0.8 }}>
+                    <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px' }}>
                         {timestamp}
                     </Typography>
                     {isMe && <MessageStatus status={status} />}

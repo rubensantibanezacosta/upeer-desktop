@@ -16,6 +16,7 @@ export interface FileMessageData {
     tempPath?: string;
     savedPath?: string;
     timestamp?: string;
+    isVaulting?: boolean;
 }
 
 interface FileMessageItemProps {
@@ -25,6 +26,7 @@ interface FileMessageItemProps {
     onOpen?: (fileId: string) => void;
     onCancel?: (fileId: string) => void;
     onRetry?: (fileId: string) => void;
+    onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
     status?: string;
 }
 
@@ -35,25 +37,29 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     onOpen,
     onCancel,
     onRetry,
+    onMediaClick,
     status = 'sent',
 }) => {
     const {
         fileId, fileName, fileSize, mimeType, thumbnail,
         transferState = 'completed',
         direction = 'receiving',
-        progress = 100,
-        savedPath, timestamp, caption,
+        progress,
+        savedPath, timestamp, caption, isVaulting
     } = data;
-
-    const safeProgress = progress != null && !isNaN(progress) ? progress : 100;
-    const [isDownloading, setIsDownloading] = useState(false);
-
-    const isImage = mimeType.startsWith('image/');
-    const isVideo = mimeType.startsWith('video/');
 
     const isTransferComplete = transferState === 'completed';
     const isTransferInProgress = transferState === 'pending' || transferState === 'active';
     const isTransferFailed = transferState === 'failed';
+
+    // Improved safeProgress logic: default to 0 during transfer, 100 when done
+    const safeProgress = progress != null && !isNaN(progress)
+        ? progress
+        : (isTransferComplete ? 100 : 0);
+
+    const [isDownloading, setIsDownloading] = useState(false);
+    const isImage = mimeType.startsWith('image/');
+    const isVideo = mimeType.startsWith('video/');
 
     const handleDownload = async () => {
         if (onDownload && isTransferComplete) {
@@ -69,11 +75,12 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
         isTransferComplete, isTransferInProgress, isTransferFailed,
         savedPath, direction,
         safeProgress, transferState,
-        isDownloading,
+        isDownloading, isVaulting,
         onOpen: () => onOpen && isTransferComplete && savedPath && onOpen(fileId),
         onCancel: () => onCancel && (transferState === 'pending' || transferState === 'active') && onCancel(fileId),
         onRetry: () => onRetry && isTransferFailed && onRetry(fileId),
         onDownload: handleDownload,
+        onMediaClick,
     };
 
     if (isImage || isVideo) {

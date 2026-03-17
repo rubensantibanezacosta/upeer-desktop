@@ -43,18 +43,19 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
                         onClick={() => onOpenSettings && activeView === 'settings' && onOpenSettings()}
+                        sx={{ borderRadius: 'sm' }}
                     >
                         <ChatIcon />
                     </IconButton>
                 </Box>
             </Tooltip>
             <Tooltip title="Actualizaciones" placement="right">
-                <IconButton variant="plain" color="neutral">
+                <IconButton variant="plain" color="neutral" sx={{ borderRadius: 'sm' }}>
                     <DonutLargeIcon />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Comunidades" placement="right">
-                <IconButton variant="plain" color="neutral">
+                <IconButton variant="plain" color="neutral" sx={{ borderRadius: 'sm' }}>
                     <GroupsIcon />
                 </IconButton>
             </Tooltip>
@@ -66,6 +67,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     variant={activeView === 'settings' ? 'soft' : 'plain'}
                     color={activeView === 'settings' ? 'primary' : 'neutral'}
                     onClick={onOpenSettings}
+                    sx={{ borderRadius: 'sm' }}
                 >
                     <SettingsIcon />
                 </IconButton>
@@ -80,6 +82,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         mt: 1,
                         width: 32,
                         height: 32,
+                        borderRadius: 'md',
                         background: myAvatar ? 'transparent' : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
                         fontWeight: 700,
                         fontSize: '14px',

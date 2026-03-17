@@ -1,4 +1,3 @@
-
 import { BrowserWindow } from 'electron';
 import {
     getContactByUpeerId,
@@ -8,9 +7,10 @@ import {
     updateContactPublicKey,
     updateContactEphemeralPublicKey,
     getContactByAddress,
+    updateContactName,
+    updateContactAvatar,
 } from '../../storage/db.js';
 import {
-
     verify,
     getUPeerIdFromPublicKey,
 } from '../../security/identity.js';
@@ -20,11 +20,9 @@ import { issueVouch, VouchType, computeScore } from '../../security/reputation/v
 import { network, security, error, warn } from '../../security/secure-logger.js';
 import { runTransaction } from '../../storage/shared.js';
 import { computeKeyFingerprint, updateContactSignedPreKey } from '../../storage/contacts/keys.js';
-import { updateContactName, updateContactAvatar } from '../../storage/db.js';
 import { flushPendingOutbox } from '../../storage/pending-outbox.js';
 import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
 
-// Rate limiter instance (shared with core)
 const rateLimiter = new IdentityRateLimiter();
 
 export async function handleHandshakeReq(
@@ -37,13 +35,11 @@ export async function handleHandshakeReq(
     _sendResponse: (ip: string, data: any) => void,
     _tcpSourceAddress: string
 ): Promise<void> {
-    // Verify signature using provided public key
     if (!signature || !senderUpeerId || !data.publicKey) {
         security('HANDSHAKE_REQ missing required fields', { ip: rinfo.address }, 'network');
         return;
     }
 
-    // Exclude fields that are not part of the signature
     const fieldsToExclude = ['contactCache', 'renewalToken'];
     const dataForVerification = { ...data };
     fieldsToExclude.forEach(field => {
@@ -51,8 +47,6 @@ export async function handleHandshakeReq(
             delete dataForVerification[field];
         }
     });
-    // senderUpeerId y senderYggAddress se incluyen en la firma (desde server.ts)
-    // para evitar address spoofing. Los añadimos aquí para que la verificación sea coherente.
     const payloadForVerification = { ...dataForVerification, senderUpeerId, senderYggAddress };
     const isValidSignature = verify(
         Buffer.from(canonicalStringify(payloadForVerification)),
@@ -61,7 +55,6 @@ export async function handleHandshakeReq(
     );
 
     if (!isValidSignature) {
-        // Backward-compat fallback: peers with old firmware sign without senderYggAddress
         const legacyPayload = { ...dataForVerification, senderUpeerId };
         const legacyValid = verify(
             Buffer.from(canonicalStringify(legacyPayload)),
@@ -74,7 +67,6 @@ export async function handleHandshakeReq(
         }
     }
 
-    // Verify senderUpeerId matches derived ID from public key
     const derivedId = getUPeerIdFromPublicKey(Buffer.from(data.publicKey, 'hex'));
     if (derivedId !== senderUpeerId) {
         security('HANDSHAKE_REQ ID mismatch', { ip: rinfo.address, expected: derivedId, received: senderUpeerId }, 'network');
@@ -83,23 +75,18 @@ export async function handleHandshakeReq(
 
     network('Handshake request verified', rinfo.address, { upeerId: senderUpeerId }, 'handshake');
 
-    // Silently drop packets from blocked contacts
     if (isContactBlocked(senderUpeerId)) {
         security('Blocked contact attempted handshake', { upeerId: senderUpeerId, ip: rinfo.address }, 'network');
         return;
     }
 
-    // Apply identity-based rate limiting
     if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, data.type)) {
-        // Silently drop packet when rate limited (already logged by rate limiter)
         return;
     }
 
-    // Check if contact already exists
     const existingContact = await getContactByUpeerId(senderUpeerId);
     const isNewContact = !existingContact;
 
-    // Require PoW for new contacts (Sybil resistance)
     if (isNewContact) {
         if (!data.powProof) {
             security('New contact requires PoW proof', { upeerId: senderUpeerId, ip: rinfo.address }, 'pow');
@@ -114,7 +101,6 @@ export async function handleHandshakeReq(
 
     issueVouch(senderUpeerId, VouchType.HANDSHAKE).catch((err) => warn('Failed to issue vouch for handshake', err, 'reputation'));
 
-    // Si ya tenemos vouches del nodo y su score es bajo, alertar
     const { getContacts: _gc } = await import('../../storage/db.js').catch(() => ({ getContacts: () => [] })) as any;
     const _contacts = _gc() as any[];
     const _directIds = new Set<string>(_contacts.filter((c: any) => c.status === 'connected' && c.upeerId).map((c: any) => c.upeerId as string));
@@ -129,9 +115,6 @@ export async function handleHandshakeReq(
         });
     }
 
-    // BUG BD fix: rechazar handshake de contactos bloqueados antes de llamar a
-    // addOrUpdateContact. Sin esta guarda, un contacto bloqueado que enviara un
-    // HANDSHAKE_REQ obtenía status 'incoming' en el upsert, saltándose el bloqueo.
     if (existingContact?.status === 'blocked') {
         security('Rejected handshake from blocked contact', { upeerId: senderUpeerId, ip: rinfo.address }, 'security');
         return;
@@ -139,11 +122,9 @@ export async function handleHandshakeReq(
 
     const isAlreadyConnected = existingContact?.status === 'connected';
     const newStatus = isAlreadyConnected ? 'connected' : 'incoming';
-    // Bug FA fix: limitar alias a 100 chars para evitar DoS por nombres gigantes
     const rawAlias = typeof data.alias === 'string' ? data.alias.slice(0, 100) : null;
     const alias = rawAlias || existingContact?.name || `Peer ${senderUpeerId.slice(0, 4)}`;
 
-    // ── TOFU check: detectar si la clave estática cambió ─────────────
     if (isAlreadyConnected && existingContact?.publicKey && existingContact.publicKey !== data.publicKey) {
         win?.webContents.send('key-change-alert', {
             upeerId: senderUpeerId,
@@ -154,42 +135,41 @@ export async function handleHandshakeReq(
         security('TOFU: static public key changed on re-handshake!', { upeerId: senderUpeerId, ip: rinfo.address }, 'security');
     }
 
-    // Bug FI fix: ephemeralPublicKey debe ser hex de 64 chars (Curve25519 = 32 bytes).
-    // Sin validación, un peer puede enviar strings arbitrarios que se persisten en la DB.
     const safeEphKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
         ? data.ephemeralPublicKey : undefined;
-    addOrUpdateContact(senderUpeerId, rinfo.address, alias, data.publicKey, newStatus, safeEphKey);
 
-    // Guardar Signed PreKey del contacto para futuros X3DH / Double Ratchet
-    if (data.signedPreKey && typeof data.signedPreKey === 'object') {
-        const { spkPub, spkSig, spkId } = data.signedPreKey;
-        if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
-            try {
-                const spkValid = verify(
-                    Buffer.from(spkPub, 'hex'),
-                    Buffer.from(spkSig, 'hex'),
-                    Buffer.from(data.publicKey, 'hex')
-                );
-                if (spkValid) {
-                    import('../../storage/contacts/keys.js').then(({ updateContactSignedPreKey }) => {
-                        updateContactSignedPreKey(senderUpeerId, spkPub, spkSig, spkId);
-                    }).catch((err) => warn('Dynamic import failed', err, 'import'));
-                } else {
-                    security('HANDSHAKE_REQ: firma SPK inválida', { upeerId: senderUpeerId }, 'security');
+    try {
+        runTransaction(() => {
+            addOrUpdateContact(senderUpeerId, rinfo.address, alias, data.publicKey, newStatus, safeEphKey, undefined, undefined, undefined, data.addresses);
+
+            if (data.signedPreKey && typeof data.signedPreKey === 'object') {
+                const { spkPub, spkSig, spkId } = data.signedPreKey;
+                if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
+                    try {
+                        const spkValid = verify(
+                            Buffer.from(spkPub, 'hex'),
+                            Buffer.from(spkSig, 'hex'),
+                            Buffer.from(data.publicKey, 'hex')
+                        );
+                        if (spkValid) {
+                            updateContactSignedPreKey(senderUpeerId, spkPub, spkSig, spkId);
+                        } else {
+                            security('HANDSHAKE_REQ: firma SPK inválida', { upeerId: senderUpeerId }, 'security');
+                        }
+                    } catch (err) { warn('Error in SPK verification', err, 'security'); }
                 }
-            } catch (err) { warn('Error in SPK verification', err, 'security'); }
-        }
-    }
+            }
 
-    // Save avatar if provided by the peer (Bug FA fix: ≤ 2 MB)
-    if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
-        import('../../storage/db.js').then(({ updateContactAvatar }) => {
-            updateContactAvatar?.(senderUpeerId, data.avatar);
-        }).catch((err) => warn('Failed to update contact avatar', err, 'db'));
+            if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
+                updateContactAvatar(senderUpeerId, data.avatar);
+            }
+        });
+    } catch (err) {
+        error('Transaction failed in handshake request', err, 'db');
+        return;
     }
 
     if (isAlreadyConnected) {
-        // If they re-request connection but are already accepted, silently accept and refresh presence
         win?.webContents.send('contact-presence', { upeerId: senderUpeerId, lastSeen: new Date().toISOString() });
 
         import('../server/index.js').then(({ acceptContactRequest }) => {
@@ -219,13 +199,11 @@ export async function handleHandshakeAccept(
     _sendResponse: (ip: string, data: any) => void,
     _tcpSourceAddress: string
 ): Promise<void> {
-    // Verify signature using provided public key
     if (!signature || !senderUpeerId || !data.publicKey) {
         security('HANDSHAKE_ACCEPT missing required fields', { ip: rinfo.address }, 'network');
         return;
     }
 
-    // Verificar con senderUpeerId + senderYggAddress (formato post-Phase4)
     const acceptPayload = { ...data, senderUpeerId, senderYggAddress };
     let isValidAcceptSignature = verify(
         Buffer.from(canonicalStringify(acceptPayload)),
@@ -233,7 +211,6 @@ export async function handleHandshakeAccept(
         Buffer.from(data.publicKey, 'hex')
     );
     if (!isValidAcceptSignature) {
-        // Fallback: sin senderYggAddress (peers con firmware anterior)
         const legacyAcceptPayload = { ...data, senderUpeerId };
         isValidAcceptSignature = verify(
             Buffer.from(canonicalStringify(legacyAcceptPayload)),
@@ -242,7 +219,6 @@ export async function handleHandshakeAccept(
         );
     }
     if (!isValidAcceptSignature) {
-        // Super-legacy: solo los datos del paquete (firmware muy antiguo)
         isValidAcceptSignature = verify(
             Buffer.from(canonicalStringify(data)),
             Buffer.from(signature, 'hex'),
@@ -255,7 +231,6 @@ export async function handleHandshakeAccept(
         return;
     }
 
-    // Verify senderUpeerId matches derived ID from public key
     const derivedId = getUPeerIdFromPublicKey(Buffer.from(data.publicKey, 'hex'));
     if (derivedId !== senderUpeerId) {
         security('HANDSHAKE_ACCEPT ID mismatch', { ip: rinfo.address, expected: derivedId, received: senderUpeerId }, 'network');
@@ -264,13 +239,10 @@ export async function handleHandshakeAccept(
 
     network('Handshake accepted verified', rinfo.address, { upeerId: senderUpeerId }, 'handshake');
 
-    // Apply identity-based rate limiting
     if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, data.type)) {
-        // Silently drop packet when rate limited (already logged by rate limiter)
         return;
     }
 
-    // Limpieza de fantasmas: Borramos cualquier rastro previo de esta IP si era un temporal
     const ghost = await getContactByAddress(rinfo.address);
     if (ghost && ghost.upeerId.startsWith('pending-')) {
         deleteContact(ghost.upeerId);
@@ -283,12 +255,10 @@ export async function handleHandshakeAccept(
             keyResult = runTransaction<{ changed: boolean; oldKey?: string; newKey: string }>(() => {
                 const result = updateContactPublicKey(senderUpeerId, data.publicKey);
                 
-                // Bug FI fix: misma validación hex-64 de ephemeralPublicKey.
                 if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
                     updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
                 }
                 
-                // Guardar Signed PreKey del contacto (HANDSHAKE_ACCEPT)
                 if (data.signedPreKey && typeof data.signedPreKey === 'object') {
                     const { spkPub, spkSig, spkId } = data.signedPreKey;
                     if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
@@ -309,12 +279,15 @@ export async function handleHandshakeAccept(
                     }
                 }
                 
-                // Update contact name with their real alias if they provided one (Bug FA fix: ≤ 100 chars)
                 if (data.alias && typeof data.alias === 'string') {
                     updateContactName(senderUpeerId, (data.alias as string).slice(0, 100));
                 }
+
+                const currentAddress = rinfo.address;
+                const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
                 
-                // Update contact avatar if provided (Bug FA fix: ≤ 2 MB)
+                addOrUpdateContact(senderUpeerId, currentAddress, data.alias || existing.name, data.publicKey, 'connected', data.ephemeralPublicKey, undefined, undefined, undefined, incomingAddresses);
+                
                 if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
                     updateContactAvatar(senderUpeerId, data.avatar);
                 }
@@ -326,9 +299,6 @@ export async function handleHandshakeAccept(
             return;
         }
         
-
-        
-        // ⚠️ TOFU alert: la clave criptográfica de este contacto cambió (fuera de transacción)
         const kr = keyResult;
         if (kr.changed && kr.oldKey) {
             win?.webContents.send('key-change-alert', {
@@ -339,8 +309,6 @@ export async function handleHandshakeAccept(
             });
         }
 
-        // Fix 3 — Flush pending outbox: si habíamos intentado escribirle antes de
-        // tener su clave pública, ahora la tenemos → cifrar + vaultear esos mensajes.
         if (data.publicKey) {
             flushPendingOutbox(senderUpeerId, data.publicKey).catch((err) => 
                 warn('Failed to flush pending outbox', err, 'storage')

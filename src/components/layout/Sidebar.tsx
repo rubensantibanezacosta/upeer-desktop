@@ -33,6 +33,7 @@ interface SidebarProps {
     onSelectContact: (id: string) => void;
     onSelectGroup?: (groupId: string) => void;
     onDeleteContact: (id: string) => void;
+    onClearChat: (id: string) => void;
     onLeaveGroup?: (groupId: string) => void;
     selectedId?: string;
     selectedGroupId?: string;
@@ -48,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onSelectContact,
     onSelectGroup,
     onDeleteContact,
+    onClearChat,
     onLeaveGroup,
     selectedId,
     selectedGroupId,
@@ -170,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     {mergedList.map(entry =>
                                         entry.kind === 'group'
                                             ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} />
-                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onDelete={onDeleteContact} isTyping={!!typingStatus[entry.data.upeerId]} />
+                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onDelete={onDeleteContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} />
                                     )}
                                 </List>
                             )}
@@ -213,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     '&:hover': { backgroundColor: 'background.level1' },
                                 }}
                             >
-                                <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
+                                <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
                                     <PersonAddIcon />
                                 </Avatar>
                                 <Box>
@@ -232,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         '&:hover': { backgroundColor: 'background.level1' },
                                     }}
                                 >
-                                    <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
+                                    <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
                                         <GroupAddIcon />
                                     </Avatar>
                                     <Box>
@@ -258,6 +260,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 isSelected={false}
                                 onSelect={handleSelectExisting}
                                 onDelete={() => { }}
+                                onClear={() => { }}
                                 isTyping={false}
                             />
                         ))}

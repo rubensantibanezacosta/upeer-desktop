@@ -9,6 +9,7 @@ declare global {
             deleteContact: (upeerId: string) => Promise<any>;
             blockContact: (upeerId: string) => Promise<any>;
             unblockContact: (upeerId: string) => Promise<any>;
+            clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
             sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<string>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
@@ -44,15 +45,15 @@ declare global {
             onReceive: (callback: (data: any) => void) => void;
             onMessageDelivered: (callback: (data: { id: string, upeerId: string }) => void) => void;
             onMessageRead: (callback: (data: { id: string, upeerId: string }) => void) => void;
-            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, emoji: string, remove: boolean }) => void) => void;
-            onMessageUpdated: (callback: (data: { id: string, upeerId: string, content: string }) => void) => void;
-            onMessageDeleted: (callback: (data: { id: string, upeerId: string }) => void) => void;
+            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, chatUpeerId: string, emoji: string, remove: boolean }) => void) => void;
+            onMessageUpdated: (callback: (data: { id: string, upeerId: string, chatUpeerId: string, content: string }) => void) => void;
+            onMessageDeleted: (callback: (data: { id: string, upeerId: string, chatUpeerId: string }) => void) => void;
             onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => void;
             onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => void;
             onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => void;
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
-            onTyping: (callback: (data: { upeerId: string }) => void) => void;
+            onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;
@@ -74,8 +75,9 @@ declare global {
                 error?: string;
             }>;
             getPathForFile: (file: File) => string;
-            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+            retryFileTransfer: (fileId: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;
             saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
             // BUG EC fix: nuevos métodos para descargar y abrir archivos recibidos

@@ -1,6 +1,6 @@
 import { getDb, getSchema, eq } from '../shared.js';
 
-export function updateMessageStatus(id: string, status: 'sent' | 'delivered' | 'read' | 'vaulted') {
+export async function updateMessageStatus(id: string, status: 'sent' | 'delivered' | 'read' | 'vaulted'): Promise<boolean> {
     const db = getDb();
     const schema = getSchema();
 
@@ -18,13 +18,15 @@ export function updateMessageStatus(id: string, status: 'sent' | 'delivered' | '
         const newRank = statusOrder[status] ?? 0;
 
         // Don't downgrade status (e.g., from 'read' to 'delivered')
-        if (newRank <= currentRank) return;
+        if (newRank <= currentRank) return false;
     }
 
-    return db.update(schema.messages)
+    const result = db.update(schema.messages)
         .set({ status })
         .where(eq(schema.messages.id, id))
         .run();
+
+    return result.changes > 0;
 }
 
 export function getMessageStatus(id: string) {

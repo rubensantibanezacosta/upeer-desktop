@@ -156,7 +156,7 @@ const PeerRow: React.FC<{ peer: PeerStat; maxLatency: number }> = ({ peer, maxLa
 const LiveDot: React.FC<{ freshSec: number }> = ({ freshSec }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <Box sx={{
-            width: 7, height: 7, borderRadius: '50%',
+            width: 7, height: 7, borderRadius: 'sm',
             backgroundColor: freshSec < 12 ? 'success.400' : 'neutral.400',
             animation: freshSec < 12 ? 'pulse 2s ease-in-out infinite' : 'none',
             '@keyframes pulse': {
@@ -243,7 +243,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 display: 'flex', alignItems: 'center', gap: 2,
             }}>
                 <Box sx={{
-                    width: 44, height: 44, borderRadius: '50%',
+                    width: 44, height: 44, borderRadius: 'md',
                     backgroundColor: `${meta.color}.softHoverBg`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>

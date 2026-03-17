@@ -18,6 +18,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   deleteContact: (upeerId) => electron.ipcRenderer.invoke("delete-contact", { upeerId }),
   blockContact: (upeerId) => electron.ipcRenderer.invoke("block-contact", { upeerId }),
   unblockContact: (upeerId) => electron.ipcRenderer.invoke("unblock-contact", { upeerId }),
+  clearChat: (upeerId) => electron.ipcRenderer.invoke("clear-chat", { upeerId }),
   getBlockedContacts: () => electron.ipcRenderer.invoke("get-blocked-contacts"),
   sendMessage: (upeerId, message, replyTo) => electron.ipcRenderer.invoke("send-p2p-message", { upeerId, message, replyTo }),
   sendTypingIndicator: (upeerId) => electron.ipcRenderer.invoke("send-typing-indicator", { upeerId }),
@@ -104,6 +105,10 @@ electron.contextBridge.exposeInMainWorld("upeer", {
     electron.ipcRenderer.removeAllListeners("message-deleted");
     electron.ipcRenderer.on("message-deleted", (event, data) => callback(data));
   },
+  onChatCleared: (callback) => {
+    electron.ipcRenderer.removeAllListeners("chat-cleared");
+    electron.ipcRenderer.on("chat-cleared", (event, data) => callback(data));
+  },
   onMessageStatusUpdated: (callback) => {
     electron.ipcRenderer.removeAllListeners("message-status-updated");
     electron.ipcRenderer.on("message-status-updated", (event, data) => callback(data));
@@ -113,8 +118,9 @@ electron.contextBridge.exposeInMainWorld("upeer", {
     electron.ipcRenderer.on("peer-typing", (event, data) => callback(data));
   },
   // File transfer API (Phase 16)
-  startFileTransfer: (upeerId, filePath, thumbnail) => electron.ipcRenderer.invoke("start-file-transfer", { upeerId, filePath, thumbnail }),
+  startFileTransfer: (upeerId, filePath, thumbnail, caption) => electron.ipcRenderer.invoke("start-file-transfer", { upeerId, filePath, thumbnail, caption }),
   cancelFileTransfer: (fileId, reason) => electron.ipcRenderer.invoke("cancel-file-transfer", { fileId, reason: reason || "User cancelled" }),
+  retryFileTransfer: (fileId) => electron.ipcRenderer.invoke("retry-file-transfer", { fileId }),
   getFileTransfers: () => electron.ipcRenderer.invoke("get-file-transfers"),
   saveTransferredFile: (fileId, destinationPath) => electron.ipcRenderer.invoke("save-transferred-file", { fileId, destinationPath }),
   onFileTransferStarted: (callback) => {
@@ -158,5 +164,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   onYggstackStatus: (callback) => {
     electron.ipcRenderer.removeAllListeners("yggstack-status");
     electron.ipcRenderer.on("yggstack-status", (_event, status, address) => callback(status, address));
-  }
+  },
+  // BUG FIX: Generador de miniaturas nativo
+  generateVideoThumbnail: (filePath) => electron.ipcRenderer.invoke("generate-video-thumbnail", { filePath })
 });

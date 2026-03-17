@@ -95,7 +95,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                     sx={{
                         position: 'relative', cursor: 'pointer',
                         width: 80, height: 80,
-                        borderRadius: '50%',
+                        borderRadius: 'lg',
                         overflow: 'hidden',
                         border: '2px dashed',
                         borderColor: 'divider',
@@ -105,7 +105,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                     <Avatar
                         src={groupAvatar}
                         sx={{
-                            width: '100%', height: '100%', borderRadius: '50%',
+                            width: '100%', height: '100%', borderRadius: 'lg',
                             background: groupAvatar ? undefined : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))'
                         }}
                     >

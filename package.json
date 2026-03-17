@@ -19,7 +19,9 @@
     "lint": "eslint --ext .ts,.tsx .",
     "test-phase11": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --import tsx tests/test_phase11.ts",
     "test-file-transfer": "for f in tests/file-transfer-*.test.ts; do npx tsx $f; done",
-    "test": "npm run test-file-transfer"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "keywords": [],
   "author": {
@@ -37,6 +39,8 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19.2.14",
@@ -45,14 +49,18 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/ui": "^4.1.0",
     "drizzle-kit": "^0.31.9",
     "electron": "40.6.1",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react-hooks": "^4.6.2",
+    "happy-dom": "^20.8.4",
+    "jsdom": "^29.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^4.1.0"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -71,7 +79,6 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-simple-maps": "^3.0.0",
-    "react-virtuoso": "^4.18.3",
     "sodium-native": "^5.0.10",
     "world-atlas": "^2.0.2",
     "zustand": "^5.0.11"

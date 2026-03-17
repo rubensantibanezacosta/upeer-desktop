@@ -10,6 +10,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import ImageIcon from '@mui/icons-material/Image';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { formatFileSize } from '../../../utils/fileUtils.js';
 
@@ -33,13 +34,16 @@ interface MediaFileMessageProps {
     safeProgress: number;
     transferState?: string;
     isDownloading: boolean;
+    isVaulting?: boolean;
     onOpen: () => void;
     onCancel: () => void;
     onRetry: () => void;
     onDownload: () => void;
+    onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
 }
 
 export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
+    fileId,
     fileName,
     fileSize,
     mimeType,
@@ -58,10 +62,12 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     safeProgress,
     transferState,
     isDownloading,
+    isVaulting,
     onOpen,
     onCancel,
     onRetry,
     onDownload,
+    onMediaClick,
 }) => {
     const getFileExtension = () => {
         const parts = fileName.split('.');
@@ -75,31 +81,82 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 width: 260,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
+                justifyContent: 'flex-start',
+                alignItems: 'stretch',
                 cursor: (isTransferComplete && savedPath) ? 'pointer' : 'default',
             }}
-            onClick={(isTransferComplete && savedPath) ? onOpen : undefined}
+            onClick={() => {
+                if (isTransferComplete && savedPath) {
+                    if (onMediaClick) {
+                        onMediaClick({ url: savedPath, name: fileName, mimeType, fileId });
+                    } else {
+                        onOpen();
+                    }
+                }
+            }}
         >
-            {thumbnail ? (
-                <Box
-                    component="img"
-                    src={thumbnail}
-                    alt={fileName}
-                    sx={{
-                        width: '100%',
-                        display: 'block',
-                        objectFit: 'cover',
-                        filter: isTransferComplete ? 'none' : 'blur(4px)',
-                        transition: 'filter 0.3s ease',
-                    }}
-                />
-            ) : (
-                <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'text.secondary' }}>
-                    {isVideo ? <VideoFileIcon sx={{ fontSize: 48 }} /> : <ImageIcon sx={{ fontSize: 48 }} />}
-                    <Typography level="body-xs" sx={{ mt: 1 }}>{getFileExtension()}</Typography>
-                </Box>
-            )}
+            <Box sx={{
+                position: 'relative',
+                width: '100%',
+                display: 'block',
+                overflow: 'hidden',
+                borderTopLeftRadius: isMe ? '12px' : '4px',
+                borderTopRightRadius: isMe ? '4px' : '12px',
+                borderBottomLeftRadius: caption ? 0 : '12px',
+                borderBottomRightRadius: caption ? 0 : '12px',
+            }}>
+                {thumbnail ? (
+                    <Box
+                        component="img"
+                        src={thumbnail}
+                        alt={fileName}
+                        sx={{
+                            width: '100%',
+                            display: 'block',
+                            objectFit: 'cover',
+                            height: 'auto',
+                            maxHeight: 300,
+                            filter: isTransferComplete ? 'none' : 'blur(4px)',
+                            transition: 'filter 0.3s ease',
+                        }}
+                    />
+                ) : (
+                    <Box sx={{
+                        p: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        color: 'text.secondary',
+                        backgroundColor: 'background.level2'
+                    }}>
+                        {isVideo ? <VideoFileIcon sx={{ fontSize: 48 }} /> : <ImageIcon sx={{ fontSize: 48 }} />}
+                        <Typography level="body-xs" sx={{ mt: 1 }}>{getFileExtension()}</Typography>
+                    </Box>
+                )}
+
+                {isVideo && isTransferComplete && (
+                    <IconButton
+                        variant="solid"
+                        color="neutral"
+                        sx={{
+                            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                            borderRadius: 'md',
+                            width: 50, height: 50,
+                            '--IconButton-size': '50px',
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' }
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onMediaClick && savedPath) {
+                                onMediaClick({ url: savedPath, name: fileName, mimeType, fileId });
+                            }
+                        }}
+                    >
+                        <PlayArrowIcon sx={{ fontSize: 32 }} />
+                    </IconButton>
+                )}
+            </Box>
 
             {/* Transfer state overlay */}
             {!isTransferComplete && (
@@ -107,7 +164,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                     position: 'absolute', top: '50%', left: '50%',
                     transform: 'translate(-50%, -50%)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 50, height: 50, borderRadius: '50%',
+                    width: 50, height: 50, borderRadius: 'md',
                     backgroundColor: 'rgba(0,0,0,0.5)', color: 'white',
                 }}>
                     {isTransferInProgress ? (
@@ -130,7 +187,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
                     <IconButton
                         size="lg" variant="solid" color="neutral"
-                        sx={{ borderRadius: '50%', boxShadow: 'md', bgcolor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+                        sx={{ borderRadius: 'md', boxShadow: 'md', bgcolor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
                         onClick={(e) => { e.stopPropagation(); onDownload(); }}
                         disabled={isDownloading}
                     >
@@ -141,55 +198,78 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
 
             {/* File size badge */}
             <Box sx={{
-                position: 'absolute', top: 8, left: 8,
+                position: 'absolute', top: 12, left: 12,
                 display: 'flex', alignItems: 'center', gap: 0.5,
-                p: 0.5, px: 1, borderRadius: 'md',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(4px)', color: 'white',
+                p: 0.6, px: 1.5, borderRadius: '8px',
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(8px)', color: 'white',
+                zIndex: 2,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
             }}>
                 {isVideo && <VideoFileIcon sx={{ fontSize: 14 }} />}
-                <Typography level="body-xs" sx={{ color: 'white', fontWeight: 500 }}>
+                <Typography level="body-xs" sx={{ color: 'white', fontWeight: 700, fontSize: '11px' }}>
                     {formatFileSize(fileSize)}
                 </Typography>
+                {isVaulting && (
+                    <Typography level="body-xs" sx={{ ml: 0.5, bgcolor: 'primary.500', px: 0.6, borderRadius: '4px', fontSize: '9px', fontWeight: 900, color: 'white' }}>
+                        VAULT
+                    </Typography>
+                )}
             </Box>
 
-            {/* Caption */}
+            {/* Caption & Timestamp Container */}
             {caption && (
                 <Box sx={{
-                    p: 1.5, width: '100%',
-                    backgroundColor: isMe ? 'primary.600' : 'background.surface',
-                    color: isMe ? 'white' : 'text.primary',
-                    pb: timestamp ? 3 : 1.5, boxSizing: 'border-box',
+                    px: 1.5,
+                    pt: 1.2,
+                    pb: 0.8,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    columnGap: 1.5,
+                    rowGap: 0,
+                    alignItems: 'flex-end'
                 }}>
-                    <Typography level="body-sm" sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', color: 'inherit' }}>
+                    <Typography level="body-md" sx={{
+                        wordBreak: 'break-word',
+                        whiteSpace: 'pre-wrap',
+                        color: 'inherit',
+                        lineHeight: 1.5,
+                        flexGrow: 1,
+                        pb: 0.2
+                    }}>
                         {caption}
                     </Typography>
+                    {timestamp && (
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            ml: 'auto',
+                            mb: 0.5,
+                            opacity: 0.8
+                        }}>
+                            <Typography level="body-xs" sx={{ fontSize: '10px', color: 'inherit' }}>{timestamp}</Typography>
+                            {isMe && <MessageStatus status={status} />}
+                        </Box>
+                    )}
                 </Box>
             )}
 
-            {/* Timestamp (with caption overlaying bottom of caption) */}
-            {caption && timestamp && (
-                <Box sx={{
-                    position: 'absolute', bottom: 4, right: 8,
-                    display: 'flex', alignItems: 'center', gap: 0.5,
-                    color: isMe ? 'rgba(255,255,255,0.7)' : 'text.tertiary',
-                }}>
-                    <Typography level="body-xs" sx={{ fontSize: '10px', color: 'inherit' }}>{timestamp}</Typography>
-                    {isMe && <MessageStatus status={status} />}
-                </Box>
-            )}
-
-            {/* Timestamp (no caption, placed over the image natively) */}
+            {/* Timestamp (no caption, over the image) */}
             {!caption && timestamp && (
                 <Box sx={{
-                    position: 'absolute', bottom: 4, right: 8,
+                    position: 'absolute', bottom: 10, right: 10,
                     display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                    p: 0.5, px: 1, borderRadius: 'md',
+                    p: 0.5, px: 1, borderRadius: '6px',
                     backgroundColor: 'rgba(0,0,0,0.5)',
-                    backdropFilter: 'blur(4px)',
+                    backdropFilter: 'blur(10px)',
+                    zIndex: 2,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Typography level="body-xs" sx={{ color: 'white', fontSize: '10px' }}>
+                        <Typography level="body-xs" sx={{ color: 'white', fontSize: '10px', fontWeight: 600 }}>
                             {timestamp}
                         </Typography>
                         {isMe && <MessageStatus status={status} />}

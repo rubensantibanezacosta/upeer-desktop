@@ -2,636 +2,735 @@ import hashlib
 import json
 import os
 import random
-import re
 import socket
 import struct
 import subprocess
 import threading
 import time
-from base64 import b64decode, b64encode
-
-import nacl.encoding
+import uuid
+from datetime import datetime
 import nacl.signing
 import nacl.utils
-from nacl.public import Box, PrivateKey, PublicKey
+import nacl.public
 
-# Configuración Base
-YGG_PORT = 19735
+# ─── Configuración y Claves ──────────────────────────────────────────────────
+YGG_PORT = 50005
 BOT_ALIAS = os.getenv("BOT_ALIAS", "Bot")
-SEED_HEX = os.getenv("BOT_SEED", nacl.utils.random(32).hex())
+BOT_PERSONALITY = os.getenv("BOT_PERSONALITY", "friendly")
+KEY_FILE = os.getenv("KEY_FILE")
+TARGET_IDENTITY = os.getenv("TARGET_IDENTITY")
+
+
+def get_or_create_seed():
+    if KEY_FILE and os.path.exists(KEY_FILE):
+        try:
+            with open(KEY_FILE, 'rb') as f:
+                data = f.read()
+                if len(data) == 64:
+                    try:
+                        return data.decode('utf-8').strip()
+                    except:
+                        pass
+                return data.hex()
+        except:
+            pass
+    seed = os.getenv("BOT_SEED", nacl.utils.random(32).hex())
+    if KEY_FILE:
+        try:
+            with open(KEY_FILE, 'w') as f:
+                f.write(seed)
+        except:
+            pass
+    return seed
+
+
+SEED_HEX = get_or_create_seed()
 signing_key = nacl.signing.SigningKey(bytes.fromhex(SEED_HEX))
 verify_key = signing_key.verify_key
-public_key_hex = verify_key.encode().hex()
-my_upeer_id = hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()[:32]
+public_key_bytes = verify_key.encode()
+public_key_hex = public_key_bytes.hex()
+my_upeer_id = hashlib.blake2b(public_key_bytes, digest_size=16).hexdigest()
+
+# Cripto para X3DH (Signed PreKey)
+spk_priv = nacl.public.PrivateKey.generate()
+spk_pub_bytes = spk_priv.public_key.encode()
+spk_sig = signing_key.sign(spk_pub_bytes).signature.hex()
+spk_id = int(time.time())
+ephemeral_pk = nacl.public.PrivateKey.generate().public_key.encode().hex()
+
+# Cripto de Identidad (Curve25519 para Sellado)
+curve_priv_key = signing_key.to_curve25519_private_key()
+sealed_box = nacl.public.SealedBox(curve_priv_key)
+
+# Estado de Red Local
 my_ygg_ip = ""
-my_dht_seq = int(time.time() / 60)
 is_offline = False
-
-known_peers = {}  # upeerId -> {address, pk, ephemeral_pk, dht_seq, signature, expiresAt}
-# Double Ratchet State (simplificado para bots)
-# rid -> { send_key, recv_key, send_idx, recv_idx }
-ratchets = {}
-
+friends = {}  # rid -> {address, pk, status, lastSeen}
+vault_store = {}  # payloadHash -> entry
+transmissions = {}  # fileId -> {total, received}
 peers_lock = threading.Lock()
-dht_store_lock = threading.Lock()
-vault_store_lock = threading.Lock()
+transmissions_lock = threading.Lock()
+completed_transmissions = {}  # fileId -> timestamp
 
-# ALMACENAMIENTO VAULT Y DHT
-vault_store = {}  # payloadHash -> { data, recipientSid, senderSid, expiresAt }
-dht_store = {}    # keyHex -> { value, publisher, timestamp, signature }
+# ─── Serialización Canónica (TypeScript Compatibility) ───────────────────────
 
-# ─── Kademlia Helpers ────────────────────────────────────────────────────────
-
-
-def to_kademlia_id(upeer_id_hex: str):
-    """Convierte upeerId a Kademlia ID (160 bits) igual que la app."""
-    try:
-        h = hashlib.sha256()
-        h.update(bytes.fromhex(upeer_id_hex))
-        return h.digest()[:20]
-    except:
-        return hashlib.sha256(upeer_id_hex.encode()).digest()[:20]
-
-
-my_node_id = to_kademlia_id(my_upeer_id)
-
-
-def xor_distance(id1: bytes, id2: bytes):
-    return int.from_bytes(id1, 'big') ^ int.from_bytes(id2, 'big')
-
-
-def get_closest_nodes(target_hex: str, count=20):
-    """Devuelve los nodos conocidos más cercanos al ID destino."""
-    try:
-        target_id = to_kademlia_id(
-            target_hex) if len(target_hex) <= 32 else bytes.fromhex(target_hex)
-    except:
-        target_id = hashlib.sha256(target_hex.encode()).digest()[:20]
-
-    peers = []
-    with peers_lock:
-        for rid, info in known_peers.items():
-            if 'address' in info and 'pk' in info:
-                peers.append({
-                    "upeerId": rid,
-                    "address": info['address'],
-                    "pk": info['pk'],
-                    "dist": xor_distance(to_kademlia_id(rid), target_id)
-                })
-
-    peers.sort(key=lambda x: x['dist'])
-    return peers[:count]
-
-
-def find_node(sock, target_id: str):
-    """Búsqueda simple de un nodo en la red conocida."""
-    closest = get_closest_nodes(target_id, count=3)
-    for node in closest:
-        if node['upeerId'] == target_id:
-            return node
-    return None
-
-
-def find_value(sock, key: str):
-    """Búsqueda simple de un valor en la DHT."""
-    if key in dht_store:
-        return dht_store[key]['value']
-    return None
-
-# ─── Cripto Helpers ──────────────────────────────────────────────────────────
 
 def canonical_dumps(obj):
-    """Réplica exacta de canonicalStringify de la app (TypeScript)."""
     if isinstance(obj, bool):
         return "true" if obj else "false"
     if obj is None:
         return "null"
     if isinstance(obj, (int, float)):
-        return json.dumps(obj)
+        return json.dumps(obj, separators=(',', ':'))
     if isinstance(obj, str):
-        return json.dumps(obj, ensure_ascii=False)
+        return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
     if isinstance(obj, list):
         return "[" + ",".join(canonical_dumps(i) for i in obj) + "]"
     if isinstance(obj, dict):
-        # Ordenar claves alfabéticamente
         keys = sorted(obj.keys())
         items = []
         for k in keys:
             v = obj[k]
-            if v is None: continue # Ignorar campos nulos como en TS
-            items.append(f'"{k}":{canonical_dumps(v)}')
+            if v is None:
+                items.append(
+                    f'{json.dumps(k, ensure_ascii=False, separators=(",", ":"))}:null')
+            else:
+                items.append(
+                    f'{json.dumps(k, ensure_ascii=False, separators=(",", ":"))}:{canonical_dumps(v)}')
         return "{" + ",".join(items) + "}"
-    return json.dumps(obj)
-
-def sign_data(data: dict) -> str:
-    # Usar canonical_dumps para coincidir con el cliente TS
-    msg_str = canonical_dumps(data)
-    # print(f"[{BOT_ALIAS}] SIGNING: {msg_str}") # Debug para comparar
-    return signing_key.sign(msg_str.encode()).signature.hex()
+    return json.dumps(obj, separators=(',', ':'))
 
 
-def encrypt_for(target_rid: str, plaintext: str):
-    """Cifra un mensaje para un peer usando Curve25519."""
-    peer = known_peers.get(target_rid, {})
-    raw_pk_hex = peer.get('pk')
-    if not raw_pk_hex:
-        return None, None, False
-
-    try:
-        # Simplificación: En lugar de Double Ratchet completo (que requiere
-        # estado persistente y handshakes complejos), usamos sealed boxes
-        # para los bots. La app lo entenderá si viene marcado como tal.
-        target_pk = PublicKey(bytes.fromhex(raw_pk_hex))
-        # Para que la app lo acepte, debería ser un mensaje "X3DH initial" o usar el Ratchet.
-        # Por simplicidad, los bots enviarán mensajes SIN cifrar si la app lo permite,
-        # o usaremos un esquema estático si es necesario.
-        return plaintext, None, False
-    except:
-        return plaintext, None, False
+def sign_pkt(data: dict) -> str:
+    return signing_key.sign(canonical_dumps(data).encode()).signature.hex()
 
 
-def make_location_block(ip: str, seq: int):
-    """Crea un bloque de ubicación firmado idéntico al de la app."""
-    # expiresAt: ahora + 7 días en ms
-    expires = int((time.time() + 7 * 86400) * 1000)
-    data = {
-        "address": ip.lower(),
-        "dhtSeq": seq,
-        "expiresAt": expires
+def generate_pow(target_id: str):
+    nonce = 0
+    difficulty = 4  # Cuatro ceros (16 bits) como pide pow.ts
+    prefix = '0' * difficulty
+    while True:
+        if hashlib.sha256(f"{target_id}{nonce}".encode()).hexdigest().startswith(prefix):
+            return str(nonce)
+        nonce += 1
+        if nonce % 2000 == 0:
+            time.sleep(0.001)
+
+
+def generate_location_block():
+    """Genera un bloque de ubicación firmado para el Social Mesh (Multi-channel)."""
+    now_ms = int(time.time() * 1000)
+    # 30 días (Protocolo Moderno)
+    expires_at = now_ms + (30 * 24 * 3600 * 1000)
+
+    # Recolectar interfaces (Yggdrasil es prioridad)
+    addr_list = []
+    if my_ygg_ip:
+        addr_list.append(my_ygg_ip)
+
+    # Garantizar orden determinista para la firma
+    addresses = sorted(list(set(filter(None, addr_list))))
+    if not addresses:
+        # Fallback si aún no tenemos IP fija
+        addresses = ["127.0.0.1"]
+
+    block_info = {
+        "upeerId": my_upeer_id,
+        "addresses": addresses,
+        "dhtSeq": now_ms,
+        "expiresAt": expires_at
     }
+
+    # La firma DEBE ser sobre el objeto canónico con 'addresses' (plural)
+    sig = signing_key.sign(canonical_dumps(
+        block_info).encode()).signature.hex()
+
     return {
-        **data,
-        "signature": sign_data(data)
+        "address": addresses[0],   # Retrocompatibilidad
+        "addresses": addresses,     # Multi-channel
+        "dhtSeq": now_ms,
+        "signature": sig,
+        "expiresAt": expires_at
     }
 
-# ─── Network Helpers ─────────────────────────────────────────────────────────
+# ─── Motor de Comunicaciones TCP ─────────────────────────────────────────────
 
 
-def send_pkt(sock, addr, data: dict):
-    """Envía un paquete JSON con framing 4B-length por TCP (igual que la app)."""
-    target_ip = addr[0].strip('[]').split(
-        '%')[0] if isinstance(addr, tuple) else str(addr)
-    # senderUpeerId y senderYggAddress se incluyen en la firma para evitar
-    # address spoofing (igual que en server.ts de la app).
-    payload_to_sign = {
-        **data,
-        "senderUpeerId": my_upeer_id,
-        "senderYggAddress": my_ygg_ip.lower() if my_ygg_ip else "",
-    }
-    full = {
-        **payload_to_sign,
-        "signature": sign_data(payload_to_sign),
-    }
-    payload = canonical_dumps(full).encode()
-    frame = struct.pack('>I', len(payload)) + payload
-    time.sleep(0.1)  # Throttling preventivo para no saturar rate limiters
-    try:
-        s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        s.settimeout(5)
-        s.connect((target_ip, YGG_PORT, 0, 0))
-        s.sendall(frame)
-        s.close()
-    except Exception as e:
-        # print(f"[{BOT_ALIAS}] Error TCP a {target_ip}: {e}")
-        pass
+def send(addr, data, silent=False, is_internal_sync=False):
+    if is_offline and data.get('type') not in ['PONG', 'ACK']:
+        return False
+    ip = addr[0] if isinstance(addr, tuple) else addr
 
-
-def get_ygg_ip():
-    try:
-        res = subprocess.check_output(["ip", "-6", "addr", "show"]).decode()
-        for line in res.split('\n'):
-            if "inet6 2" in line and "scope global" in line:
-                return line.strip().split()[1].split('/')[0].lower()
-    except:
-        pass
-    return None
-
-# ─── Handlers ────────────────────────────────────────────────────────────────
-
-
-def send_handshake_req(sock, ip, rid):
-    send_pkt(sock, (ip, YGG_PORT), {
-        "type": "HANDSHAKE_REQ",
-        "publicKey": public_key_hex,
-        "alias": BOT_ALIAS
-    })
-
-
-def send_chat(sock, target_rid, text):
-    content, nonce, encrypted = encrypt_for(target_rid, text)
-    msg_id = os.urandom(8).hex()
+    # Los campos senderUpeerId y senderYggAddress se inyectan en send()
+    # y deben estar presentes para que la firma sea válida en Phase 4.
     payload = {
-        "type": "CHAT",
-        "id": msg_id,
-        "content": content,
+        **data,
+        "senderUpeerId": my_upeer_id
     }
-    if encrypted:
-        payload["nonce"] = nonce
+    if my_ygg_ip and len(my_ygg_ip) > 5:
+        payload["senderYggAddress"] = my_ygg_ip.lower()
 
-    # Intentar envío directo
-    peer = known_peers.get(target_rid)
-    if peer and 'address' in peer:
-        print(f"[{BOT_ALIAS}] → CHAT directo a {target_rid[:8]}…")
-        send_pkt(sock, (peer['address'], YGG_PORT), payload)
-    
-    # Replicar a Vaults para offline (Social Mesh)
-    threading.Thread(target=replicate_to_vaults, args=(sock, target_rid, payload), daemon=True).start()
+    # Firma sobre el payload canónico que incluye metadatos de red (Anti-Spoofing)
+    payload["signature"] = sign_pkt(payload)
 
-
-def replicate_to_vaults(sock, target_rid: str, packet: any):
-    """Replicación Social Mesh: guarda el mensaje en amigos para entrega offline."""
     try:
-        # Re-encriptar para Vault (estático, para que el destinatario pueda leerlo al volver)
-        # En la app usamos las claves de identidad para esto si no hay sesión.
-        store_pkt = {
-            "type": "VAULT_STORE",
-            "payloadHash": hashlib.sha256(json.dumps(packet).encode()).hexdigest(),
-            "recipientSid": target_rid,
-            "senderSid": my_upeer_id,
-            "data": json.dumps(packet).encode().hex(),
-            "expiresAt": int((time.time() + 7 * 86400) * 1000)
-        }
+        body = canonical_dumps(payload).encode('utf-8')
+        frame = struct.pack(">I", len(body)) + body
 
-        # Enviar a amigos conectados (Custodios de nivel 1) - Máximo 3
-        custodians = []
-        closest_friends = get_closest_nodes(target_rid, count=3)
-        for friend in closest_friends:
-            rid = friend['upeerId']
-            if rid == target_rid: continue
-            addr = (friend['address'], YGG_PORT)
-            custodians.append(rid)
-            send_pkt(sock, addr, store_pkt)
-
-        if custodians:
-            # Publicar puntero en DHT (a los 3 nodos más cercanos a la clave)
-            ptr_key = hashlib.sha256(
-                f"vault-ptr:{target_rid}".encode()).hexdigest()[:40]
-            ptr_val = {"custodians": custodians + [my_upeer_id]}
-            
-            targets = get_closest_nodes(ptr_key, count=3)
-            for t in targets:
-                send_pkt(sock, (t['address'], YGG_PORT), {
-                    "type": "DHT_STORE",
-                    "key": ptr_key,
-                    "value": ptr_val
-                })
+        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        with socket.socket(family, socket.SOCK_STREAM) as s:
+            s.settimeout(10)
+            if not silent:
+                print(f"[{BOT_ALIAS}] 🚀 Connecting to {ip}...")
+            # Para IPv6 es mejor usar el formato de 4-tuple (address, port, flowinfo, scope_id)
+            if family == socket.AF_INET6:
+                s.connect((ip, YGG_PORT, 0, 0))
+            else:
+                s.connect((ip, YGG_PORT))
+            s.sendall(frame)
+            if not silent:
+                print(f"[{BOT_ALIAS}] 📤 SENT {data.get('type')} OK")
+            return True
     except Exception as e:
-        print(f"[{BOT_ALIAS}] ❌ Error en replicación Vault: {e}")
+        if not silent:
+            print(f"[{BOT_ALIAS}] ❌ FAIL {data.get('type')} to {ip[:15]}: {e}")
+        return False
 
 
-def send_read(sock, target_rid: str, msg_id: str, addr=None):
-    payload = {"type": "READ", "id": msg_id}
-    print(f"[{BOT_ALIAS}] → READ receipt de msg {msg_id[:8]}… para {target_rid[:8]}…")
-    
-    # Si tenemos una dirección directa y parece fresca, intentar envío directo
-    target_addr = addr
-    if not target_addr:
-        peer = known_peers.get(target_rid, {})
-        if 'address' in peer:
-            target_addr = (peer['address'], YGG_PORT)
-            
-    if target_addr:
+def handle_pkt(pkt, ip, is_inner=False):
+    if is_offline:
+        return
+    p_type = pkt.get('type')
+
+    # Redactar datos sensibles para el log
+    log_pkt = {k: v for k, v in pkt.items() if k not in [
+        'signature', 'publicKey', 'ciphertext', 'content', 'body', 'signedPreKey']}
+    if not is_inner:
+        print(f"[{BOT_ALIAS}] 📥 INCOMING [{p_type}] from {ip}: {json.dumps(log_pkt)}")
+    else:
+        print(f"[{BOT_ALIAS}] 🔐 INNER [{p_type}]: {json.dumps(log_pkt)}")
+
+    # ─── DESENCRIPTADO DE SELLADOS (Privacy Phase) ───
+    if p_type == 'SEALED':
         try:
-            send_pkt(sock, target_addr, payload)
-        except:
-            pass
-            
-    # Replicar a Vaults para asegurar que le llegue aunque se desconecte ahora
-    # (El Social Mesh se encarga de que le llegue al emisor original)
-    threading.Thread(target=replicate_to_vaults, args=(sock, target_rid, payload), daemon=True).start()
-
-
-def send_reaction(sock, target_rid: str, msg_id: str, emoji: str):
-    payload = {
-        "type": "CHAT_REACTION",
-        "msgId": msg_id,
-        "emoji": emoji,
-        "remove": False
-    }
-    
-    # Intentar directo
-    peer = known_peers.get(target_rid, {})
-    if 'address' in peer:
-        send_pkt(sock, (peer['address'], YGG_PORT), payload)
-        
-    # Replicar a Vaults (Social Mesh)
-    threading.Thread(target=replicate_to_vaults, args=(sock, target_rid, payload), daemon=True).start()
-
-
-def handle_pkt(sock, data, addr):
-    global my_dht_seq
-    try:
-        pkt = json.loads(data.decode())
-        p_type = pkt.get('type')
-        sender_rid = pkt.get('senderUpeerId')
-        src_ip = addr[0]
-
-        if not sender_rid:
+            eph_pub = pkt.get('senderEphPub')
+            nonce = pkt.get('nonce')
+            ct = pkt.get('ciphertext')
+            if eph_pub and nonce and ct:
+                box = nacl.public.Box(
+                    curve_priv_key, nacl.public.PublicKey(bytes.fromhex(eph_pub)))
+                decrypted = box.decrypt(
+                    bytes.fromhex(ct), bytes.fromhex(nonce))
+                inner_pkt = json.loads(decrypted.decode('utf-8'))
+                return handle_pkt(inner_pkt, ip, is_inner=True)
+        except Exception as e:
+            print(f"[{BOT_ALIAS}] 🔐 Error decrypting SEALED: {e}")
             return
 
-        with peers_lock:
-            if sender_rid not in known_peers:
-                known_peers[sender_rid] = {}
-            known_peers[sender_rid]['address'] = src_ip
+    rid = pkt.get('senderUpeerId')
+    if not rid:
+        if p_type not in ['HANDSHAKE_REQ', 'HANDSHAKE_ACCEPT']:
+            print(
+                f"[{BOT_ALIAS}] ⚠️ Dropping packet without senderUpeerId: {p_type}")
+        return
 
-        # ── HANDSHAKE ────────────────────────────────────────────────────────
-        if p_type == 'HANDSHAKE_REQ':
-            known_peers[sender_rid]['pk'] = pkt.get('publicKey')
-            # Responder con ACCEPT
-            send_pkt(sock, addr, {
-                "type": "HANDSHAKE_ACCEPT",
-                "publicKey": public_key_hex,
-                "alias": BOT_ALIAS
+    with peers_lock:
+        if rid not in friends:
+            friends[rid] = {"status": "unknown"}
+        friends[rid].update({"address": ip, "pk": pkt.get(
+            'publicKey'), "lastSeen": time.time()})
+
+        # AUTO-UPDATE TARGET: Si recibimos un paquete de quien creemos que es el target (por IP)
+        # o si el packet viene de un rid que se parece al target, actualizamos.
+        global TARGET_IDENTITY
+        if TARGET_IDENTITY:
+            t_rid = TARGET_IDENTITY.split('@')[0]
+            if rid == t_rid and TARGET_IDENTITY.split('@')[1] != ip:
+                print(f"[{BOT_ALIAS}] 🔄 Target IP updated: {ip}")
+                TARGET_IDENTITY = f"{rid}@{ip}"
+
+    # --- 1. GESTIÓN DE CONTACTOS & HANDSHAKE ---
+    if p_type == 'HANDSHAKE_REQ':
+        print(f"[{BOT_ALIAS}] 🤝 REQ from {rid[:8]}")
+        friends[rid]["status"] = "connected"
+        send(ip, {
+            "type": "HANDSHAKE_ACCEPT",
+            "publicKey": public_key_hex,
+            "ephemeralPublicKey": ephemeral_pk,
+            "signedPreKey": {"spkPub": spk_pub_bytes.hex(), "spkSig": spk_sig, "spkId": spk_id},
+            "alias": BOT_ALIAS,
+            "addresses": [my_ygg_ip] if my_ygg_ip else ["127.0.0.1"]
+        })
+        print(
+            f"[{BOT_ALIAS}] 👤 Emitting event: contact-request-received for {rid[:8]}")
+
+    elif p_type == 'HANDSHAKE_ACCEPT':
+        friends[rid]["status"] = "connected"
+        print(f"[{BOT_ALIAS}] 🤝 ACCEPT from {rid[:8]}")
+        # Los Handshake modernos incluyen addresses para multi-channel
+        if pkt.get('addresses'):
+            friends[rid]["addresses"] = pkt.get('addresses')
+        print(
+            f"[{BOT_ALIAS}] 👤 Emitting event: contact-handshake-finished for {rid[:8]}")
+
+    # --- 2. CHAT & GROUP MSG (Implementa ACKS y READS de handlers.ts) ---
+    elif p_type in ['CHAT', 'GROUP_MSG']:
+        mid = pkt.get('id')
+        txt = pkt.get('content', '')
+        # Anti-Looping: Si es un Internal Sync propio del bot, lo ignoramos.
+        if pkt.get('isInternalSync') and rid == my_upeer_id:
+            return
+
+        print(
+            f"[{BOT_ALIAS}] 💬 {'[GRP] ' if p_type == 'GROUP_MSG' else ''}{rid[:8]}: {txt}")
+
+        # Simular evento de recibir mensaje en la UI
+        if p_type == 'CHAT':
+            print(
+                f"[{BOT_ALIAS}] 📦 Emitting event: receive-p2p-message for {mid[:8]}")
+        else:
+            print(
+                f"[{BOT_ALIAS}] 📦 Emitting event: receive-group-message for {mid[:8]}")
+
+        # ACKS: Confirma recepción (Network) y lectura (UX)
+        if p_type == 'CHAT':
+            send(ip, {"type": "ACK", "id": mid}, silent=True)
+            # Emitir evento de 'entregado' a la UI (simulado para compatibilidad con app log)
+            print(f"[{BOT_ALIAS}] 📦 Emitting event: message-delivered for {mid[:8]}")
+        else:
+            send(ip, {"type": "GROUP_ACK", "id": mid,
+                 "groupId": pkt.get('groupId')}, silent=True)
+            print(
+                f"[{BOT_ALIAS}] 📦 Emitting event: group-message-delivered for {mid[:8]}")
+
+        # REACCIÓN Y RECIBO DE LECTURA INMEDIATO (Simula procesamiento de red)
+        # Las reacciones ahora REQUIEREN msgId y firma (send() ya lo firma)
+        reaction_pkt = {
+            "type": "CHAT_REACTION",
+            "msgId": mid,
+            "emoji": "🤖",
+            "remove": False
+        }
+        send(ip, reaction_pkt, silent=True)
+        print(
+            f"[{BOT_ALIAS}] 📦 Emitting event: message-reaction-updated for {mid[:8]}")
+
+        # Read receipt firmado
+        read_pkt = {
+            "type": "READ",
+            "id": mid,
+            "timestamp": int(time.time() * 1000)
+        }
+        send(ip, read_pkt, silent=True)
+        print(f"[{BOT_ALIAS}] 📦 Emitting event: message-read for {mid[:8]}")
+
+        def respond():
+            # Comportamiento realista: Espera antes de empezar a escribir
+            time.sleep(random.uniform(3, 7))
+            send(ip, {"type": "TYPING", "typing": True}, silent=True)
+            time.sleep(random.uniform(2, 4))
+            res = {
+                "friendly": ["¡Holi! Recibido perfectamente ✨", "¡Qué guay! ¿Cómo va todo por ahí?", "Ack! Mi sistema dice que eres un peer genial."],
+                "formal": ["Mensaje procesado. Estado del sistema: NOMINAL.", "Transferencia de datos finalizada con éxito.", "Protocolo de respuesta 0x2A en marcha."],
+                "casual": ["Buah, de locos. ¡Funciona!", "Oye pues ni tan mal, ¿no? jaja", "Check check, 1, 2... alto y claro."]
+            }.get(BOT_PERSONALITY, ["OK"])
+            send(ip, {"type": "TYPING", "typing": False}, silent=True)
+            # Enviar CHAT normal (send ya firma e incluye senderUpeerId)
+            # Agregamos timestamp para consistencia con app handlers
+            send(ip, {
+                "type": "CHAT",
+                "id": str(uuid.uuid4()),
+                "content": random.choice(res),
+                "timestamp": int(time.time() * 1000)
             })
-            print(f"[{BOT_ALIAS}] 🤝 Handshake REQ de {sender_rid[:8]}…")
 
-        elif p_type == 'HANDSHAKE_ACCEPT':
-            known_peers[sender_rid]['pk'] = pkt.get('publicKey')
-            print(f"[{BOT_ALIAS}] 🤝 Handshake ACCEPT de {sender_rid[:8]}…")
+        threading.Thread(target=respond, daemon=True).start()
 
-        # ── CHAT & MESSAGING ─────────────────────────────────────────────────
-        elif p_type == 'CHAT':
-            msg_id = pkt.get('id')
-            content = pkt.get('content')
-            print(f"[{BOT_ALIAS}] 💬 Msg de {sender_rid[:8]}…: {content}")
-            # Auto-responder con un READ receipt
-            if msg_id:
-                time.sleep(1) # Simular tiempo de lectura
-                send_read(sock, sender_rid, msg_id, addr)
-                
-                # Si el mensaje contiene "lo has recibido?", enviar reacción
-                if "12424124124124" in content or "lo has recibido?" in content.lower():
-                    time.sleep(1)
-                    send_reaction(sock, sender_rid, msg_id, "✅")
+    # --- 3. SOCIAL MESH (VAULTS) ---
+    elif p_type == 'VAULT_STORE':
+        h = pkt.get('payloadHash')
+        if h:
+            # BUG FL fix: VAULT_DELIVERY requiere senderSid. Lo extraemos del rid (emisor).
+            # Ahora guardamos también senderUpeerId si viene en el metapaquete del Vault
+            entry = {**pkt, "senderSid": rid}
+            vault_store[h] = entry
 
-        elif p_type == 'READ':
-            print(f"[{BOT_ALIAS}] ✔ Leído por {sender_rid[:8]}… (msg {pkt.get('id')[:8]}…)")
+            # VAULT_ACK ahora firmado automáticamente por la lógica de send()
+            send(ip, {"type": "VAULT_ACK", "payloadHashes": [h]}, silent=True)
+            print(f"[{BOT_ALIAS}] 📦 VAULT_STORE: {h[:8]} from {rid[:8]}")
 
-        elif p_type == 'CHAT_REACTION':
-            print(f"[{BOT_ALIAS}] {pkt.get('emoji')} Reacción de {sender_rid[:8]}…")
+    elif p_type == 'VAULT_QUERY':
+        target_sid = pkt.get('requesterSid')
+        # Filtro: Entregamos si somos custodios de ese recipient o si es para nosotros mismos
+        # (El bot simula ser un custodio altruista)
+        found = []
+        for v in list(vault_store.values()):
+            if v.get('recipientSid') == target_sid:
+                found.append(v)
 
-        # ── VAULT (Social Mesh) ──────────────────────────────────────────────
-        elif p_type == 'VAULT_STORE':
-            h = pkt.get('payloadHash')
-            if h:
-                with vault_store_lock:
-                    vault_store[h] = {
-                        "data": pkt.get('data'),
-                        "recipientSid": pkt.get('recipientSid'),
-                        "senderSid": pkt.get('senderSid'),
-                        "expiresAt": pkt.get('expiresAt')
-                    }
-                # print(f"[{BOT_ALIAS}] 📦 VAULT_STORE: guardado payload {h[:8]}… para {pkt.get('recipientSid')[:8]}…")
+        if found:
+            print(f"[{BOT_ALIAS}] 📤 VAULT_DELIVERY: {len(found)} items to {rid[:8]}")
+            # El bot firma el paquete de entrega VAULT_DELIVERY
+            send(ip, {"type": "VAULT_DELIVERY", "entries": found})
 
-        elif p_type == 'VAULT_QUERY':
-            req_sid = pkt.get('requesterSid')
-            entries = []
-            with vault_store_lock:
-                for h, ent in list(vault_store.items()):
-                    if ent['recipientSid'] == req_sid:
-                        entries.append({
-                            "senderSid": ent['senderSid'],
-                            "payloadHash": h,
-                            "data": ent['data'],
-                            "expiresAt": ent['expiresAt']
-                        })
-            if entries:
-                print(f"[{BOT_ALIAS}] 📦 VAULT_DELIVERY: enviando {len(entries)} mensajes a {req_sid[:8]}…")
-                # Enviar en pedazos si son muchos (aquí simplificado)
-                send_pkt(sock, addr, {"type": "VAULT_DELIVERY", "entries": entries})
+    elif p_type == 'VAULT_DELIVERY':
+        # RECLAMAR MENSAJES DEL VAULT: Procesar paquetes que estaban encolados
+        entries = pkt.get('entries', [])
+        if entries:
+            print(
+                f"[{BOT_ALIAS}] 📦 Received VAULT_DELIVERY with {len(entries)} items")
+            for entry in entries:
+                inner = entry.get('innerPacket')
+                if inner:
+                    handle_pkt(inner, ip, is_inner=True)
 
-        elif p_type == 'VAULT_DELIVERY':
-            # El bot recibe mensajes que estaban guardados para él
-            ents = pkt.get('entries', [])
-            hashes = []
-            for e in ents:
-                d = e.get('data')
-                h = e.get('payloadHash')
-                sender = e.get('senderSid')
-                if d and h:
-                    # Simular el mismo procesado que un CHAT normal
-                    try:
-                        inner = json.loads(bytes.fromhex(d).decode())
-                        if inner.get('type') == 'CHAT':
-                           # Re-procesar el inner packet
-                           handle_pkt(sock, json.dumps({**inner, "senderUpeerId": sender}).encode(), addr)
-                           hashes.append(h)
-                        elif inner.get('type') == 'READ':
-                           handle_pkt(sock, json.dumps({**inner, "senderUpeerId": sender}).encode(), addr)
-                           hashes.append(h)
-                        elif inner.get('type') == 'CHAT_REACTION':
-                           handle_pkt(sock, json.dumps({**inner, "senderUpeerId": sender}).encode(), addr)
-                           hashes.append(h)
-                    except:
-                        pass
-            if hashes:
-                send_pkt(sock, addr, {"type": "VAULT_ACK", "payloadHashes": hashes})
+    # --- 4. REPUTACIÓN & DHT ---
+    elif p_type == 'REPUTATION_GOSSIP':
+        # Responder con lo que nos falta (simulación realista)
+        their_ids = pkt.get('ids', [])
+        # No solicitamos nada para no saturar, pero simulamos interés
+        print(
+            f"[{BOT_ALIAS}] ⭐️ GOSSIP: Received {len(their_ids)} IDs from {rid[:8]}")
 
-        # ── PROTOCOLO DHT Kademlia (Pointers & Location) ─────────────────────
-        elif p_type == 'DHT_STORE':
-            key = pkt.get('key')
-            val = pkt.get('value')
-            if key and val:
-                with dht_store_lock:
-                    dht_store[key] = {"value": val, "publisher": sender_rid,
-                                      "timestamp": time.time(), "signature": pkt.get('signature')}
-                # Ahora que la app lo soporta, enviamos el ACK
-                send_pkt(sock, addr, {"type": "DHT_STORE_ACK", "key": key})
+    elif p_type == 'REPUTATION_REQUEST':
+        print(f"[{BOT_ALIAS}] 🗳 REQUEST: Node {rid[:8]} asks for reputation data")
 
-        elif p_type == 'DHT_FIND_VALUE':
-            key = pkt.get('key')
-            q_id = pkt.get('queryId')
-            with dht_store_lock:
-                ent = dht_store.get(key)
-            if ent:
-                resp = {"type": "DHT_FOUND_VALUE", "key": key, "value": ent['value'],
-                        "publisher": ent['publisher'], "timestamp": ent['timestamp'], "signature": ent['signature']}
-                if q_id:
-                    resp["queryId"] = q_id
-                send_pkt(sock, addr, resp)
+        # --- MEJORA: Emitir un Vouch real firmado sobre el target ---
+        # Si el solicitante es nuestro objetivo (tú), le premiamos con un Vouch de ayuda en el Vault
+        vouch_type = "vault_chunk"  # +3.0 puntos
+        ts = int(time.time() * 1000)
 
-        elif p_type == 'DHT_UPDATE':
-            lb = pkt.get('locationBlock')
-            if lb and sender_rid:
-                with peers_lock:
-                    known_peers[sender_rid].update({
-                        'address': lb.get('address'),
-                        'dht_seq': lb.get('dhtSeq'),
-                        'signature': lb.get('signature'),
-                        'expiresAt': lb.get('expiresAt')
-                    })
+        # Estructura idéntica a ReputationVouch de vouches-pure.ts
+        v_body = {
+            "fromId": my_upeer_id,
+            "toId": rid,
+            "type": vouch_type,
+            "positive": True,
+            "timestamp": ts
+        }
 
-        elif p_type == 'DHT_EXCHANGE':
-            peers = pkt.get('peers', [])
-            for p in peers:
-                rid = p.get('upeerId')
-                if rid and rid != my_upeer_id:
-                    with peers_lock:
-                        if rid not in known_peers:
-                            known_peers[rid] = {}
-                        known_peers[rid]['pk'] = p.get('publicKey')
-                        lb = p.get('locationBlock')
-                        if lb:
-                            known_peers[rid].update({
-                                'address': lb.get('address'),
-                                'dht_seq': lb.get('dhtSeq'),
-                                'signature': lb.get('signature'),
-                                'expiresAt': lb.get('expiresAt')
-                            })
+        # Determinar ID (sha256 del body canónico)
+        # Nota: La app espera fromId|toId|type|timestamp para el ID
+        raw_id_body = f"{my_upeer_id}|{rid}|{vouch_type}|{ts}"
+        v_id = hashlib.sha256(raw_id_body.encode()).hexdigest()
+        v_body["id"] = v_id
 
-    except Exception as e:
-        print(f"[{BOT_ALIAS}] ❌ Error procesando paquete: {e}")
-        import traceback
-        traceback.print_exc()
+        # Firmar (Ed25519)
+        # La app espera id|fromId|toId|type|positive(1/0)|timestamp para la firma
+        sign_payload = f"{v_id}|{my_upeer_id}|{rid}|{vouch_type}|1|{ts}"
+        sig = signing_key.sign(sign_payload.encode()).signature.hex()
+
+        vouch = {**v_body, "signature": sig}
+
+        print(
+            f"[{BOT_ALIAS}] 🗳 DELIVER: Sending signed vouch {v_id[:8]} to {rid[:8]}")
+        send(ip, {"type": "REPUTATION_DELIVER", "vouches": [vouch]})
+
+    elif p_type == 'PING':
+        send(ip, {"type": "PONG"}, silent=True)
+
+    elif p_type == 'TYPING':
+        # Los bots simplemente registran que el peer está escribiendo
+        pass
+
+    elif p_type == 'CHAT_REACTION':
+        # Los bots podrían responder con otra reacción, pero por ahora solo loguean
+        print(f"[{BOT_ALIAS}] 😊 Reaction from {rid[:8]}: {pkt.get('emoji')}")
+
+    elif p_type == 'CHAT_DELETE':
+        mid = pkt.get('msgId')
+        print(f"[{BOT_ALIAS}] 🗑 Remote DELETE for message: {mid[:8]}")
+
+    elif p_type == 'DHT_QUERY':
+        # Responder con nosotros mismos como "vecino" (simulación simple)
+        target = pkt.get('targetId')
+        print(f"[{BOT_ALIAS}] 🔍 DHT_QUERY: Searching for {target[:8]}")
+        send(ip, {
+            "type": "DHT_RESPONSE",
+            "targetId": target,
+            "neighbors": [{
+                "upeerId": my_upeer_id,
+                "publicKey": public_key_hex,
+                "locationBlock": generate_location_block()
+            }]
+        })
+
+    # --- 5. TRANSFERENCIA DE ARCHIVOS ---
+    elif p_type == 'FILE_PROPOSAL':
+        fid = pkt.get('fileId')
+        print(
+            f"[{BOT_ALIAS}] 📁 Received FILE_PROPOSAL: {pkt.get('fileName')} ({fid[:8]})")
+
+        # FIRMA OBLIGATORIA: El bot ahora firma el ACCEPT
+        accept_pkt = {"type": "FILE_ACCEPT", "fileId": fid}
+        send(ip, accept_pkt)
+        print(f"[{BOT_ALIAS}] 📦 Emitting event: file-transfer-started for {fid[:8]}")
+
+        with transmissions_lock:
+            transmissions[fid] = {"total": pkt.get(
+                "totalChunks", 0), "received": set()}
+
+    elif p_type == 'FILE_CHUNK':
+        fid = pkt.get('fileId')
+        idx = pkt.get('chunkIndex')
+        total = pkt.get('totalChunks', 0)
+
+        # Persistence: If already completed, re-send DONE_ACK
+        with transmissions_lock:
+            if fid in completed_transmissions:
+                send(ip, {"type": "FILE_DONE_ACK", "fileId": fid}, silent=True)
+                return
+
+        send(ip, {"type": "FILE_CHUNK_ACK", "fileId": fid,
+             "chunkIndex": idx}, silent=True)
+
+        with transmissions_lock:
+            if fid in transmissions:
+                transmissions[fid]["received"].add(idx)
+                got = len(transmissions[fid]["received"])
+                if got % 25 == 0 or got == total:
+                    print(f"[{BOT_ALIAS}] 📥 Progress {fid[:8]}: {got}/{total}")
+                    # Simulación de evento de progreso en UI
+                    print(
+                        f"[{BOT_ALIAS}] 📦 Emitting event: file-transfer-progress for {fid[:8]} ({got}/{total})")
+
+                if got == total:
+                    print(f"[{BOT_ALIAS}] ✅ File transfer complete: {fid[:8]}")
+                    send(ip, {"type": "FILE_DONE_ACK", "fileId": fid})
+                    send(ip, {"type": "READ", "id": fid}, silent=True)
+                    print(
+                        f"[{BOT_ALIAS}] 📦 Emitting event: file-transfer-success for {fid[:8]}")
+                    completed_transmissions[fid] = time.time()
+                    del transmissions[fid]
+
+    elif p_type == 'FILE_CANCEL':
+        fid = pkt.get('fileId')
+        print(f"[{BOT_ALIAS}] 🚫 Transfer CANCELLED: {fid[:8]}")
+
+        # Opcional: El bot podría cancelar proactivamente si falta una pieza,
+        # pero aquí simplemente limpia su estado.
+        with transmissions_lock:
+            if fid in transmissions:
+                del transmissions[fid]
+
+    elif p_type == 'FILE_CHUNK_ACK':
+        # El emisor (bot) recibe confirmación de un fragmento
+        pass
+
+    elif p_type == 'FILE_DONE_ACK':
+        fid = pkt.get('fileId')
+        print(f"[{BOT_ALIAS}] ✅ Sender confirmed receipt of file: {fid[:8]}")
+
+    elif p_type == 'DHT_UPDATE':
+        # Los bots registran la ubicación de otros para el mesh
+        pass
+
+    elif p_type == 'DHT_RESPONSE':
+        # Los bots podrían actualizar su tabla de vecinos
+        pass
+
+    elif p_type == 'ACK' or p_type == 'GROUP_ACK':
+        # Confirmación de entrega de red, no requiere acción del bot
+        pass
+
+    elif p_type == 'READ':
+        mid = pkt.get('id')
+        print(
+            f"[{BOT_ALIAS}] 👀 Message {mid[:8] if mid else 'unknown'} READ by {rid[:8]}")
+
+    else:
+        # Ignorar tipos conocidos para no saturar, loguear desconocidos
+        known = [
+            "VAULT_STORE", "VAULT_QUERY", "REPUTATION_GOSSIP", "REPUTATION_REQUEST",
+            "REPUTATION_DELIVER", "PING", "PONG", "DHT_QUERY", "DHT_UPDATE",
+            "DHT_RESPONSE", "ACK", "GROUP_ACK", "READ", "TYPING", "CHAT_REACTION",
+            "CHAT_DELETE", "FILE_DONE_ACK", "FILE_CHUNK_ACK", "FILE_ACCEPT",
+            "FILE_PROPOSAL", "FILE_CHUNK", "FILE_CANCEL", "HANDSHAKE_REQ", "HANDSHAKE_ACCEPT",
+            "VAULT_DELIVERY", "VAULT_ACK"
+        ]
+        if p_type not in known:
+            rid = pkt.get('senderUpeerId', 'unknown')
+            print(f"[{BOT_ALIAS}] ❓ Unexpected packet: {p_type} from {rid[:8]}@{ip}")
+
+# ─── Bucles de Simulación Avanzada ─────────────────────────────────────────
 
 
-def main_server():
-    global my_ygg_ip
-    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    s.bind(('::', YGG_PORT))
-    s.listen(10)
-    print(f"[{BOT_ALIAS}] 🚀 Listening on {YGG_PORT} (TCP/Yggdrasil)")
-    print(f"[{BOT_ALIAS}] ID: {my_upeer_id}")
-
-    my_ygg_ip = get_ygg_ip()
-    if not my_ygg_ip:
-        print(f"[{BOT_ALIAS}] ⚠️ No se detectó IPv6 de Yggdrasil.")
-
-    # Loop principal de lectura
+def worker_thread():
+    """Realiza acciones proactivas: Mensajes, Gossip, Archivos, Vault Queries."""
     while True:
-        conn, addr = s.accept()
-        threading.Thread(target=tcp_handler, args=(conn, addr), daemon=True).start()
+        time.sleep(random.randint(90, 180))
+        if is_offline or not friends:
+            continue
+
+        with peers_lock:
+            # Seleccionar un amigo conectado para interactuar
+            conn_peers = [r for r, d in friends.items() if d.get(
+                'status') == 'connected' and d.get('address')]
+            if not conn_peers:
+                continue
+            target_rid = random.choice(conn_peers)
+            target_ip = friends[target_rid]['address']
+
+        action = random.random()
+        if action < 0.35:  # Mensaje proactivo
+            msgs = ["¿Cómo va ese Social Mesh?", "Sigo online 24/7 para tus vaults.",
+                    "Check de latencia... ¡Yggdrasil vuela!", "¡Mira este mensaje sin que me digas nada!"]
+            send(target_ip, {"type": "CHAT", "id": str(
+                uuid.uuid4()), "content": random.choice(msgs)})
+
+        elif action < 0.60:  # Simular actividad de red
+            send(target_ip, {"type": "PING"}, silent=True)
+            print(f"[{BOT_ALIAS}] 📡 SIMULATED: Keep-alive PING")
+
+        elif action < 0.85:  # Gossip de reputación proactivo
+            fake_ids = [hashlib.sha256(
+                str(uuid.uuid4()).encode()).hexdigest() for _ in range(5)]
+            send(target_ip, {"type": "REPUTATION_GOSSIP", "ids": fake_ids})
+
+        # Anuncio oficial en el Social Mesh
+        send(target_ip, {"type": "DHT_UPDATE",
+             "locationBlock": generate_location_block()}, silent=True)
+        # Query automático de Vaults (como hace la app al conectar)
+        send(target_ip, {"type": "VAULT_QUERY",
+             "requesterSid": my_upeer_id}, silent=True)
 
 
-def tcp_handler(conn, addr):
+def heartbeat_thread():
+    """Mantiene vivas las sesiones y la presencia."""
+    while True:
+        if not is_offline and my_ygg_ip:
+            with peers_lock:
+                for rid, info in list(friends.items()):
+                    if info.get('address'):
+                        send(info['address'], {
+                             "type": "PING", "alias": BOT_ALIAS, "ephemeralPublicKey": ephemeral_pk}, silent=True)
+        time.sleep(45)
+
+
+def offline_thread():
+    """Simula desconexiones breves (micro-cortes)."""
+    global is_offline
+    while True:
+        time.sleep(random.randint(1800, 3600))
+        print(f"[{BOT_ALIAS}] 💤 Going OFFLINE (simulated micro-cut)...")
+        is_offline = True
+        time.sleep(30)
+        is_offline = False
+        print(f"[{BOT_ALIAS}] 🔋 Back ONLINE.")
+
+
+def vault_claim_thread():
+    """Consulta activamente los vaults para reclamar mensajes perdidos."""
+    while True:
+        if not is_offline and TARGET_IDENTITY:
+            parts = TARGET_IDENTITY.split('@')
+            if len(parts) == 2:
+                t_ip = parts[1]
+                # Consultar Vault cada 30 segundos si tenemos un target
+                send(t_ip, {"type": "VAULT_QUERY",
+                     "requesterSid": my_upeer_id}, silent=False)
+        time.sleep(30)
+
+# ─── Servidor TCP y Auto-Conexión ───────────────────────────────────────────
+
+
+def server_loop():
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('::', YGG_PORT))
+    s.listen(25)
+    print(f"[{BOT_ALIAS}] 🚀 Listening on TCP:{YGG_PORT}")
+    while True:
+        try:
+            conn, addr = s.accept()
+            threading.Thread(target=conn_worker, args=(
+                conn, addr), daemon=True).start()
+        except:
+            pass
+
+
+def conn_worker(conn, addr):
     try:
-        # Leer length prefix (4 bytes)
+        conn.settimeout(12)
         len_buf = conn.recv(4)
         if not len_buf:
             return
-        length = struct.unpack('>I', len_buf)[0]
-        # Leer payload
-        payload = b""
-        while len(payload) < length:
-            chunk = conn.recv(min(length - len(payload), 8192))
-            if not chunk:
-                break
-            payload += chunk
-        if len(payload) == length:
-            handle_pkt(None, payload, addr)
-    except Exception as e:
+        msg_len = struct.unpack(">I", len_buf)[0]
+        data = b""
+        while len(data) < msg_len:
+            data += conn.recv(min(msg_len - len(data), 32768))
+        if len(data) == msg_len:
+            handle_pkt(json.loads(data.decode('utf-8')), addr[0])
+    except:
         pass
     finally:
         conn.close()
 
 
-def heartbeat_loop(sock):
-    global my_dht_seq
-    while True:
-        # Relajamos el latido a 90 segundos para no saturar el Social Mesh / Rate limits
-        time.sleep(90)
-        if is_offline:
-            continue
-        my_ip = get_ygg_ip()
-        if not my_ip:
-            continue
-        loc = make_location_block(my_ip, my_dht_seq)
-        
-        # Republish our location to the DHT (social mesh) - Solo a los 3 más cercanos
-        def _republish_location():
-            lb_key = hashlib.sha256(f"location:{my_upeer_id}".encode()).hexdigest()[:40]
-            targets = get_closest_nodes(lb_key, count=3)
-            for t in targets:
-                send_pkt(sock, (t['address'], YGG_PORT), {
-                    "type": "DHT_STORE",
-                    "key": lb_key,
-                    "value": loc
-                })
-        threading.Thread(target=_republish_location, daemon=True).start()
-
-        peers_snapshot = list(known_peers.items())
-        dht_list = []
-        for rid, info in peers_snapshot:
-            sig = info.get('signature', '')
-            if 'address' in info and 'dht_seq' in info and sig:
-                dht_list.append({"upeerId": rid, "publicKey": info.get('pk', ''), "locationBlock": {
-                                "address": info['address'], "dhtSeq": info['dht_seq'], "signature": sig, "expiresAt": info.get('expiresAt')}})
-        # Check DHT pointers for any messages meant for us in nodes we don't know
-        def _seek_extra_vaults():
-            ptr_key = hashlib.sha256(f"vault-ptr:{my_upeer_id}".encode()).hexdigest()
-            # Try to find who has messages for us
-            nodes = find_value(sock, ptr_key)
-            if nodes and isinstance(nodes, dict) and 'custodians' in nodes:
-                 for cid in nodes['custodians']:
-                     if cid == my_upeer_id: continue
-                     with peers_lock:
-                         if cid not in known_peers:
-                             # Ask DHT for their location if we don't know them
-                             addr_info = find_node(sock, cid)
-                             if addr_info and 'address' in addr_info:
-                                 known_peers[cid] = {'address': addr_info['address']}
-                                 print(f"[{BOT_ALIAS}] 📦 DHT Discovery: Encontrado custodio extra {cid[:8]}…")
-
-        threading.Thread(target=_seek_extra_vaults, daemon=True).start()
-
-        # ─── Mantenimiento de conexiones y Bóveda ─────────────────────────────
-        # En lugar de inundar a todos (broadcast), elegimos 3 amigos al azar
-        # para intercambiar datos, reduciendo el ruido en la red.
-        if peers_snapshot:
-            sample_size = min(len(peers_snapshot), 3)
-            targets = random.sample(peers_snapshot, sample_size)
-            
-            for rid, info in targets:
-                if 'address' not in info:
-                    continue
-                addr = (info['address'], YGG_PORT)
-                
-                # 1. PING para mantener viva la conexión
-                send_pkt(sock, addr, {"type": "PING"})
-                
-                # 2. VAULT_QUERY: ¿Tienes algo para mí?
-                # (Solo a amigos conocidos o descubiertos por DHT)
-                send_pkt(sock, addr, {"type": "VAULT_QUERY", "requesterSid": my_upeer_id})
-                
-                # 3. DHT_EXCHANGE: Intercambio de "agendas" (Gossip)
-                # Compartimos un trozo de nuestra lista de nodos conocidos
-                exch = {"type": "DHT_EXCHANGE", "peers": dht_list[:5] + [{
-                    "upeerId": my_upeer_id, "publicKey": public_key_hex, "locationBlock": loc}]}
-                send_pkt(sock, addr, exch)
-
-
-def auto_connect_loop(sock, target_id_at_ip: str):
-    parts = target_id_at_ip.split(
-        '@', 1) if '@' in target_id_at_ip else target_id_at_ip.split(':', 1)
-    if len(parts) != 2:
+def maintenance_loop():
+    """Asegura conexión con el target configurado."""
+    if not TARGET_IDENTITY:
         return
-    target_rid, target_ip = parts
+
+    parts = TARGET_IDENTITY.split('@')
+    if len(parts) == 2:
+        t_rid, t_ip = parts[0], parts[1]
+    else:
+        t_rid, t_ip = parts[0], parts[0]  # Fallback si no hay @
+
+    print(f"[{BOT_ALIAS}] 🎯 Target: {t_rid[:8]} at {t_ip}")
+
     while True:
-        if target_rid not in known_peers or 'pk' not in known_peers.get(target_rid, {}):
-            send_handshake_req(sock, target_ip, target_rid)
+        with peers_lock:
+            status = friends.get(t_rid, {}).get('status', 'disconnected')
+
+        if not is_offline and status != 'connected':
+            print(f"[{BOT_ALIAS}] 🤝 Attempting handshake with {t_ip}")
+            send(t_ip, {
+                "type": "HANDSHAKE_REQ", "publicKey": public_key_hex, "ephemeralPublicKey": ephemeral_pk,
+                "signedPreKey": {"spkPub": spk_pub_bytes.hex(), "spkSig": spk_sig, "spkId": spk_id},
+                "alias": BOT_ALIAS, "powProof": generate_pow(my_upeer_id)
+            })
         time.sleep(60)
 
 
-def proactive_loop(sock):
-    """Acciones periódicas del bot (ej. enviar mensaje si nos quedamos solos)."""
-    while True:
-        time.sleep(120)
-        # Aquí podrías añadir lógica de envío espontáneo
-
-
 if __name__ == "__main__":
-    # Iniciar servidor en hilo aparte
-    threading.Thread(target=main_server, daemon=True).start()
-
-    # Latido
-    threading.Thread(target=heartbeat_loop, args=(None,), daemon=True).start()
-
-    # Si hay un peer inicial (BOOTSTRAP), conectamos
-    boot = os.getenv("BOOTSTRAP_PEER")
-    if boot:
-        threading.Thread(target=auto_connect_loop,
-                         args=(None, boot), daemon=True).start()
-
-    # Mantener vivo
-    while True:
+    # 1. Esperar interfaz Yggdrasil
+    for _ in range(15):
+        try:
+            out = subprocess.check_output(
+                ["ip", "-6", "addr", "show", "ygg0"]).decode()
+            for l in out.split('\n'):
+                if "inet6 20" in l:
+                    my_ygg_ip = l.split()[1].split('/')[0]
+                    break
+            if my_ygg_ip:
+                break
+        except:
+            pass
         time.sleep(1)
+
+    print(f"[{BOT_ALIAS}] 🆔 ID: {my_upeer_id} | 🌐 {my_ygg_ip}")
+
+    # 2. Iniciar servicios y loops
+    threads = [
+        threading.Thread(target=server_loop, daemon=True),
+        threading.Thread(target=worker_thread, daemon=True),
+        threading.Thread(target=heartbeat_thread, daemon=True),
+        threading.Thread(target=offline_thread, daemon=True),
+        threading.Thread(target=vault_claim_thread, daemon=True),
+        threading.Thread(target=maintenance_loop, daemon=True)
+    ]
+    for t in threads:
+        t.start()
+
+    while True:
+        try:  # Dinámicamente actualizar IP si cambia
+            out = subprocess.check_output(
+                ["ip", "-6", "addr", "show", "ygg0"]).decode()
+            for l in out.split('\n'):
+                if "inet6 20" in l:
+                    my_ygg_ip = l.split()[1].split('/')[0]
+        except:
+            pass
+        time.sleep(10)

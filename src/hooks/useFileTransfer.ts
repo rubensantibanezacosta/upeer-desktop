@@ -25,6 +25,7 @@ export interface FileTransfer {
   bytesTransferred: number;
   totalBytes: number;
   chunksTransferred: number;
+  isVaulting?: boolean;
 
   // Timing
   startedAt: number;
@@ -46,12 +47,14 @@ export interface TransferProgress {
   direction: 'sending' | 'receiving';
   state?: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
   phase?: number;
+  isVaulting?: boolean;
 }
 
 export interface StartTransferParams {
   upeerId: string;
   filePath: string;
   thumbnail?: string;
+  caption?: string;
 }
 
 export interface SaveFileParams {
@@ -64,6 +67,7 @@ export type TransferStateUpdate = {
   thumbnail?: string;
   transferState?: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
   direction?: 'sending' | 'receiving';
+  savedPath?: string;
 };
 
 export function useFileTransfer(onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void) {
@@ -160,6 +164,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
             bytesTransferred: progress.bytesTransferred,
             totalBytes: progress.totalBytes || transfer.fileSize,
             chunksTransferred: progress.chunksTransferred,
+            isVaulting: progress.isVaulting,
             lastActivity: Date.now()
           } as FileTransfer;
         }
@@ -174,7 +179,8 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       const result = await window.upeer.startFileTransfer(
         params.upeerId,
         params.filePath,
-        params.thumbnail
+        params.thumbnail,
+        params.caption
       );
 
       if (result.success) {
@@ -200,6 +206,24 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       return result;
     } catch (error) {
       console.error('Error cancelling transfer:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  };
+
+  const retryTransfer = async (fileId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const result = await window.upeer.retryFileTransfer(fileId);
+      if (result.success) {
+        // Al reintentar, actualizamos el estado del mensaje localmente a 'active' o 'pending'
+        onTransferStateChangeRef.current?.(fileId, { transferState: 'pending' });
+        await loadTransfers();
+      }
+      return result;
+    } catch (error) {
+      console.error('Error retrying transfer:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -263,6 +287,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     // Actions
     startTransfer,
     cancelTransfer,
+    retryTransfer,
     saveFile,
     getTransfer,
     getTransfersForContact,

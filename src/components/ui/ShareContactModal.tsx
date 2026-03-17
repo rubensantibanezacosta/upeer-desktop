@@ -66,7 +66,7 @@ export const ShareContactModal: React.FC<ShareContactModalProps> = ({ open, onCl
                                     onClose();
                                 }} sx={{ py: 1.5, px: 2 }}>
                                     <ListItemDecorator sx={{ mr: 2 }}>
-                                        <Avatar size="md" variant="soft" color="neutral">{contact.name[0]}</Avatar>
+                                        <Avatar size="md" variant="soft" color="neutral" sx={{ borderRadius: 'md' }}>{contact.name[0]}</Avatar>
                                     </ListItemDecorator>
                                     <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                                         <Typography level="title-sm" noWrap>{contact.name}</Typography>

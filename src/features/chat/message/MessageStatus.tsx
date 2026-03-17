@@ -14,7 +14,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status }) => {
             alignItems: 'center',
             color: status === 'read' ? '#53bdeb' : 'text.tertiary',
         }}>
-            {status === 'sent' ?
+            {(status === 'sent' || status === 'vaulted') ?
                 <DoneIcon sx={{ fontSize: '15px' }} /> :
                 <DoneAllIcon sx={{ fontSize: '15px' }} />
             }

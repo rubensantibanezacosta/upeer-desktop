@@ -60,7 +60,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 <Avatar
                     src={avatar || undefined}
                     sx={{
-                        width: 120, height: 120,
+                        borderRadius: 'lg',
                         fontSize: '3rem',
                         backgroundColor: isUntrustworthy ? 'warning.softBg' : 'background.level1',
                         border: '2px solid',
@@ -72,7 +72,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 {isUntrustworthy && (
                     <Box sx={{
                         position: 'absolute', bottom: 4, right: 4,
-                        width: 28, height: 28, borderRadius: '50%',
+                        width: 28, height: 28, borderRadius: 'sm',
                         backgroundColor: 'warning.softBg',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid', borderColor: 'background.surface'

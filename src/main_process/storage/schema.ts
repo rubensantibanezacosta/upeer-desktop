@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const groups = sqliteTable('groups', {
@@ -8,20 +8,24 @@ export const groups = sqliteTable('groups', {
     members: text('members').notNull().default('[]'), // JSON array of upeerIds
     status: text('status').notNull().default('active'), // 'active' | 'invited'
     avatar: text('avatar'), // base64 data URL, local only
-    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    createdAt: integer('created_at').notNull(), // Unix ms
+    // ── Resiliencia de vaciado de chat (Anti-Zombi) para Grupos ─────────────
+    lastClearedAt: integer('last_cleared_at').notNull().default(0), // unix timestamp ms
 });
 
 export const messages = sqliteTable('messages', {
     id: text('id').primaryKey(),
     chatUpeerId: text('chat_upeer_id').notNull(),
+    senderUpeerId: text('sender_upeer_id'), // Para grupos: quién envió el mensaje
     isMine: integer('is_mine', { mode: 'boolean' }).notNull(),
     message: text('message').notNull(),
     replyTo: text('reply_to'),
     signature: text('signature'),
     status: text('status').notNull().default('sent'),
+    version: integer('version').notNull().default(1), // Versión incremental para LWW (Last Write Wins)
     isDeleted: integer('is_deleted', { mode: 'boolean' }).notNull().default(false),
     isEdited: integer('is_edited', { mode: 'boolean' }).notNull().default(false),
-    timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
+    timestamp: integer('timestamp').notNull(), // Unix ms epoch. BUG DB-TS fix: evitar mezcla text/int
 });
 
 export const reactions = sqliteTable('reactions', {
@@ -29,7 +33,7 @@ export const reactions = sqliteTable('reactions', {
     messageId: text('message_id').notNull(),
     upeerId: text('upeer_id').notNull(),
     emoji: text('emoji').notNull(),
-    timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
+    timestamp: integer('timestamp').notNull(), // Unix ms epoch
 });
 
 export const contacts = sqliteTable('contacts', {
@@ -54,6 +58,10 @@ export const contacts = sqliteTable('contacts', {
     status: text('status').notNull().default('connected'), // 'pending'|'incoming'|'connected'|'offline'|'blocked'
     blockedAt: text('blocked_at'), // ISO timestamp cuando fue bloqueado
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
+    // ── Resiliencia de vaciado de chat (Anti-Zombi) ─────────────────────────
+    // Registra el timestamp del último vaciado total del chat para ignorar 
+    // mensajes antiguos que lleguen vía sincronización/vaults.
+    lastClearedAt: integer('last_cleared_at').notNull().default(0), // unix timestamp ms
 });
 
 export const backupSurvivalKit = sqliteTable('backup_survival_kit', {
@@ -81,6 +89,7 @@ export const distributedAssets = sqliteTable('distributed_assets', {
     id: integer('id').primaryKey({ autoIncrement: true }),
     fileHash: text('file_hash').notNull(),
     cid: text('cid').unique().notNull(),        // Content ID del fragmento
+    segmentIndex: integer('segment_index').notNull().default(0),
     shardIndex: integer('shard_index').notNull(),
     totalShards: integer('total_shards').notNull(),
     custodianSid: text('custodian_sid').notNull(), // Amigo que lo tiene
@@ -107,7 +116,11 @@ export const reputationVouches = sqliteTable('reputation_vouches', {
     timestamp: integer('timestamp').notNull(),               // ms epoch
     signature: text('signature').notNull(),                  // hex Ed25519
     receivedAt: integer('received_at').notNull(),            // cuando lo recibimos
-});
+}, (table) => ({
+    toIdx: index('rep_vouches_to_idx').on(table.toId),
+    fromIdx: index('rep_vouches_from_idx').on(table.fromId),
+    tsIdx: index('rep_vouches_ts_idx').on(table.timestamp),
+}));
 
 // ── Double Ratchet: estado de sesión por contacto ─────────────────────────────
 // Protegido por SQLCipher. Contiene material de clave sensible (dhsSk).
@@ -132,4 +145,6 @@ export const pendingOutbox = sqliteTable('pending_outbox', {
     plaintext: text('plaintext').notNull(),          // contenido del mensaje (SQLCipher lo protege)
     replyTo: text('reply_to'),                       // id del mensaje al que se responde (opcional)
     createdAt: integer('created_at').notNull(),      // epoch ms
-});
+}, (table) => ({
+    recipientIdx: index('pending_outbox_recipient_idx').on(table.recipientSid),
+}));

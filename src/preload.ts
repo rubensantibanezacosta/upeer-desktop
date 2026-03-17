@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('upeer', {
     deleteContact: (upeerId: string) => ipcRenderer.invoke('delete-contact', { upeerId }),
     blockContact: (upeerId: string) => ipcRenderer.invoke('block-contact', { upeerId }),
     unblockContact: (upeerId: string) => ipcRenderer.invoke('unblock-contact', { upeerId }),
+    clearChat: (upeerId: string) => ipcRenderer.invoke('clear-chat', { upeerId }),
     getBlockedContacts: () => ipcRenderer.invoke('get-blocked-contacts'),
     sendMessage: (upeerId: string, message: string, replyTo?: string) => ipcRenderer.invoke('send-p2p-message', { upeerId, message, replyTo }),
     sendTypingIndicator: (upeerId: string) => ipcRenderer.invoke('send-typing-indicator', { upeerId }),
@@ -104,6 +105,10 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.removeAllListeners('message-deleted');
         ipcRenderer.on('message-deleted', (event, data) => callback(data));
     },
+    onChatCleared: (callback: (data: { upeerId: string }) => void) => {
+        ipcRenderer.removeAllListeners('chat-cleared');
+        ipcRenderer.on('chat-cleared', (event, data) => callback(data));
+    },
     onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => {
         ipcRenderer.removeAllListeners('message-status-updated');
         ipcRenderer.on('message-status-updated', (event, data) => callback(data));
@@ -113,8 +118,9 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.on('peer-typing', (event, data) => callback(data));
     },
     // File transfer API (Phase 16)
-    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail }),
+    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption }),
     cancelFileTransfer: (fileId: string, reason?: string) => ipcRenderer.invoke('cancel-file-transfer', { fileId, reason: reason || 'User cancelled' }),
+    retryFileTransfer: (fileId: string) => ipcRenderer.invoke('retry-file-transfer', { fileId }),
     getFileTransfers: () => ipcRenderer.invoke('get-file-transfers'),
     saveTransferredFile: (fileId: string, destinationPath: string) => ipcRenderer.invoke('save-transferred-file', { fileId, destinationPath }),
     onFileTransferStarted: (callback: (data: any) => void) => {
@@ -160,4 +166,6 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.removeAllListeners('yggstack-status');
         ipcRenderer.on('yggstack-status', (_event, status: string, address?: string) => callback(status, address));
     },
+    // BUG FIX: Generador de miniaturas nativo
+    generateVideoThumbnail: (filePath: string) => ipcRenderer.invoke('generate-video-thumbnail', { filePath }),
 });

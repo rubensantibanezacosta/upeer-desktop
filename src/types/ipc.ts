@@ -121,6 +121,15 @@ export interface DeleteContactResponse {
     error?: string;
 }
 
+export interface ClearChatRequest {
+    upeerId: string;
+}
+
+export interface ClearChatResponse {
+    success: boolean;
+    error?: string;
+}
+
 export interface BlockContactRequest {
     upeerId: string;
 }
@@ -644,16 +653,17 @@ export interface IPCMap {
     'set-my-alias': { request: SetMyAliasRequest; response: SetMyAliasResponse };
     'set-my-avatar': { request: SetMyAvatarRequest; response: SetMyAvatarResponse };
     'get-my-reputation': { request: void; response: GetMyReputationResponse };
-    
+
     // Contacts
     'add-contact': { request: AddContactRequest; response: AddContactResponse };
     'accept-contact-request': { request: AcceptContactRequestRequest; response: AcceptContactRequestResponse };
     'delete-contact': { request: DeleteContactRequest; response: DeleteContactResponse };
+    'clear-chat': { request: ClearChatRequest; response: ClearChatResponse };
     'block-contact': { request: BlockContactRequest; response: BlockContactResponse };
     'unblock-contact': { request: UnblockContactRequest; response: UnblockContactResponse };
     'get-blocked-contacts': { request: void; response: GetBlockedContactsResponse };
     'get-contacts': { request: void; response: GetContactsResponse };
-    
+
     // Messaging
     'send-p2p-message': { request: SendMessageRequest; response: SendMessageResponse };
     'send-typing-indicator': { request: SendTypingIndicatorRequest; response: SendTypingIndicatorResponse };
@@ -663,7 +673,7 @@ export interface IPCMap {
     'send-chat-update': { request: SendChatUpdateRequest; response: SendChatUpdateResponse };
     'send-chat-delete': { request: SendChatDeleteRequest; response: SendChatDeleteResponse };
     'get-messages': { request: GetMessagesRequest; response: GetMessagesResponse };
-    
+
     // Groups
     'get-groups': { request: void; response: GetGroupsResponse };
     'create-group': { request: CreateGroupRequest; response: CreateGroupResponse };
@@ -672,22 +682,22 @@ export interface IPCMap {
     'invite-to-group': { request: InviteToGroupRequest; response: InviteToGroupResponse };
     'update-group': { request: UpdateGroupRequest; response: UpdateGroupResponse };
     'leave-group': { request: LeaveGroupRequest; response: LeaveGroupResponse };
-    
+
     // Files
     'open-file-dialog': { request: OpenFileDialogOptions; response: OpenFileDialogResponse };
     'read-file-as-base64': { request: ReadFileAsBase64Request; response: ReadFileAsBase64Response };
     'get-path-for-file': { request: GetPathForFileRequest; response: GetPathForFileResponse };
-    
+
     // File Transfer
     'start-file-transfer': { request: StartFileTransferRequest; response: StartFileTransferResponse };
     'cancel-file-transfer': { request: CancelFileTransferRequest; response: CancelFileTransferResponse };
     'get-file-transfers': { request: void; response: GetFileTransfersResponse };
     'save-transferred-file': { request: SaveTransferredFileRequest; response: SaveTransferredFileResponse };
-    
+
     // Network
     'get-network-stats': { request: void; response: GetNetworkStatsResponse };
     'restart-yggstack': { request: void; response: RestartYggstackResponse };
-    
+
     // Dialogs
     'show-save-dialog': { request: ShowSaveDialogOptions; response: ShowSaveDialogResponse };
     'open-file': { request: OpenFileRequest; response: OpenFileResponse };
@@ -710,18 +720,18 @@ export interface IPCEventMap {
     'message-deleted': MessageDeletedEvent;
     'message-status-updated': MessageStatusUpdatedEvent;
     'peer-typing': PeerTypingEvent;
-    
+
     'group-updated': GroupUpdatedEvent;
     'receive-group-message': ReceiveGroupMessageEvent;
     'group-invite-received': GroupInviteReceivedEvent;
     'group-message-delivered': GroupMessageDeliveredEvent;
-    
+
     'file-transfer-started': FileTransferStartedEvent;
     'file-transfer-progress': FileTransferProgressEvent;
     'file-transfer-completed': FileTransferCompletedEvent;
     'file-transfer-cancelled': FileTransferCancelledEvent;
     'file-transfer-failed': FileTransferFailedEvent;
-    
+
     'yggstack-address': YggstackAddressEvent;
     'yggstack-status': YggstackStatusEvent;
 }

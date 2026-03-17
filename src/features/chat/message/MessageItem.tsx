@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, IconButton, Sheet, Typography } from '@mui/joy';
+import React, { useState, useMemo } from 'react';
+import { Box, IconButton, Sheet, Typography, Avatar } from '@mui/joy';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import { MessageStatus } from './MessageStatus.js';
 import { MessageReply } from './MessageReply.js';
@@ -22,6 +22,7 @@ interface MessageItemProps {
         reactions?: Array<{ upeerId: string; emoji: string }>;
         senderName?: string;
         senderUpeerId?: string;
+        senderAvatar?: string;
     };
     onReply: (msg: any) => void;
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
@@ -30,11 +31,16 @@ interface MessageItemProps {
     originalMessage?: string;
     activeTransfers?: any[];
     onScrollToMessage?: (msgId: string) => void;
+    onRetryTransfer?: (fileId: string) => void;
+    onCancelTransfer?: (fileId: string) => void;
+    onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
+    originalSenderName?: string;
     isGroup?: boolean;
+    onTransferStateChange?: (fileId: string, updates: any) => void;
 }
 
 /** Parse the raw message string into card/file data */
-function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
+export function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
     let cardData: any = null;
     let fileData: any = null;
     let isJSONFile = false;
@@ -55,8 +61,8 @@ function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
                 );
                 const phase = activeTransfer?.phase;
                 const isFinished = activeTransfer ? (
-                    (typeof phase === 'number' && phase >= 5) ||
-                    phase === 'completing' || phase === 'done' || activeTransfer.state === 'completed'
+                    (typeof phase === 'number' && (phase === 4 || phase === 5 || phase === 6 || phase === 8)) ||
+                    phase === 'verifying' || phase === 'completing' || phase === 'done' || activeTransfer.state === 'completed'
                 ) : false;
                 const transferState = activeTransfer ? (isFinished ? 'completed' : activeTransfer.state) : (parsed.state || 'completed');
                 fileData = {
@@ -67,10 +73,12 @@ function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
                     transferState,
                     progress: activeTransfer ? (transferState === 'completed' ? 100 : activeTransfer.progress) : (parsed.state === 'completed' || !parsed.state ? 100 : 0),
                     direction,
-                    // BUG EC fix: propagar la ruta del archivo recibido para que
-                    // el botón "Abrir" funcione (usa tempPath hasta que el usuario
-                    // guarde en una ubicación definitiva).
-                    savedPath: activeTransfer?.savedPath || (transferState === 'completed' ? activeTransfer?.tempPath : undefined),
+                    isVaulting: activeTransfer?.isVaulting,
+                    // BUG EC fix: propagar la ruta del archivo para que el botón "Abrir" funcione tras reiniciar.
+                    // Para el emisor, usamos filePath (original); para el receptor, tempPath (descargado).
+                    savedPath: activeTransfer?.savedPath ||
+                        (direction === 'sending' ? parsed.filePath : parsed.tempPath) ||
+                        (transferState === 'completed' ? activeTransfer?.tempPath : undefined),
                 };
             }
         } catch (_) { /* not a file */ }
@@ -97,6 +105,7 @@ function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
                 fileHash: parts[5],
                 thumbnail: parts[6] && parts[6] !== 'undefined' ? parts[6] : undefined,
                 transferState, progress, direction,
+                isVaulting: activeTransfer?.isVaulting,
                 // BUG EC fix: misma propagación de ruta que el formato JSON
                 savedPath: activeTransfer?.savedPath || (transferState === 'completed' ? activeTransfer?.tempPath : undefined),
             };
@@ -106,15 +115,19 @@ function parseMessage(message: string, isMe: boolean, activeTransfers: any[]) {
     return { cardData, fileData, isJSONFile };
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({
-    msg, onReply, onReact, onEdit, onDelete, originalMessage, activeTransfers = [], onScrollToMessage, isGroup
+const QUICK_EMOJIS_CONST = ['👍', '❤️', '😂', '😮', '😢', '👎'];
+
+export const MessageItem: React.FC<MessageItemProps> = React.memo(({
+    msg, onReply, onReact, onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange
 }) => {
     const isMe = msg.isMine;
     const [isHovered, setIsHovered] = useState(false);
     const [emojiOpen, setEmojiOpen] = useState(false);
-    const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👎'];
+    const QUICK_EMOJIS = QUICK_EMOJIS_CONST;
 
-    const { cardData, fileData, isJSONFile } = parseMessage(msg.message, isMe, activeTransfers);
+    const { cardData, fileData, isJSONFile } = useMemo(() =>
+        parseMessage(msg.message, isMe, activeTransfers),
+        [msg.message, isMe, activeTransfers]);
     const isContactCard = !!cardData;
     const isFile = isJSONFile || (msg.message.startsWith('FILE_TRANSFER|') && !!fileData);
     const isMediaFile = isFile && fileData && (fileData.mimeType?.startsWith('image/') || fileData.mimeType?.startsWith('video/'));
@@ -138,160 +151,208 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: isMe ? 'flex-end' : 'flex-start',
-                mb: msg.reactions && msg.reactions.length > 0 ? 1.5 : 0.5,
+                mb: msg.reactions && msg.reactions.length > 0 ? 1.2 : 0.2,
             }}
         >
-            {/* Sender name for group messages */}
-            {isGroup && !isMe && msg.senderName && (
-                <Typography
-                    level="body-xs"
-                    color="primary"
-                    sx={{ fontWeight: 700, ml: 1, mb: 0.25, fontSize: '11px', letterSpacing: '0.01em' }}
-                >
-                    {msg.senderName}
-                </Typography>
-            )}
-            <Box
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexDirection: isMe ? 'row-reverse' : 'row', maxWidth: '80%' }}
-            >
-                <Box sx={{ position: 'relative' }}>
-                    <Sheet
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                {isGroup && !isMe && (
+                    <Avatar
+                        size="sm"
+                        src={msg.senderAvatar}
                         variant="soft"
-                        color={isMe ? 'primary' : 'neutral'}
-                        sx={{
-                            p: (isMediaFile && !msg.isDeleted) ? 0 : 1,
-                            px: (isMediaFile && !msg.isDeleted) ? 0 : 1.5,
-                            pb: (isMediaFile && !msg.isDeleted) ? 0 : 0.5,
-                            overflow: 'hidden',
-                            borderRadius: '12px',
-                            borderTopRightRadius: isMe ? '4px' : '12px',
-                            borderTopLeftRadius: isMe ? '12px' : '4px',
-                            maxWidth: isContactCard ? '320px' : '100%',
-                            boxShadow: 'sm',
-                            position: 'relative',
-                            opacity: msg.isDeleted ? 0.6 : 1,
-                        }}
+                        sx={{ mt: 0.5, borderRadius: 'sm', width: 28, height: 28 }}
                     >
-                        {!!msg.replyTo && !msg.isDeleted && (
-                            <MessageReply isMe={isMe} originalMessage={originalMessage} onClick={scrollToOriginal} />
-                        )}
-
-                        {isContactCard && cardData && !msg.isDeleted ? (
-                            <ContactCard name={cardData.name} address={cardData.address} upeerId={cardData.upeerId} isMe={isMe} />
-                        ) : isFile && fileData && !msg.isDeleted ? (
-                            <FileMessageItem
-                                data={{ ...fileData, timestamp: msg.timestamp } as any}
-                                isMe={isMe}
-                                status={msg.status}
-                                onDownload={async (fid) => {
-                                    // BUG EC fix: mostrar diálogo nativo "Guardar como" y
-                                    // mover el archivo desde el temp del gestor de transferencias
-                                    // al destino elegido por el usuario.
-                                    const result = await window.upeer.showSaveDialog({
-                                        defaultPath: fileData?.fileName,
-                                    });
-                                    if (!result.canceled && result.filePath) {
-                                        await window.upeer.saveTransferredFile(fid, result.filePath);
-                                    }
-                                }}
-                                onOpen={async (_fid) => {
-                                    // BUG EC fix: abrir el archivo (tempPath o savedPath)
-                                    // con la aplicación predeterminada del sistema.
-                                    const sp = fileData?.savedPath;
-                                    if (sp) await window.upeer.openFile(sp);
-                                }}
-                            />
-                        ) : (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0, alignItems: 'flex-end', minWidth: '80px' }}>
-                                <Typography
-                                    level="body-md"
-                                    sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', fontStyle: msg.isDeleted ? 'italic' : 'normal', pb: 0.5 }}
-                                >
-                                    {msg.message}
-                                </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
-                                    {msg.isEdited && !msg.isDeleted && (
-                                        <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(editado)</Typography>
-                                    )}
-                                    <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px', opacity: 0.8 }}>
-                                        {msg.timestamp}
-                                    </Typography>
-                                    {isMe && <MessageStatus status={msg.status} />}
-                                </Box>
-                            </Box>
-                        )}
-
-                        {!msg.isDeleted && isHovered && (
-                            <MessageContextMenu
-                                msgId={msg.id!}
-                                isMe={isMe}
-                                isFile={isFile}
-                                fileCompleted={fileData?.transferState === 'completed'}
-                                onReply={() => onReply(msg)}
-                                onReact={(emoji) => onReact(msg.id!, emoji, false)}
-                                onDelete={() => onDelete(msg.id!)}
-                            />
-                        )}
-                    </Sheet>
-                    <MessageReactions
-                        reactions={msg.reactions || []}
-                        isMe={isMe}
-                        onRemoveReact={(emoji) => onReact(msg.id!, emoji, true)}
-
-                    />
-                </Box>
-
-                {/* Botón flotante de reacción */}
-                {!msg.isDeleted && (isHovered || emojiOpen) && (
-                    <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', alignSelf: 'flex-end', mb: '4px' }}>
-                        <IconButton
-                            size="sm"
-                            variant="outlined"
-                            color="neutral"
-                            onClick={(e) => { e.stopPropagation(); setEmojiOpen(v => !v); }}
-                            sx={{ '--IconButton-size': '28px', borderRadius: '50%', flexShrink: 0 }}
-
+                        {msg.senderName ? msg.senderName[0] : '?'}
+                    </Avatar>
+                )}
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                    {/* Sender name for group messages */}
+                    {isGroup && !isMe && msg.senderName && (
+                        <Typography
+                            level="body-xs"
+                            color="primary"
+                            sx={{ fontWeight: 700, ml: 0.5, mb: 0.25, fontSize: '11px', letterSpacing: '0.01em' }}
                         >
-                            <AddReactionOutlinedIcon sx={{ fontSize: '16px' }} />
-                        </IconButton>
-                        {emojiOpen && (
+                            {msg.senderName}
+                        </Typography>
+                    )}
+                    <Box
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexDirection: isMe ? 'row-reverse' : 'row' }}
+                    >
+                        <Box sx={{ position: 'relative' }}>
+                            <Sheet
+                                variant="soft"
+                                color={isMe ? 'primary' : 'neutral'}
+                                sx={{
+                                    p: 0.5,
+                                    overflow: 'hidden',
+                                    borderRadius: '12px',
+                                    borderTopRightRadius: isMe ? '4px' : '12px',
+                                    borderTopLeftRadius: isMe ? '12px' : '4px',
+                                    maxWidth: isContactCard ? '320px' : '100%',
+                                    position: 'relative',
+                                    opacity: msg.isDeleted ? 0.6 : 1,
+                                    outline: '0px solid transparent',
+                                    transition: 'outline 0.2s, outline-offset 0.2s',
+                                }}
+                            >
+                                {!!msg.replyTo && !msg.isDeleted && (
+                                    <MessageReply isMe={isMe} originalMessage={originalMessage} originalSenderName={originalSenderName} onClick={scrollToOriginal} />
+                                )}
+
+                                {isContactCard && cardData && !msg.isDeleted ? (
+                                    <ContactCard name={cardData.name} address={cardData.address} upeerId={cardData.upeerId} isMe={isMe} />
+                                ) : isFile && fileData && !msg.isDeleted ? (
+                                    <FileMessageItem
+                                        data={{ ...fileData, timestamp: msg.timestamp } as any}
+                                        isMe={isMe}
+                                        status={msg.status}
+                                        onRetry={onRetryTransfer}
+                                        onCancel={onCancelTransfer}
+                                        onDownload={async (fid) => {
+                                            const result = await window.upeer.showSaveDialog({
+                                                defaultPath: fileData?.fileName,
+                                            });
+                                            if (!result.canceled && result.filePath) {
+                                                const saveResult = await window.upeer.saveTransferredFile(fid, result.filePath);
+                                                if (saveResult.success) {
+                                                    onTransferStateChange?.(fid, { savedPath: result.filePath });
+                                                }
+                                            }
+                                        }}
+                                        onOpen={async (_fid) => {
+                                            const sp = fileData?.savedPath;
+                                            if (sp) await window.upeer.openFile(sp);
+                                        }}
+                                        onMediaClick={onMediaClick}
+                                    />
+                                ) : (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        columnGap: 1.5,
+                                        rowGap: 0,
+                                        alignItems: 'flex-end',
+                                        minWidth: '80px',
+                                        p: 1,
+                                        pt: msg.replyTo ? 0.5 : 1,
+                                        px: 1.5,
+                                        pb: 0.5
+                                    }}>
+                                        <Typography
+                                            level="body-md"
+                                            sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', fontStyle: msg.isDeleted ? 'italic' : 'normal', pb: 0.5 }}
+                                        >
+                                            {(() => {
+                                                if (isFile && fileData && fileData.caption) return fileData.caption;
+                                                if (isJSONFile) return '';
+                                                return msg.message;
+                                            })()}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
+                                            {msg.isEdited && !msg.isDeleted && (
+                                                <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(editado)</Typography>
+                                            )}
+                                            <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px', opacity: 0.8 }}>
+                                                {msg.timestamp}
+                                            </Typography>
+                                            {isMe ? <MessageStatus status={msg.status} /> : null}
+                                        </Box>
+                                    </Box>
+                                )}
+                            </Sheet>
+
+                            <MessageReactions
+                                reactions={msg.reactions || []}
+                                isMe={isMe}
+                                onRemoveReact={(emoji) => onReact(msg.id!, emoji, true)}
+                            />
+                        </Box>
+
+                        {!msg.isDeleted && (
                             <Box sx={{
-                                position: 'absolute',
-                                [isMe ? 'right' : 'left']: 0,
-                                bottom: '110%',
+                                opacity: isHovered || emojiOpen ? 1 : 0,
+                                transition: 'opacity 0.1s',
                                 display: 'flex',
+                                alignItems: 'center',
                                 gap: 0.5,
-                                backgroundColor: 'background.surface',
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 'lg',
-                                p: 0.75,
-                                boxShadow: 'lg',
-                                zIndex: 1200,
-                                whiteSpace: 'nowrap',
+                                pointerEvents: (isHovered || emojiOpen) ? 'auto' : 'none'
                             }}>
-                                {QUICK_EMOJIS.map(emoji => (
-                                    <Box
-                                        key={emoji}
-                                        onClick={() => { onReact(msg.id!, emoji, false); setEmojiOpen(false); }}
+                                {/* Quick Reaction Button */}
+                                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <IconButton
+                                        size="sm"
+                                        variant="plain"
+                                        color="neutral"
+                                        onClick={(e) => { e.stopPropagation(); setEmojiOpen(v => !v); }}
                                         sx={{
-                                            width: 34, height: 34,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: '20px',
-                                            cursor: 'pointer',
-                                            borderRadius: 'md',
-                                            transition: 'background-color 0.1s ease, transform 0.1s ease',
-                                            '&:hover': { backgroundColor: 'background.level1', transform: 'scale(1.15)' },
+                                            '--IconButton-size': '26px',
+                                            borderRadius: 'sm',
+                                            flexShrink: 0,
+                                            opacity: 0.7,
+                                            '&:hover': {
+                                                opacity: 1,
+                                                backgroundColor: 'background.level1'
+                                            },
+                                            '&:active': {
+                                                backgroundColor: 'background.level2'
+                                            }
                                         }}
                                     >
-                                        {emoji}
-                                    </Box>
-                                ))}
+                                        <AddReactionOutlinedIcon sx={{ fontSize: '18px' }} />
+                                    </IconButton>
+                                    {emojiOpen && (
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            [isMe ? 'right' : 'left']: 0,
+                                            bottom: '100%',
+                                            mb: 1,
+                                            display: 'flex',
+                                            gap: 0.5,
+                                            backgroundColor: 'background.surface',
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            borderRadius: 'lg',
+                                            p: 0.75,
+                                            boxShadow: 'lg',
+                                            zIndex: 1200,
+                                            whiteSpace: 'nowrap',
+                                        }}>
+                                            {QUICK_EMOJIS.map(emoji => (
+                                                <Box
+                                                    key={emoji}
+                                                    onClick={() => { onReact(msg.id!, emoji, false); setEmojiOpen(false); }}
+                                                    sx={{
+                                                        width: 32, height: 32,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '18px',
+                                                        cursor: 'pointer',
+                                                        borderRadius: 'md',
+                                                        transition: 'background-color 0.1s ease, transform 0.1s ease',
+                                                        '&:hover': { backgroundColor: 'background.level1', transform: 'scale(1.15)' },
+                                                    }}
+                                                >
+                                                    {emoji}
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                <MessageContextMenu
+                                    msgId={msg.id!}
+                                    isMe={isMe}
+                                    isFile={isFile}
+                                    fileCompleted={fileData?.transferState === 'completed'}
+                                    onReply={() => onReply(msg)}
+                                    onDelete={() => onDelete(msg.id!)}
+                                    sx={{ position: 'static' }}
+                                />
                             </Box>
                         )}
                     </Box>
-                )}
+                </Box>
             </Box>
         </Box>
     );
-};
+});

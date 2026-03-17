@@ -19,7 +19,7 @@ export const EmptyChat: React.FC = () => (
             width: 100,
             height: 100,
             backgroundColor: 'background.level1',
-            borderRadius: '50%',
+            borderRadius: 'xl',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

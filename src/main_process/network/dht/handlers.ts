@@ -162,8 +162,8 @@ async function handleDhtUpdate(senderUpeerId: string, data: any, _win: BrowserWi
         return; // Silent skip for identical sequence
     }
 
-    network('Updating location', undefined, { upeerId: senderUpeerId, address: block.address, dhtSeq: block.dhtSeq }, 'dht');
-    updateContactDhtLocation(senderUpeerId, block.address, block.dhtSeq, block.signature, block.expiresAt, block.renewalToken);
+    network('Updating location', undefined, { upeerId: senderUpeerId, address: block.address, addresses: block.addresses, dhtSeq: block.dhtSeq }, 'dht');
+    updateContactDhtLocation(senderUpeerId, block.addresses || block.address, block.dhtSeq, block.signature, block.expiresAt, block.renewalToken);
 
     // Store renewal token in DHT for distributed access
     if (block.renewalToken) {
@@ -248,7 +248,7 @@ async function handleDhtExchange(senderUpeerId: string, data: any) {
             }
         }
 
-        updateContactDhtLocation(peer.upeerId, finalBlock.address, finalBlock.dhtSeq, finalBlock.signature, finalBlock.expiresAt, finalRenewalToken);
+        updateContactDhtLocation(peer.upeerId, finalBlock.addresses || finalBlock.address, finalBlock.dhtSeq, finalBlock.signature, finalBlock.expiresAt, finalRenewalToken);
 
         // Store renewal token in DHT for distributed access
         if (finalRenewalToken) {
@@ -349,7 +349,7 @@ async function handleDhtResponse(
                 }
             }
 
-            updateContactDhtLocation(data.targetId, finalBlock.address, finalBlock.dhtSeq, finalBlock.signature, finalBlock.expiresAt, finalRenewalToken);
+            updateContactDhtLocation(data.targetId, finalBlock.addresses || finalBlock.address, finalBlock.dhtSeq, finalBlock.signature, finalBlock.expiresAt, finalRenewalToken);
 
             // Store renewal token in DHT for distributed access
             if (finalRenewalToken) {
@@ -362,13 +362,16 @@ async function handleDhtResponse(
 }
 
 // New DHT functions using Kademlia
-export async function publishLocationBlock(address: string, dhtSeq: number, signature: string, renewalToken?: any): Promise<void> {
+export async function publishLocationBlock(locationBlock: any): Promise<void> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return;
 
-    const locationBlock = { address, dhtSeq, signature, renewalToken };
     await kademlia.storeLocationBlock(kademlia['upeerId'], locationBlock);
-    network('Published location block', undefined, { dhtSeq, hasRenewalToken: !!renewalToken }, 'kademlia');
+    network('Published location block to Kademlia', undefined, { 
+        dhtSeq: locationBlock.dhtSeq, 
+        hasRenewalToken: !!locationBlock.renewalToken,
+        addresses: locationBlock.addresses?.length || 1
+    }, 'kademlia');
 }
 
 // Auto-renewal function for delegated renewal
@@ -423,7 +426,7 @@ export async function performAutoRenewal(): Promise<void> {
                     if (contact) {
                         updateContactDhtLocation(
                             storedValue.publisher,
-                            renewedBlock.address,
+                            renewedBlock.addresses || renewedBlock.address,
                             renewedBlock.dhtSeq,
                             renewedBlock.signature,
                             renewedBlock.expiresAt,
@@ -436,12 +439,12 @@ export async function performAutoRenewal(): Promise<void> {
     }
 }
 
-export async function findNodeLocation(upeerId: string): Promise<string | null> {
+export async function findNodeLocation(upeerId: string): Promise<any | null> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return null;
 
     const locationBlock = await kademlia.findLocationBlock(upeerId);
-    return locationBlock?.address || null;
+    return locationBlock || null;
 }
 
 export async function iterativeFindNode(upeerId: string, sendMessage: (address: string, data: any) => void): Promise<string | null> {

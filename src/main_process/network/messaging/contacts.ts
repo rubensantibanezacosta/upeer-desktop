@@ -15,7 +15,8 @@ export async function sendContactRequest(targetIp: string) {
         signedPreKey: getMySignedPreKeyBundle(), // ← X3DH / Double Ratchet
         alias: getMyAlias() || undefined,
         avatar: getMyAvatar() || undefined,
-        powProof
+        powProof,
+        addresses: (await import('../utils.js')).getNetworkAddresses()
     };
     sendSecureUDPMessage(targetIp, data);
 }
@@ -32,7 +33,8 @@ export async function acceptContactRequest(upeerId: string, publicKey: string) {
         ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
         signedPreKey: getMySignedPreKeyBundle(), // ← X3DH / Double Ratchet
         alias: getMyAlias() || undefined,
-        avatar: getMyAvatar() || undefined
+        avatar: getMyAvatar() || undefined,
+        addresses: (await import('../utils.js')).getNetworkAddresses()
     };
     sendSecureUDPMessage(contact.address, data);
 }

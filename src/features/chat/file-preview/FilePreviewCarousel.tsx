@@ -7,6 +7,8 @@ import AudioFileIcon from '@mui/icons-material/AudioFile';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { getMimeType } from '../../../utils/fileUtils.js';
 
 interface FileInfo {
     path: string;
@@ -25,11 +27,15 @@ interface FilePreviewCarouselProps {
     onAddMore: () => void;
 }
 
-const getFileIcon = (fileType: string, size: number = 24) => {
-    if (fileType.startsWith('image/')) return <ImageIcon sx={{ fontSize: size }} />;
-    if (fileType.startsWith('audio/')) return <AudioFileIcon sx={{ fontSize: size }} />;
-    if (fileType.startsWith('video/')) return <VideoFileIcon sx={{ fontSize: size }} />;
-    if (fileType.includes('pdf')) return <DescriptionIcon sx={{ fontSize: size }} />;
+const getFileIcon = (fileType: string, fileName: string, size: number = 24) => {
+    let effectiveType = fileType;
+    if (!effectiveType || effectiveType === 'application/octet-stream') {
+        effectiveType = getMimeType(fileName);
+    }
+    if (effectiveType.startsWith('image/')) return <ImageIcon sx={{ fontSize: size }} />;
+    if (effectiveType.startsWith('audio/')) return <AudioFileIcon sx={{ fontSize: size }} />;
+    if (effectiveType.startsWith('video/')) return <VideoFileIcon sx={{ fontSize: size }} />;
+    if (effectiveType.includes('pdf')) return <DescriptionIcon sx={{ fontSize: size }} />;
     return <InsertDriveFileIcon sx={{ fontSize: size }} />;
 };
 
@@ -73,13 +79,25 @@ export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
                     }}
                 >
                     {previews[file.path]?.thumbnail ? (
-                        <Box
-                            component="img"
-                            src={previews[file.path].thumbnail}
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                            <Box
+                                component="img"
+                                src={previews[file.path].thumbnail}
+                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            {(file.type.startsWith('video/') || getMimeType(file.name).startsWith('video/')) && (
+                                <Box sx={{
+                                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                                    color: 'white', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 'sm',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    width: 24, height: 24, backdropFilter: 'blur(2px)'
+                                }}>
+                                    <PlayArrowIcon sx={{ fontSize: 16 }} />
+                                </Box>
+                            )}
+                        </Box>
                     ) : (
-                        getFileIcon(file.type, 24)
+                        getFileIcon(file.type, file.name, 24)
                     )}
 
                     {files.length > 1 && (
@@ -90,7 +108,7 @@ export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
                             sx={{
                                 position: 'absolute', top: -8, right: -8,
                                 minWidth: 16, minHeight: 16, width: 16, height: 16, p: 0,
-                                borderRadius: '50%',
+                                borderRadius: 'sm',
                                 opacity: 0, transform: 'scale(0.5)',
                                 transition: 'all 0.2s',
                                 display: 'flex', zIndex: 1,

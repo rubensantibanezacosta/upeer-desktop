@@ -39,8 +39,8 @@ export function getContacts() {
     });
 
     result.sort((a, b) => {
-        const tA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-        const tB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        const tA = a.lastMessageTime ? Number(a.lastMessageTime) : 0;
+        const tB = b.lastMessageTime ? Number(b.lastMessageTime) : 0;
         return tB - tA;
     });
     return result;
@@ -55,7 +55,8 @@ export function addOrUpdateContact(
     ephemeralPublicKey?: string,
     dhtSeq?: number,
     dhtSignature?: string,
-    dhtExpiresAt?: number
+    dhtExpiresAt?: number,
+    addresses?: string[] // Optional array of multiple addresses
 ) {
     const db = getDb();
     const schema = getSchema();
@@ -68,10 +69,23 @@ export function addOrUpdateContact(
 
     let known: string[] = [];
     try { known = JSON.parse(existing?.knownAddresses ?? '[]'); } catch { known = []; }
-    if (!known.includes(address)) {
-        known.unshift(address);
-        if (known.length > 20) known = known.slice(0, 20);
+    
+    // Merge provided addresses and the primary address
+    const incomingAddresses = addresses || [address];
+    for (const addr of incomingAddresses) {
+        const idx = known.indexOf(addr);
+        if (idx !== -1) known.splice(idx, 1);
+        known.unshift(addr); // Most recent to the front
     }
+    
+    // Ensure the designated primary address is at the very front
+    const pIdx = known.indexOf(address);
+    if (pIdx !== -1) {
+        known.splice(pIdx, 1);
+        known.unshift(address);
+    }
+
+    if (known.length > 20) known = known.slice(0, 20);
     const knownAddresses = JSON.stringify(known);
 
     const now = new Date().toISOString();

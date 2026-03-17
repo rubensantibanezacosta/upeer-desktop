@@ -10,7 +10,8 @@ export async function trackDistributedAsset(
     cid: string,
     shardIndex: number,
     totalShards: number,
-    custodianSid: string
+    custodianSid: string,
+    segmentIndex: number = 0
 ) {
     const db = getDb();
     return db.insert(distributedAssets).values({
@@ -19,6 +20,7 @@ export async function trackDistributedAsset(
         shardIndex,
         totalShards,
         custodianSid,
+        segmentIndex,
         lastVerified: Date.now()
     }).onConflictDoUpdate({
         target: distributedAssets.cid,

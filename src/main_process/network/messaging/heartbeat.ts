@@ -7,22 +7,43 @@ import {
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/db.js';
 import { warn, network } from '../../security/secure-logger.js';
-import { getNetworkAddress, generateSignedLocationBlock } from '../utils.js';
+import { getNetworkAddresses, generateSignedLocationBlock } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
+
+/**
+ * Helper to get all verified addresses for a contact (primary + known)
+ */
+function getFanOutAddresses(contact: any): string[] {
+    const addresses = new Set<string>();
+    if (contact.address) addresses.add(contact.address);
+    if (contact.knownAddresses) {
+        try {
+            const known = typeof contact.knownAddresses === 'string' 
+                ? JSON.parse(contact.knownAddresses) 
+                : contact.knownAddresses;
+            if (Array.isArray(known)) {
+                known.forEach((a: string) => addresses.add(a));
+            }
+        } catch { /* ignore */ }
+    }
+    return Array.from(addresses);
+}
 
 export function checkHeartbeat(contacts: any[]) {
     for (const contact of contacts) {
         if (contact.status === 'connected') {
             // Si la IP está en backoff (falla repetida), omitir este ciclo
-            if (isIPBlocked(contact.address)) continue;
-
-            sendSecureUDPMessage(contact.address, {
-                type: 'PING',
-                alias: getMyAlias() || undefined,
-                avatar: getMyAvatar() || undefined,
-            });
+            const addresses = getFanOutAddresses(contact);
+            for (const addr of addresses) {
+                if (isIPBlocked(addr)) continue;
+                sendSecureUDPMessage(addr, {
+                    type: 'PING',
+                    alias: getMyAlias() || undefined,
+                    avatar: getMyAvatar() || undefined,
+                }, contact.publicKey);
+            }
             sendDhtExchange(contact.upeerId, sendSecureUDPMessage);
 
             // Enhanced distributed heartbeat with contact cache exchange
@@ -37,7 +58,7 @@ export function checkHeartbeat(contacts: any[]) {
 // Distributed Heartbeat Protocol for Extreme Resilience
 // ========================
 
-export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (ip: string, data: any) => void) {
+export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
     const myId = getMyUPeerId();
 
     // 1. Exchange location blocks
@@ -59,39 +80,38 @@ export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (
 
 async function exchangeReputationGossip(
     contact: any,
-    send: (ip: string, data: any) => void,
+    send: (ip: string, data: any, pubKey?: string, internal?: boolean) => void,
 ): Promise<void> {
     try {
         const { getGossipIds } = await import('../../security/reputation/vouches.js');
         const ids = getGossipIds();
         if (ids.length === 0) return;
-        send(contact.address, { type: 'REPUTATION_GOSSIP', ids });
+        const addresses = getFanOutAddresses(contact);
+        for (const addr of addresses) {
+            send(addr, { type: 'REPUTATION_GOSSIP', ids }, contact.publicKey);
+        }
     } catch {
         // No bloquear el heartbeat si el módulo falla
     }
 }
 
-async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: string, data: any) => void) {
-    // Send our current location block
-    const currentIp = getNetworkAddress();
-    if (!currentIp) return;
+async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
+    // Send our current location blocks for all available channels
+    const currentAddresses = getNetworkAddresses();
+    if (currentAddresses.length === 0) return;
 
-    // BUG AV fix: usar getMyDhtSeq() (lectura) en lugar de incrementMyDhtSeq() (escritura).
-    // exchangeLocationBlocks se llama una vez por contacto conectado en cada heartbeat;
-    // con N contactos, incrementMyDhtSeq() se ejecutaba N veces por ciclo, haciendo
-    // que distintos contactos recibieran seqs dispares (N, N+1, …, N+M-1) y que el seq
-    // se agotara M veces más rápido de lo necesario. broadcastDhtUpdate() ya incrementa
-    // el seq cuando detecta un cambio de IP — esa es la fuente autorizada de incremento.
     const currentSeq = getMyDhtSeq();
 
-    // generateSignedLocationBlock genera internamente el renewalToken con nuestro propio ID
-    // como targetId si no se le pasa ninguno — que es lo correcto para nuestro propio bloque.
-    const locBlock = generateSignedLocationBlock(currentIp, currentSeq);
+    // generateSignedLocationBlock now accepts string[] and handles plural 'addresses'
+    const locBlock = generateSignedLocationBlock(currentAddresses, currentSeq);
 
-    sendSecureUDPMessage(contact.address, {
-        type: 'DHT_UPDATE',
-        locationBlock: locBlock
-    });
+    const addresses = getFanOutAddresses(contact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, {
+            type: 'DHT_UPDATE',
+            locationBlock: locBlock
+        }, contact.publicKey);
+    }
 }
 
 function getContactsSeenLast24h(): Array<{
@@ -116,15 +136,12 @@ function getContactsSeenLast24h(): Array<{
         }));
 }
 
-async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDPMessage: (ip: string, data: any) => void) {
+async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
     if (aliveContacts.length === 0) return;
 
-    sendSecureUDPMessage(contact.address, {
+    const packet = {
         type: 'DHT_EXCHANGE',
         peers: aliveContacts
-            // BUG AY fix: publicKey es obligatoria en validateDhtExchange; sin ella
-            // todos los paquetes DHT_EXCHANGE de heartbeat eran rechazados silenciosamente.
-            // Además filtrar peers sin publicKey para no enviar entradas incompletas.
             .filter(c => c.publicKey && c.upeerId)
             .map(c => ({
                 upeerId: c.upeerId,
@@ -132,7 +149,12 @@ async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDP
                 address: c.address,
                 lastSeen: c.lastSeen
             }))
-    });
+    };
+
+    const addresses = getFanOutAddresses(contact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, packet, contact.publicKey);
+    }
 }
 
 function getLocationBlocksForRenewal(): Array<{
@@ -169,14 +191,19 @@ function getLocationBlocksForRenewal(): Array<{
         }));
 }
 
-async function shareBlocks(contact: any, blocksToShare: any[], sendSecureUDPMessage: (ip: string, data: any) => void) {
+async function shareBlocks(contact: any, blocksToShare: any[], sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
     if (blocksToShare.length === 0) return;
 
     // Share blocks that need renewal
-    sendSecureUDPMessage(contact.address, {
+    const packet = {
         type: 'DHT_EXCHANGE',
         peers: blocksToShare
-    });
+    };
+
+    const addresses = getFanOutAddresses(contact);
+    for (const addr of addresses) {
+        sendSecureUDPMessage(addr, packet, contact.publicKey);
+    }
 }
 
 export function wrappedBroadcastDhtUpdate() {

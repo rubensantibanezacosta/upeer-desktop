@@ -1,18 +1,48 @@
-import { getDb, getSchema, eq, desc } from '../shared.js';
+import { getDb, getSchema, eq, desc, or, and, lt, sql, runTransaction } from '../shared.js';
+import { updateMessageStatus } from './status.js';
 
-export function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent') {
+export async function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.insert(schema.messages).values({
+    let lastClearedAt = 0;
+    if (chatUpeerId.startsWith('grp-')) {
+        const group = db.select({ lastClearedAt: schema.groups.lastClearedAt })
+            .from(schema.groups)
+            .where(eq(schema.groups.groupId, chatUpeerId))
+            .get();
+        if (group) lastClearedAt = group.lastClearedAt;
+    } else {
+        const contact = db.select({ lastClearedAt: schema.contacts.lastClearedAt })
+            .from(schema.contacts)
+            .where(eq(schema.contacts.upeerId, chatUpeerId))
+            .get();
+        if (contact) lastClearedAt = contact.lastClearedAt;
+    }
+
+    const messageTimestamp = timestamp ? Number(timestamp) : Date.now();
+
+    if (lastClearedAt > 0 && messageTimestamp <= lastClearedAt) {
+        return { changes: 0 };
+    }
+
+    const result = db.insert(schema.messages).values({
         id,
         chatUpeerId,
+        senderUpeerId,
         isMine,
         message,
         replyTo,
         signature,
-        status
+        status,
+        timestamp: messageTimestamp
     }).onConflictDoNothing().run();
+
+    if (result.changes === 0) {
+        await updateMessageStatus(id, status);
+    }
+
+    return result;
 }
 
 export function getMessages(chatUpeerId: string) {
@@ -33,21 +63,24 @@ export function getMessages(chatUpeerId: string) {
     });
 }
 
-export function updateMessageContent(id: string, newMessage: string, signature?: string) {
+export function updateMessageContent(id: string, newMessage: string, signature?: string, version?: number) {
     const db = getDb();
     const schema = getSchema();
 
+    const updates: any = {
+        message: newMessage,
+        isEdited: true,
+        signature: signature
+    };
+    if (version !== undefined) updates.version = version;
+
     return db.update(schema.messages)
-        .set({
-            message: newMessage,
-            isEdited: true,
-            signature: signature
-        })
+        .set(updates)
         .where(eq(schema.messages.id, id))
         .run();
 }
 
-export function deleteMessageLocally(id: string) {
+export function deleteMessageLocally(id: string, timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
 
@@ -60,18 +93,36 @@ export function deleteMessageLocally(id: string) {
         .run();
 }
 
-export function deleteMessagesByChatId(chatUpeerId: string): void {
+export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: number): void {
     const db = getDb();
     const schema = getSchema();
-    // Delete reactions for all messages in this chat
-    const msgIds = db.select({ id: schema.messages.id }).from(schema.messages)
-        .where(eq(schema.messages.chatUpeerId, chatUpeerId))
-        .all()
-        .map(m => m.id);
-    for (const id of msgIds) {
-        db.delete(schema.reactions).where(eq(schema.reactions.messageId, id)).run();
-    }
-    db.delete(schema.messages).where(eq(schema.messages.chatUpeerId, chatUpeerId)).run();
+    const timestamp = clearTimestamp || Date.now();
+
+    runTransaction(() => {
+        if (chatUpeerId.startsWith('grp-')) {
+            db.update(schema.groups)
+                .set({ lastClearedAt: timestamp })
+                .where(eq(schema.groups.groupId, chatUpeerId))
+                .run();
+        } else {
+            db.update(schema.contacts)
+                .set({ lastClearedAt: timestamp })
+                .where(eq(schema.contacts.upeerId, chatUpeerId))
+                .run();
+        }
+
+        const messagesToDelete = db.select({ id: schema.messages.id }).from(schema.messages)
+            .where(and(
+                eq(schema.messages.chatUpeerId, chatUpeerId),
+                lt(schema.messages.timestamp, timestamp + 1000)
+            ))
+            .all();
+
+        for (const msg of messagesToDelete) {
+            db.delete(schema.reactions).where(eq(schema.reactions.messageId, msg.id)).run();
+            db.delete(schema.messages).where(eq(schema.messages.id, msg.id)).run();
+        }
+    });
 }
 
 export function getMessageById(id: string) {
@@ -83,51 +134,17 @@ export function getMessageById(id: string) {
         .get();
 }
 
-export async function saveFileMessage(
-    id: string,
-    chatUpeerId: string,
-    isMine: boolean,
-    fileInfo: {
-        fileName: string;
-        fileSize: number;
-        mimeType: string;
-        fileHash: string;
-        tempPath?: string;
-        filePath?: string;
-        direction: 'sending' | 'receiving';
-        transferId: string;
-        thumbnail?: string;
-        state?: string;
-    },
-    signature?: string,
-    status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent'
-) {
+export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
 
-    // Create a structured message that can be parsed by the frontend
-    const fileMessage = {
-        type: 'file' as const,
-        ...fileInfo
-    };
+    const messageJson = JSON.stringify({
+        type: 'file',
+        fileId,
+        fileName,
+        fileSize,
+        mimeType
+    });
 
-    return db.insert(schema.messages).values({
-        id,
-        chatUpeerId,
-        isMine,
-        message: JSON.stringify(fileMessage),
-        replyTo: undefined,
-        signature,
-        status
-    }).onConflictDoNothing().run();
-
-    // Update message content
-    db.update(schema.messages)
-        .set({ message: JSON.stringify(fileMessage) })
-        .where(eq(schema.messages.id, id))
-        .run();
-
-    // Use specific status update logic that respects precedence
-    const { updateMessageStatus } = await import('./status.js');
-    return updateMessageStatus(id, status);
+    return saveMessage(id, chatUpeerId, isMine, messageJson, undefined, signature, status, senderUpeerId, timestamp);
 }

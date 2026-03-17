@@ -8,34 +8,42 @@ import {
 } from '../../security/identity.js';
 import {
     generateSignedLocationBlock,
-    getNetworkAddress
+    getNetworkAddresses
 } from '../utils.js';
 import { getKademliaInstance, publishLocationBlock, findNodeLocation, iterativeFindNode } from './handlers.js';
 import { network, warn, error } from '../../security/secure-logger.js';
 
-let lastKnownIp: string | null = null;
+let lastKnownAddresses: string[] = [];
 
 export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any) => void) {
-    const currentIp = getNetworkAddress();
-    if (!currentIp) return;
+    const addresses = getNetworkAddresses();
+    if (addresses.length === 0) return;
 
-    if (currentIp !== lastKnownIp) {
-        lastKnownIp = currentIp;
+    // Check if the set of addresses has changed
+    const hasChanged = addresses.length !== lastKnownAddresses.length || 
+                      !addresses.every(addr => lastKnownAddresses.includes(addr));
+
+    if (hasChanged) {
+        lastKnownAddresses = [...addresses];
         const newSeq = incrementMyDhtSeq();
 
-        network('IP detected/changed', undefined, { currentIp, newSeq }, 'dht');
-        const locBlock = generateSignedLocationBlock(currentIp, newSeq);
+        network('Network addresses changed', undefined, { addresses, newSeq }, 'dht');
+        
+        // Generate signed block with ALL addresses
+        const locBlock = generateSignedLocationBlock(addresses, newSeq);
 
-        // 1. Publish to Kademlia DHT (distributed storage) with renewal token
-        publishLocationBlock(currentIp, newSeq, locBlock.signature, locBlock.renewalToken).catch(err => {
+        // 1. Publish to Kademlia DHT
+        // Note: For Kademlia, we still publish it keyed by upeerId. 
+        // We pass the full signed block to ensure signature verification and multi-channel support for consumers.
+        publishLocationBlock(locBlock).catch(err => {
             warn('Failed to publish location block', err, 'kademlia');
         });
 
-        // 2. Limited broadcast to intimate contacts (for low-latency updates)
+        // 2. Limited broadcast to intimate contacts with the FULL multi-channel block
         const contacts = getContacts();
         const intimateContacts = contacts
             .filter(c => c.status === 'connected')
-            .slice(0, 10); // Limit to 10 closest contacts
+            .slice(0, 10);
 
         for (const contact of intimateContacts) {
             sendSecureUDPMessage(contact.address, {
@@ -44,7 +52,7 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any)
             });
         }
 
-        network('Update propagated', undefined, { intimateContacts: intimateContacts.length }, 'dht');
+        network('Multi-channel update propagated', undefined, { intimateContacts: intimateContacts.length }, 'dht');
     }
 }
 
@@ -71,11 +79,18 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                 const dbContact = await getContactByUpeerId(c.upeerId);
                 // BUG BP fix: el campo Drizzle es dhtExpiresAt (columna dht_expires_at),
                 // no expiresAt. renewalToken se almacena JSON.stringify → parsear al leer.
+                
+                let known: string[] | undefined;
+                if (dbContact?.knownAddresses) {
+                    try { known = JSON.parse(dbContact.knownAddresses); } catch { /* ignore */ }
+                }
+
                 return {
                     upeerId: c.upeerId,
                     publicKey: c.publicKey,
                     locationBlock: {
                         address: c.address,
+                        addresses: known || [c.address], // Include all known addresses for multi-channel
                         dhtSeq: c.dhtSeq,
                         signature: c.dhtSignature,
                         expiresAt: dbContact?.dhtExpiresAt ?? undefined,

@@ -2,11 +2,10 @@ import net from 'node:net';
 import { SOCKS5_HOST, SOCKS5_PORT } from './constants.js';
 
 export function parseIPv6ToBuffer(addr: string): Buffer {
-    // Quitar corchetes si los hay
-    addr = addr.replace(/^\\[|\\]$/g, '');
-    // Expandir \"::\"
+    addr = addr.replace(/[\[\]]/g, '');
     const halves = addr.split('::');
-    let groups: string[];
+    let groups: string[] = [];
+    
     if (halves.length === 2) {
         const left = halves[0] ? halves[0].split(':') : [];
         const right = halves[1] ? halves[1].split(':') : [];
@@ -15,13 +14,17 @@ export function parseIPv6ToBuffer(addr: string): Buffer {
     } else {
         groups = addr.split(':');
     }
-    const buf = Buffer.allocUnsafe(16);
-    for (let i = 0; i < 8; i++) buf.writeUInt16BE(parseInt(groups[i] ?? '0', 16), i * 2);
+    
+    const buf = Buffer.alloc(16);
+    for (let i = 0; i < 8; i++) {
+        const val = parseInt(groups[i] || '0', 16);
+        buf.writeUInt16BE(isNaN(val) ? 0 : val, i * 2);
+    }
     return buf;
 }
 
 export function encodeFrame(data: Buffer): Buffer {
-    const len = Buffer.allocUnsafe(4);
+    const len = Buffer.alloc(4);
     len.writeUInt32BE(data.length, 0);
     return Buffer.concat([len, data]);
 }
@@ -33,11 +36,17 @@ export function socks5Connect(host: string, port: number): Promise<net.Socket> {
         let buf = Buffer.alloc(0);
 
         socket.setTimeout(8000);
-        socket.on('timeout', () => { socket.destroy(); reject(new Error('SOCKS5 timeout')); });
-        socket.on('error', reject);
+        socket.on('timeout', () => { 
+            socket.destroy(); 
+            reject(new Error('SOCKS5 timeout')); 
+        });
+        
+        socket.on('error', (err) => {
+            socket.destroy();
+            reject(err);
+        });
 
         socket.once('connect', () => {
-            // Saludo SOCKS5: versión 5, 1 método, sin autenticación
             socket.write(Buffer.from([0x05, 0x01, 0x00]));
         });
 
@@ -54,19 +63,19 @@ export function socks5Connect(host: string, port: number): Promise<net.Socket> {
                 buf = buf.subarray(2);
                 state = 'connect';
 
-                // Construir petición CONNECT IPv6
                 try {
                     const addrBuf = parseIPv6ToBuffer(host);
-                    const portBuf = Buffer.allocUnsafe(2);
+                    const portBuf = Buffer.alloc(2);
                     portBuf.writeUInt16BE(port, 0);
-                    // VER=5, CMD=CONNECT, RSV=0, ATYP=4 (IPv6)
                     socket.write(Buffer.concat([Buffer.from([0x05, 0x01, 0x00, 0x04]), addrBuf, portBuf]));
-                } catch (e) { socket.destroy(); reject(e); }
+                } catch (e) { 
+                    socket.destroy(); 
+                    reject(e); 
+                }
                 return;
             }
 
             if (state === 'connect') {
-                // Respuesta mínima: VER REP RSV ATYP + addr + port (≥10 bytes)
                 if (buf.length < 10) return;
                 socket.removeAllListeners('data');
                 socket.setTimeout(0);

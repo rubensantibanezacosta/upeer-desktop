@@ -17,7 +17,7 @@ export class FileTransferStore {
         thumbnail?: string;
         direction: 'sending' | 'receiving';
         filePath?: string;
-        fileBuffer?: Buffer;
+        caption?: string;
     }): FileTransfer {
         const fileId = data.fileId || crypto.randomUUID();
 
@@ -32,6 +32,7 @@ export class FileTransferStore {
             chunkSize: data.chunkSize,
             fileHash: data.fileHash,
             thumbnail: data.thumbnail,
+            caption: data.caption,
             state: 'pending',
             phase: TransferPhase.PROPOSED,
             direction: data.direction,
@@ -40,11 +41,10 @@ export class FileTransferStore {
             lastActivity: Date.now(),
             pendingChunks: new Set(),
             filePath: data.filePath,
-            fileBuffer: data.fileBuffer,
-            windowSize: 20, // initialWindowSize
-            ssthresh: 64,   // slow start threshold
-            srtt: 250,      // smoothed RTT
-            rto: 500,       // initial retransmission timeout
+            windowSize: 40, // initialWindowSize (increased for better start)
+            ssthresh: 128,  // slow start threshold
+            srtt: 200,      // smoothed RTT (slightly more optimistic)
+            rto: 400,       // initial retransmission timeout
             consecutiveAcks: 0,
             nextChunkIndex: 0
         };

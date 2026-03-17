@@ -178,16 +178,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                             src={avatar || undefined}
                             color="primary"
                             variant="soft"
-                            sx={!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}}
+                            sx={{
+                                borderRadius: 'md',
+                                ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {})
+                            }}
                         >
                             {!avatar && <GroupsIcon sx={{ fontSize: 18, color: 'white' }} />}
                         </Avatar>
                     ) : (
-                        <Avatar size="sm" src={avatar || undefined}>{contactName ? contactName[0] : ''}</Avatar>
+                        <Avatar size="sm" src={avatar || undefined} sx={{ borderRadius: 'md' }}>{contactName ? contactName[0] : ''}</Avatar>
                     )}
                     {isGroup && isAdmin && (
                         <Box sx={{
-                            position: 'absolute', inset: 0, borderRadius: '50%',
+                            position: 'absolute', inset: 0, borderRadius: 'md',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: 'rgba(0,0,0,0.45)', opacity: 0,
                             transition: 'opacity 0.15s',
@@ -256,7 +259,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                         color="primary"
                         startDecorator={<CheckIcon />}
                         onClick={onAccept}
-                        sx={{ borderRadius: 'xl', mr: 1, fontWeight: 600 }}
+                        sx={{ borderRadius: 'md', mr: 1, fontWeight: 600 }}
                     >
                         Aceptar Solicitud
                     </Button>

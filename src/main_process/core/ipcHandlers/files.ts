@@ -135,7 +135,13 @@ export function registerFileHandlers(): void {
         '.gif': 'image/gif',
         '.webp': 'image/webp',
         '.bmp': 'image/bmp',
-        '.svg': 'image/svg+xml'
+        '.svg': 'image/svg+xml',
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm',
+        '.ogg': 'video/ogg',
+        '.mov': 'video/quicktime',
+        '.avi': 'video/x-msvideo',
+        '.mkv': 'video/x-matroska'
       };
 
       if (mimeMap[ext]) {
@@ -171,6 +177,29 @@ export function registerFileHandlers(): void {
     } catch (error) {
       logError('Error en show-save-dialog', { err: String(error) }, 'ipc');
       return { canceled: true };
+    }
+  });
+
+  // BUG FIX: Generar miniatura de video robusta usando ffmpeg en el main process
+  // Evita problemas de codecs/aceleración en el renderer durante la previsualización.
+  ipcMain.handle('generate-video-thumbnail', async (event, { filePath }) => {
+    try {
+      if (typeof filePath !== 'string' || !filePath) {
+        return { success: false, error: 'Ruta de archivo inválida' };
+      }
+      const resolvedPath = path.resolve(filePath);
+      const homeDir = app.getPath('home');
+      const homeDirNormalized = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+      if (!resolvedPath.startsWith(homeDirNormalized) && resolvedPath !== homeDir) {
+        return { success: false, error: 'El archivo debe estar dentro del directorio home' };
+      }
+
+      const { generateVideoThumbnail } = await import('../../utils/thumbnailGenerator.js');
+      const dataUrl = await generateVideoThumbnail(resolvedPath);
+      return { success: true, dataUrl };
+    } catch (error) {
+      logError('Error generatig video thumbnail', { err: String(error) }, 'ipc');
+      return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
   });
 

@@ -63,7 +63,7 @@ const {
 - `open`: boolean
 - `onClose`: () => void
 - `onSubmit`: (file: File, thumbnail?: string) => void
-- `maxSizeMB`: number (default: 100MB)
+- `maxSizeMB`: number (default: 500MB)
 - `allowedTypes`: string[] (lista de MIME types)
 
 ### 3. Componente `TransferProgressBar`

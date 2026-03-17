@@ -26,6 +26,7 @@ interface SecurityModalProps {
     contactName: string;
     contactPublicKey: string;
     myPublicKey: string;
+    knownAddresses?: string[];
 }
 
 export const SecurityModal: React.FC<SecurityModalProps> = ({
@@ -33,7 +34,8 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
     onClose,
     contactName,
     contactPublicKey,
-    myPublicKey
+    myPublicKey,
+    knownAddresses = []
 }) => {
 
     // BUG DY fix: computar el safety number con SHA-256 (SubtleCrypto del renderer)
@@ -79,7 +81,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                     <Stack spacing={3} alignItems="center">
                         <Box sx={{
                             width: 80, height: 80,
-                            borderRadius: '50%',
+                            borderRadius: 'xl',
                             backgroundColor: 'primary.softBg',
                             display: 'flex',
                             alignItems: 'center',
@@ -139,6 +141,43 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                             </Typography>
                         </Box>
 
+                        <Divider sx={{ width: '100%' }}>Interfaces Verificadas</Divider>
+                        
+                        <Box sx={{ width: '100%', textAlign: 'left' }}>
+                            <Stack spacing={1}>
+                                {knownAddresses.length > 0 ? (
+                                    knownAddresses.map((addr, idx) => (
+                                        <Box key={idx} sx={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'space-between',
+                                            backgroundColor: 'background.level1',
+                                            py: 1, px: 2, borderRadius: 'md',
+                                            border: '1px solid', borderColor: 'divider'
+                                        }}>
+                                            <Typography level="body-xs" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                                                {addr}
+                                            </Typography>
+                                            <Typography level="body-xs" sx={{ 
+                                                textTransform: 'uppercase', 
+                                                fontSize: '10px', 
+                                                fontWeight: 700,
+                                                opacity: 0.5,
+                                                color: addr.includes(':') ? 'primary.main' : 'success.main'
+                                            }}>
+                                                {addr.includes(':') ? (addr.startsWith('2') || addr.startsWith('3') ? 'Yggdrasil' : 'IPv6') : 'LAN IPv4'}
+                                                {idx === 0 && ' • Principal'}
+                                            </Typography>
+                                        </Box>
+                                    ))
+                                ) : (
+                                    <Typography level="body-xs" sx={{ textAlign: 'center', opacity: 0.5 }}>
+                                        No se han detectado interfaces adicionales.
+                                    </Typography>
+                                )}
+                            </Stack>
+                        </Box>
+
                         <Divider sx={{ width: '100%' }}>Resiliencia P2P</Divider>
 
                         <Alert
@@ -163,7 +202,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                             startDecorator={<WarningAmberIcon />}
                             sx={{ fontSize: '13px', textAlign: 'left', p: 0 }}
                         >
-                            upeer no almacena tus llaves privadas. Todo el proceso de cifrado ocurre localmente en tu dispositivo.
+                            uPeer no almacena tus llaves privadas. Todo el proceso de cifrado ocurre localmente en tu dispositivo.
                         </Alert>
 
                         <Button

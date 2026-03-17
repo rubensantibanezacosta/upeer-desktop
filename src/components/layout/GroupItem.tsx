@@ -73,7 +73,10 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                         src={group.avatar || undefined}
                         color="primary"
                         variant="soft"
-                        sx={!group.avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}}
+                        sx={{
+                            borderRadius: 'md',
+                            ...(!group.avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {})
+                        }}
                     >
                         {!group.avatar && <GroupsIcon sx={{ fontSize: 24, color: 'white' }} />}
                     </Avatar>

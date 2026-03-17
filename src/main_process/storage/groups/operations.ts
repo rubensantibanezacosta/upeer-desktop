@@ -41,6 +41,7 @@ export function saveGroup(
         adminUpeerId,
         members: JSON.stringify(members),
         status,
+        createdAt: Date.now(), // BUG DB-GRP-TS fix: inserción manual de integer
         ...(avatar ? { avatar } : {})
     }).onConflictDoUpdate({
         target: schema.groups.groupId,
@@ -89,8 +90,8 @@ export function getGroups(): GroupRecord[] {
         };
     });
     result.sort((a, b) => {
-        const tA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-        const tB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        const tA = a.lastMessageTime ? Number(a.lastMessageTime) : 0;
+        const tB = b.lastMessageTime ? Number(b.lastMessageTime) : 0;
         return tB - tA;
     });
     return result;

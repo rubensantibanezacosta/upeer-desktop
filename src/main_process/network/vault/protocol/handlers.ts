@@ -40,12 +40,12 @@ export async function handleVaultStore(senderSid: string, data: VaultStoreData, 
         return;
     }
 
-    // Tiered Quotas based on vouchScore
-    let quota = 5 * 1024 * 1024; // New/Casual: 5MB
+    // Tiered Quotas based on vouchScore (Updated for large segmented files)
+    let quota = 50 * 1024 * 1024; // Casual/New: 50MB
     if (vouchScore >= 80) {
-        quota = 1000 * 1024 * 1024; // Highly Trusted: 1GB
+        quota = 2500 * 1024 * 1024; // Highly Trusted: 2.5GB
     } else if (vouchScore >= 65) {
-        quota = 100 * 1024 * 1024;  // Known Peer: 100MB
+        quota = 500 * 1024 * 1024;  // Trusted: 500MB
     }
 
     const currentUsage = await getSenderUsage(senderSid);
@@ -199,6 +199,9 @@ export async function handleVaultAck(senderSid: string, data: { payloadHashes: s
  * extender TTLs indefinidamente, pero el cap a 60 días lo previene. Requerir
  * senderSid === entry.senderSid rompería el ciclo de renovación del RepairWorker,
  * que renueva desde su propia identidad, no desde la del emisor original.
+ * BUG L fix: solo el emisor original O un custodio con reputación alta puede renovar.
+ * Sin esto, cualquier peer conectado puede extender el TTL de cualquier entry ajena,
+ * manteniendo datos en el custodio indefinidamente y agotando su cuota (DoS).
  */
 export async function handleVaultRenew(
     senderSid: string,
@@ -206,6 +209,37 @@ export async function handleVaultRenew(
 ) {
     if (!data.payloadHash || typeof data.newExpiresAt !== 'number') {
         warn('Invalid VAULT_RENEW packet', { senderSid }, 'vault');
+        return;
+    }
+
+    const entry = await getVaultEntryByHash(data.payloadHash);
+    if (!entry) {
+        debug('VAULT_RENEW for unknown entry, ignoring', { hash: data.payloadHash.slice(0, 8), from: senderSid }, 'vault');
+        return;
+    }
+
+    // Autorización:
+    // 1. El remitente es el dueño original de la entry (senderSid === entry.senderSid).
+    // 2. O el remitente es un custodio de confianza (score >= 65) que está ayudando a la red (RepairWorker).
+    const { getContacts: _getContactsForScore } = await import('../../../storage/db.js');
+    const _allContacts = _getContactsForScore() as any[];
+    const _directIds = new Set<string>(
+        _allContacts
+            .filter((c: any) => c.status === 'connected' && c.upeerId)
+            .map((c: any) => c.upeerId as string)
+    );
+    const vouchScore = computeScore(senderSid, _directIds);
+
+    const isOwner = entry.senderSid === senderSid;
+    const isTrustedCustodian = vouchScore >= 65;
+
+    if (!isOwner && !isTrustedCustodian) {
+        security('Unauthorized VAULT_RENEW attempt', {
+            hash: data.payloadHash,
+            attacker: senderSid,
+            owner: entry.senderSid,
+            vouchScore
+        }, 'vault');
         return;
     }
 
@@ -217,7 +251,5 @@ export async function handleVaultRenew(
     const renewed = await renewVaultEntry(data.payloadHash, safeExpiry);
     if (renewed) {
         debug('Vault entry TTL extended by VAULT_RENEW', { hash: data.payloadHash.slice(0, 8), from: senderSid }, 'vault');
-    } else {
-        debug('VAULT_RENEW for unknown entry, ignoring', { hash: data.payloadHash.slice(0, 8), from: senderSid }, 'vault');
     }
 }

@@ -79,7 +79,7 @@ export async function handleVaultDelivery(
                     // Un contacto comprometido puede firmar un packet malformado que crashe handlers.
                     // Se valida aquí para los tipos que tienen validador; FILE_* y FILE_DATA_SMALL
                     // gestionan su propia validación en sus respectivos handlers.
-                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_DELETE', 'GROUP_INVITE', 'GROUP_UPDATE'];
+                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'ACK', 'READ'];
                     if (_vaultTypes.includes(innerPacket.type)) {
                         const _innerValidation = validateMessage(innerPacket.type, innerPacket);
                         if (!_innerValidation.valid) {
@@ -92,6 +92,9 @@ export async function handleVaultDelivery(
                     if (innerPacket.type === 'CHAT') {
                         const { handleChatMessage } = await import('./chat.js');
                         await handleChatMessage(entry.senderSid, originalContact, innerPacket, win, innerSig, fromAddress, sendResponse);
+                    } else if (innerPacket.type === 'CHAT_CLEAR_ALL') {
+                        const { handleIncomingClear } = await import('./chat.js');
+                        await handleIncomingClear(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'FILE_DATA_SMALL') {
                         // BUG FJ fix: innerPacket.fileHash se usaba directamente como ID de mensaje en DB
                         // sin validar el formato. Un peer puede enviar fileHash = UUID de otro mensaje
@@ -113,6 +116,12 @@ export async function handleVaultDelivery(
                     } else if (innerPacket.type === 'CHAT_DELETE') {
                         const { handleIncomingDelete } = await import('./chat.js');
                         await handleIncomingDelete(entry.senderSid, innerPacket, win);
+                    } else if (innerPacket.type === 'ACK') {
+                        const { handleAck } = await import('./chat.js');
+                        await handleAck(entry.senderSid, innerPacket, win);
+                    } else if (innerPacket.type === 'READ') {
+                        const { handleReadReceipt } = await import('./chat.js');
+                        await handleReadReceipt(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'GROUP_INVITE') {
                         const { handleGroupInvite } = await import('./groups.js');
                         await handleGroupInvite(entry.senderSid, innerPacket, win);
@@ -126,12 +135,25 @@ export async function handleVaultDelivery(
                         debug('Received file shard from vault', { cid: entry.payloadHash }, 'vault');
                         issueVouch(senderSid, VouchType.VAULT_CHUNK).catch(() => { });
 
-                        // For shards, we store them as assets. The fileHash is the middle part of CID.
-                        const [_, fileHash, shardIndex] = entry.payloadHash.split(':');
-                        if (fileHash && shardIndex) {
+                        // For shards, we store them as assets. 
+                        // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)
+                        const parts = entry.payloadHash.split(':');
+                        const fileHash = parts[1];
+                        let segIdx = 0;
+                        let shardIndex = 0;
+
+                        if (parts.length === 4) {
+                            segIdx = parseInt(parts[2]);
+                            shardIndex = parseInt(parts[3]);
+                        } else {
+                            shardIndex = parseInt(parts[2]);
+                        }
+
+                        if (fileHash && !isNaN(shardIndex)) {
                             await saveFileMessage(fileHash, entry.senderSid, false, {
                                 fileHash,
-                                shardIndex: parseInt(shardIndex),
+                                segIdx,
+                                shardIndex,
                                 data: entry.data,
                                 state: 'completed'
                             } as any);

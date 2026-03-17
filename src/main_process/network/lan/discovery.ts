@@ -1,7 +1,8 @@
 import dgram from 'node:dgram';
 import os from 'node:os';
 import { getMyUPeerId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
-import { getNetworkAddress, canonicalStringify } from '../utils.js';
+import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock } from '../utils.js';
+import { getMyDhtSeq } from '../../security/identity.js';
 import { addOrUpdateContact } from '../../storage/db.js';
 import { isContactBlocked } from '../../storage/contacts/operations.js';
 import { network, info, warn } from '../../security/secure-logger.js';
@@ -112,8 +113,8 @@ export class LanDiscovery {
     private announcePresence(): void {
         if (!this.socket) return;
 
-        const myAddress = getNetworkAddress();
-        if (!myAddress) return;
+        const myAddresses = getNetworkAddresses();
+        if (myAddresses.length === 0) return;
 
         // Guard: no intentar firmar si la identidad no está lista
         let upeerId: string;
@@ -128,13 +129,17 @@ export class LanDiscovery {
             return;
         }
 
-        // Create message data without signature
+        const dhtSeq = getMyDhtSeq();
+        // Generar un bloque firmado DETERMINISTA que incluya todas las IPs
+        const locBlock = generateSignedLocationBlock(myAddresses, dhtSeq);
+
         const messageData = {
             type: 'LAN_DISCOVERY_ANNOUNCE' as const,
             upeerId,
             publicKey,
             ephemeralPublicKey,
-            address: myAddress,
+            address: locBlock.address, // Primaria (compatible)
+            addresses: locBlock.addresses, // Lista completa
             timestamp: Date.now()
         };
 
@@ -142,7 +147,7 @@ export class LanDiscovery {
         const signature = sign(Buffer.from(canonicalStringify(messageData))).toString('hex');
 
         // Add signature to final message
-        const message: LanDiscoveryMessage = {
+        const message = {
             ...messageData,
             signature
         };
@@ -156,7 +161,7 @@ export class LanDiscovery {
             }
         });
 
-        network('LAN announcement sent', undefined, { address: myAddress }, 'lan');
+        network('LAN announcement sent (multi-channel)', undefined, { addresses: myAddresses }, 'lan');
     }
 
     // Handle incoming LAN messages
@@ -279,16 +284,17 @@ export class LanDiscovery {
     private sendResponse(targetUpeerId: string, targetAddress: string): void {
         if (!this.socket) return;
 
-        const myAddress = getNetworkAddress();
-        if (!myAddress) return;
+        const myAddresses = getNetworkAddresses();
+        if (myAddresses.length === 0) return;
 
         // Create response data without signature
-        const responseData: Omit<LanDiscoveryMessage, 'signature'> = {
+        const responseData = {
             type: 'LAN_DISCOVERY_RESPONSE' as const,
             upeerId: getMyUPeerId(),
             publicKey: getMyPublicKeyHex(),
             ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
-            address: myAddress,
+            address: myAddresses[0],
+            addresses: myAddresses,
             timestamp: Date.now()
         };
 
@@ -296,7 +302,7 @@ export class LanDiscovery {
         const signature = sign(Buffer.from(canonicalStringify(responseData))).toString('hex');
 
         // Add signature to final response
-        const response: LanDiscoveryMessage = {
+        const response = {
             ...responseData,
             signature
         };
@@ -310,7 +316,7 @@ export class LanDiscovery {
             }
         });
 
-        network('LAN response sent', undefined, { target: targetUpeerId }, 'lan');
+        network('LAN response sent (multi-channel)', undefined, { target: targetUpeerId }, 'lan');
     }
 
     // Add discovered peer to contacts

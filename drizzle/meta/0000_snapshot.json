@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fc1456c7-50e6-410f-b602-96ad44953026",
+  "id": "aaf909cc-17a5-467c-9dd1-df024136d8f2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "backup_survival_kit": {
@@ -219,6 +219,14 @@
           "notNull": false,
           "autoincrement": false,
           "default": "CURRENT_TIMESTAMP"
+        },
+        "last_cleared_at": {
+          "name": "last_cleared_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -258,6 +266,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "segment_index": {
+          "name": "segment_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "shard_index": {
           "name": "shard_index",
@@ -359,11 +375,18 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_cleared_at": {
+          "name": "last_cleared_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "default": 0
         }
       },
       "indexes": {},
@@ -387,6 +410,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "sender_upeer_id": {
+          "name": "sender_upeer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "is_mine": {
@@ -425,6 +455,14 @@
           "autoincrement": false,
           "default": "'sent'"
         },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
         "is_deleted": {
           "name": "is_deleted",
           "type": "integer",
@@ -443,11 +481,10 @@
         },
         "timestamp": {
           "name": "timestamp",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -502,7 +539,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "pending_outbox_recipient_idx": {
+          "name": "pending_outbox_recipient_idx",
+          "columns": [
+            "recipient_sid"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -586,11 +631,10 @@
         },
         "timestamp": {
           "name": "timestamp",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -719,7 +763,29 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "rep_vouches_to_idx": {
+          "name": "rep_vouches_to_idx",
+          "columns": [
+            "to_id"
+          ],
+          "isUnique": false
+        },
+        "rep_vouches_from_idx": {
+          "name": "rep_vouches_from_idx",
+          "columns": [
+            "from_id"
+          ],
+          "isUnique": false
+        },
+        "rep_vouches_ts_idx": {
+          "name": "rep_vouches_ts_idx",
+          "columns": [
+            "timestamp"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

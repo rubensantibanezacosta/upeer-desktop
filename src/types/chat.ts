@@ -18,6 +18,7 @@ export interface ChatMessage {
     senderName?: string;
     groupId?: string;
     isSystem?: boolean;
+    date: number;
 }
 
 export interface ReputationData {
@@ -38,6 +39,8 @@ export interface Contact {
     lastMessageIsMine?: boolean;
     lastMessageStatus?: string;
     isTyping?: boolean;
+    vouchScore?: number;
+    knownAddresses?: string[];
 }
 
 export interface Group {
@@ -51,5 +54,17 @@ export interface Group {
     // UI extras
     lastMessage?: string;
     lastMessageTime?: string;
+}
+
+export interface MediaItem {
+    url: string;
+    fileName: string;
+    mimeType: string;
+    fileId: string;
+    messageId?: string;
+    thumbnail?: string;
+    senderName?: string;
+    senderAvatar?: string;
+    timestamp?: string;
 }
 

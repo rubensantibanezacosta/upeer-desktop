@@ -98,10 +98,12 @@ export function createLocationBlockKey(upeerId: string): Buffer {
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }
 
-// Helper function to create Vault Pointer key
+// Helper function to create Vault Pointer key (Hashed-Targeting V2)
 export function createVaultPointerKey(recipientSid: string): Buffer {
-    // Key for vault pointers: hash of "vault-ptr:" + upeerId
+    // Salted key for vault pointers to prevent social graph analysis
+    // Uses daily salt + versioned prefix
+    const dateSalt = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const hash = crypto.createHash('sha256');
-    hash.update(`vault-ptr:${recipientSid}`);
+    hash.update(`vault-ptr-v2:${recipientSid}:${dateSalt}`);
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }

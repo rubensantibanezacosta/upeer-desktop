@@ -9,7 +9,7 @@ import { getContactByUpeerId } from '../../storage/db.js';
  */
 export function registerFileTransferHandlers(): void {
   // File transfer handlers (Phase 16)
-  ipcMain.handle('start-file-transfer', async (event, { upeerId, filePath, thumbnail }) => {
+  ipcMain.handle('start-file-transfer', async (event, { upeerId, filePath, thumbnail, caption }) => {
     try {
       // BUG CW fix: un renderer comprometido (XSS en contenido del chat) podría llamar a
       // start-file-transfer con filePath='~/.ssh/id_rsa' y el proceso principal leería y
@@ -25,12 +25,35 @@ export function registerFileTransferHandlers(): void {
         return { success: false, error: 'Source file must be within home directory' };
       }
 
+      const { getGroupById } = await import('../../storage/db.js');
+      const group = getGroupById(upeerId);
+
+      if (group) {
+        if (group.status !== 'active') return { success: false, error: 'Group is not active' };
+
+        // Multi-send to all connected members
+        const myId = (await import('../../security/identity.js')).getMyUPeerId();
+        let firstFileId: string | undefined;
+
+        for (const memberId of group.members) {
+          if (memberId === myId) continue;
+          const contact = await getContactByUpeerId(memberId);
+          if (contact && contact.status === 'connected') {
+            const fid = await fileTransferManager.startSend(memberId, contact.address, resolvedSrc, thumbnail, caption);
+            if (!firstFileId) firstFileId = fid;
+          }
+        }
+
+        if (!firstFileId) return { success: false, error: 'No group members are online' };
+        return { success: true, fileId: firstFileId };
+      }
+
       const contact = await getContactByUpeerId(upeerId);
       if (!contact || contact.status !== 'connected') {
         return { success: false, error: 'Contact not connected' };
       }
 
-      const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail);
+      const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail, caption);
       return { success: true, fileId };
     } catch (err: any) {
       logError('Error starting file transfer', { err: String(err) }, 'file-transfer');
@@ -44,6 +67,16 @@ export function registerFileTransferHandlers(): void {
       return { success: true };
     } catch (err: any) {
       logError('Error canceling file transfer', { err: String(err) }, 'file-transfer');
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  });
+
+  ipcMain.handle('retry-file-transfer', async (event, { fileId }) => {
+    try {
+      await fileTransferManager.retryTransfer(fileId);
+      return { success: true };
+    } catch (err: any) {
+      logError('Error retrying file transfer', { err: String(err) }, 'file-transfer');
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
   });

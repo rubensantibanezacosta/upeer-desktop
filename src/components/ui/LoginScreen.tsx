@@ -500,7 +500,7 @@ const CreateConfirmScreen: React.FC<{
                     <Box
                         onClick={() => !isLoading && fileInputRef.current?.click()}
                         sx={{
-                            width: 72, height: 72, borderRadius: '50%',
+                            width: 72, height: 72, borderRadius: 'lg',
                             border: '2px dashed',
                             borderColor: avatar ? 'primary.400' : 'divider',
                             overflow: 'hidden',

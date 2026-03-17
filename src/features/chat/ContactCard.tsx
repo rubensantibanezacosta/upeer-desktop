@@ -30,9 +30,9 @@ export const ContactCard: React.FC<ContactCardProps> = ({ name, address, upeerId
     const fullIdentity = `${upeerId}@${normalizedAddress}`;
 
     return (
-        <Box sx={{ p: 0.5 }}>
+        <Box sx={{ p: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                <Avatar size="lg" sx={{ fontWeight: 700, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'primary.100', color: isMe ? 'white' : 'primary.600' }}>
+                <Avatar size="lg" sx={{ fontWeight: 700, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'primary.100', color: isMe ? 'white' : 'primary.600', borderRadius: 'md' }}>
                     {(name?.[0] ?? '?').toUpperCase()}
                 </Avatar>
                 <Box>

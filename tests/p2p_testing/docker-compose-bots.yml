@@ -47,7 +47,7 @@ services:
     <<: *bot-common
     container_name: bot-alice
     environment:
-      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5bff:fc61:a4d7:e753:a40f:bdf7:8135
       - BOT_ALIAS=Alice
       - BOT_COLOR=#e91e8c
       - BOT_PERSONALITY=friendly
@@ -58,7 +58,7 @@ services:
     <<: *bot-common
     container_name: bot-bob
     environment:
-      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5bff:fc61:a4d7:e753:a40f:bdf7:8135
       - BOT_ALIAS=Bob
       - BOT_COLOR=#1565c0
       - BOT_PERSONALITY=formal
@@ -69,7 +69,7 @@ services:
     <<: *bot-common
     container_name: bot-carlos
     environment:
-      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5884:ec67:1c3e:d713:8b32:ed5e:9de3
+      - TARGET_IDENTITY=a64a5ea070f3066f96d71af21101837f@201:5bff:fc61:a4d7:e753:a40f:bdf7:8135
       - BOT_ALIAS=Carlos
       - BOT_COLOR=#e65100
       - BOT_PERSONALITY=casual

@@ -9,6 +9,7 @@ import {
 import {
     getContactByUpeerId,
     saveMessage,
+    updateMessageStatus,
     getGroupById,
     saveGroup,
     updateGroupMembers,
@@ -41,7 +42,7 @@ export async function sendGroupMessage(
         error(`Group message size exceeds limit (${message.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { groupId }, 'security');
         return undefined;
     }
-    
+
     const group = getGroupById(groupId);
     if (!group || group.status !== 'active') return undefined;
 
@@ -50,15 +51,22 @@ export async function sendGroupMessage(
 
     // Save locally first
     const signature = sign(Buffer.from(message));
-    saveMessage(msgId, groupId, true, message, replyTo, signature.toString('hex'), 'sent');
+    await saveMessage(msgId, groupId, true, message, replyTo, signature.toString('hex'), 'sent', myId);
 
-    // Fan-out: send to every member that is not us
-    for (const memberUpeerId of group.members) {
-        if (memberUpeerId === myId) continue;
+    // Fan-out: send to every member including other devices of ours for "Self-Sync"
+    const membersWithSelf = [...group.members];
+    // Asegurar que no duplicamos el ID pero permitimos el fan-out de IPs adicionales
+    const uniqueMembers = Array.from(new Set(membersWithSelf));
+
+    for (const memberUpeerId of uniqueMembers) {
+        // En grupos, el emisor (yo) también quiere recibir una copia en sus otros dispositivos
+        // if (memberUpeerId === myId) continue; // <-- Eliminado para habilitar Self-Sync
+
         const contact = await getContactByUpeerId(memberUpeerId);
-        if (!contact || contact.status !== 'connected' || !contact.publicKey) continue;
+        // Si somos nosotros mismos, el "contacto" es nuestra propia info (status connected)
+        if (!contact || (memberUpeerId !== myId && contact.status !== 'connected') || !contact.publicKey) continue;
 
-        const useEphemeral = shouldUseEphemeral(contact);
+        const useEphemeral = memberUpeerId === myId ? false : shouldUseEphemeral(contact);
         const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
 
         const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
@@ -81,25 +89,77 @@ export async function sendGroupMessage(
             ephemeralPublicKey: ephPubKey,
             useRecipientEphemeral: useEphemeral,
             replyTo
-            // members omitted: receiver already has the group roster locally;
-            // including it leaks the full membership list to vault custodians
         };
 
-        sendSecureUDPMessage(contact.address, data, contact.publicKey); // ← Sealed Sender
+        // Identificar direcciones IP para este UPeerId (Fan-out multicanal)
+        const addresses: string[] = [];
+        if (contact.address) addresses.push(contact.address);
 
-        // ── Resilience: vault fallback if the member appears offline later ──
-        // We preemptively vault for members with low lastSeen recency or uncertain status
-        // by not sending and instead vaulting when status is not 'connected'
+        // Si somos nosotros, buscamos nuestras otras IPs vía DHT
+        if (memberUpeerId === myId) {
+            try {
+                const { getKademliaInstance } = await import('../dht/handlers.js');
+                const kademlia = getKademliaInstance();
+                const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+                if (kademlia) {
+                    const selfNodes = kademlia.findClosestContacts(myId, 20)
+                        .filter(n => n.upeerId === myId && n.address !== myYggAddress);
+                    for (const node of selfNodes) {
+                        if (!addresses.includes(node.address)) addresses.push(node.address);
+                    }
+                }
+            } catch { /* silent */ }
+        }
+
+        // Añadir todas las direcciones conocidas del contacto
+        try {
+            const known: string[] = JSON.parse((contact as any).knownAddresses ?? '[]');
+            for (const addr of known) {
+                if (!addresses.includes(addr)) addresses.push(addr);
+            }
+        } catch { /* ignore */ }
+
+        // Enviar a todas las direcciones conocidas del miembro (o de nosotros mismos)
+        const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+        for (const addr of addresses) {
+            // Si el destino es una dirección de otro dispositivo mío, mandarlo con mi propia pubkey para Sealed Sender
+            const isSelf = memberUpeerId === myId;
+            const targetSealedKey = isSelf ? myPublicKey : contact.publicKey;
+            sendSecureUDPMessage(addr, data, targetSealedKey, isSelf);
+        }
     }
 
-    // Vault for offline members (we have their pubkey from previous handshake)
-    for (const memberUpeerId of group.members) {
-        if (memberUpeerId === myId) continue;
+    // Vault for offline members (we have their pubkey from previous handshake).
+    // Incluirnos a nosotros mismos para la sincronización si no hay otros dispositivos online.
+    const offlineTargetMembers = [...uniqueMembers];
+    for (const memberUpeerId of offlineTargetMembers) {
         const contact = await getContactByUpeerId(memberUpeerId);
-        // Skip if we just sent to them (connected) or if we have no key at all
-        if (!contact || contact.status === 'connected' || !contact.publicKey) continue;
+        // Skip si el contacto está conectado (ya se envió por UDP).
+        // PERO si somos nosotros, siempre intentamos vaultear una copia si no hay otros "self-nodes" online.
+        const isSelf = memberUpeerId === myId;
 
-        // Offline members: always use static key — their stored eph key for us is certainly stale.
+        // Determinar si debemos vaultear para este miembro
+        if (!contact || !contact.publicKey) continue;
+
+        let shouldVault = false;
+        if (isSelf) {
+            // Para nosotros mismos: vaultear si no detectamos otras IPs propias activas
+            try {
+                const { getKademliaInstance } = await import('../dht/handlers.js');
+                const kademlia = getKademliaInstance();
+                const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+                const otherSelfOnline = kademlia ? kademlia.findClosestContacts(myId, 20)
+                    .some(n => n.upeerId === myId && n.address !== myYggAddress) : false;
+                if (!otherSelfOnline) shouldVault = true;
+            } catch { shouldVault = true; }
+        } else {
+            // Para otros miembros: vaultear si no están conectados
+            if (contact.status !== 'connected') shouldVault = true;
+        }
+
+        if (!shouldVault) continue;
+
+        // Offline members (y auto-sync): always use static key.
         const useEphemeral = false;
         const targetKeyHex = contact.publicKey;
         const ephPubKey = getMyEphemeralPublicKeyHex();
@@ -112,9 +172,7 @@ export async function sendGroupMessage(
             type: 'GROUP_MSG',
             id: msgId,
             groupId,
-            // groupName omitido: el receptor lo tiene en su BD desde GROUP_INVITE.
-            // senderUpeerId omitido: el custodio lo conoce del protocolo VAULT_STORE
-            // (entry.senderSid) — no hace falta exponerlo dentro del payload cifrado.
+            // groupName omitido por privacidad
             content: ciphertext.toString('hex'),
             nonce: nonce.toString('hex'),
             useRecipientEphemeral: useEphemeral,
@@ -122,16 +180,26 @@ export async function sendGroupMessage(
         };
         const signedPacket = {
             ...offlinePacket,
+            senderUpeerId: myId, // Necesario para que el receptor sepa quién lo envió
             signature: sign(Buffer.from(canonicalStringify(offlinePacket))).toString('hex')
         };
+
         const { VaultManager } = await import('../vault/manager.js');
         // CID determinista: group:msgId:memberUpeerId
-        // → si varios miembros online intentan vaultear el mismo mensaje para el mismo offline,
-        //   saveVaultEntry usa onConflictDoUpdate → un solo slot por (mensaje, miembro).
         const payloadHashOverride = crypto.createHash('sha256')
             .update(`group:${msgId}:${memberUpeerId}`)
             .digest('hex');
-        await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
+
+        // Replicar al vault del miembro (o al nuestro propio si isSelf)
+        const nodes = await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
+
+        if (!isSelf && nodes > 0) {
+            const { updateMessageStatus } = await import('../../storage/db.js');
+            if (await updateMessageStatus(msgId, 'vaulted' as any)) {
+                const { BrowserWindow } = await import('electron');
+                BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
+            }
+        }
     }
 
     return msgId;
@@ -225,7 +293,16 @@ export async function updateGroup(
         };
 
         if (contact.status === 'connected') {
-            sendSecureUDPMessage(contact.address, packet);
+            const addresses: string[] = [];
+            if (contact.address) addresses.push(contact.address);
+            try {
+                const known = JSON.parse((contact as any).knownAddresses ?? '[]');
+                for (const addr of known) if (!addresses.includes(addr)) addresses.push(addr);
+            } catch { /* ignore */ }
+
+            for (const addr of addresses) {
+                sendSecureUDPMessage(addr, packet, contact.publicKey);
+            }
         } else {
             const signedPacket = {
                 ...packet,
@@ -277,7 +354,16 @@ async function _sendGroupInvite(
     };
 
     if (contact.status === 'connected') {
-        sendSecureUDPMessage(contact.address, packet);
+        const addresses: string[] = [];
+        if (contact.address) addresses.push(contact.address);
+        try {
+            const known = JSON.parse((contact as any).knownAddresses ?? '[]');
+            for (const addr of known) if (!addresses.includes(addr)) addresses.push(addr);
+        } catch { /* ignore */ }
+
+        for (const addr of addresses) {
+            sendSecureUDPMessage(addr, packet, contact.publicKey);
+        }
     } else {
         // Vault the encrypted invite for when the member comes back online
         const signedPacket = {
@@ -314,8 +400,17 @@ export async function leaveGroup(groupId: string): Promise<void> {
     for (const memberUpeerId of group.members) {
         if (memberUpeerId === myId) continue;
         const contact = await getContactByUpeerId(memberUpeerId);
-        if (contact?.status === 'connected' && contact.address) {
-            sendSecureUDPMessage(contact.address, packet);
+        if (contact?.status === 'connected') {
+            const addresses: string[] = [];
+            if (contact.address) addresses.push(contact.address);
+            try {
+                const known = JSON.parse((contact as any).knownAddresses ?? '[]');
+                for (const addr of known) if (!addresses.includes(addr)) addresses.push(addr);
+            } catch { /* ignore */ }
+
+            for (const addr of addresses) {
+                sendSecureUDPMessage(addr, packet, contact.publicKey);
+            }
         }
     }
 

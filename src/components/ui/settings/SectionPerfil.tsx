@@ -155,18 +155,18 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
 
                 <Tooltip title="Cambiar foto de perfil" variant="soft" size="sm">
                     <Box onClick={handleAvatarClick} sx={{
-                        width: 96, height: 96, borderRadius: '50%',
+                        width: 96, height: 96, borderRadius: 'lg',
                         overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative',
                         '&:hover .avatar-overlay': { opacity: 1 },
                     }}>
                         {avatar
                             ? <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <Avatar sx={{ width: '100%', height: '100%', fontSize: '2.5rem', borderRadius: '50%' }}>
+                            : <Avatar sx={{ width: '100%', height: '100%', fontSize: '2.5rem', borderRadius: 'lg' }}>
                                 {displayName.charAt(0).toUpperCase()}
                             </Avatar>
                         }
                         <Box className="avatar-overlay" sx={{
-                            position: 'absolute', inset: 0, borderRadius: '50%',
+                            position: 'absolute', inset: 0, borderRadius: 'lg',
                             backgroundColor: 'rgba(0,0,0,0.48)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             opacity: 0, transition: 'opacity 0.18s',

@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 // @journeyapps/sqlcipher no exporta tipos de clase compatibles con InstanceType;
 // usamos any para sqlite y conservamos tipado fuerte solo para drizzle.
 import * as schema from './schema.js';
-import { eq, desc, or, and } from 'drizzle-orm';
+import { eq, desc, or, and, lt, sql } from 'drizzle-orm';
 import { warn, error } from '../security/secure-logger.js';
 
 // Shared database instance
@@ -59,27 +59,23 @@ export function clearUserData(): void {
 
 /**
  * Ejecuta una función dentro de una transacción SQLite.
- * Si la función lanza un error, la transacción se revierte y el error se relanza.
+ * Si la función lanza un error, la transacción se revierte automáticamente.
  * Devuelve el valor devuelto por la función.
+ * Utiliza el método nativo .transaction() de better-sqlite3 para mayor robustez.
  */
 export function runTransaction<T>(fn: () => T): T {
     const sqliteInstance = getSqlite();
     if (!sqliteInstance) {
         throw new Error('Database not initialized');
     }
-    
-    // Begin transaction
-    sqliteInstance.exec('BEGIN TRANSACTION');
-    
+
     try {
-        const result = fn();
-        sqliteInstance.exec('COMMIT');
-        return result;
+        const transaction = sqliteInstance.transaction(fn);
+        return transaction();
     } catch (err) {
-        sqliteInstance.exec('ROLLBACK');
-        error('Transaction failed, rolled back', err, 'db');
+        error('Transaction failed', err, 'db');
         throw err;
     }
 }
 
-export { eq, desc, or, and };
+export { eq, desc, or, and, lt, sql };

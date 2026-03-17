@@ -12,5 +12,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*", "tests/**/*", "vite-env.d.ts"],
-  "exclude": ["node_modules", "out", "dist", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["node_modules", "out", "dist"]
 }

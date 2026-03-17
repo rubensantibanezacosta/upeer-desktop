@@ -140,11 +140,15 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                 <MenuItem disabled sx={{
                     cursor: 'default',
                     '&:hover': { backgroundColor: 'transparent' },
-                    justifyContent: 'center',
-                    py: 1
+                    flexDirection: 'column',
+                    py: 1,
+                    px: 2
                 }}>
-                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-                        Límite: 100MB por archivo
+                    <Typography level="body-xs" sx={{ opacity: 0.7, fontWeight: 600 }}>
+                        Límite: 10GB por archivo
+                    </Typography>
+                    <Typography level="body-xs" sx={{ opacity: 0.5, textAlign: 'center', mt: 0.5, fontSize: '10px' }}>
+                        Adjuntos offline ({'>'}10MB) requieren reputación ≥ 30
                     </Typography>
                 </MenuItem>
             </Menu>

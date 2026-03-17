@@ -41,3 +41,27 @@ body {
   scrollbar-color: var(--joy-palette-neutral-600, rgba(255, 255, 255, 0.2))
     transparent;
 }
+
+/* Animación para resaltar mensajes al navegar hacia ellos */
+@keyframes highlight-message {
+  0% {
+    outline: 0px solid var(--joy-palette-primary-500);
+    outline-offset: 0px;
+  }
+  20% {
+    outline: 2px solid var(--joy-palette-primary-500);
+    outline-offset: 2px;
+  }
+  80% {
+    outline: 2px solid var(--joy-palette-primary-500);
+    outline-offset: 2px;
+  }
+  100% {
+    outline: 0px solid transparent;
+    outline-offset: 0px;
+  }
+}
+
+.highlight-message-active {
+  animation: highlight-message 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+}

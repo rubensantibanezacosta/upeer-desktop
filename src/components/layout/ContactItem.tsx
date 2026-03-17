@@ -49,11 +49,13 @@ interface ContactItemProps {
     isSelected: boolean;
     onSelect: (id: string) => void;
     onDelete: (id: string) => void;
+    onClear: (id: string) => void;
     isTyping: boolean;
 }
 
-export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onDelete, isTyping }) => {
+export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onDelete, onClear, isTyping }) => {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+    const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
     const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
     const isPending = c.status === 'pending' || c.status === 'incoming';
 
@@ -135,7 +137,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                             '& .MuiBadge-badge': {
                                 width: 20,
                                 height: 20,
-                                borderRadius: '50%',
+                                borderRadius: 'sm',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -151,6 +153,8 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                             size="lg"
                             color={c.status === 'incoming' ? 'primary' : 'neutral'}
                             src={c.avatar || undefined}
+                            variant="soft"
+                            sx={{ borderRadius: 'md' }}
                         >
                             {c.name[0]}
                         </Avatar>
@@ -208,7 +212,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                     <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, maxWidth: '100%', overflow: 'hidden' }}>
                                         {c.lastMessageIsMine && (
                                             <Box component="span" sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                                                {c.lastMessageStatus === 'sent' ? (
+                                                {(c.lastMessageStatus === 'sent' || c.lastMessageStatus === 'vaulted') ? (
                                                     <DoneIcon sx={{ fontSize: '16px', opacity: 0.7 }} />
                                                 ) : (
                                                     <DoneAllIcon sx={{
@@ -321,13 +325,47 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                     <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><FavoriteBorderIcon /></ListItemDecorator> Añadir a Favoritos</MenuItem>
                                     <ListDivider />
                                     <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><BlockIcon /></ListItemDecorator> Bloquear</MenuItem>
-                                    <MenuItem onClick={(e) => { e.stopPropagation(); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
+                                    <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmClearOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
                                     <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmDeleteOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteIcon /></ListItemDecorator> Eliminar chat</MenuItem>
                                 </Menu>
                             </Dropdown>
                         </Box>
                     </Box>
                 </Box>
+
+                <Modal open={confirmClearOpen} onClose={() => setConfirmClearOpen(false)}>
+                    <ModalDialog variant="outlined" role="alertdialog" sx={{ minWidth: 400 }}>
+                        <DialogTitle>
+                            <DeleteSweepIcon color="warning" />
+                            Vaciar mensajes del chat
+                        </DialogTitle>
+                        <Divider />
+                        <DialogContent>
+                            <Typography level="body-md">
+                                ¿Estás seguro de que quieres borrar todos los mensajes con <b>{c.name}</b>?
+                            </Typography>
+                            <Typography level="body-sm" sx={{ mt: 1 }}>
+                                El contacto <b>permanecerá en tu lista</b>, pero se eliminará todo el historial de conversación. Esta acción no se puede deshacer.
+                            </Typography>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                variant="solid"
+                                color="warning"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClear(c.upeerId);
+                                    setConfirmClearOpen(false);
+                                }}
+                            >
+                                Vaciar historial
+                            </Button>
+                            <Button variant="plain" color="neutral" onClick={(e) => { e.stopPropagation(); setConfirmClearOpen(false); }}>
+                                Cancelar
+                            </Button>
+                        </DialogActions>
+                    </ModalDialog>
+                </Modal>
 
                 <Modal open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
                     <ModalDialog variant="outlined" role="alertdialog" sx={{ minWidth: 400 }}>

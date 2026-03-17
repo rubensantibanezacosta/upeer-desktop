@@ -7,7 +7,8 @@ import {
   sendContactCard,
   sendChatReaction,
   sendChatUpdate,
-  sendChatDelete
+  sendChatDelete,
+  sendChatClear
 } from '../../network/server/index.js';
 
 /**

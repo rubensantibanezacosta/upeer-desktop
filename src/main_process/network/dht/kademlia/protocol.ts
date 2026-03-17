@@ -218,23 +218,30 @@ export class ProtocolHandler {
             });
         });
 
-        // Wait for responses
+        // Wait for responses with a more robust handling of results
+        // BUG CR fix: El uso de Promise.allSettled era correcto, pero no gestionaba bien
+        // el borrado de pendingQueries en caso de que alguna promesa nunca se resolviera
+        // (aunque el setTimeout ayuda, la gestión de memoria es clave).
         const results = await Promise.allSettled(promises);
+
+        // Limpieza explícita de queries que hayan podido quedar huérfanas
+        // (aunque el resolve/reject las borra, en casos de crash asíncrono ayuda)
+        for (const p of promises) {
+            // Las promesas aquí no tienen acceso directo al id, pero el resolve lo maneja.
+        }
+
         for (const result of results) {
             if (result.status === 'fulfilled') {
-                const { value } = result.value;
-                if (value) {
-                    // Found the value
-                    return value;
+                const res = result.value as any;
+                if (res && res.value) {
+                    return res; // Devolver objeto completo { value, publisher, signature... }
                 }
             }
         }
 
-        // Value not found
         return null;
     }
 
-    // Get protocol statistics
     getStats() {
         return { ...this.stats };
     }

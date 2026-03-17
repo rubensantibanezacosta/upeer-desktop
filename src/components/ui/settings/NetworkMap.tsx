@@ -255,15 +255,15 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
                     { color: '#ef4444', label: '> 250 ms' },
                     { color: '#4b5563', label: 'Sin respuesta' },
                 ].map(({ color, label }) => (
-                    <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
-                        <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>{label}</Typography>
-                    </Box>
+                        <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: color, flexShrink: 0 }} />
+                            <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>{label}</Typography>
+                        </Box>
                 ))}
-                <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'white', opacity: 0.85, flexShrink: 0 }} />
-                    <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>Tu posición</Typography>
-                </Box>
+                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: 'white', opacity: 0.85, flexShrink: 0 }} />
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>Tu posición</Typography>
+                    </Box>
             </Box>
         </Box>
     );

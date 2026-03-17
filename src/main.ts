@@ -1,7 +1,21 @@
-import { app } from 'electron';
+import { app, protocol } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import started from 'electron-squirrel-startup';
+
+// Registrar el esquema como privilegiado para permitir streaming (range requests)
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'media', privileges: { stream: true, bypassCSP: true, secure: true, supportFetchAPI: true } }
+]);
+
+// BUG FIX: Deshabilitar aceleración de hardware en Linux para corregir
+// el problema de "pantalla negra" en reproducción de video y previsualizaciones.
+if (process.platform === 'linux') {
+  app.disableHardwareAcceleration();
+  // Switches adicionales para estabilidad en Linux
+  app.commandLine.appendSwitch('disable-gpu-rasterization');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+}
 
 // Configuración de proceso
 import { setupProcessHandlers } from './main_process/core/processConfig.js';

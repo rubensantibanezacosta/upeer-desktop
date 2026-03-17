@@ -1,28 +1,10 @@
 import { getDb, getSchema, eq } from '../shared.js';
 
-export function updateContactLocation(upeerId: string, address: string) {
+export async function updateContactLocation(upeerId: string, address: string) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
-        .set({ address, lastSeen: new Date().toISOString() })
-        .where(eq(schema.contacts.upeerId, upeerId))
-        .run();
-}
-
-export function updateContactDhtLocation(
-    upeerId: string,
-    address: string,
-    dhtSeq: number,
-    dhtSignature: string,
-    dhtExpiresAt?: number,
-    renewalToken?: any
-) {
-    const db = getDb();
-    const schema = getSchema();
-
-    // Merge the incoming IP into knownAddresses (multi-device support).
-    // knownAddresses is a JSON string[]; we keep up to 20 unique IPs.
+    // Re-use merging logic to avoid losing other paths
     const existing = db.select({ knownAddresses: schema.contacts.knownAddresses })
         .from(schema.contacts)
         .where(eq(schema.contacts.upeerId, upeerId))
@@ -33,13 +15,55 @@ export function updateContactDhtLocation(
         known = JSON.parse(existing?.knownAddresses ?? '[]');
     } catch { known = []; }
 
-    if (!known.includes(address)) {
-        known.unshift(address); // newest first
-        if (known.length > 20) known = known.slice(0, 20);
+    const idx = known.indexOf(address);
+    if (idx !== -1) known.splice(idx, 1);
+    known.unshift(address);
+    if (known.length > 20) known = known.slice(0, 20);
+
+    return db.update(schema.contacts)
+        .set({ 
+            address, // Set as primary
+            knownAddresses: JSON.stringify(known),
+            lastSeen: new Date().toISOString() 
+        })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+}
+
+export function updateContactDhtLocation(
+    upeerId: string,
+    addressOrAddresses: string | string[],
+    dhtSeq: number,
+    dhtSignature: string,
+    dhtExpiresAt?: number,
+    renewalToken?: any
+) {
+    const db = getDb();
+    const schema = getSchema();
+
+    const incoming = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+    const primary = incoming[0];
+
+    // Merge logic: newest IPs at the front, limit to 20
+    const existing = db.select({ knownAddresses: schema.contacts.knownAddresses })
+        .from(schema.contacts)
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .get() as { knownAddresses: string } | undefined;
+
+    let known: string[] = [];
+    try {
+        known = JSON.parse(existing?.knownAddresses ?? '[]');
+    } catch { known = []; }
+
+    for (const addr of incoming) {
+        const idx = known.indexOf(addr);
+        if (idx !== -1) known.splice(idx, 1);
+        known.unshift(addr);
     }
+    if (known.length > 20) known = known.slice(0, 20);
 
     const updateData: any = {
-        address,            // primary (most recent)
+        address: primary,
         dhtSeq,
         dhtSignature,
         knownAddresses: JSON.stringify(known),
