@@ -35,14 +35,15 @@ describe('AppLock Component (UI-to-Backend Integration)', () => {
         fireEvent.change(passwordInputs[3], { target: { value: '4' } });
 
         await waitFor(() => {
-            expect(mockVerifyPin).toHaveBeenCalledWith('1234');
+            expect(mockVerifyPin).toHaveBeenCalledWith({ pin: '1234' });
             expect(onUnlock).toHaveBeenCalled();
         });
     });
 
     it('should show error message on invalid PIN', async () => {
         mockVerifyPin.mockResolvedValue(false);
-        render(<AppLock onUnlock={vi.fn()} />);
+        const onUnlock = vi.fn();
+        render(<AppLock onUnlock={onUnlock} />);
 
         const passwordInputs = document.querySelectorAll('input[type="password"]');
 
@@ -52,6 +53,7 @@ describe('AppLock Component (UI-to-Backend Integration)', () => {
         fireEvent.change(passwordInputs[3], { target: { value: '0' } });
 
         await waitFor(() => {
+            expect(mockVerifyPin).toHaveBeenCalledWith({ pin: '0000' });
             expect(screen.getByText(/PIN incorrecto/i)).toBeDefined();
         });
 

@@ -38,7 +38,13 @@ export async function saveMessage(id: string, chatUpeerId: string, isMine: boole
         signature,
         status,
         timestamp: messageTimestamp
-    }).onConflictDoNothing().run();
+    }).onConflictDoUpdate({
+        target: schema.messages.id,
+        set: {
+            message: message, // Actualizar el JSON con thumbnail/caption
+            status: status
+        }
+    }).run();
 
     if (result.changes === 0) {
         await updateMessageStatus(id, status);
@@ -136,7 +142,7 @@ export function getMessageById(id: string) {
         .get();
 }
 
-export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
+export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string) {
     const _db = getDb();
     const _schema = getSchema();
 
@@ -145,7 +151,10 @@ export async function saveFileMessage(id: string, chatUpeerId: string, isMine: b
         fileId,
         fileName,
         fileSize,
-        mimeType
+        mimeType,
+        savedPath,
+        thumbnail,
+        caption
     });
 
     return saveMessage(id, chatUpeerId, isMine, messageJson, undefined, signature, status, senderUpeerId, timestamp);

@@ -212,6 +212,24 @@ export class TransferManager implements ITransferManager {
         await this.finalizeTransfer(fileId, 'sending');
     }
 
+    public notifyVaultProgress(fileId: string, processed: number, total: number) {
+        const transfer = this.store.getTransfer(fileId, 'sending');
+        if (!transfer) return;
+
+        const isDone = processed >= total;
+        const updates: Partial<FileTransfer> = {
+            chunksProcessed: processed,
+            totalChunks: total,
+            isVaulting: true,
+            phase: isDone ? TransferPhase.DONE : TransferPhase.REPLICATING
+        };
+
+        const updated = this.store.updateTransfer(fileId, 'sending', updates);
+        if (updated) {
+            this.ui.notifyProgress(updated, isDone);
+        }
+    }
+
     public cancelTransfer(fileId: string, directionOrReason?: 'sending' | 'receiving' | string, reasonText = 'user') {
         let direction: 'sending' | 'receiving';
         let reason = reasonText;

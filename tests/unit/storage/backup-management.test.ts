@@ -13,7 +13,7 @@ const mockDb = {
 };
 
 const mockSchema = {
-    backupSurvivalKit: {
+    backupPulseSync: {
         kitId: 'kitId',
         name: 'name',
         description: 'description',
@@ -60,7 +60,7 @@ describe('storage/backup/management.ts', () => {
             const result = getAllPulseSyncs();
             expect(result).toHaveLength(1);
             expect(result[0].kitId).toBe('k1');
-            expect(mockDb.from).toHaveBeenCalledWith(mockSchema.backupSurvivalKit);
+            expect(mockDb.from).toHaveBeenCalledWith(mockSchema.backupPulseSync);
         });
 
         it('should handle missing optional fields', () => {
@@ -78,7 +78,7 @@ describe('storage/backup/management.ts', () => {
             const res = updatePulseSync('k1', data);
 
             expect(res).toBe(true);
-            expect(mockDb.update).toHaveBeenCalledWith(mockSchema.backupSurvivalKit);
+            expect(mockDb.update).toHaveBeenCalledWith(mockSchema.backupPulseSync);
             expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({
                 data: JSON.stringify(data)
             }));
@@ -96,7 +96,7 @@ describe('storage/backup/management.ts', () => {
         it('should delete a kit and return true', () => {
             const res = deletePulseSync('k1');
             expect(res).toBe(true);
-            expect(mockDb.delete).toHaveBeenCalledWith(mockSchema.backupSurvivalKit);
+            expect(mockDb.delete).toHaveBeenCalledWith(mockSchema.backupPulseSync);
         });
 
         it('should log error and return false on failure', () => {

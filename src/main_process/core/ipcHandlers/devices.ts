@@ -1,43 +1,37 @@
 import { ipcMain } from 'electron';
 import { getMyDeviceId, getMyUPeerId } from '../../security/identity.js';
-import { getKademliaInstance } from '../../network/dht/shared.js';
-import { toKademliaId } from '../../network/dht/kademlia/types.js';
+import { getDevicesByUPeerId, setDeviceTrust, deleteDevice } from '../../storage/devices-operations.js';
 
 /**
  * Registra los manejadores IPC para la gestión de múltiples dispositivos
  */
 export function registerDeviceHandlers(): void {
     /**
-     * Obtiene la lista de dispositivos conocidos vinculados a la identidad actual
-     * consultando la propia entrada de ubicación en el nodo Kademlia local.
+     * Obtiene la lista de dispositivos registrados para el usuario actual.
      */
-    ipcMain.handle('get-my-devices', async () => {
+    ipcMain.handle('get-devices', async () => {
         const myId = getMyUPeerId();
-        const myDeviceId = getMyDeviceId();
-        const kademlia = getKademliaInstance();
+        if (!myId) return [];
+        return getDevicesByUPeerId(myId);
+    });
 
-        if (!kademlia || !myId) return [];
+    /**
+     * Establece el estado de confianza de un dispositivo.
+     */
+    ipcMain.handle('set-device-trust', async (_event, { deviceId, isTrusted }: { deviceId: string, isTrusted: boolean }) => {
+        const myId = getMyUPeerId();
+        if (!myId) throw new Error('Identity not loaded');
+        await setDeviceTrust(myId, deviceId, isTrusted);
+        return { success: true };
+    });
 
-        // Buscamos nuestra propia clave de ubicación en el ValueStore local
-        const key = toKademliaId(myId);
-        const storedValue = kademlia.getLocalValue(key);
-
-        if (!storedValue || !Array.isArray(storedValue.value)) {
-            // Si solo hay un dispositivo (el actual), devolvemos una lista mínima
-            return [{
-                deviceId: myDeviceId,
-                isCurrent: true,
-                lastSeen: Date.now()
-            }];
-        }
-
-        // El ValueStore ahora guarda una lista de LocationBlocks para multi-device
-        return storedValue.value.map((block: any) => ({
-            deviceId: block.deviceId,
-            isCurrent: block.deviceId === myDeviceId,
-            lastSeen: storedValue.timestamp, // Aproximación, el bloque individual no tiene TS propio aún
-            address: block.address,
-            metadata: block.deviceMeta
-        }));
+    /**
+     * Elimina un dispositivo registrado.
+     */
+    ipcMain.handle('delete-device', async (_event, { deviceId }: { deviceId: string }) => {
+        const myId = getMyUPeerId();
+        if (!myId) throw new Error('Identity not loaded');
+        await deleteDevice(myId, deviceId);
+        return { success: true };
     });
 }

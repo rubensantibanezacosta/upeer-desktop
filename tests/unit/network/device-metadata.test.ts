@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateSignedLocationBlock, verifyLocationBlock } from '../../../src/main_process/network/utils';
 
 // Mocks necesarios para que utils.js no falle al firmar

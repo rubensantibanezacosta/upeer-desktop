@@ -15,14 +15,14 @@ export function getAllPulseSyncs(): Array<{
     const schema = getSchema();
 
     const results = db.select({
-        kitId: schema.backupSurvivalKit.kitId,
-        name: schema.backupSurvivalKit.name,
-        description: schema.backupSurvivalKit.description,
-        created: schema.backupSurvivalKit.created,
-        expires: schema.backupSurvivalKit.expires,
-        isActive: schema.backupSurvivalKit.isActive
+        kitId: schema.backupPulseSync.kitId,
+        name: schema.backupPulseSync.name,
+        description: schema.backupPulseSync.description,
+        created: schema.backupPulseSync.created,
+        expires: schema.backupPulseSync.expires,
+        isActive: schema.backupPulseSync.isActive
     })
-        .from(schema.backupSurvivalKit)
+        .from(schema.backupPulseSync)
         .all();
 
     return results.map(r => ({
@@ -40,12 +40,12 @@ export function updatePulseSync(kitId: string, data: PulseSyncData): boolean {
     const schema = getSchema();
 
     try {
-        db.update(schema.backupSurvivalKit)
+        db.update(schema.backupPulseSync)
             .set({
                 data: JSON.stringify(data),
                 expires: Date.now() + (60 * 24 * 60 * 60 * 1000) // Reset to 60 days
             })
-            .where(eq(schema.backupSurvivalKit.kitId, kitId))
+            .where(eq(schema.backupPulseSync.kitId, kitId))
             .run();
         return true;
     } catch (err) {
@@ -59,8 +59,8 @@ export function deletePulseSync(kitId: string): boolean {
     const schema = getSchema();
 
     try {
-        db.delete(schema.backupSurvivalKit)
-            .where(eq(schema.backupSurvivalKit.kitId, kitId))
+        db.delete(schema.backupPulseSync)
+            .where(eq(schema.backupPulseSync.kitId, kitId))
             .run();
         return true;
     } catch (err) {
@@ -75,13 +75,13 @@ export function cleanupExpiredPulseSyncs(): number {
 
     const now = Date.now();
     // Delete inactive kits
-    const inactiveResult = db.delete(schema.backupSurvivalKit)
-        .where(eq(schema.backupSurvivalKit.isActive, false))
+    const inactiveResult = db.delete(schema.backupPulseSync)
+        .where(eq(schema.backupPulseSync.isActive, false))
         .run();
 
     // lt(expires, now) borra correctamente todos los registros vencidos.
-    const expiredResult = db.delete(schema.backupSurvivalKit)
-        .where(lt(schema.backupSurvivalKit.expires, now))
+    const expiredResult = db.delete(schema.backupPulseSync)
+        .where(lt(schema.backupPulseSync.expires, now))
         .run();
 
     return (inactiveResult.changes || 0) + (expiredResult.changes || 0);

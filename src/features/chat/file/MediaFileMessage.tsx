@@ -23,6 +23,7 @@ interface MediaFileMessageProps {
     caption?: string;
     timestamp?: string;
     isMe: boolean;
+    isImage: boolean;
     isVideo: boolean;
     status: string;
     isTransferComplete: boolean;
@@ -39,6 +40,7 @@ interface MediaFileMessageProps {
     onRetry: () => void;
     onDownload: () => void;
     onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
+    filePath?: string;
 }
 
 export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
@@ -50,6 +52,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     caption,
     timestamp,
     isMe,
+    isImage: _isImage,
     isVideo,
     status,
     isTransferComplete,
@@ -66,6 +69,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     onRetry,
     onDownload,
     onMediaClick,
+    filePath,
 }) => {
     const getFileExtension = () => {
         const parts = fileName.split('.');
@@ -74,6 +78,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
 
     return (
         <Box
+            data-testid="media-file-message-container"
             sx={{
                 position: 'relative',
                 width: 260,
@@ -81,13 +86,15 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
                 alignItems: 'stretch',
-                cursor: (isTransferComplete && savedPath) ? 'pointer' : 'default',
+                cursor: (isTransferComplete && savedPath) || isMe ? 'pointer' : 'default',
             }}
             onClick={() => {
-                if (isTransferComplete && savedPath) {
+                const completeOrMe = isTransferComplete || isMe;
+                if (completeOrMe) {
                     if (onMediaClick) {
-                        onMediaClick({ url: savedPath, name: fileName, mimeType, fileId });
-                    } else {
+                        const url = (isMe ? filePath : savedPath) || thumbnail || '';
+                        onMediaClick({ url, name: fileName, mimeType, fileId });
+                    } else if (savedPath) {
                         onOpen();
                     }
                 }
@@ -146,8 +153,10 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         }}
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (onMediaClick && savedPath) {
-                                onMediaClick({ url: savedPath, name: fileName, mimeType, fileId });
+                            if (onMediaClick) {
+                                // Prefer original path for sender, savedPath for receiver
+                                const url = (isMe ? filePath : savedPath) || '';
+                                onMediaClick({ url, name: fileName, mimeType, fileId });
                             }
                         }}
                     >
@@ -209,8 +218,16 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                     {formatFileSize(fileSize)}
                 </Typography>
                 {isVaulting && (
-                    <Typography level="body-xs" sx={{ ml: 0.5, bgcolor: 'primary.500', px: 0.6, borderRadius: '4px', fontSize: '9px', fontWeight: 900, color: 'white' }}>
-                        VAULT
+                    <Typography level="body-xs" sx={{
+                        ml: 0.5,
+                        bgcolor: isTransferFailed ? 'danger.500' : 'primary.500',
+                        px: 0.6,
+                        borderRadius: '4px',
+                        fontSize: '9px',
+                        fontWeight: 900,
+                        color: 'white'
+                    }}>
+                        {isTransferFailed ? 'VAULT FAILED' : 'VAULT'}
                     </Typography>
                 )}
             </Box>

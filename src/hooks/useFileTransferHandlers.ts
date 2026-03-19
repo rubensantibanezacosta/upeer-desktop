@@ -17,7 +17,7 @@ interface UseFileTransferHandlersProps {
     targetUpeerId: string | undefined;
     activeContact: any;
     fileTransfer: FileTransferType;
-    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, fileType: string, tempHash: string, thumbnail: string, caption: string, isOutgoing: boolean) => void;
+    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, fileType: string, tempHash: string, thumbnail: string, caption: string, isOutgoing: boolean, filePath?: string) => void;
     updateFileTransferMessage: (fileId: string, updates: any) => void;
 }
 
@@ -104,7 +104,8 @@ export const useFileTransferHandlers = ({
                         tempHash,
                         thumbnail || '',
                         caption || '',
-                        true
+                        true,
+                        file.path
                     );
                 } else {
                     console.error('Failed to start transfer for', file.name, ':', result.error);

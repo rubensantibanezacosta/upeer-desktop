@@ -23,6 +23,7 @@ import { stopPeerManager } from '../../sidecars/peer-manager.js';
 import { stopLanDiscovery, startLanDiscovery } from '../../network/lan/discovery.js';
 import { clearUserData } from '../../storage/shared.js';
 import { getMainWindow } from '../windowManager.js';
+import { warn } from '../../security/secure-logger.js';
 
 /**
  * Registra los manejadores IPC relacionados con identidad y autenticación

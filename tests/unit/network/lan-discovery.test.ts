@@ -15,7 +15,8 @@ vi.mock('../../../src/main_process/security/secure-logger.js');
 vi.mock('../../../src/main_process/network/utils.js', () => ({
     getNetworkAddresses: vi.fn().mockReturnValue(['201:1:1:1:1:1:1:1']),
     canonicalStringify: (obj: any) => JSON.stringify(obj),
-    generateSignedLocationBlock: vi.fn().mockReturnValue({ address: '201:1:1:1:1:1:1:1', addresses: ['201:1:1:1:1:1:1:1'] })
+    generateSignedLocationBlock: vi.fn().mockReturnValue({ address: '201:1:1:1:1:1:1:1', addresses: ['201:1:1:1:1:1:1:1'] }),
+    getDeviceMetadata: vi.fn().mockReturnValue({ clientName: 'Test' })
 }));
 
 import * as identity from '../../../src/main_process/security/identity.js';
@@ -67,7 +68,7 @@ describe('LAN Discovery', () => {
     });
 
     it('should handle start failures gracefully', async () => {
-        mockSocket.bind.mockImplementationOnce((_p, _a, cb) => { throw new Error('Bind failed'); });
+        mockSocket.bind.mockImplementationOnce((_p: any, _a: any, cb: any) => { throw new Error('Bind failed'); });
         await lan.start();
         expect(logger.warn).toHaveBeenCalledWith('Failed to start LAN discovery', expect.any(Error), 'lan');
         expect(lan.isActive()).toBe(false);
@@ -223,7 +224,7 @@ describe('LAN Discovery', () => {
 
     it('should handle announcement failures', async () => {
         await lan.start();
-        mockSocket.send.mockImplementationOnce((_b, _o, _l, _p, _a, cb) => cb(new Error('Send failed')));
+        mockSocket.send.mockImplementationOnce((_b: any, _o: any, _l: any, _p: any, _a: any, cb: any) => cb(new Error('Send failed')));
 
         // Trigger announce manually via private if possible or just wait for timer
         // @ts-ignore

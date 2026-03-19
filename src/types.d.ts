@@ -125,6 +125,10 @@ declare global {
             disablePin: (args: { pin: string }) => Promise<{ success: boolean; error?: string }>;
             verifyPin: (args: { pin: string }) => Promise<boolean>;
             getMnemonic: (pin: string) => Promise<{ success: boolean; mnemonic?: string; error?: string }>;
+            /** Assets internos */
+            persistInternalAsset: (args: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
+            /** Eliminar identidad */
+            deleteIdentity: () => Promise<{ success: boolean; error?: string }>;
         }
     }
 }

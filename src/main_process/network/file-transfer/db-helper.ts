@@ -20,9 +20,13 @@ export async function saveTransferToDB(transfer: FileTransfer) {
             transfer.fileId,
             transfer.fileSize,
             transfer.mimeType,
+            transfer.filePath,
             undefined, // signature
             isSelf ? 'read' : (transfer.state === 'completed' ? 'delivered' : 'sent'),
-            myId // senderUpeerId
+            myId, // senderUpeerId
+            undefined, // timestamp
+            transfer.thumbnail,
+            transfer.caption
         );
     } catch (err) {
         warn('Failed to save file transfer to DB', err, 'file-transfer');

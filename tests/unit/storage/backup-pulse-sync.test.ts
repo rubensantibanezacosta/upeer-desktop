@@ -24,7 +24,7 @@ const mockSchema = {
         address: 'address',
         dhtSeq: 'dhtSeq'
     },
-    backupSurvivalKit: {
+    backupPulseSync: {
         kitId: 'kitId',
         name: 'name',
         description: 'description',

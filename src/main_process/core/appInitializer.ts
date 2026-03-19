@@ -9,6 +9,7 @@ import { getContacts } from '../storage/contacts/operations.js';
 import { startUDPServer } from '../network/server/tcpServer.js';
 import { broadcastDhtUpdate, checkHeartbeat } from '../network/messaging/heartbeat.js';
 import { startLanDiscovery } from '../network/lan/discovery.js';
+import { startRenewalService } from '../network/dht/renewal.js';
 import { info, error as logError } from '../security/secure-logger.js';
 import { setMainWindow, getAllWindows } from './windowManager.js';
 
@@ -30,6 +31,13 @@ export function stopHeartbeat() {
  * @param baseDir Directorio base donde se encuentra el archivo main.js (usualmente __dirname del entry point)
  */
 export async function initializeApp(baseDir: string): Promise<void> {
+  // ── 0. Crear directorio de assets internos para adjuntos ──────────────────
+  const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
+  if (!fs.existsSync(internalAssetsDir)) {
+    fs.mkdirSync(internalAssetsDir, { recursive: true });
+    info('[Init] Directorio de assets internos creado', { path: internalAssetsDir }, 'init');
+  }
+
   // ── 1. Configurar proxy SOCKS5 ANTES de crear la ventana ──────────────────
   //
   // Todo el tráfico de red de la sesión Electron (fetch, XHR, WebSocket) se
@@ -57,8 +65,10 @@ export async function initializeApp(baseDir: string): Promise<void> {
         const remainingPath = decodeURIComponent(url.pathname);
         filePath = path.normalize(drive + ':' + remainingPath);
       } else {
-        // En Linux/macOS, el path suele venir en 'url.pathname'
-        filePath = path.normalize(decodeURIComponent(url.pathname));
+        // En Linux/macOS, Electron 25+ puede meter el path en hostname si no hay triple slash
+        // Combinamos hostname y pathname para capturar la ruta completa
+        const combinedPath = url.hostname + decodeURIComponent(url.pathname);
+        filePath = path.normalize(combinedPath);
         if (!filePath.startsWith('/')) {
           filePath = '/' + filePath;
         }
@@ -70,21 +80,17 @@ export async function initializeApp(baseDir: string): Promise<void> {
         return n.endsWith(path.sep) ? n : n + path.sep;
       };
 
-      const homeDir = normalizeForGrant(app.getPath('home'));
-      const tempDir = normalizeForGrant(app.getPath('temp'));
-      const downloadsDir = normalizeForGrant(app.getPath('downloads'));
-      const userDataDir = normalizeForGrant(app.getPath('userData'));
+      const assetsDir = normalizeForGrant(path.join(app.getPath('userData'), 'assets'));
+      const tempDir = normalizeForGrant(app.getPath('temp')); // Necesario para descargas en curso
 
-      // Añadir slash al final de filePath para que .startsWith() no valide "home/user2" cuando el grant es "home/user"
+      // Añadir slash al final de filePath para que .startsWith() no valide "dir2" cuando el grant es "dir"
       const filePathCheck = filePath.endsWith(path.sep) ? filePath : filePath + path.sep;
 
-      const isUnderHome = filePathCheck.startsWith(homeDir);
+      const isUnderAssets = filePathCheck.startsWith(assetsDir);
       const isUnderTemp = filePathCheck.startsWith(tempDir);
-      const isUnderDownloads = filePathCheck.startsWith(downloadsDir);
-      const isUnderUserData = filePathCheck.startsWith(userDataDir);
 
-      if (!isUnderHome && !isUnderTemp && !isUnderDownloads && !isUnderUserData) {
-        logError('[Protocol] Bloqueado acceso fuera de directorios permitidos', { path: filePath, platform: process.platform }, 'security');
+      if (!isUnderAssets && !isUnderTemp) {
+        logError('[Protocol] Bloqueado acceso fuera de assets o temp', { path: filePath }, 'security');
         return new Response('Access Denied', { status: 403 });
       }
 
@@ -108,8 +114,9 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
         const mimeMap: Record<string, string> = {
           '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',
-          '.avi': 'video/x-msvideo', '.mov': 'video/quicktime', '.jpg': 'image/jpeg',
-          '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp'
+          '.avi': 'video/x-msvideo', '.mov': 'video/quicktime', '.m4v': 'video/x-m4v',
+          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+          '.gif': 'image/gif', '.webp': 'image/webp'
         };
         const contentType = mimeMap[ext] || 'application/octet-stream';
 
@@ -132,7 +139,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
         const webStream = Readable.toWeb(stream);
 
-        return new Response(webStream as unknown as ReadableStream, {
+        const responseObj = {
           status: responseStatus,
           statusText: responseStatus === 206 ? 'Partial Content' : 'OK',
           headers: {
@@ -141,7 +148,9 @@ export async function initializeApp(baseDir: string): Promise<void> {
             'Content-Length': chunksize.toString(),
             'Content-Range': responseStatus === 206 ? `bytes ${start}-${end}/${stats.size}` : undefined as any,
           }
-        });
+        };
+
+        return new Response(webStream as unknown as ReadableStream, responseObj);
       } catch (e: any) {
         info(`[Protocol] Error sirviendo ${filePath}: ${e.message}`, {}, 'network');
         return new Response('File error', { status: 404 });
@@ -190,6 +199,11 @@ export async function initializeApp(baseDir: string): Promise<void> {
     height: 800,
     webPreferences: {
       preload: path.join(baseDir, 'preload.cjs'),
+      // Permitir la reproducción de codecs no libres (como los que suelen ir en MKV)
+      // si el hardware lo soporta y evitar problemas de sandboxing en desarrollo
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true, // Mantener por seguridad, el protocolo media:// ya lo maneja
     },
   });
 
@@ -217,6 +231,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   if (!isSessionLocked()) {
     try {
       await startLanDiscovery();
+      startRenewalService(); // Iniciar renovación automática de bloques DHT
     } catch (err) {
       logError('[LAN] Error starting LAN discovery', { err: String(err) }, 'lan');
     }

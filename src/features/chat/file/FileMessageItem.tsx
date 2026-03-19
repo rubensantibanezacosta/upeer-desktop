@@ -52,6 +52,8 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     const isTransferInProgress = transferState === 'pending' || transferState === 'active';
     const isTransferFailed = transferState === 'failed';
 
+    const fullPath = data.savedPath || (direction === 'sending' ? (data as any).filePath : undefined);
+
     // Improved safeProgress logic: default to 0 during transfer, 100 when done
     const safeProgress = progress != null && !isNaN(progress)
         ? progress
@@ -59,7 +61,9 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
 
     const [isDownloading, setIsDownloading] = useState(false);
     const isImage = mimeType.startsWith('image/');
-    const isVideo = mimeType.startsWith('video/');
+    const isVideo = mimeType.startsWith('video/') ||
+        mimeType.toLowerCase() === 'video/x-matroska' ||
+        fileName.toLowerCase().endsWith('.mkv');
 
     const handleDownload = async () => {
         if (onDownload && isTransferComplete) {
@@ -73,10 +77,11 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
         fileName, fileSize, mimeType, caption, timestamp,
         isMe, status,
         isTransferComplete, isTransferInProgress, isTransferFailed,
-        savedPath, direction,
+        savedPath: fullPath || savedPath, direction,
         safeProgress, transferState,
         isDownloading, isVaulting,
-        onOpen: () => onOpen && isTransferComplete && savedPath && onOpen(fileId),
+        filePath: fullPath || savedPath,
+        onOpen: () => onOpen && isTransferComplete && (fullPath || savedPath) && onOpen(fileId),
         onCancel: () => onCancel && (transferState === 'pending' || transferState === 'active') && onCancel(fileId),
         onRetry: () => onRetry && isTransferFailed && onRetry(fileId),
         onDownload: handleDownload,

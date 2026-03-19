@@ -17,7 +17,6 @@ try {
             sendSecureUDPMessage: (ip, data) => {
                 if (!global.testSentMessages) global.testSentMessages = [];
                 global.testSentMessages.push({ ip, data });
-                console.log(`[NET MOCK] Sending ${data.type} to ${ip}`);
             }
         }
     });
@@ -26,11 +25,11 @@ try {
     const identityPath = path.join(projectRoot, 'src/main_process/security/identity.js');
     mock.module(identityPath, {
         namedExports: {
-            initIdentity: () => { console.log('[IDENTITY MOCK] initIdentity called'); },
+            initIdentity: () => { },
             getMyUPeerId: () => 'my-id-mock',
             getMyPublicKey: () => Buffer.alloc(32, 1),
             getMyPublicKeyHex: () => '01'.repeat(32),
-            sign: (data) => Buffer.alloc(64, 0),
+            sign: (_data) => Buffer.alloc(64, 0),
             verify: () => true,
             decrypt: (msg) => msg,
             encrypt: (msg) => ({ ciphertext: msg, nonce: Buffer.alloc(24, 0) }),

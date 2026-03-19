@@ -1,6 +1,7 @@
 import { ipcMain, dialog, app, shell, BrowserWindow } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import { error as logError } from '../../security/secure-logger.js';
 import { getFocusedWindow } from '../windowManager.js';
 
@@ -54,13 +55,26 @@ export function registerFileHandlers(): void {
             '.png': 'image/png',
             '.gif': 'image/gif',
             '.webp': 'image/webp',
+            '.bmp': 'image/bmp',
+            '.svg': 'image/svg+xml',
             '.txt': 'text/plain',
             '.pdf': 'application/pdf',
             '.zip': 'application/zip',
             '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.flac': 'audio/flac',
+            '.ogg': 'audio/ogg',
             '.mp4': 'video/mp4',
-            '.mov': 'video/quicktime',
+            '.webm': 'video/webm',
+            '.mkv': 'video/x-matroska',
             '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime',
+            '.wmv': 'video/x-ms-wmv',
+            '.flv': 'video/x-flv',
+            '.m4v': 'video/x-m4v',
+            '.3gp': 'video/3gpp',
+            '.ts': 'video/mp2t',
+            '.mts': 'video/mp2t',
             '.doc': 'application/msword',
             '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             '.xls': 'application/vnd.ms-excel',
@@ -212,15 +226,61 @@ export function registerFileHandlers(): void {
         return { success: false, error: 'Ruta de archivo inválida' };
       }
       const resolvedPath = path.resolve(filePath);
-      const homeDir = app.getPath('home');
-      const homeDirNormalized = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
-      if (!resolvedPath.startsWith(homeDirNormalized) && resolvedPath !== homeDir) {
-        return { success: false, error: 'El archivo debe estar dentro del directorio home' };
+      const assetsDir = path.join(app.getPath('userData'), 'assets');
+      const assetsDirNormalized = assetsDir.endsWith(path.sep) ? assetsDir : assetsDir + path.sep;
+      const downloadsDir = app.getPath('downloads');
+      const downloadsDirNormalized = downloadsDir.endsWith(path.sep) ? downloadsDir : downloadsDir + path.sep;
+      const tempDir = app.getPath('temp');
+      const tempDirNormalized = tempDir.endsWith(path.sep) ? tempDir : tempDir + path.sep;
+
+      if (!resolvedPath.startsWith(assetsDirNormalized) && 
+          !resolvedPath.startsWith(downloadsDirNormalized) && 
+          !resolvedPath.startsWith(tempDirNormalized)) {
+        return { success: false, error: 'Acceso denegado: el archivo debe estar en assets, descargas o temporal.' };
       }
+
+      // Verificar si el archivo existe antes de intentar abrirlo
+      try {
+        await fs.access(resolvedPath);
+      } catch (err) {
+        return { 
+          success: false, 
+          error: 'El archivo ya no existe en la ruta original. Es posible que haya sido movido o eliminado.' 
+        };
+      }
+
       const errorMsg = await shell.openPath(resolvedPath);
       return { success: !errorMsg, error: errorMsg || undefined };
     } catch (error) {
       logError('Error abriendo archivo', { err: String(error) }, 'ipc');
+      return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+    }
+  });
+
+  // Copia un archivo a la carpeta interna de assets para persistencia
+  ipcMain.handle('persist-internal-asset', async (event, { filePath, fileName }) => {
+    try {
+      if (typeof filePath !== 'string' || !filePath) {
+        return { success: false, error: 'Ruta de archivo inválida' };
+      }
+      
+      const resolvedSource = path.resolve(filePath);
+      const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
+      
+      if (!fsSync.existsSync(internalAssetsDir)) {
+        await fs.mkdir(internalAssetsDir, { recursive: true });
+      }
+
+      // Nombre único basado en hash o timestamp para evitar colisiones
+      const ext = path.extname(fileName || filePath);
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${ext}`;
+      const targetPath = path.join(internalAssetsDir, uniqueName);
+
+      await fs.copyFile(resolvedSource, targetPath);
+      
+      return { success: true, path: targetPath };
+    } catch (error) {
+      logError('Error persistiendo asset interno', { err: String(error) }, 'ipc');
       return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
   });

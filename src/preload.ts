@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('upeer', {
     sendChatDelete: (upeerId: string, msgId: string) => ipcRenderer.invoke('send-chat-delete', { upeerId, msgId }),
     getMessages: (upeerId: string) => ipcRenderer.invoke('get-messages', upeerId),
     getContacts: () => ipcRenderer.invoke('get-contacts'),
+    // Multi-device API
+    getDevices: () => ipcRenderer.invoke('get-devices'),
+    setDeviceTrust: (deviceId: string, isTrusted: boolean) => ipcRenderer.invoke('set-device-trust', { deviceId, isTrusted }),
+    deleteDevice: (deviceId: string) => ipcRenderer.invoke('delete-device', { deviceId }),
     // Group API
     getGroups: () => ipcRenderer.invoke('get-groups'),
     createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => ipcRenderer.invoke('create-group', { name, memberUpeerIds, avatar }),
@@ -55,6 +59,7 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.on('group-message-delivered', (event, data) => callback(data));
     },
     openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => ipcRenderer.invoke('open-file-dialog', options || {}),
+    persistInternalAsset: (args: { filePath: string; fileName: string }) => ipcRenderer.invoke('persist-internal-asset', args),
     readFileAsBase64: (filePath: string, maxSizeMB?: number) => ipcRenderer.invoke('read-file-as-base64', { filePath, maxSizeMB }),
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
     onReceive: (callback: (data: any) => void) => {
@@ -175,5 +180,4 @@ contextBridge.exposeInMainWorld('upeer', {
     setPin: (args: { newPin: string, currentPin?: string }) => ipcRenderer.invoke('set-pin', args),
     disablePin: (args: { pin: string }) => ipcRenderer.invoke('disable-pin', args),
     verifyPin: (args: { pin: string }) => ipcRenderer.invoke('verify-pin', args),
-    getMnemonic: (pin: string) => ipcRenderer.invoke('get-mnemonic', { pin }),
 });

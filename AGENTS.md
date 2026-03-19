@@ -2,7 +2,7 @@
 
 Estas reglas son de obligado cumplimiento en cada interacción y tienen prioridad sobre cualquier otra instrucción.
 
-1.  **PROHIBIDO EDITAR CÓDIGO CON LA TERMINAL**:
+1.  **PROHIBIDO EDITAR CÓDIGO CON LA TERMINAL BAJO PENA DE MUERTE**:
     - NUNCA uses comandos como `sed`, `grep -v`, `printf >`, `echo >`, `cat >` o similares para modificar o crear archivos de código fuente o tests.
     - Usa EXCLUSIVAMENTE las herramientas de edición proporcionadas (`replace_string_in_file`, `create_file`, `edit_notebook_file`).
     - La terminal se reserva únicamente para lectura (`cat`, `ls`), ejecución de tests (`npx vitest`), gestión de dependencias y tareas del sistema que no impliquen escribir código.

@@ -75,10 +75,9 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
                     direction,
                     isVaulting: activeTransfer?.isVaulting,
                     // BUG EC fix: propagar la ruta del archivo para que el botón "Abrir" funcione tras reiniciar.
-                    // Para el emisor, usamos filePath (original); para el receptor, tempPath (descargado).
-                    savedPath: activeTransfer?.savedPath ||
-                        (direction === 'sending' ? parsed.filePath : parsed.tempPath) ||
-                        (transferState === 'completed' ? activeTransfer?.tempPath : undefined),
+                    // Priorizamos savedPath del mensaje guardado (persistence fix), luego el estado activo de la transferencia.
+                    savedPath: parsed.savedPath || activeTransfer?.savedPath ||
+                        (direction === 'sending' ? (parsed.filePath || activeTransfer?.filePath) : (parsed.tempPath || activeTransfer?.tempPath)),
                 };
             }
         } catch (_) { /* not a file */ }
@@ -130,7 +129,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         [msg.message, isMe, activeTransfers]);
     const isContactCard = !!cardData;
     const isFile = isJSONFile || (msg.message.startsWith('FILE_TRANSFER|') && !!fileData);
-    const _isMediaFile = isFile && fileData && (fileData.mimeType?.startsWith('image/') || fileData.mimeType?.startsWith('video/'));
+    const _isMediaFile = isFile && fileData && (
+        fileData.mimeType?.startsWith('image/') ||
+        fileData.mimeType?.startsWith('video/') ||
+        fileData.mimeType?.toLowerCase() === 'video/x-matroska'
+    );
 
     const scrollToOriginal = () => {
         if (msg.replyTo && onScrollToMessage) {

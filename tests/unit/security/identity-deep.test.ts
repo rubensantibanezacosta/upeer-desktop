@@ -112,7 +112,7 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         const msg = Buffer.from('sealed-secret');
 
         // To use sealed box with Ed25519 identity, sender MUST convert my Ed25519 PK to Curve25519
-        const curvePk = Buffer.alloc(sodium.crypto_sign_ed25519_pk_to_curve25519(Buffer.alloc(32), myPk) ? 32 : 32);
+        const curvePk = Buffer.alloc(32);
         sodium.crypto_sign_ed25519_pk_to_curve25519(curvePk, myPk);
 
         const ciphertext = Buffer.alloc(msg.length + sodium.crypto_box_SEALBYTES);

@@ -29,7 +29,7 @@ describe('Network Utils', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        
+
         vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
         vi.mocked(identity.getMyDeviceId).mockReturnValue('device-1');
         vi.mocked(identity.getMyAlias).mockReturnValue('Alice');
@@ -56,7 +56,7 @@ describe('Network Utils', () => {
 
         it('should throw on invalid address', () => {
             expect(() => utils.validateAddress('not-an-ip')).toThrow();
-            expect(() => utils.validateAddress('123.456.789.0')).toThrow(); 
+            expect(() => utils.validateAddress('123.456.789.0')).toThrow();
         });
     });
 
@@ -92,9 +92,34 @@ describe('Network Utils', () => {
 
         it('should fail verification if token is tampered', () => {
             const token = utils.generateRenewalToken('target-id', 5);
+            // Tamper with a SIGNED field (maxRenewals)
             token.maxRenewals = 10;
             const isValid = utils.verifyRenewalToken(token, myPkHex);
             expect(isValid).toBe(false);
+        });
+
+        it('should NOT fail verification if renewalsUsed is incremented (BUG AF fix)', () => {
+            const token = utils.generateRenewalToken('target-id', 5);
+            // Simulate a network peer incrementing the counter
+            token.renewalsUsed = 1;
+            const isValid = utils.verifyRenewalToken(token, myPkHex);
+            // This MUST be true because renewalsUsed is excluded from signature (it's mutable)
+            expect(isValid).toBe(true);
+        });
+    });
+
+    describe('DHT Sequence Validation (BUG BG fix)', () => {
+        it('should allow initial jump from 0 without PoW', () => {
+            const result = utils.validateDhtSequence(0, 1000);
+            expect(result.valid).toBe(true);
+            expect(result.requiresPoW).toBe(false);
+        });
+
+        it('should require PoW for large sequence jumps', () => {
+            // MAX_DHT_SEQ_JUMP is 24h (86400000)
+            const result = utils.validateDhtSequence(100, 100 + 86400000 + 1);
+            expect(result.valid).toBe(false);
+            expect(result.requiresPoW).toBe(true);
         });
     });
 
@@ -109,7 +134,7 @@ describe('Network Utils', () => {
             if (renewed && renewed.renewalToken) {
                 expect(renewed.address).toBe('1.1.1.1');
                 expect(renewed.renewalToken.renewalsUsed).toBe(1);
-                
+
                 // Un bloque expirado ya no es válido para verifyLocationBlock (ATAJO DE RENEWAL ELIMINADO POR SEGURIDAD)
                 const isValid = utils.verifyLocationBlock(myId, renewed as any, myPkHex);
                 expect(isValid).toBe(false);
@@ -140,7 +165,7 @@ describe('Network Utils', () => {
         });
 
         it('should reject expired block even if signature is valid', () => {
-            const block = utils.generateSignedLocationBlock('200:1::1', 1, -1000, null as any); 
+            const block = utils.generateSignedLocationBlock('200:1::1', 1, -1000, null as any);
             const isValid = utils.verifyLocationBlock(myId, block, myPkHex);
             expect(isValid).toBe(false);
         });
@@ -149,7 +174,7 @@ describe('Network Utils', () => {
             const block = utils.generateSignedLocationBlock('200:1::1', 1, -1000);
             const maliciousBlock = { ...block, address: '66.66.66.66', addresses: ['66.66.66.66'] };
             const isValid = utils.verifyLocationBlock(myId, maliciousBlock, myPkHex);
-            expect(isValid).toBe(false); 
+            expect(isValid).toBe(false);
         });
     });
 
@@ -173,7 +198,7 @@ describe('Network Utils', () => {
         it('should return Yggdrasil address if available', () => {
             vi.mocked(yggstack.getYggstackAddress).mockReturnValue('200:test::1');
             vi.mocked(os.networkInterfaces).mockReturnValue({});
-            
+
             const addresses = utils.getNetworkAddresses();
             expect(addresses).toContain('200:test::1');
         });
@@ -218,7 +243,7 @@ describe('Network Utils', () => {
         it('should find renewal token in DHT', async () => {
             const token = utils.generateRenewalToken('target-id');
             mockKademlia.findValue.mockResolvedValue({ value: token });
-            
+
             const found = await utils.findRenewalTokenInDHT('target-id');
             expect(found).toEqual(token);
         });
@@ -248,7 +273,7 @@ describe('Network Utils', () => {
         it('should canRenewLocationBlockWithDHT with DHT token', async () => {
             const token = utils.generateRenewalToken('target-id');
             mockKademlia.findValue.mockResolvedValue({ value: token });
-            
+
             const canRenew = await utils.canRenewLocationBlockWithDHT({}, myPkHex, 'target-id');
             expect(canRenew).toBe(true);
         });

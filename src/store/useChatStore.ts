@@ -78,7 +78,7 @@ interface ChatActions {
     handleRetryMessage: (msgId: string) => Promise<void>;
 
     // File Transfer Messages
-    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean) => void;
+    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string) => void;
     updateFileTransferMessage: (fileId: string, updates: any) => void;
 
     // IPC Listener Initialization
@@ -447,7 +447,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     setPendingFiles: (files) => set({ pendingFiles: files }),
     setIsDragging: (dragging) => set({ isDragging: dragging }),
 
-    addFileTransferMessage: (upeerId, fileId, fileName, fileSize, mimeType, fileHash, thumbnail, caption, isMine = true) => {
+    addFileTransferMessage: (upeerId, fileId, fileName, fileSize, mimeType, fileHash, thumbnail, caption, isMine = true, filePath) => {
         const fileMessage = {
             type: 'file',
             transferId: fileId,
@@ -457,7 +457,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             fileHash,
             thumbnail: thumbnail || '',
             caption: caption || '',
-            direction: isMine ? 'sending' : 'receiving'
+            direction: isMine ? 'sending' : 'receiving',
+            filePath: isMine ? filePath : undefined
         };
         const messageContent = JSON.stringify(fileMessage);
         const { replyByConversation, activeGroupId, myIdentity } = get();

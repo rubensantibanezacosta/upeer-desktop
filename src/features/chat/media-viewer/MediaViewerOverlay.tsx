@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, Avatar, Tooltip } from '@mui/joy';
+import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, Avatar, Tooltip, Stack, Button } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -38,11 +38,15 @@ interface MediaViewerOverlayProps {
     onGoToMessage?: (item: MediaItem) => void;
 }
 
-const isVideo = (mime: string) => mime.startsWith('video/');
+const isVideo = (mime: string, fileName?: string) => {
+    const m = mime.toLowerCase();
+    const ext = fileName ? fileName.split('.').pop()?.toLowerCase() : '';
+    return m.startsWith('video/') || m === 'video/x-matroska' || ext === 'mkv';
+};
 
 // ── Video Player Component ───────────────────────────────────────────────────
 
-const VideoPlayerWithControls: React.FC<{ src: string; fileName: string }> = ({ src, fileName }) => {
+const VideoPlayerWithControls: React.FC<{ src: string; fileName: string; onVideoError?: () => void }> = ({ src, fileName, onVideoError }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -133,6 +137,10 @@ const VideoPlayerWithControls: React.FC<{ src: string; fileName: string }> = ({ 
                 onClick={() => togglePlay()}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onError={(e) => {
+                    console.error('[VideoPlayer] Error loading video source:', e);
+                    if (onVideoError) onVideoError();
+                }}
             />
 
             {/* Controls Bar */}
@@ -199,6 +207,43 @@ const VideoPlayerWithControls: React.FC<{ src: string; fileName: string }> = ({ 
 
 // ── Main Overlay Component ──────────────────────────────────────────────────
 
+const THUMB_WIDTH = 56;
+const THUMB_GAP = 12;
+const VISIBLE_BUFFER = 2;
+
+const useVideoThumbnails = (items: MediaItem[], currentIndex: number) => {
+    const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        let isMounted = true;
+        const generateVisible = async () => {
+            const start = Math.max(0, currentIndex - VISIBLE_BUFFER);
+            const end = Math.min(items.length - 1, currentIndex + VISIBLE_BUFFER);
+            
+            for (let i = start; i <= end; i++) {
+                if (!isMounted) break;
+                const item = items[i];
+                const hasThumbnail = item.thumbnail && item.thumbnail.length > 10;
+                if (hasThumbnail || thumbnails[item.fileId]) continue;
+                if (!isVideo(item.mimeType, item.fileName)) continue;
+                if (!item.url) continue;
+
+                try {
+                    const filePath = item.url.replace(/\\/g, '/');
+                    const result = await (window as any).upeer.generateVideoThumbnail(filePath);
+                    if (isMounted && result.success) {
+                        setThumbnails(prev => ({ ...prev, [item.fileId]: result.dataUrl }));
+                    }
+                } catch { /* ffmpeg not available */ }
+            }
+        };
+        generateVisible();
+        return () => { isMounted = false; };
+    }, [items, currentIndex, thumbnails]);
+
+    return thumbnails;
+};
+
 export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
     items,
     initialIndex,
@@ -215,9 +260,10 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [emojiOpen, setEmojiOpen] = useState(false);
     const emojiMenuRef = useRef<HTMLDivElement>(null);
+    const generatedThumbnails = useVideoThumbnails(items, currentIndex);
 
     const currentItem = items[currentIndex];
-    const isMediaVideo = currentItem ? isVideo(currentItem.mimeType) : false;
+    const isMediaVideo = currentItem ? isVideo(currentItem.mimeType, currentItem.fileName) : false;
 
     // Handle index change
     useEffect(() => {
@@ -230,13 +276,15 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
         let url = '';
         if (fileUrl.startsWith('data:') || fileUrl.startsWith('media://')) {
             url = fileUrl;
-        } else {
+        } else if (fileUrl) {
             // BUG FIX: Asegurar que el path sea absoluto y esté normalizado para el protocolo media://
-            // En Windows, los paths pueden venir con \ o /. El handler en appInitializer espera url.hostname + url.pathname
-            url = `media://${fileUrl.replace(/\\/g, '/')}`;
+            // En Windows, los paths pueden venir con \ o /. El handler en appInitializer espera url.hostname + url.pathname.
+            // En Linux, necesitamos que empiece por / tras el media:// para que appInitializer lo reciba correctamente.
+            const normalizedPath = fileUrl.replace(/\\/g, '/');
+            url = `media://${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
         }
 
-        setContentUrl(url);
+        setContentUrl(url || null);
         setLoading(false);
     }, [currentIndex, currentItem]);
 
@@ -351,15 +399,42 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                 {error && (
                     <Box sx={{ textAlign: 'center' }}>
                         <Typography level="body-md" sx={{ color: 'danger.300', mb: 1 }}>{error}</Typography>
-                        <Sheet variant="outlined" color="neutral" sx={{ p: 1, cursor: 'pointer', borderRadius: 'md' }} onClick={onClose}>
-                            Cerrar
-                        </Sheet>
+                        {currentItem?.fileName?.toLowerCase().endsWith('.mkv') && (
+                            <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.7)', mb: 2, maxWidth: 300, mx: 'auto' }}>
+                                Los archivos MKV pueden contener flujos no soportados por el navegador interno.
+                            </Typography>
+                        )}
+                        <Stack direction="row" spacing={2} justifyContent="center">
+                            <Sheet variant="outlined" color="neutral" sx={{ p: 1, px: 2, cursor: 'pointer', borderRadius: 'md', bgcolor: 'transparent', color: 'white' }} onClick={onClose}>
+                                Cerrar
+                            </Sheet>
+                            {contentUrl && (
+                                <Button
+                                    variant="solid"
+                                    color="primary"
+                                    startDecorator={<OpenInNewIcon />}
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        // Extraer el path del protocolo media:// o usar el original
+                                        const cleanPath = contentUrl.replace('media://', '');
+                                        await window.upeer.openFile(cleanPath);
+                                        onClose();
+                                    }}
+                                >
+                                    Abrir en sistema
+                                </Button>
+                            )}
+                        </Stack>
                     </Box>
                 )}
 
                 {!loading && !error && contentUrl && (
                     isMediaVideo ? (
-                        <VideoPlayerWithControls src={contentUrl} fileName={currentItem.fileName} />
+                        <VideoPlayerWithControls
+                            src={contentUrl}
+                            fileName={currentItem.fileName}
+                            onVideoError={() => setError('El formato de video o sus codecs no son compatibles con el reproductor interno.')}
+                        />
                     ) : (
                         <img
                             key={currentIndex}
@@ -537,14 +612,14 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                 </Box>
             </Box>
 
-            {/* Thumbnails Carousel (Absolute Bottom) */}
+            {/* Thumbnails Carousel (Absolute Bottom) - Fixed Window */}
             <Box
                 sx={{
                     position: 'absolute',
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    height: 110,
+                    height: 100,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -552,66 +627,64 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                     backdropFilter: 'blur(4px)',
                     zIndex: 30
                 }}
+                onClick={e => e.stopPropagation()}
             >
-                <Box
-                    ref={carouselRef}
-                    sx={{
-                        display: 'flex',
-                        gap: 1.5,
-                        overflowX: 'auto',
-                        px: 4,
-                        py: 1.5,
-                        maxWidth: '95vw',
-                        '&::-webkit-scrollbar': { display: 'none' },
-                        maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
-                    }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    {items.map((item, idx) => (
-                        <Box
-                            key={item.fileId}
-                            data-index={idx}
-                            onClick={() => setCurrentIndex(idx)}
-                            sx={{
-                                width: 56,
-                                height: 56,
-                                flexShrink: 0,
-                                borderRadius: '8px',
-                                overflow: 'hidden',
-                                cursor: 'pointer',
-                                border: '2px solid',
-                                borderColor: currentIndex === idx ? 'primary.400' : 'transparent',
-                                backgroundColor: 'rgba(255,255,255,0.05)',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                position: 'relative',
-                                '&:hover': {
-                                    borderColor: currentIndex === idx ? 'primary.400' : 'rgba(255,255,255,0.3)',
-                                    backgroundColor: 'rgba(255,255,255,0.1)'
-                                },
-                            }}
-                        >
-                            <img
-                                src={item.thumbnail || (isVideo(item.mimeType) ? '' : item.url)}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover',
-                                    opacity: currentIndex === idx ? 1 : 0.6,
-                                    transition: 'opacity 0.2s'
-                                }}
-                            />
-                            {isVideo(item.mimeType) && (
-                                <Box sx={{
-                                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                                    color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'sm',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    width: 24, height: 24, backdropFilter: 'blur(2px)'
-                                }}>
-                                    <PlayArrowIcon sx={{ fontSize: 16 }} />
+                <Box sx={{ display: 'flex', gap: `${THUMB_GAP}px`, alignItems: 'center' }}>
+                    {(() => {
+                        const visibleCount = Math.min(VISIBLE_BUFFER * 2 + 1, items.length);
+                        let startIdx = currentIndex - VISIBLE_BUFFER;
+                        if (startIdx < 0) startIdx = 0;
+                        if (startIdx + visibleCount > items.length) startIdx = items.length - visibleCount;
+                        
+                        return Array.from({ length: visibleCount }, (_, i) => {
+                            const idx = startIdx + i;
+                            const item = items[idx];
+                            const thumb = item.thumbnail || generatedThumbnails[item.fileId];
+                            const isImg = !isVideo(item.mimeType, item.fileName);
+                            const showImg = (thumb && thumb.length > 10) || (isImg && item.url);
+                            const isCurrent = idx === currentIndex;
+                            
+                            return (
+                                <Box
+                                    key={item.fileId}
+                                    onClick={() => setCurrentIndex(idx)}
+                                    sx={{
+                                        width: THUMB_WIDTH,
+                                        height: THUMB_WIDTH,
+                                        flexShrink: 0,
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        cursor: 'pointer',
+                                        border: '2px solid',
+                                        borderColor: isCurrent ? 'primary.400' : 'transparent',
+                                        backgroundColor: 'neutral.800',
+                                        transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        opacity: isCurrent ? 1 : 0.5,
+                                        position: 'relative',
+                                        '&:hover': { borderColor: isCurrent ? 'primary.400' : 'rgba(255,255,255,0.3)', opacity: 0.85 },
+                                    }}
+                                >
+                                    {showImg ? (
+                                        <img
+                                            src={thumb || item.url}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                    ) : (
+                                        <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <PlayArrowIcon sx={{ fontSize: 24, color: 'neutral.400' }} />
+                                        </Box>
+                                    )}
+                                    {isVideo(item.mimeType, item.fileName) && (
+                                        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'sm', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <PlayArrowIcon sx={{ fontSize: 14 }} />
+                                        </Box>
+                                    )}
                                 </Box>
-                            )}
-                        </Box>
-                    ))}
+                            );
+                        });
+                    })()}
                 </Box>
             </Box>
 

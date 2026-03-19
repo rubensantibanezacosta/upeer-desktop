@@ -14,7 +14,7 @@ import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
+import { SidebarView, SidebarFilter, useNavigationStore } from '../../store/useNavigationStore.js';
 
 // Import subcomponents
 import { EmptyState } from './sidebar/EmptyState.js';
@@ -54,20 +54,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCreateGroup,
 }) => {
     const {
-        sidebarView: view,
-        sidebarFilter: filter,
+        sidebarView,
+        sidebarFilter,
         newChatSearch,
-        setSidebarView: _setView,
-        setSidebarFilter: setFilter,
-        setNewChatSearch: _setNewChatSearch,
+        setSidebarView,
+        setSidebarFilter,
         openNewChat,
         backToList,
     } = useNavigationStore();
 
     const filteredGroups = useMemo(() => {
-        if (filter === 'unread' || filter === 'favorites') return [];
+        if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];
         return groups;
-    }, [groups, filter]);
+    }, [groups, sidebarFilter]);
 
     const mergedList = useMemo(() => {
         type Entry =
@@ -104,16 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // ── helpers de animación: 4 posibles vistas ──────────────
     const offset = (v: SidebarView): string => {
-        // list=base(0), new=stack 1(+100), add-contact=stack 2(+200), create-group=stack 2(+200)
-        if (view === v) return 'translateX(0)';
-        // Si la vista activa es más "a la derecha" que la especificada, ésta sale por la izquierda
-        // create-group está en el mismo nivel de profundidad que add-contact
+        if (sidebarView === v) return 'translateX(0)';
         const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2 };
-        return orderMap[view] > orderMap[v] ? 'translateX(-100%)' : 'translateX(100%)';
+        return orderMap[sidebarView] > orderMap[v] ? 'translateX(-100%)' : 'translateX(100%)';
     };
 
     const panelSx = (v: SidebarView) => {
-        const isActive = view === v;
+        const isActive = sidebarView === v;
         return {
             position: 'absolute' as const,
             inset: 0,
@@ -148,11 +144,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarHeader
                     onShowMyIdentity={onShowMyIdentity}
                     onAddNew={handleOpenNew}
-                    onCreateGroup={onCreateGroup ? () => setView('create-group') : undefined}
+                    onCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                 />
-                <SidebarSearch activeFilter={filter} onFilterChange={(f) => setFilter(f as SidebarFilter)} />
+                <SidebarSearch activeFilter={sidebarFilter} onFilterChange={(f) => setSidebarFilter(f as SidebarFilter)} />
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    {filter === 'all' && (
+                    {sidebarFilter === 'all' && (
                         <>
                             {groups.length === 0 && contacts.length === 0 ? (
                                 <EmptyState
@@ -172,13 +168,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             )}
                         </>
                     )}
-                    {filter === 'groups' && (
+                    {sidebarFilter === 'groups' && (
                         groups.length === 0 ? (
                             <EmptyState
                                 icon={<GroupsIcon sx={{ fontSize: 'inherit' }} />}
                                 title="Sin grupos"
                                 subtitle="Crea un grupo para hablar con varias personas a la vez."
-                                action={onCreateGroup ? { label: 'Crear grupo', onClick: () => setView('create-group') } : undefined}
+                                action={onCreateGroup ? { label: 'Crear grupo', onClick: () => setSidebarView('create-group') } : undefined}
                             />
                         ) : (
                             <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
@@ -188,8 +184,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </List>
                         )
                     )}
-                    {filter === 'unread' && <EmptyState icon={<NotificationsOffIcon sx={{ fontSize: 'inherit' }} />} title="Sin mensajes no leídos" subtitle="Estás al día. Aquí aparecerán los chats con mensajes nuevos." />}
-                    {filter === 'favorites' && <EmptyState icon={<StarBorderIcon sx={{ fontSize: 'inherit' }} />} title="Sin favoritos" subtitle="Marca contactos como favoritos para encontrarlos rápidamente aquí." />}
+                    {sidebarFilter === 'unread' && <EmptyState icon={<NotificationsOffIcon sx={{ fontSize: 'inherit' }} />} title="Sin mensajes no leídos" subtitle="Estás al día. Aquí aparecerán los chats con mensajes nuevos." />}
+                    {sidebarFilter === 'favorites' && <EmptyState icon={<StarBorderIcon sx={{ fontSize: 'inherit' }} />} title="Sin favoritos" subtitle="Marca contactos como favoritos para encontrarlos rápidamente aquí." />}
                 </Box>
             </Box>
 
@@ -201,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <Box>
                             {/* Acción: Nueva conversación */}
                             <Box
-                                onClick={() => setView('add-contact')}
+                                onClick={() => setSidebarView('add-contact')}
                                 sx={{
                                     display: 'flex', alignItems: 'center',
                                     height: '60px', px: 2, gap: 1.5,
@@ -220,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {/* Acción: Nuevo grupo */}
                             {onCreateGroup && (
                                 <Box
-                                    onClick={() => setView('create-group')}
+                                    onClick={() => setSidebarView('create-group')}
                                     sx={{
                                         display: 'flex', alignItems: 'center',
                                         height: '60px', px: 2, gap: 1.5,
@@ -269,21 +265,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* ══ Panel 2a: Añadir contacto ══════════════════════ */}
             <Box sx={panelSx('add-contact')}>
-                <SubViewHeader title="Añadir contacto" onBack={() => setView('new')} />
+                <SubViewHeader title="Añadir contacto" onBack={() => setSidebarView('new')} />
                 <AddContactForm
                     onAdd={onAddContact}
-                    onDone={() => setView('list')}
+                    onDone={() => setSidebarView('list')}
                 />
             </Box>
 
             {/* ══ Panel 2b: Crear grupo ═══════════════════════════ */}
             <Box sx={panelSx('create-group')}>
-                <SubViewHeader title="Nuevo grupo" onBack={() => setView(view === 'create-group' && filter === 'groups' ? 'list' : 'new')} />
+                <SubViewHeader title="Nuevo grupo" onBack={() => setSidebarView(sidebarView === 'create-group' && sidebarFilter === 'groups' ? 'list' : 'new')} />
                 {onCreateGroup && (
                     <CreateGroupForm
                         contacts={contacts}
                         onCreate={onCreateGroup}
-                        onDone={() => setView('list')}
+                        onDone={() => setSidebarView('list')}
                     />
                 )}
             </Box>

@@ -454,6 +454,18 @@ export function getNetworkAddress(): string | null {
 }
 
 /**
+ * Returns current device technical metadata for location blocks.
+ */
+export function getDeviceMetadata(): DeviceMetadata {
+    return {
+        clientName: 'Revelnest Desktop',
+        clientVersion: '1.2.0', // TODO: Cargar desde package.json
+        platform: os.platform(),
+        deviceClass: 'desktop'
+    };
+}
+
+/**
  * Create a DHT key for a renewal token
  * Key format: SHA256("renewal:" + targetId + ":" + signaturePrefix)
  */

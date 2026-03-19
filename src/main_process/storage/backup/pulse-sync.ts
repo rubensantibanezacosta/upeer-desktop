@@ -57,7 +57,7 @@ export function createPulseSync(name: string, description?: string): string {
         renewalTokens
     };
     
-    db.insert(schema.backupSurvivalKit).values({
+    db.insert(schema.backupPulseSync).values({
         kitId,
         name,
         description,
@@ -74,8 +74,8 @@ export function getPulseSync(pulseId: string): PulseSyncData | null {
     const schema = getSchema();
     
     const result = db.select()
-        .from(schema.backupSurvivalKit)
-        .where(eq(schema.backupSurvivalKit.kitId, pulseId))
+        .from(schema.backupPulseSync)
+        .where(eq(schema.backupPulseSync.kitId, pulseId))
         .get();
     
     if (!result) return null;

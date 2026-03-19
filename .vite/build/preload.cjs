@@ -30,6 +30,10 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   sendChatDelete: (upeerId, msgId) => electron.ipcRenderer.invoke("send-chat-delete", { upeerId, msgId }),
   getMessages: (upeerId) => electron.ipcRenderer.invoke("get-messages", upeerId),
   getContacts: () => electron.ipcRenderer.invoke("get-contacts"),
+  // Multi-device API
+  getDevices: () => electron.ipcRenderer.invoke("get-devices"),
+  setDeviceTrust: (deviceId, isTrusted) => electron.ipcRenderer.invoke("set-device-trust", { deviceId, isTrusted }),
+  deleteDevice: (deviceId) => electron.ipcRenderer.invoke("delete-device", { deviceId }),
   // Group API
   getGroups: () => electron.ipcRenderer.invoke("get-groups"),
   createGroup: (name, memberUpeerIds, avatar) => electron.ipcRenderer.invoke("create-group", { name, memberUpeerIds, avatar }),
@@ -55,6 +59,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
     electron.ipcRenderer.on("group-message-delivered", (event, data) => callback(data));
   },
   openFileDialog: (options) => electron.ipcRenderer.invoke("open-file-dialog", options || {}),
+  persistInternalAsset: (args) => electron.ipcRenderer.invoke("persist-internal-asset", args),
   readFileAsBase64: (filePath, maxSizeMB) => electron.ipcRenderer.invoke("read-file-as-base64", { filePath, maxSizeMB }),
   getPathForFile: (file) => electron.webUtils.getPathForFile(file),
   onReceive: (callback) => {
@@ -173,6 +178,5 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   isPinEnabled: () => electron.ipcRenderer.invoke("is-pin-enabled"),
   setPin: (args) => electron.ipcRenderer.invoke("set-pin", args),
   disablePin: (args) => electron.ipcRenderer.invoke("disable-pin", args),
-  verifyPin: (args) => electron.ipcRenderer.invoke("verify-pin", args),
-  getMnemonic: (pin) => electron.ipcRenderer.invoke("get-mnemonic", { pin })
+  verifyPin: (args) => electron.ipcRenderer.invoke("verify-pin", args)
 });

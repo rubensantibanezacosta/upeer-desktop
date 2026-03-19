@@ -26,10 +26,49 @@ vi.mock('../../../src/main_process/storage/messages/status.js', async (importOri
 
 describe('Storage - Message Operations', () => {
     const mockDb = {
-        insert: vi.fn(),
-        select: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
+        insert: vi.fn().mockImplementation(() => ({
+            values: vi.fn().mockImplementation(() => ({
+                onConflictDoUpdate: vi.fn().mockImplementation(() => ({
+                    run: vi.fn().mockReturnValue({ changes: 1 })
+                })),
+                onConflictDoNothing: vi.fn().mockImplementation(() => ({
+                    run: vi.fn().mockReturnValue({ changes: 1 })
+                })),
+                run: vi.fn().mockReturnValue({ changes: 1 })
+            }))
+        })),
+        select: vi.fn().mockImplementation(() => ({
+            from: vi.fn().mockImplementation(() => ({
+                where: vi.fn().mockImplementation(() => ({
+                    get: vi.fn().mockReturnValue(null),
+                    orderBy: vi.fn().mockImplementation(() => ({
+                        limit: vi.fn().mockImplementation(() => ({
+                            all: vi.fn().mockReturnValue([])
+                        }))
+                    })),
+                    run: vi.fn().mockReturnValue({ changes: 1 })
+                })),
+                get: vi.fn().mockReturnValue(null),
+                all: vi.fn().mockReturnValue([])
+            }))
+        })),
+        update: vi.fn().mockImplementation(() => ({
+            set: vi.fn().mockImplementation(() => ({
+                where: vi.fn().mockImplementation(() => ({
+                    run: vi.fn().mockReturnValue({ changes: 1 })
+                }))
+            }))
+        })),
+        delete: vi.fn().mockImplementation(() => ({
+            from: vi.fn().mockImplementation(() => ({
+                where: vi.fn().mockImplementation(() => ({
+                    run: vi.fn().mockReturnValue({ changes: 1 })
+                }))
+            })),
+            where: vi.fn().mockImplementation(() => ({
+                run: vi.fn().mockReturnValue({ changes: 1 })
+            }))
+        })),
     };
 
     const mockSchema = {
@@ -63,12 +102,17 @@ describe('Storage - Message Operations', () => {
 
     it('should save a message and handle conflict by updating status', async () => {
         const mockRun = vi.fn().mockReturnValue({ changes: 0 });
+        const mockInsertValuesResult = {
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            run: mockRun
+        };
         mockDb.insert.mockReturnValue({
-            values: vi.fn().mockReturnValue({
-                onConflictDoNothing: vi.fn().mockReturnValue({
-                    run: mockRun
-                })
-            })
+            values: vi.fn().mockReturnValue(mockInsertValuesResult)
         });
 
         // Mock status update chain
@@ -208,12 +252,17 @@ describe('Storage - Message Operations', () => {
 
     it('should save a message with senderUpeerId and replyTo', async () => {
         const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+        const mockInsertValuesResult = {
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            run: mockRun
+        };
         mockDb.insert.mockReturnValue({
-            values: vi.fn().mockReturnValue({
-                onConflictDoNothing: vi.fn().mockReturnValue({
-                    run: mockRun
-                })
-            })
+            values: vi.fn().mockReturnValue(mockInsertValuesResult)
         });
 
         // Mock check for lastClearedAt (contacts)
@@ -237,12 +286,17 @@ describe('Storage - Message Operations', () => {
 
     it('should save group message and check lastClearedAt for groups', async () => {
         const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+        const mockInsertValuesResult = {
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            run: mockRun
+        };
         mockDb.insert.mockReturnValue({
-            values: vi.fn().mockReturnValue({
-                onConflictDoNothing: vi.fn().mockReturnValue({
-                    run: mockRun
-                })
-            })
+            values: vi.fn().mockReturnValue(mockInsertValuesResult)
         });
 
         // Mock check for lastClearedAt (groups)
@@ -347,12 +401,17 @@ describe('Storage - Message Operations', () => {
 
     it('should save a file message with JSON payload', async () => {
         const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+        const mockInsertValuesResult = {
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+                run: mockRun
+            }),
+            run: mockRun
+        };
         mockDb.insert.mockReturnValue({
-            values: vi.fn().mockReturnValue({
-                onConflictDoNothing: vi.fn().mockReturnValue({
-                    run: mockRun
-                })
-            })
+            values: vi.fn().mockReturnValue(mockInsertValuesResult)
         });
 
         // Mock check for lastClearedAt

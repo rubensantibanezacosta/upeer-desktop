@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { ErasureCoder } from './redundancy/erasure.js';
 import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -70,6 +71,11 @@ export class ChunkVault {
         const { sign } = await import('../../security/identity.js');
         const { canonicalStringify } = await import('../utils.js');
         const myId = getMyUPeerId();
+        const allContacts = await getContacts();
+
+        const candidates = allContacts
+            .filter(c => c.status === 'connected' && c.upeerId !== myId)
+            .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
 
         const fileDataPacket = {
             type: 'FILE_DATA_SMALL',
@@ -80,11 +86,41 @@ export class ChunkVault {
         const signature = sign(Buffer.from(canonicalStringify(fileDataPacket)));
         const signedPacket = { ...fileDataPacket, senderUpeerId: myId, signature: signature.toString('hex') };
 
+        if (candidates.length === 0) {
+            warn('No candidates for small buffer vault replication', { fileHash, fileId }, 'vault');
+            if (fileId) {
+                const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
+                fileTransferManager.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
+                const updated = fileTransferManager.getTransfer(fileId, 'sending');
+                if (updated) fileTransferManager.ui.notifyProgress(updated, true);
+            }
+            return 0;
+        }
+
+        const packetJson = JSON.stringify(signedPacket);
+        const payloadHash = crypto.createHash('sha256').update(packetJson).digest('hex');
+        const expiresAt = Date.now() + SHARD_TTL_MS;
+
+        const vaultPacket = {
+            type: 'VAULT_STORE',
+            payloadHash,
+            recipientSid,
+            senderSid: myId,
+            priority: 2,
+            data: Buffer.from(packetJson).toString('hex'),
+            expiresAt,
+        };
+
         const { VaultManager } = await import('./manager.js');
         const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
         if (fileId && nodes > 0) {
             const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
             fileTransferManager.notifyVaultProgress(fileId, 1, 1);
+        } else if (fileId) {
+            const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
+            fileTransferManager.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
+            const updated = fileTransferManager.getTransfer(fileId, 'sending');
+            if (updated) fileTransferManager.ui.notifyProgress(updated, true);
         }
         return nodes;
     }

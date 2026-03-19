@@ -110,7 +110,7 @@ const useFilesPreview = (files: FileInfo[]) => {
             for (const file of files) {
                 if (!isMounted) break;
                 let effectiveType = file.type;
-                if (!effectiveType) effectiveType = getMimeType(file.name);
+                if (!effectiveType || effectiveType === 'application/octet-stream') effectiveType = getMimeType(file.name);
                 if (!effectiveType.startsWith("image/") && !effectiveType.startsWith("video/")) continue;
                 if (previews[file.path]) continue;
                 try {

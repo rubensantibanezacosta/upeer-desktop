@@ -7,7 +7,13 @@ import * as handlers from '../../../src/main_process/network/dht/handlers';
 
 vi.mock('../../../src/main_process/storage/contacts/operations');
 vi.mock('../../../src/main_process/security/identity');
-vi.mock('../../../src/main_process/network/utils');
+vi.mock('../../../src/main_process/network/utils', () => ({
+    getNetworkAddresses: vi.fn(),
+    generateSignedLocationBlock: vi.fn(),
+    getDeviceMetadata: vi.fn(),
+    validateDhtSequence: vi.fn(),
+    canonicalStringify: (obj: any) => JSON.stringify(obj)
+}));
 vi.mock('../../../src/main_process/network/dht/handlers');
 vi.mock('../../../src/main_process/security/secure-logger');
 
@@ -17,6 +23,7 @@ describe('DHT Core', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(identity.getMyUPeerId).mockReturnValue('my-upeer-id');
+        vi.mocked(utils.getDeviceMetadata).mockReturnValue({ clientName: 'Test' });
     });
 
     describe('broadcastDhtUpdate', () => {

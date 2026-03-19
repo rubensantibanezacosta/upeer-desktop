@@ -12,9 +12,12 @@ protocol.registerSchemesAsPrivileged([
 // el problema de "pantalla negra" en reproducción de video y previsualizaciones.
 if (process.platform === 'linux') {
   app.disableHardwareAcceleration();
-  // Switches adicionales para estabilidad en Linux
+  // Switches adicionales para estabilidad en Linux y soporte de codecs en MKV
   app.commandLine.appendSwitch('disable-gpu-rasterization');
   app.commandLine.appendSwitch('disable-software-rasterizer');
+  // BUG FIX MKV: Forzar el soporte de codecs adicionales y evitar que Chromium bloquee streams locales
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder');
+  app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 }
 
 // Configuración de proceso

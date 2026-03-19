@@ -252,8 +252,18 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
                     if (await updateTransferMessageStatus(fileId, 'vaulted')) {
                         this.ui.notifyStatusUpdated(fileId, 'vaulted');
                     }
+                } else {
+                    warn('No nodes available for vault replication, marking as failed', { fileId, upeerId }, 'vault');
+                    this.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
+                    const updated = this.store.getTransfer(fileId, 'sending');
+                    if (updated) this.ui.notifyProgress(updated, true);
                 }
-            }).catch(err => warn('Failed to replicate to vaults', err, 'vault'));
+            }).catch(err => {
+                warn('Failed to replicate to vaults', err, 'vault');
+                this.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
+                const updated = this.store.getTransfer(fileId, 'sending');
+                if (updated) this.ui.notifyProgress(updated, true);
+            });
         } catch (err) {
             warn('Failed to vault file proposal', err, 'vault');
         }
@@ -269,7 +279,13 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
 
             try {
                 const { ChunkVault } = await import('../vault/chunk-vault.js');
-                ChunkVault.replicateFile(currentTransfer.fileHash, filePath, aesKey, upeerId, fileId);
+                ChunkVault.replicateFile(currentTransfer.fileHash, filePath, aesKey, upeerId, fileId)
+                    .catch(err => {
+                        error('Vault file replication failed async', err, 'vault');
+                        this.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
+                        const updated = this.store.getTransfer(fileId, 'sending');
+                        if (updated) this.ui.notifyProgress(updated, true);
+                    });
             } catch (err) {
                 warn('Failed to initiate background file replication', err, 'vault');
             }

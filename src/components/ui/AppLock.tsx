@@ -12,6 +12,14 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
     const [loading, setLoading] = useState(false);
     const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
+    React.useEffect(() => {
+        // Autofocus the first input shortly after mounting
+        const timer = setTimeout(() => {
+            inputRefs.current[0]?.focus();
+        }, 100);
+        return () => clearTimeout(timer);
+    }, []);
+
     const handleUnlock = async (currentPin: string) => {
         if (currentPin.length < 4) {
             setError('Introduce el PIN completo');

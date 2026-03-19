@@ -60,7 +60,10 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
     const getFileExtension = () => {
         const parts = fileName.split('.');
         const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
-        return isVaulting ? `VAULT • ${ext}` : ext;
+        if (isVaulting) {
+            return isTransferFailed ? `VAULT FAILED • ${ext}` : `VAULT • ${ext}`;
+        }
+        return ext;
     };
 
     return (
@@ -71,7 +74,8 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                     borderRadius: 'md',
                     backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'background.level1',
                     cursor: (isTransferComplete && savedPath) ? 'pointer' : 'default',
-                    border: '1px solid transparent',
+                    border: '1px solid',
+                    borderColor: isTransferFailed && isVaulting ? 'danger.300' : 'transparent',
                 }}
                 onClick={(isTransferComplete && savedPath) ? onOpen : undefined}
             >

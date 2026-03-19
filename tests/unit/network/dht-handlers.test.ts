@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleDhtUpdate, handleDhtExchange, handleDhtQuery, handleDhtResponse } from '../../../src/main_process/network/handlers/dht.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 import * as locationOps from '../../../src/main_process/storage/contacts/location.js';
+import * as deviceOps from '../../../src/main_process/storage/devices-operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 
@@ -13,6 +14,13 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/location.js', () => ({
     updateContactDhtLocation: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/devices-operations.js', () => ({
+    upsertDevice: vi.fn(async () => { }),
+    getDevicesByUPeerId: vi.fn(async () => []),
+    setDeviceTrust: vi.fn(async () => { }),
+    deleteDevice: vi.fn(async () => { }),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -66,6 +74,22 @@ describe('DHT Handlers', () => {
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledWith(
                 'peer-id', '1.2.3.4', 10, 'valid-sig', 123456789, 'token'
             );
+        });
+
+        it('should upsert device info if present in locationBlock', async () => {
+            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
+            const deviceMeta = { clientName: 'Test', platform: 'linux', clientVersion: '1.0' };
+            const data = {
+                locationBlock: {
+                    dhtSeq: 10,
+                    address: '1.2.3.4',
+                    signature: 'valid-sig',
+                    deviceId: 'dev-123',
+                    deviceMeta
+                }
+            };
+            await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' }, data);
+            expect(deviceOps.upsertDevice).toHaveBeenCalledWith('peer-id', 'dev-123', deviceMeta);
         });
 
         it('should not update if dhtSeq is older or equal', async () => {

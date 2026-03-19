@@ -159,3 +159,22 @@ export const pendingOutbox = sqliteTable('pending_outbox', {
 }, (table) => ({
     recipientIdx: index('pending_outbox_recipient_idx').on(table.recipientSid),
 }));
+
+/**
+ * Tabla para persistir metadatos de dispositivos propios y de contactos.
+ * Fundamental para el ruteo multi-dispositivo y la UX de gestión de sesiones.
+ */
+export const devices = sqliteTable('devices', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    upeerId: text('upeer_id').notNull(),         // Dueño del dispositivo
+    deviceId: text('device_id').notNull(),       // ID único persistente del dispositivo
+    clientName: text('client_name'),             // Nombre amigable (ej: "Mi Android")
+    platform: text('platform'),                  // OS/Platform (linux, darwin, android)
+    clientVersion: text('client_version'),       // Versión del cliente
+    lastSeen: integer('last_seen').notNull(),    // Unix ms epoch
+    isTrusted: integer('is_trusted', { mode: 'boolean' }).notNull().default(true),
+}, (table) => ({
+    upeerIdx: index('devices_upeer_idx').on(table.upeerId),
+    deviceIdx: index('devices_id_idx').on(table.deviceId),
+    uniqueConstraint: index('devices_unique_idx').on(table.upeerId, table.deviceId)
+}));

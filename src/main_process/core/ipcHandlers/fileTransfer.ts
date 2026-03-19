@@ -19,10 +19,12 @@ export function registerFileTransferHandlers(): void {
         return { success: false, error: 'Invalid file path' };
       }
       const resolvedSrc = path.resolve(filePath);
-      const homeDir = app.getPath('home');
-      const homeDirNormalized = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
-      if (!resolvedSrc.startsWith(homeDirNormalized) && resolvedSrc !== homeDir) {
-        return { success: false, error: 'Source file must be within home directory' };
+      const userDataDir = app.getPath('userData');
+      const assetsDir = path.join(userDataDir, 'assets');
+      const assetsDirNormalized = assetsDir.endsWith(path.sep) ? assetsDir : assetsDir + path.sep;
+
+      if (!resolvedSrc.startsWith(assetsDirNormalized)) {
+        return { success: false, error: 'Source file must be within internal assets directory. Copy it there first.' };
       }
 
       const { getGroupById } = await import('../../storage/groups/operations.js');
