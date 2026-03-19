@@ -36,7 +36,8 @@ export function registerDeviceHandlers(): void {
             deviceId: block.deviceId,
             isCurrent: block.deviceId === myDeviceId,
             lastSeen: storedValue.timestamp, // Aproximación, el bloque individual no tiene TS propio aún
-            address: block.address
+            address: block.address,
+            metadata: block.deviceMeta
         }));
     });
 }

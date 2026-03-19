@@ -40,10 +40,20 @@ export type MessageType =
     | 'VAULT_RENEW';  // Custodio renueva entry próxima a expirar
 
 
+export interface DeviceMetadata {
+    clientName?: string;
+    clientVersion?: string;
+    platform?: string;
+    deviceClass?: string;
+    capabilities?: string[];
+}
+
 export interface LocationBlock {
     address: string;          // Primary / most-recent device IP
     addresses?: string[];     // All known device IPs (multi-device support)
     alias?: string;           // Sender’s display name (unsigned, informational)
+    deviceId?: string;        // Stable unique ID for the specific device
+    deviceMeta?: DeviceMetadata; // Hardware/OS information (informed/consented)
     dhtSeq: number;
     signature: string;
     expiresAt?: number;

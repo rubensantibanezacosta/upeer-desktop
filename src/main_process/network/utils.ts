@@ -1,10 +1,10 @@
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { getMyUPeerId, sign, verify, getMyAlias } from '../security/identity.js';
+import { getMyUPeerId, sign, verify, getMyAlias, getMyDeviceId } from '../security/identity.js';
 import { getKademliaInstance } from './dht/shared.js';
 import { getYggstackAddress } from '../sidecars/yggstack.js';
 import { network, warn, error, debug } from '../security/secure-logger.js';
-import type { RenewalToken } from './types.js';
+import type { RenewalToken, DeviceMetadata } from './types.js';
 
 /**
  * Validation utility for IP addresses (IPv4 or IPv6/Yggdrasil).
@@ -91,7 +91,7 @@ export function canonicalStringify(obj: any): string {
     return '{' + parts.join(',') + '}';
 }
 
-export function generateSignedLocationBlock(addressOrAddresses: string | string[], dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken) {
+export function generateSignedLocationBlock(addressOrAddresses: string | string[], dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken, deviceMeta?: DeviceMetadata) {
     const ttl = ttlMs ?? LOCATION_BLOCK_TTL_MS;
     // Cap TTL to maximum allowed
     const cappedTtl = Math.min(ttl, LOCATION_BLOCK_TTL_MAX);
@@ -105,13 +105,28 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
     // Generate renewal token if not provided (for extreme resilience)
     const finalRenewalToken = renewalToken || generateRenewalToken(getMyUPeerId(), 3);
 
-    // Signature includes upeerId, addresses (plural), dhtSeq, expiresAt
-    const data = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt };
+    const deviceId = getMyDeviceId();
+
+    // Signature includes upeerId, addresses (plural), dhtSeq, expiresAt, deviceId, deviceMeta
+    // Note: deviceMeta is part of the signed data to ensure integrity
+    const data: any = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt, deviceId };
+    if (deviceMeta) data.deviceMeta = deviceMeta;
+
     const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
 
     // For backward compatibility in object keys, we keep 'address' as the primary one (first)
     // Thanks to prioritizeYggdrasil, addresses[0] will be Yggdrasil if available.
-    return { address: sortedAddresses[0], addresses: sortedAddresses, dhtSeq, expiresAt, signature: sig, renewalToken: finalRenewalToken, alias: getMyAlias() || undefined };
+    return {
+        address: sortedAddresses[0],
+        addresses: sortedAddresses,
+        dhtSeq,
+        expiresAt,
+        signature: sig,
+        renewalToken: finalRenewalToken,
+        alias: getMyAlias() || undefined,
+        deviceId,
+        deviceMeta
+    };
 }
 
 
@@ -126,7 +141,7 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
  */
 
 
-export function verifyLocationBlock(upeerId: string, block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken }, publicKeyHex: string): boolean {
+export function verifyLocationBlock(upeerId: string, block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken, deviceId?: string, deviceMeta?: DeviceMetadata }, publicKeyHex: string): boolean {
     // Audit Note: Removed legacy fallbacks for blocks without expiresAt.
     // Modern protocol requires expiresAt and consistent canonical serialization.
 
@@ -148,8 +163,11 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, a
         const sortedAddresses = [...new Set(inputAddresses)].sort(prioritizeYggdrasil);
         sortedAddresses.forEach(addr => validateAddress(addr));
 
-        // Attempt verification with the modern 'addresses' array
-        const data = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        // Attempt verification with the modern 'addresses' array and new metadata
+        const data: any = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        if (block.deviceId) data.deviceId = block.deviceId;
+        if (block.deviceMeta) data.deviceMeta = block.deviceMeta;
+
         let isValid = verify(
             Buffer.from(canonicalStringify(data)),
             safeBufferFromHex(block.signature, 64, 'signature'),
@@ -157,13 +175,17 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, a
         );
 
         if (!isValid) {
-            // Backward compatibility fallback: try verifying with single 'address' field
-            const legacyData = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
-            isValid = verify(
-                Buffer.from(canonicalStringify(legacyData)),
-                safeBufferFromHex(block.signature, 64, 'signature'),
-                safeBufferFromHex(publicKeyHex, 32, 'publicKey')
-            );
+            // Check if it's a block with device metadata but without it in the signature (unlikely in new versions)
+            // or if it's a legacy block without device metadata at all.
+            if (!block.deviceId && !block.deviceMeta) {
+                // Backward compatibility fallback: try verifying with single 'address' field
+                const legacyData = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+                isValid = verify(
+                    Buffer.from(canonicalStringify(legacyData)),
+                    safeBufferFromHex(block.signature, 64, 'signature'),
+                    safeBufferFromHex(publicKeyHex, 32, 'publicKey')
+                );
+            }
         }
 
         if (isValid && block.renewalToken) {

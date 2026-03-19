@@ -1,6 +1,6 @@
 import dgram from 'node:dgram';
 import { getMyUPeerId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
-import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock } from '../utils.js';
+import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock, getDeviceMetadata } from '../utils.js';
 import { getMyDhtSeq } from '../../security/identity.js';
 import { addOrUpdateContact } from '../../storage/contacts/operations.js';
 import { isContactBlocked } from '../../storage/contacts/operations.js';
@@ -130,8 +130,9 @@ export class LanDiscovery {
         }
 
         const dhtSeq = getMyDhtSeq();
+        const deviceMeta = getDeviceMetadata();
         // Generar un bloque firmado DETERMINISTA que incluya todas las IPs
-        const locBlock = generateSignedLocationBlock(myAddresses, dhtSeq);
+        const locBlock = generateSignedLocationBlock(myAddresses, dhtSeq, undefined, undefined, deviceMeta);
 
         const messageData = {
             type: 'LAN_DISCOVERY_ANNOUNCE' as const,

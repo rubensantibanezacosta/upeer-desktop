@@ -8,7 +8,8 @@ import {
 } from '../../security/identity.js';
 import {
     generateSignedLocationBlock,
-    getNetworkAddresses
+    getNetworkAddresses,
+    getDeviceMetadata
 } from '../utils.js';
 import { getKademliaInstance, publishLocationBlock, findNodeLocation, iterativeFindNode } from './handlers.js';
 import { network, warn, error } from '../../security/secure-logger.js';
@@ -29,8 +30,9 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any)
 
         network('Network addresses changed', undefined, { addresses, newSeq }, 'dht');
 
+        const deviceMeta = getDeviceMetadata();
         // Generate signed block with ALL addresses
-        const locBlock = generateSignedLocationBlock(addresses, newSeq);
+        const locBlock = generateSignedLocationBlock(addresses, newSeq, undefined, undefined, deviceMeta);
 
         // 1. Publish to Kademlia DHT
         // Note: For Kademlia, we still publish it keyed by upeerId. 

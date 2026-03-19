@@ -27,6 +27,7 @@ import { handleChatAck, handleChatMessage, handleChatEdit, handleChatDelete, han
 import { handleHandshakeAccept, handleHandshakeReq } from './handlers/contacts.js';
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
 import { handleReputationDeliver, handleReputationGossip, handleReputationRequest } from './handlers/reputation.js';
+import { handleSyncPulse } from './handlers/sync.js';
 import { handleVaultDelivery } from './handlers/vault.js';
 import { unsealPacket } from './sealed.js';
 import { canonicalStringify } from './utils.js';
@@ -328,6 +329,10 @@ export async function handlePacket(
                 break;
 
             // ── Reputation Gossip (G-Set CRDT) ─────────────────────────────
+            case 'SYNC_PULSE':
+                await handleSyncPulse(upeerId, data, win);
+                break;
+
             case 'REPUTATION_GOSSIP':
                 handleReputationGossip(upeerId, data, sendResponse, rinfo);
                 break;

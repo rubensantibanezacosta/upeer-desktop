@@ -6,7 +6,7 @@ import {
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
-import { getNetworkAddresses, generateSignedLocationBlock } from '../utils.js';
+import { getNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
@@ -98,9 +98,10 @@ async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: s
     if (currentAddresses.length === 0) return;
 
     const currentSeq = getMyDhtSeq();
+    const deviceMeta = getDeviceMetadata();
 
     // generateSignedLocationBlock now accepts string[] and handles plural 'addresses'
-    const locBlock = generateSignedLocationBlock(currentAddresses, currentSeq);
+    const locBlock = generateSignedLocationBlock(currentAddresses, currentSeq, undefined, undefined, deviceMeta);
 
     const addresses = getFanOutAddresses(contact);
     for (const addr of addresses) {
