@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    Box, IconButton, Typography, Input, Sheet, Slider,
+    Box, IconButton, Typography, Input, Sheet, Slider, Tooltip,
 } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
@@ -15,6 +15,14 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import CropIcon from '@mui/icons-material/Crop';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
+import EditIcon from '@mui/icons-material/Edit';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import TuneIcon from '@mui/icons-material/Tune';
+import EmojiEmotionsOutlinedIcon from '@mui/icons-material/EmojiEmotionsOutlined';
+import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined';
+import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { formatFileSize, getMimeType } from '../../../utils/fileUtils.js';
@@ -39,6 +47,8 @@ interface FilePreviewOverlayProps {
     onDragLeave?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
 }
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👎', '🔥', '🎉'];
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -337,6 +347,8 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [captions, setCaptions] = useState<Record<number, string>>({});
+    const [emojiOpen, setEmojiOpen] = useState(false);
+    const emojiMenuRef = useRef<HTMLDivElement>(null);
     const { previews, isGenerating } = useFilesPreview(files);
 
     useEffect(() => {
@@ -391,14 +403,61 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             )}
 
             {/* Header */}
-            <Box sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
-                <IconButton variant="plain" color="neutral" onClick={onClose} sx={{ color: 'text.primary', '&:hover': { backgroundColor: 'background.level2' } }}>
+            <Box sx={{ 
+                p: 2, 
+                display: 'flex', 
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
+            }}>
+                <IconButton variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <CloseIcon />
                 </IconButton>
-                <Box sx={{ flexGrow: 1, textAlign: 'center' }}>
-                    <Typography level="body-sm" sx={{ color: 'text.primary', fontWeight: 'md' }}>{currentFile.name}</Typography>
-                </Box>
-                <Box sx={{ width: 40 }} />
+                
+                {/* Toolbar centrada - solo para imágenes */}
+                {currentPreview?.previewUrl && (currentFile.type.startsWith('image/') || getMimeType(currentFile.name).startsWith('image/')) ? (
+                    <Box sx={{ display: 'flex', gap: 1, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }} onClick={e => e.stopPropagation()}>
+                        <Tooltip title="Recortar" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <CropIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Cortar" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <ContentCutIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Dibujar" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <EditIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Texto" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <TextFieldsIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Ajustes" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <TuneIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Stickers" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <StickyNote2OutlinedIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Más" variant="soft" sx={{ zIndex: 3000 }}>
+                            <IconButton variant="plain" color="neutral" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                <AppsIcon />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                ) : null}
+                
+                <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 'md', ml: 'auto' }}>
+                    {currentFile.name}
+                </Typography>
             </Box>
 
             {/* Preview area */}
@@ -440,15 +499,77 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 
                 {/* Caption + Send */}
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Box sx={{ width: '100%', maxWidth: 600, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ width: '100%', maxWidth: 600, display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
                         <Input
                             size="lg" variant="outlined" color="neutral"
                             placeholder="Añade un comentario..."
                             value={captions[selectedIndex] || ''}
                             onChange={(e) => setCaptions(prev => ({ ...prev, [selectedIndex]: e.target.value }))}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isGenerating) handleSendAll(); }}
-                            sx={{ flexGrow: 1, borderRadius: 'lg' }}
+                            sx={{ flexGrow: 1, borderRadius: 'lg', pr: 5 }}
                             disabled={isGenerating}
+                            endDecorator={
+                                <Box sx={{ position: 'relative' }}>
+                                    <IconButton
+                                        variant="plain"
+                                        color="neutral"
+                                        size="sm"
+                                        onClick={() => setEmojiOpen(!emojiOpen)}
+                                        sx={{ 
+                                            color: 'text.secondary',
+                                            '&:hover': { bgcolor: 'background.level2' }
+                                        }}
+                                    >
+                                        <EmojiEmotionsOutlinedIcon />
+                                    </IconButton>
+                                    
+                                    {emojiOpen && (
+                                        <Box
+                                            ref={emojiMenuRef}
+                                            sx={{
+                                                position: 'absolute',
+                                                right: 0,
+                                                bottom: '100%',
+                                                mb: 1,
+                                                display: 'flex',
+                                                gap: 0.5,
+                                                backgroundColor: 'background.surface',
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                                borderRadius: 'lg',
+                                                p: 0.75,
+                                                boxShadow: 'lg',
+                                                zIndex: 3100,
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {QUICK_EMOJIS.map(emoji => (
+                                                <Box
+                                                    key={emoji}
+                                                    onClick={() => {
+                                                        setCaptions(prev => ({
+                                                            ...prev,
+                                                            [selectedIndex]: (prev[selectedIndex] || '') + emoji
+                                                        }));
+                                                        setEmojiOpen(false);
+                                                    }}
+                                                    sx={{
+                                                        width: 34, height: 34,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '20px',
+                                                        cursor: 'pointer',
+                                                        borderRadius: 'md',
+                                                        transition: 'background-color 0.1s ease, transform 0.1s ease',
+                                                        '&:hover': { backgroundColor: 'background.level1', transform: 'scale(1.15)' },
+                                                    }}
+                                                >
+                                                    {emoji}
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+                            }
                         />
                         <IconButton variant="plain" color={isGenerating ? 'neutral' : 'primary'} onClick={handleSendAll} disabled={isGenerating}>
                             <SendIcon />
