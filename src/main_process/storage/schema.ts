@@ -1,6 +1,16 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+/**
+ * Tabla para configuraciones locales de la aplicación
+ * No se sincroniza con otros dispositivos por defecto.
+ */
+export const appSettings = sqliteTable('app_settings', {
+    key: text('key').primaryKey(),
+    value: text('value').notNull(), // JSON stringified
+    updatedAt: integer('updated_at').notNull()
+});
+
 export const groups = sqliteTable('groups', {
     groupId: text('group_id').primaryKey(),
     name: text('name').notNull(),
@@ -64,16 +74,17 @@ export const contacts = sqliteTable('contacts', {
     lastClearedAt: integer('last_cleared_at').notNull().default(0), // unix timestamp ms
 });
 
-export const backupSurvivalKit = sqliteTable('backup_survival_kit', {
+export const backupPulseSync = sqliteTable('backup_pulse_sync', {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    kitId: text('kit_id').unique().notNull(),
+    kitId: text('kit_id').unique().notNull(), // UUID del PulseSync
     name: text('name').notNull(),
     description: text('description'),
     data: text('data').notNull(), // JSON string with contacts and location blocks
     created: text('created').default(sql`CURRENT_TIMESTAMP`),
-    expires: integer('expires'), // Timestamp when kit expires
+    expires: integer('expires'), // Timestamp when pulse sync expires
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 });
+
 export const vaultStorage = sqliteTable('vault_storage', {
     id: integer('id').primaryKey({ autoIncrement: true }),
     payloadHash: text('payload_hash').unique().notNull(),

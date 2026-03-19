@@ -1,0 +1,700 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/home/rubendev/Proyectos/chat-p2p[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly rotate Ephemeral Keys and search previous keys during decryption
+[22m[39m16:53:03.733 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mloadSeedNodesFromDNS[2m > [22m[2mshould return empty array if DNS resolution fails
+[22m[39m16:53:03.737 INFO [kademlia-bootstrap] DNS seed resolution skipped or failed 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mloadSeedNodes[2m > [22m[2mshould aggregate seeds from all sources and filter duplicates
+[22m[39m16:53:03.738 INFO [kademlia-bootstrap] Loaded 2 seed nodes from 2 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mloadSeedNodes[2m > [22m[2mshould return 0 sources if both DNS and File fail and SEED_NODES is empty
+[22m[39m16:53:03.739 INFO [kademlia-bootstrap] DNS seed resolution skipped or failed 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mloadSeedNodes[2m > [22m[2mshould return 0 sources if both DNS and File fail and SEED_NODES is empty
+[22m[39m16:53:03.739 INFO [kademlia-bootstrap] Loaded 0 seed nodes from 0 unique sources 
+
+[yggstack] IPv6: 200:1234:5678::1
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould handle lifecycle and health check
+[22m[39m16:53:03.739 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould handle lifecycle and health check
+[22m[39m16:53:03.741 INFO [peers] Parsed 0 peers from 0 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould handle lifecycle and health check
+[22m[39m16:53:03.741 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould handle lifecycle and health check
+[22m[39m16:53:03.742 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould handle lifecycle and health check
+[22m[39m16:53:03.742 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.742 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.742 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.742 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.743 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.743 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.743 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.743 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mloadSeedNodes[2m > [22m[2mshould return 0 file seeds if File fails
+[22m[39m16:53:03.742 INFO [kademlia-bootstrap] Loaded 0 seed nodes from 0 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mbootstrapFromContacts[2m > [22m[2mshould add valid connected contacts to routing table
+[22m[39m16:53:03.745 INFO [kademlia-bootstrap] Bootstrapped with 1 contacts (out of 3) 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mbootstrapFromContacts[2m > [22m[2mshould return 0 if no contacts are provided
+[22m[39m16:53:03.745 INFO [kademlia-bootstrap] Bootstrapped with 0 contacts (out of 0) 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould respect retry timeout
+[22m[39m16:53:03.745 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould respect retry timeout
+[22m[39m16:53:03.745 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover fetch/probe errors
+[22m[39m16:53:03.745 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover fetch/probe errors
+[22m[39m16:53:03.745 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover fetch/probe errors
+[22m[39m16:53:03.746 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould load seeds and attempt to ping each
+[22m[39m16:53:03.746 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould load seeds and attempt to ping each
+[22m[39m16:53:03.746 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover fetch/probe errors
+[22m[39m16:53:03.746 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.746 INFO [peers] score= 78.0 latency=   1 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.746 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.746 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.747 INFO [peers] Parsed 2 peers from 1 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.747 INFO [peers] 2 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.747 INFO [peers] Latency: 12/12 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.747 INFO [peers] Active pool: 12 reachable peers — top 6: 
+16:53:03.747 INFO [peers] score= 80.0 latency=   0 ms dist=    ? km uptime=100% [Germany] tls://2.2.2.2:2222 
+16:53:03.747 INFO [peers] score= 79.0 latency=   0 ms dist=    ? km uptime=95% [Germany] tcp://1.1.1.1:1111 
+16:53:03.747 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.747 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.747 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.747 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.747 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.747 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.748 INFO [peers] Parsed 1 peers from 1 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.748 INFO [peers] 1 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.748 INFO [peers] Latency: 11/11 peers reachable 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould handle send failures gracefully
+[22m[39m16:53:03.747 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mattemptBootstrapFromSeeds[2m > [22m[2mshould handle send failures gracefully
+[22m[39m16:53:03.747 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mupdateBootstrapStatus[2m > [22m[2mshould update bootstrapped status correctly
+[22m[39m16:53:03.748 INFO [kademlia-bootstrap] Gained bootstrap status (10 contacts) 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mupdateBootstrapStatus[2m > [22m[2mshould increment bootstrapSuccesses when gaining status
+[22m[39m16:53:03.748 INFO [kademlia-bootstrap] Gained bootstrap status (10 contacts) 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mretryBootstrap[2m > [22m[2mshould bypass the timeout and retry
+[22m[39m16:53:03.748 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mretryBootstrap[2m > [22m[2mshould bypass the timeout and retry
+[22m[39m16:53:03.748 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover markdown and HTML parsing of peers
+[22m[39m16:53:03.748 INFO [peers] Active pool: 11 reachable peers — top 6: 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.748 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.748 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover additional edge cases in geolocate and probe
+[22m[39m16:53:03.749 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover additional edge cases in geolocate and probe
+[22m[39m16:53:03.749 INFO [peers] Parsed 0 peers from 0 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover additional edge cases in geolocate and probe
+[22m[39m16:53:03.749 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover additional edge cases in geolocate and probe
+[22m[39m16:53:03.749 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover additional edge cases in geolocate and probe
+[22m[39m16:53:03.750 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.750 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.750 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mretryBootstrap[2m > [22m[2mshould bypass the timeout and retry
+[22m[39m16:53:03.749 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mretryBootstrap[2m > [22m[2mshould bypass the timeout and retry
+[22m[39m16:53:03.749 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mhelper methods[2m > [22m[2mshould return time since last attempt
+[22m[39m16:53:03.749 INFO [kademlia-bootstrap] Loaded 1 seed nodes from 1 unique sources 
+
+[90mstdout[2m | tests/unit/dht/kademlia-bootstrap.test.ts[2m > [22m[2mBootstrapManager Unit Tests[2m > [22m[2mhelper methods[2m > [22m[2mshould return time since last attempt
+[22m[39m16:53:03.749 INFO [kademlia-bootstrap] Attempting bootstrap from 1 seed nodes 
+
+[yggstack] IPv6: 200:1:2:3::1
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover geolocation batching and DNS resolution
+[22m[39m16:53:03.750 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover geolocation batching and DNS resolution
+[22m[39m16:53:03.750 INFO [peers] Parsed 0 peers from 0 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover geolocation batching and DNS resolution
+[22m[39m16:53:03.750 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover geolocation batching and DNS resolution
+[22m[39m16:53:03.751 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover geolocation batching and DNS resolution
+[22m[39m16:53:03.751 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.751 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Hungary] tls://ygg1.grin.hu:42444 
+16:53:03.751 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/dht/kademlia-store.test.ts[2m > [22m[2mKademlia ValueStore[2m > [22m[2mshould respect MAX_STORE_ENTRIES and evict oldest
+[22m[39m16:53:03.750 DEBUG [kademlia] ValueStore full — evicted oldest entry { size: [33m9999[39m }
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.751 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.751 INFO [peers] Self geolocation:  (40.00, -3.00) 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.751 INFO [peers] Parsed 0 peers from 0 countries 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.751 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.752 INFO [peers] Geolocation: 0/10 peers with distance 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.752 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers and edge cases in scoring
+[22m[39m16:53:03.752 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [France] tls://51.15.204.214:54321 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Finland] tls://95.217.35.92:1337 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.752 INFO [peers] score= 78.0 latency=   0 ms dist=    ? km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.752 INFO [peers] Full peer discovery completed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers
+[22m[39m16:53:03.753 INFO [peers] Full peer discovery started 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers
+[22m[39m16:53:03.753 INFO [peers] 0 online peers parsed 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers
+[22m[39m16:53:03.754 INFO [peers] Geolocation: 8/10 peers with distance 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers
+[22m[39m16:53:03.754 INFO [peers] Latency: 10/10 peers reachable 
+
+[90mstdout[2m | tests/unit/sidecars/peer-manager.test.ts[2m > [22m[2mPeerManager Hardening[2m > [22m[2mshould cover error paths in http helpers
+[22m[39m16:53:03.754 INFO [peers] Active pool: 10 reachable peers — top 6: 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [Germany] tls://ygg.mkg20001.io:443 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [UK] tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [Germany] tls://vpn.ltha.de:443 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [UK] tcp://longseason.1200bps.xyz:13121 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [Hungary] tls://ygg1.grin.hu:42444 
+16:53:03.754 INFO [peers] score= 98.0 latency=   0 ms dist=    0 km uptime=90% [Germany] tcp://yggno.de:18226 
+16:53:03.754 INFO [peers] Full peer discovery completed 
+
+ [32m✓[39m tests/unit/network/file-chunker.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/reputation-integration.test.ts[2m > [22m[2mReputation - Vouches Integration[2m > [22m[2mshould issue a valid vouch
+[22m[39m16:53:03.754 INFO [reputation] Vouch emitido {
+  fromId: [32m'my-peer-id'[39m,
+  toId: [32m'target-peer-id'[39m,
+  type: [32m'handshake'[39m,
+  positive: [33mtrue[39m
+}
+
+ [32m✓[39m tests/unit/dht/kademlia-bootstrap.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/unit/sidecars/yggstack.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/unit/sidecars/peer-manager.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+[90mstdout[2m | tests/unit/dht/kademlia-store.test.ts[2m > [22m[2mKademlia ValueStore[2m > [22m[2mshould correctly identify expired values
+[22m[39m16:53:03.763 DEBUG [kademlia] Kademlia ValueStore: expired entries removed { removed: [33m1[39m }
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould accept handshake from a new contact with valid PoW
+[22m[39m16:53:03.776 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould reject new contact without PoW
+[22m[39m16:53:03.779 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould handle re-handshake from already connected contact
+[22m[39m16:53:03.779 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould limit entries to MAX_DELIVERY_ENTRIES (50)
+[22m[39m16:53:03.778 DEBUG [vault] Handling vault delivery { count: [33m50[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould verify integrity of inner packets
+[22m[39m16:53:03.780 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould block handshake if contact is blocked
+[22m[39m16:53:03.780 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould alert if reputation is too low (untrustworthy)
+[22m[39m16:53:03.780 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould validate structural integrity of inner packets (validateMessage)
+[22m[39m16:53:03.781 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould process valid CHAT entries from vault
+[22m[39m16:53:03.781 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeReq[2m > [22m[2mshould alert on TOFU (key change) in handleHandshakeReq
+[22m[39m16:53:03.782 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould upgrade pending contact to connected
+[22m[39m16:53:03.783 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould process CHAT_DELETE entries
+[22m[39m16:53:03.783 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould process ACK and READ entries
+[22m[39m16:53:03.785 DEBUG [vault] Handling vault delivery { count: [33m2[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle ghost pending contacts for the same address
+[22m[39m16:53:03.784 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould skip update if contact is not pending in handleHandshakeAccept
+[22m[39m16:53:03.784 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould fail on rate limit in handleHandshakeAccept
+[22m[39m16:53:03.785 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould fail on rate limit in handleHandshakeReq
+[22m[39m16:53:03.785 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+ [32m✓[39m tests/unit/security/reputation-integration.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle legacy signature in handleHandshakeAccept
+[22m[39m16:53:03.786 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle even more legacy signature in handleHandshakeAccept
+[22m[39m16:53:03.786 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould alert on key-change (TOFU) during handleHandshakeAccept
+[22m[39m16:53:03.786 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould verify and update signed prekey in handleHandshakeAccept
+[22m[39m16:53:03.787 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle invalid signed prekey in handleHandshakeAccept
+[22m[39m16:53:03.787 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle SPK verification exception in handleHandshakeReq
+[22m[39m16:53:03.788 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle SPK verification exception in handleHandshakeAccept
+[22m[39m16:53:03.792 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould process FILE_DATA_SMALL entries
+[22m[39m16:53:03.785 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould delegate FILE_ prefixed types to fileTransferManager
+[22m[39m16:53:03.786 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould process GROUP_MSG, GROUP_INVITE, and GROUP_UPDATE entries
+[22m[39m16:53:03.787 DEBUG [vault] Handling vault delivery { count: [33m3[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould handle raw file shards
+[22m[39m16:53:03.787 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould handle raw file shards
+[22m[39m16:53:03.788 DEBUG [vault] Received file shard from vault { cid: [32m'shard:abc:0'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould request next page if data.hasMore is true
+[22m[39m16:53:03.788 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould request next page if data.hasMore is true
+[22m[39m16:53:03.788 DEBUG [vault] Vault delivery: requesting next page { offset: [33m50[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould continue and log error if an entry fails to process
+[22m[39m16:53:03.789 DEBUG [vault] Handling vault delivery { count: [33m2[39m, from: [32m'custodian-id'[39m }
+
+ [32m✓[39m tests/unit/dht/kademlia-store.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/unit/network/groups-handlers.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle avatar and alias sanitization in handleHandshakeReq
+[22m[39m16:53:03.793 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle avatar and alias sanitization in handleHandshakeAccept
+[22m[39m16:53:03.793 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould skip avatar if too large or invalid format
+[22m[39m16:53:03.793 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould ignore unknown original sender
+[22m[39m16:53:03.793 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-handlers.test.ts[2m > [22m[2mVault Delivery Handler[2m > [22m[2mshould handle non-JSON data gracefully
+[22m[39m16:53:03.793 DEBUG [vault] Handling vault delivery { count: [33m1[39m, from: [32m'custodian-id'[39m }
+
+ [32m✓[39m tests/unit/network/transport.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m tests/unit/hooks/useFileTransfer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould skip avatar if too large or invalid format
+[22m[39m16:53:03.801 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle invalid signed prekey in handleHandshakeReq
+[22m[39m16:53:03.801 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle missing SPK components in handleHandshakeReq
+[22m[39m16:53:03.802 INFO [handshake] Handshake request verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle missing SPK components in handleHandshakeAccept
+[22m[39m16:53:03.802 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle transaction error in handleHandshakeAccept
+[22m[39m16:53:03.802 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+[90mstdout[2m | tests/unit/network/contacts-handlers.test.ts[2m > [22m[2mContact Handlers[2m > [22m[2mhandleHandshakeAccept[2m > [22m[2mshould handle flushPendingOutbox failure in handleHandshakeAccept
+[22m[39m16:53:03.803 INFO [handshake] Handshake accepted verified {
+  upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m,
+  ip: [32m'[REDACTED:ip (7 chars)]'[39m
+}
+
+ [32m✓[39m tests/unit/network/vault-handlers.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/unit/network/contacts-handlers.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly rotate Ephemeral Keys and search previous keys during decryption
+[22m[39m16:53:03.847 DEBUG [identity] Clave efímera rotada {}
+16:53:03.847 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852783847[39m }
+16:53:03.848 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:03.848 DEBUG [identity] Clave efímera rotada {}
+16:53:03.848 DEBUG [identity] Clave efímera rotada {}
+16:53:03.848 DEBUG [identity] Clave efímera rotada {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly rotate SPK and handle multiple previous SPKs
+[22m[39m16:53:03.852 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly rotate SPK and handle multiple previous SPKs
+[22m[39m16:53:03.945 DEBUG [identity] Clave efímera rotada {}
+16:53:03.945 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852783945[39m }
+16:53:03.945 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.037 DEBUG [identity] Clave efímera rotada {}
+16:53:04.038 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784038[39m }
+16:53:04.038 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle session restoration with device key correctly
+[22m[39m16:53:04.047 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle session restoration with device key correctly
+[22m[39m16:53:04.124 DEBUG [identity] Clave efímera rotada {}
+16:53:04.124 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784124[39m }
+16:53:04.124 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.125 DEBUG [identity] Clave efímera rotada {}
+16:53:04.125 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784125[39m }
+16:53:04.125 INFO [identity] Sesión restaurada desde disco. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.125 DEBUG [identity] Clave efímera rotada {}
+16:53:04.125 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784125[39m }
+
+[90mstdout[2m | tests/unit/dht/handlers.test.ts[2m > [22m[2mnetwork/dht/handlers.ts[2m > [22m[2mhandleDhtPacket[2m > [22m[2mshould renew location block during DHT_EXCHANGE if possible
+[22m[39mCalling handleDhtPacket with type DHT_EXCHANGE
+getContactByUpeerId called for peerX
+
+[90mstdout[2m | tests/unit/dht/handlers.test.ts[2m > [22m[2mnetwork/dht/handlers.ts[2m > [22m[2mhandleDhtPacket[2m > [22m[2mshould renew location block during DHT_EXCHANGE if possible
+[22m[39mResult: [33mtrue[39m
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould fail decryption if session is locked
+[22m[39m16:53:04.125 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+ [32m✓[39m tests/unit/storage/contacts.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/network/lan-discovery.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 116[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/core.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/unit/network/file-validator.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/unit/network/circuit-breaker.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/handlers.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/backup-management.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould fail decryption if session is locked
+[22m[39m16:53:04.187 DEBUG [identity] Clave efímera rotada {}
+16:53:04.187 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784187[39m }
+16:53:04.187 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.187 INFO [identity] Sesión bloqueada explícitamente. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly convert Ed25519 to Curve25519 in decryptSealed
+[22m[39m16:53:04.188 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+ [32m✓[39m tests/unit/network/utils.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/kademlia-main.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/unit/security/secure-logger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould correctly convert Ed25519 to Curve25519 in decryptSealed
+[22m[39m16:53:04.264 DEBUG [identity] Clave efímera rotada {}
+16:53:04.264 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784264[39m }
+16:53:04.264 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould persist and retrieve Alias and Avatar
+[22m[39m16:53:04.265 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould persist and retrieve Alias and Avatar
+[22m[39m16:53:04.266 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle DHT sequence persistence
+[22m[39m16:53:04.266 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+ [32m✓[39m tests/unit/storage/groups.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/unit/security/identity-extended.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 574[2mms[22m[39m
+[90mstdout[2m | tests/unit/network/vault-protocol.test.ts[2m > [22m[2mVault Protocol Handlers[2m > [22m[2mhandleVaultStore[2m > [22m[2mshould store entry if quota and score are valid
+[22m[39m16:53:04.312 DEBUG [vault] Vault entry saved { hash: [32m'hash1'[39m, recipient: [32m'recp1'[39m }
+
+[90mstdout[2m | tests/unit/network/vault-protocol.test.ts[2m > [22m[2mVault Protocol Handlers[2m > [22m[2mhandleVaultQuery[2m > [22m[2mshould deliver entries for authorized requester
+[22m[39m16:53:04.329 INFO [vault] Delivering vault entries { recipient: [32m'sender-1'[39m, count: [33m2[39m, hasMore: [33mfalse[39m }
+
+[90mstdout[2m | tests/unit/network/vault-protocol.test.ts[2m > [22m[2mVault Protocol Handlers[2m > [22m[2mhandleVaultAck[2m > [22m[2mshould delete entries if sender is the legitimate recipient
+[22m[39m16:53:04.332 DEBUG [vault] Vault entry cleared after delivery ACK { hash: [32m'h1'[39m, from: [32m'sender-1'[39m }
+
+ [32m✓[39m tests/unit/network/dht-handlers.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle DHT sequence persistence
+[22m[39m16:53:04.343 DEBUG [identity] Clave efímera rotada {}
+16:53:04.343 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784343[39m }
+16:53:04.343 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.344 DEBUG [identity] Clave efímera rotada {}
+16:53:04.344 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784344[39m }
+16:53:04.344 INFO [identity] Sesión restaurada desde disco. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+16:53:04.344 DEBUG [identity] Clave efímera rotada {}
+16:53:04.344 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784344[39m }
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould generate a mnemonic identity and unlock it
+[22m[39m16:53:04.345 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+ [32m✓[39m tests/unit/network/socks5.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/unit/network/vault-protocol.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/unit/network/transfer-manager-core.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 475[2mms[22m[39m
+ [32m✓[39m tests/unit/network/handlers.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould generate a mnemonic identity and unlock it
+[22m[39m16:53:04.452 DEBUG [identity] Clave efímera rotada {}
+16:53:04.452 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784452[39m }
+16:53:04.452 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould unlock session with a valid mnemonic
+[22m[39m16:53:04.455 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol-robustness.test.ts[2m > [22m[2mKademlia ProtocolHandler - Edge Cases & Robustness[2m > [22m[2mhandleMessage - Corner Cases[2m > [22m[2mshould handle unknown message types gracefully
+[22m[39m16:53:04.464 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol-robustness.test.ts[2m > [22m[2mKademlia ProtocolHandler - Edge Cases & Robustness[2m > [22m[2mhandleMessage - Corner Cases[2m > [22m[2mshould handle DHT_PONG and DHT_STORE_ACK by returning null (already handled by update)
+[22m[39m16:53:04.469 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol-robustness.test.ts[2m > [22m[2mKademlia ProtocolHandler - Edge Cases & Robustness[2m > [22m[2mhandleMessage - Corner Cases[2m > [22m[2mshould handle DHT_PONG and DHT_STORE_ACK by returning null (already handled by update)
+[22m[39m16:53:04.469 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol-robustness.test.ts[2m > [22m[2mKademlia ProtocolHandler - Edge Cases & Robustness[2m > [22m[2mhandleMessage - Corner Cases[2m > [22m[2mshould handle DHT_FIND_NODE with queryId
+[22m[39m16:53:04.471 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol-robustness.test.ts[2m > [22m[2mKademlia ProtocolHandler - Edge Cases & Robustness[2m > [22m[2mStats[2m > [22m[2mshould track messages received and sent
+[22m[39m16:53:04.485 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+ [32m✓[39m tests/unit/dht/kademlia-protocol-robustness.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/unit/network/sync-handlers.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/security/ratchet.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/unit/security/rate-limiter.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould unlock session with a valid mnemonic
+[22m[39m16:53:04.546 DEBUG [identity] Clave efímera rotada {}
+16:53:04.546 DEBUG [identity] Signed PreKey rotada { spkId: [33m1773852784546[39m }
+16:53:04.547 INFO [identity] Sesión desbloqueada con frase semilla. { upeerId: [32m'[REDACTED:upeerId (64 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould fail to unlock with an invalid mnemonic
+[22m[39m16:53:04.547 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle legacy keys properly during init
+[22m[39m16:53:04.548 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+[90mstdout[2m | tests/unit/security/identity-deep.test.ts[2m > [22m[2mIdentity Deep Coverage & Bug Hunting[2m > [22m[2mshould handle legacy keys properly during init
+[22m[39m16:53:04.548 INFO [identity] Instalación heredada detectada. Clave aleatoria respaldada. Se requiere frase semilla. {}
+16:53:04.548 INFO [identity] Primera ejecución. Se requiere crear o importar una frase semilla. {}
+
+ [32m✓[39m tests/unit/storage/backup-pulse-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/unit/security/identity-deep.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 819[2mms[22m[39m
+ [32m✓[39m tests/unit/security/validation-extended.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/security/identity.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 940[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/messages.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/unit/network/chat-handlers.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/contacts-operations.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [31m❯[39m tests/unit/security/pow.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 18[2mms[22m[39m
+       [32m✓[39m should generate and verify a valid Argon2id proof[32m 3[2mms[22m[39m
+[31m       [31m×[31m should reject a proof for a different upeerId[39m[32m 9[2mms[22m[39m
+       [32m✓[39m should reject an expired proof[32m 0[2mms[22m[39m
+       [32m✓[39m should reject malformed JSON proof[32m 4[2mms[22m[39m
+       [32m✓[39m should verify a valid legacy SHA-256 proof[32m 1[2mms[22m[39m
+       [32m✓[39m should reject invalid legacy proof[32m 0[2mms[22m[39m
+     [32m✓[39m should return false for empty or non-string proofs[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/network/reputation-handlers.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/unit/security/validation-stress.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/kademlia-routing.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould handle DHT_PING
+[22m[39m16:53:04.871 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould handle DHT_STORE and save to ValueStore
+[22m[39m16:53:04.874 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould handle DHT_FIND_VALUE and return matching value
+[22m[39m16:53:04.874 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould handle DHT_FIND_VALUE and return closest nodes if value not found
+[22m[39m16:53:04.875 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (29 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould handle unknown message types gracefully
+[22m[39m16:53:04.879 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (28 chars)]'[39m }
+
+[90mstdout[2m | tests/unit/dht/kademlia-protocol.test.ts[2m > [22m[2mKademlia ProtocolHandler[2m > [22m[2mshould include queryId in responses if provided
+[22m[39m16:53:04.880 INFO [kademlia] Created new contact from incoming message { upeerId: [32m'[REDACTED:upeerId (28 chars)]'[39m }
+
+ [32m✓[39m tests/unit/dht/kademlia-protocol.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/reputation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/security/reputation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/init.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/vault.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/unit/security/identity-rate-limiter.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/backup.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/unit/security/validation-components.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/contacts-keys.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/contacts-location.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/pending-outbox.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/network/erasure.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/ratchet.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/network/sealed.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/shared.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/security/validation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/storage/assets.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/kademlia-distance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m tests/unit/dht/kademlia-bucket.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/network/vault-manager.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 3018[2mms[22m[39m
+     [33m[2m✓[22m[39m should only include successful custodians in DHT pointer [33m 3004[2mms[22m[39m
+ [32m✓[39m tests/unit/network/vault-replication.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 6012[2mms[22m[39m
+     [33m[2m✓[22m[39m should only store pointers in DHT for successful replications [33m 3006[2mms[22m[39m
+     [33m[2m✓[22m[39m should fallback to Kademlia nodes if no friends are connected [33m 3002[2mms[22m[39m
+ [32m✓[39m tests/unit/network/file-transfer.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 6026[2mms[22m[39m
+     [33m[2m✓[22m[39m should handle selective ACKs and retransmissions correctly [33m 6002[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m64 passed[39m[22m[90m (65)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m739 passed[39m[22m[90m (740)[39m
+[2m   Start at [22m 16:53:03
+[2m   Duration [22m 7.03s[2m (transform 4.85s, setup 862ms, import 10.98s, tests 18.85s, environment 13.84s)[22m
+

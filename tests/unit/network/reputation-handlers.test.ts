@@ -48,8 +48,34 @@ describe('Reputation Handlers', () => {
             // Debería enviar REPUTATION_GOSSIP con nuestra lista completa (o paginada)
             expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
                 type: 'REPUTATION_GOSSIP',
-                ids: ourIds
+                ids: expect.any(Array)
             }));
+            const sentIds = mockSendResponse.mock.calls[0][1].ids;
+            expect(sentIds.length).toBeLessThanOrEqual(100);
+        });
+
+        it('should handle missing data.ids gracefully', () => {
+            (vouches.getGossipIds as any).mockReturnValue(['id1']);
+            handleReputationGossip(mockPeerId, {}, mockSendResponse, mockRinfo);
+            // Debería responder con GOSSIP porque el peer mandó "nada" y nosotros tenemos "algo"
+            expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
+                type: 'REPUTATION_GOSSIP'
+            }));
+        });
+
+        it('should limit ourMissing to 50 IDs', () => {
+            const ourIds: string[] = [];
+            const theirIds = Array.from({ length: 100 }, (_, i) => `id${i}`);
+
+            (vouches.getGossipIds as any).mockReturnValue(ourIds);
+
+            handleReputationGossip(mockPeerId, { ids: theirIds }, mockSendResponse, mockRinfo);
+
+            const requestCall = mockSendResponse.mock.calls.find(c => c[1].type === 'REPUTATION_REQUEST');
+            expect(requestCall).toBeDefined();
+            if (requestCall) {
+                expect(requestCall[1].missing.length).toBe(50);
+            }
         });
 
         it('should do nothing if both are synchronized', () => {

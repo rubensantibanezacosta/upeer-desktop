@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 
 // Types for file transfers
 export interface FileTransfer {
@@ -86,6 +86,53 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     return transfers;
   }, [transfers]);
 
+  const loadTransfers = async () => {
+    try {
+      const result = await window.upeer.getFileTransfers();
+      if (result.success && result.transfers) {
+        const transfersList = Array.isArray(result.transfers)
+          ? result.transfers
+          : Object.values(result.transfers);
+        setTransfers(transfersList);
+      }
+    } catch (error) {
+      console.error('Error loading transfers:', error);
+    }
+  };
+
+  const updateTransferProgress = useCallback((progress: TransferProgress) => {
+    setTransfers(prev => {
+      const exists = prev.some(t => t.fileId === progress.fileId && t.direction === progress.direction);
+
+      // If the transfer doesn't exist in our state yet (race condition), load all
+      if (!exists) {
+        loadTransfers();
+        return prev;
+      }
+
+      const updated = prev.map(transfer => {
+        if (transfer.fileId === progress.fileId && transfer.direction === progress.direction) {
+          // Use state from progress if available, otherwise keep current state
+          const newState = progress.state || transfer.state;
+
+          return {
+            ...transfer,
+            state: newState as FileTransfer['state'],
+            phase: progress.phase !== undefined ? progress.phase : (transfer as any).phase,
+            progress: progress.progress,
+            bytesTransferred: progress.bytesTransferred,
+            totalBytes: progress.totalBytes || transfer.fileSize,
+            chunksTransferred: progress.chunksTransferred,
+            isVaulting: progress.isVaulting,
+            lastActivity: Date.now()
+          } as FileTransfer;
+        }
+        return transfer;
+      });
+      return updated;
+    });
+  }, []);
+
   // Load initial transfers
   useEffect(() => {
     loadTransfers();
@@ -125,54 +172,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       loadTransfers();
       onTransferStateChangeRef.current?.(data.fileId, { transferState: 'failed' });
     });
-  }, []);
-
-  const loadTransfers = async () => {
-    try {
-      const result = await window.upeer.getFileTransfers();
-      if (result.success && result.transfers) {
-        const transfersList = Array.isArray(result.transfers)
-          ? result.transfers
-          : Object.values(result.transfers);
-        setTransfers(transfersList);
-      }
-    } catch (error) {
-      console.error('Error loading transfers:', error);
-    }
-  };
-
-  const updateTransferProgress = (progress: TransferProgress) => {
-    setTransfers(prev => {
-      const exists = prev.some(t => t.fileId === progress.fileId && t.direction === progress.direction);
-
-      // If the transfer doesn't exist in our state yet (race condition), load all
-      if (!exists) {
-        loadTransfers();
-        return prev;
-      }
-
-      const updated = prev.map(transfer => {
-        if (transfer.fileId === progress.fileId && transfer.direction === progress.direction) {
-          // Use state from progress if available, otherwise keep current state
-          const newState = progress.state || transfer.state;
-
-          return {
-            ...transfer,
-            state: newState as FileTransfer['state'],
-            phase: progress.phase !== undefined ? progress.phase : (transfer as any).phase,
-            progress: progress.progress,
-            bytesTransferred: progress.bytesTransferred,
-            totalBytes: progress.totalBytes || transfer.fileSize,
-            chunksTransferred: progress.chunksTransferred,
-            isVaulting: progress.isVaulting,
-            lastActivity: Date.now()
-          } as FileTransfer;
-        }
-        return transfer;
-      });
-      return updated;
-    });
-  };
+  }, [updateTransferProgress]);
 
   const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string }> => {
     try {

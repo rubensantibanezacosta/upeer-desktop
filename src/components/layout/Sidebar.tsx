@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
-    Box, List, Typography, Button, ListItem,
-    Avatar, Input, FormControl, FormLabel,
-    Stack, Alert, Checkbox, Chip, IconButton, Divider,
+    Box, List, Typography,
+    Avatar,
 } from '@mui/joy';
 import { SidebarHeader, NewChatHeader } from './SidebarHeader.js';
 import { SidebarSearch } from './SidebarSearch.js';
@@ -15,11 +14,7 @@ import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import SearchIcon from '@mui/icons-material/Search';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import { SidebarView, SidebarFilter, useNavigationStore } from '../../store/useNavigationStore.js';
+import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
 
 // Import subcomponents
 import { EmptyState } from './sidebar/EmptyState.js';
@@ -62,9 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         sidebarView: view,
         sidebarFilter: filter,
         newChatSearch,
-        setSidebarView: setView,
+        setSidebarView: _setView,
         setSidebarFilter: setFilter,
-        setNewChatSearch,
+        setNewChatSearch: _setNewChatSearch,
         openNewChat,
         backToList,
     } = useNavigationStore();
@@ -112,7 +107,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         // list=base(0), new=stack 1(+100), add-contact=stack 2(+200), create-group=stack 2(+200)
         if (view === v) return 'translateX(0)';
         // Si la vista activa es más "a la derecha" que la especificada, ésta sale por la izquierda
-        const order: SidebarView[] = ['list', 'new', 'add-contact'];
         // create-group está en el mismo nivel de profundidad que add-contact
         const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2 };
         return orderMap[view] > orderMap[v] ? 'translateX(-100%)' : 'translateX(100%)';

@@ -1,6 +1,6 @@
-import { getContactByUpeerId } from '../../storage/db.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { warn } from '../../security/secure-logger.js';
-import { fileTransferManager } from '../file-transfer/index.js';
+import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 
 export async function sendFile(upeerId: string, filePath: string, thumbnail?: string): Promise<string | undefined> {
     const contact = await getContactByUpeerId(upeerId);

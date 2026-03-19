@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import ReplyIcon from '@mui/icons-material/Reply';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 
 interface MessageReplyProps {
@@ -31,10 +30,10 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
         gap: 0
     }} onClick={onClick}>
         {originalSenderName && (
-            <Typography 
-                level="body-xs" 
-                sx={{ 
-                    fontWeight: 700, 
+            <Typography
+                level="body-xs"
+                sx={{
+                    fontWeight: 700,
                     fontSize: '11px',
                     color: isMe ? 'rgba(255,255,255,0.85)' : 'primary.600',
                     lineHeight: 1.2,
@@ -44,10 +43,10 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
                 {originalSenderName === 'Tú' ? 'Tú' : originalSenderName}
             </Typography>
         )}
-        <Typography 
-            level="body-sm" 
-            noWrap 
-            sx={{ 
+        <Typography
+            level="body-sm"
+            noWrap
+            sx={{
                 opacity: 0.85,
                 fontSize: '12.5px',
                 color: isMe ? 'rgba(255,255,255,0.9)' : 'text.secondary',
@@ -75,7 +74,10 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
                                 </>
                             );
                         }
-                    } catch (_) { }
+                    } catch {
+                        // Si no es un JSON válido después de todo, devolvemos el texto original
+                        return m;
+                    }
                 }
                 if (m.startsWith('FILE_TRANSFER|')) {
                     const parts = m.split('|');

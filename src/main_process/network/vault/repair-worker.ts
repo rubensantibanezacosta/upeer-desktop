@@ -61,8 +61,8 @@ export class RepairWorker {
 
             info('Renewing expiring vault entries', { count: expiringSoon.length }, 'vault');
 
-            const { sendSecureUDPMessage } = await import('../server/index.js');
-            const { getContacts } = await import('../../storage/db.js');
+            const { sendSecureUDPMessage } = await import('../server/transport.js');
+            const { getContacts } = await import('../../storage/contacts/operations.js');
             const { getMyUPeerId } = await import('../../security/identity.js');
             const allContacts = await getContacts();
             const myId = getMyUPeerId();
@@ -135,8 +135,12 @@ export class RepairWorker {
             const segments = new Map<number, any[]>();
             for (const s of shards) {
                 const idx = (s as any).segmentIndex || 0;
-                if (!segments.has(idx)) segments.set(idx, []);
-                segments.get(idx)!.push(s);
+                let segmentArr = segments.get(idx);
+                if (!segmentArr) {
+                    segmentArr = [];
+                    segments.set(idx, segmentArr);
+                }
+                segmentArr.push(s);
             }
 
             for (const [segIdx, segShards] of segments.entries()) {
@@ -207,8 +211,8 @@ export class RepairWorker {
     private static async collectMissingShards(fileHash: string, segIdx: number, missingIndices: number[]): Promise<void> {
         info('Collecting missing segments shards', { fileHash, segIdx, missingCount: missingIndices.length }, 'vault');
 
-        const { sendSecureUDPMessage } = await import('../server/index.js');
-        const { getContacts } = await import('../../storage/db.js');
+        const { sendSecureUDPMessage } = await import('../server/transport.js');
+        const { getContacts } = await import('../../storage/contacts/operations.js');
         const { getMyUPeerId } = await import('../../security/identity.js');
         const contacts = await getContacts();
         const myId = getMyUPeerId();
@@ -258,8 +262,8 @@ export class RepairWorker {
         const coder = new ErasureCoder(4, 8);
         const shards = coder.encode(segmentData);
 
-        const { sendSecureUDPMessage } = await import('../server/index.js');
-        const { getContacts } = await import('../../storage/db.js');
+        const { sendSecureUDPMessage } = await import('../server/transport.js');
+        const { getContacts } = await import('../../storage/contacts/operations.js');
         const { getMyUPeerId } = await import('../../security/identity.js');
         const contacts = await getContacts();
         const myId = getMyUPeerId();

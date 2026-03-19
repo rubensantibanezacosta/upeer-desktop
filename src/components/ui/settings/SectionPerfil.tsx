@@ -280,22 +280,31 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
                     </Box>
 
                     {vaultStats !== null ? (() => {
-                        const pct = Math.min((vaultStats.sizeBytes / (1024 * 1024 * 1024)) * 100, 100);
+                        const usageGB = vaultStats.sizeBytes / (1024 * 1024 * 1024);
+                        // El 1GB es la cuota "objetivo" o esperada para que la red sea sana, 
+                        // pero el sistema permite hasta 2.5GB por contacto de confianza.
+                        const pct = Math.min(usageGB * 100, 100);
                         return (
                             <>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
                                     <Typography level="body-sm" sx={{ fontWeight: 600 }}>{fmtBytes(vaultStats.sizeBytes)}</Typography>
-                                    <Typography level="body-xs" sx={{ opacity: 0.4 }}>/ 1 GB</Typography>
+                                    <Typography level="body-xs" sx={{ opacity: 0.4 }}>usados</Typography>
                                 </Box>
-                                <LinearProgress determinate value={pct} size="sm" color="neutral" sx={{ mb: 1.5, borderRadius: 'sm' }} />
+                                <LinearProgress
+                                    determinate
+                                    value={pct}
+                                    size="sm"
+                                    color={usageGB > 0.8 ? 'warning' : 'neutral'}
+                                    sx={{ mb: 1.5, borderRadius: 'sm' }}
+                                />
                                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                                     <Box>
-                                        <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mensajes</Typography>
+                                        <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Archivos P2P</Typography>
                                         <Typography level="body-sm" sx={{ fontWeight: 600 }}>{vaultStats.count}</Typography>
                                     </Box>
                                     <Box>
-                                        <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Uso</Typography>
-                                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>{pct.toFixed(1)}%</Typography>
+                                        <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cuota dinámica</Typography>
+                                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>Activa</Typography>
                                     </Box>
                                 </Box>
                             </>

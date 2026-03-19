@@ -8,14 +8,14 @@ interface IdentityTokenBucket {
 }
 
 let _cachedDirectIds: Set<string> = new Set();
-let _cacheTs: number = 0;
+let _cacheTs = 0;
 const _CACHE_TTL = 60_000;
 
 async function _getDirectContactIds(): Promise<Set<string>> {
     const now = Date.now();
     if (now - _cacheTs < _CACHE_TTL) return _cachedDirectIds;
     try {
-        const { getContacts } = await import('../storage/db.js');
+        const { getContacts } = await import('../storage/contacts/operations.js');
         const contacts = (getContacts() as any[]);
         _cachedDirectIds = new Set<string>(
             contacts
@@ -23,7 +23,10 @@ async function _getDirectContactIds(): Promise<Set<string>> {
                 .map((c: any) => c.upeerId as string)
         );
         _cacheTs = now;
-    } catch { }
+    } catch (err) {
+        const { error } = await import('./secure-logger.js');
+        error('Error updating direct contact cache in rate limiter', err, 'security');
+    }
     return _cachedDirectIds;
 }
 
@@ -53,7 +56,8 @@ export class IdentityRateLimiter extends RateLimiter {
         if (!this.identityBuckets.has(upeerId)) {
             this.identityBuckets.set(upeerId, new Map());
         }
-        const identityBuckets = this.identityBuckets.get(upeerId)!;
+        const identityBuckets = this.identityBuckets.get(upeerId);
+        if (!identityBuckets) return true;
 
         if (!identityBuckets.has(messageType)) {
             identityBuckets.set(messageType, {
@@ -62,10 +66,13 @@ export class IdentityRateLimiter extends RateLimiter {
             });
         }
 
-        const bucket = identityBuckets.get(messageType)!;
+        const bucket = identityBuckets.get(messageType);
+        if (!bucket) return true;
+
         const elapsedMs = now - bucket.lastRefill;
         if (elapsedMs > 0) {
-            const refillTokens = elapsedMs * (adjustedRule.refillRate / 1000);
+            const refillRate = adjustedRule.maxTokens / (adjustedRule.windowMs / 1000);
+            const refillTokens = elapsedMs * (refillRate / 1000);
             bucket.tokens = Math.min(adjustedRule.maxTokens, bucket.tokens + refillTokens);
             bucket.lastRefill = now;
         }
@@ -92,12 +99,11 @@ export class IdentityRateLimiter extends RateLimiter {
         const reputationMultiplier = this.calculateReputationMultiplier(vouchScore);
 
         const adjustedMaxTokens = Math.max(1, Math.floor(baseRule.maxTokens * reputationMultiplier));
-        const adjustedRefillRate = baseRule.refillRate * reputationMultiplier;
 
         return {
             windowMs: baseRule.windowMs,
             maxTokens: adjustedMaxTokens,
-            refillRate: adjustedRefillRate
+            refillRate: 0 // No se usa directamente debido al cálculo dinámico en refill
         };
     }
 

@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mocks de dependencias
-vi.mock('../../../src/main_process/storage/db.js', () => ({
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
     getContactByUpeerId: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/shared.js', () => ({
+    getDb: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -30,7 +34,7 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
 }));
 
 import { VaultManager } from '../../../src/main_process/network/vault/manager.js';
-import * as db from '../../../src/main_process/storage/db.js';
+import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as transport from '../../../src/main_process/network/server/transport.js';
 import * as dhtShared from '../../../src/main_process/network/dht/shared.js';
@@ -50,20 +54,20 @@ describe('VaultManager - Replication Logic', () => {
 
         // 1. Muy confiable (Score 95) -> Factor 3
         (reputation.getVouchScore as any).mockResolvedValue(95);
-        (db.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 100 * 24 * 3600000 });
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 100 * 24 * 3600000 });
         const factorHigh = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
         expect(factorHigh).toBe(3);
 
         // 2. Sospechoso (Score 20) -> Factor 12
         (reputation.getVouchScore as any).mockResolvedValue(20);
         // Reset para que no se considere "antiguo" o "estable" si no queremos
-        (db.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() });
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() });
         const factorLow = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
         expect(factorLow).toBe(12);
 
         // 3. Neutral (Score 50) -> Factor 6
         (reputation.getVouchScore as any).mockResolvedValue(50);
-        (db.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 31 * 24 * 3600000 }); // "highTenure" (>30d)
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 31 * 24 * 3600000 }); // "highTenure" (>30d)
         const factorMid = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
         expect(factorMid).toBe(6);
     });
@@ -71,8 +75,8 @@ describe('VaultManager - Replication Logic', () => {
         const contact1 = { upeerId: 'peer1', address: '1.1.1.1', status: 'connected' };
         const contact2 = { upeerId: 'peer2', address: '2.2.2.2', status: 'connected' };
 
-        (db.getContacts as any).mockResolvedValue([contact1, contact2]);
-        (db.getContactByUpeerId as any).mockResolvedValue({});
+        (contactsOps.getContacts as any).mockResolvedValue([contact1, contact2]);
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({});
         (reputation.getVouchScore as any).mockResolvedValue(55); // Factor predecible para simplificar
 
         // Mock de transporte: uno falla, otro tiene éxito
@@ -112,7 +116,7 @@ describe('VaultManager - Replication Logic', () => {
     });
 
     it('should fallback to Kademlia nodes if no friends are connected', async () => {
-        (db.getContacts as any).mockResolvedValue([]);
+        (contactsOps.getContacts as any).mockResolvedValue([]);
 
         const meshNode = { upeerId: 'mesh1', address: '3.3.3.3', status: 'connected' };
         const mockKademlia = {

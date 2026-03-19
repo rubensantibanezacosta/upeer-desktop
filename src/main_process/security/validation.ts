@@ -169,7 +169,7 @@ export function validateRead(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateTyping(data: any): ValidationResult {
+export function validateTyping(_data: any): ValidationResult {
     // No fields required for typing indicator
     return { valid: true };
 }

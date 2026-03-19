@@ -5,17 +5,15 @@ import {
     saveGroup,
     updateGroupInfo,
     updateGroupMembers,
+} from '../../storage/groups/operations.js';
+import {
     saveMessage,
     updateMessageStatus,
-    getContactByUpeerId,
-} from '../../storage/db.js';
+} from '../../storage/messages/operations.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { decrypt } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
-import { security, warn, error, network } from '../../security/secure-logger.js';
-import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
-
-// Rate limiter instance (shared with core)
-const rateLimiter = new IdentityRateLimiter();
+import { security, warn } from '../../security/secure-logger.js';
 
 // Patrón UUID reutilizado en varios handlers para validar msgId/fileId de red.
 const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,7 +25,7 @@ export async function handleGroupMessage(
     win: BrowserWindow | null,
     senderAddress?: string
 ) {
-    const { id, groupId, groupName, content, nonce, ephemeralPublicKey, useRecipientEphemeral, replyTo } = data;
+    const { id, groupId, content, nonce, ephemeralPublicKey, useRecipientEphemeral, replyTo } = data;
     if (!groupId || !content) return;
 
     // BUG CA fix: si el grupo no existe localmente, rechazar el mensaje en lugar
@@ -60,8 +58,7 @@ export async function handleGroupMessage(
                 const decrypted = decrypt(
                     Buffer.from(content, 'hex'),
                     Buffer.from(nonce, 'hex'),
-                    Buffer.from(senderKeyHex, 'hex'),
-                    !!useRecipientEphemeral
+                    Buffer.from(senderKeyHex, 'hex')
                 );
                 if (decrypted) displayContent = decrypted.toString('utf-8');
                 else displayContent = '🔒 [Error de descifrado]';
@@ -78,7 +75,7 @@ export async function handleGroupMessage(
     // Notify sender that we received the message
     const ackAddress = senderAddress || contact?.address;
     if (ackAddress) {
-        const { sendSecureUDPMessage } = await import('../server/index.js');
+        const { sendSecureUDPMessage } = await import('../server/transport.js');
         sendSecureUDPMessage(ackAddress, { type: 'GROUP_ACK', id: msgId, groupId });
     }
 
@@ -128,8 +125,7 @@ export async function handleGroupInvite(
         const decrypted = decrypt(
             Buffer.from(data.payload, 'hex'),
             Buffer.from(data.nonce, 'hex'),
-            Buffer.from(senderKey, 'hex'),
-            !!data.useRecipientEphemeral
+            Buffer.from(senderKey, 'hex')
         );
         if (!decrypted) {
             security('GROUP_INVITE: decryption failed', { upeerId, groupId }, 'security');
@@ -222,8 +218,7 @@ export async function handleGroupUpdate(
         const decrypted = decrypt(
             Buffer.from(data.payload, 'hex'),
             Buffer.from(data.nonce, 'hex'),
-            Buffer.from(senderKey, 'hex'),
-            !!data.useRecipientEphemeral
+            Buffer.from(senderKey, 'hex')
         );
         if (!decrypted) {
             security('GROUP_UPDATE: decryption failed', { senderUpeerId, groupId }, 'security');

@@ -1,8 +1,8 @@
 import { ErasureCoder } from './redundancy/erasure.js';
-import { trackDistributedAsset } from '../../storage/vault/index.js';
+import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
-import { getContacts } from '../../storage/db.js';
+import { getContacts } from '../../storage/contacts/operations.js';
 import { info, error, debug, warn } from '../../security/secure-logger.js';
 import { SHARD_TTL_MS } from './manager.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
@@ -44,7 +44,7 @@ export class ChunkVault {
      * Replicates a file across the social network using Erasure Coding.
      * Supports both direct buffers (small files) and file paths (large files with streaming).
      */
-    static async replicateFile(fileHash: string, dataOrPath: Buffer | string, aesKey: Buffer, recipientSid: string = '*', fileId?: string) {
+    static async replicateFile(fileHash: string, dataOrPath: Buffer | string, aesKey: Buffer, recipientSid = '*', fileId?: string) {
         const threshold = 1024 * 1024; // 1MB for switching from mirroring to RS
 
         // If it's a buffer and small, use mirroring
@@ -83,7 +83,7 @@ export class ChunkVault {
         const { VaultManager } = await import('./manager.js');
         const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
         if (fileId && nodes > 0) {
-            const { fileTransferManager } = await import('../file-transfer/index.js');
+            const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
             fileTransferManager.notifyVaultProgress(fileId, 1, 1);
         }
         return nodes;
@@ -114,7 +114,7 @@ export class ChunkVault {
 
         const fd = await fs.open(filePath, 'r');
         try {
-            const { fileTransferManager } = await import('../file-transfer/index.js');
+            const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
 
             for (let segIdx = 0; segIdx < totalSegments; segIdx++) {
                 // BUG EV fix: comprobar si el usuario canceló la transferencia durante el proceso de segmentación/vaulting.
@@ -190,14 +190,14 @@ export class ChunkVault {
                 await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
 
                 if (fileId) {
-                    const { fileTransferManager } = await import('../file-transfer/index.js');
+                    const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
                     const progress = Math.floor(((segIdx * shards.length + i + 1) / (totalSegments * shards.length)) * 100);
                     fileTransferManager.notifyVaultProgress(fileId, progress, 100);
                 }
 
                 const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
                 if (kademlia) {
-                    const { createVaultPointerKey } = await import('../dht/kademlia/index.js');
+                    const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
                     const ptrKey = createVaultPointerKey(fileHash);
                     kademlia.storeValue(ptrKey, { fileHash, custodians: [custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
                 }

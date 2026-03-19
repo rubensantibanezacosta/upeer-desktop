@@ -23,7 +23,6 @@ interface MediaFileMessageProps {
     caption?: string;
     timestamp?: string;
     isMe: boolean;
-    isImage: boolean;
     isVideo: boolean;
     status: string;
     isTransferComplete: boolean;
@@ -51,7 +50,6 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     caption,
     timestamp,
     isMe,
-    isImage,
     isVideo,
     status,
     isTransferComplete,

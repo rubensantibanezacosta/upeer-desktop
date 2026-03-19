@@ -7,6 +7,7 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   // Identity / Wallet Auth
   identityStatus: () => electron.ipcRenderer.invoke("identity-status"),
   generateMnemonic: () => electron.ipcRenderer.invoke("generate-mnemonic"),
+  getMnemonic: (pin) => electron.ipcRenderer.invoke("get-mnemonic", { pin }),
   createMnemonicIdentity: (mnemonic, alias, avatar) => electron.ipcRenderer.invoke("create-mnemonic-identity", { mnemonic, alias, avatar }),
   unlockSession: (mnemonic) => electron.ipcRenderer.invoke("unlock-session", { mnemonic }),
   lockSession: () => electron.ipcRenderer.invoke("lock-session"),
@@ -166,5 +167,12 @@ electron.contextBridge.exposeInMainWorld("upeer", {
     electron.ipcRenderer.on("yggstack-status", (_event, status, address) => callback(status, address));
   },
   // BUG FIX: Generador de miniaturas nativo
-  generateVideoThumbnail: (filePath) => electron.ipcRenderer.invoke("generate-video-thumbnail", { filePath })
+  generateVideoThumbnail: (filePath) => electron.ipcRenderer.invoke("generate-video-thumbnail", { filePath }),
+  getMyDevices: () => electron.ipcRenderer.invoke("get-my-devices"),
+  // PIN / Local security
+  isPinEnabled: () => electron.ipcRenderer.invoke("is-pin-enabled"),
+  setPin: (args) => electron.ipcRenderer.invoke("set-pin", args),
+  disablePin: (args) => electron.ipcRenderer.invoke("disable-pin", args),
+  verifyPin: (args) => electron.ipcRenderer.invoke("verify-pin", args),
+  getMnemonic: (pin) => electron.ipcRenderer.invoke("get-mnemonic", { pin })
 });

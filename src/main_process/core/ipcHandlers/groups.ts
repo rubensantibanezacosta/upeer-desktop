@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron';
-import { getGroups, updateGroupAvatar } from '../../storage/db.js';
+import { getGroups, updateGroupAvatar } from '../../storage/groups/operations.js';
 import {
   createGroup,
   sendGroupMessage,
   inviteToGroup,
   updateGroup,
   leaveGroup
-} from '../../network/server/index.js';
+} from '../../network/messaging/groups.js';
 
 /**
  * Registra los manejadores IPC relacionados con grupos

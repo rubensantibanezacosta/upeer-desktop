@@ -88,9 +88,10 @@ const latencyChipColor = (ms: number): 'success' | 'warning' | 'danger' =>
 
 const PeerRow: React.FC<{ peer: PeerStat; maxLatency: number }> = ({ peer, maxLatency }) => {
     const { host, country, latencyMs } = peer;
-    const hasLatency = latencyMs !== null;
-    const pct = hasLatency ? Math.min((latencyMs! / Math.max(maxLatency, LATENCY_MAX)) * 100, 100) : 0;
-    const color = hasLatency ? latencyHex(latencyMs!) : '#6b7280';
+    const hasLatency = latencyMs !== null && latencyMs !== undefined;
+    const currentMs = latencyMs ?? 0;
+    const pct = hasLatency ? Math.min((currentMs / Math.max(maxLatency, LATENCY_MAX)) * 100, 100) : 0;
+    const color = hasLatency ? latencyHex(currentMs) : '#6b7280';
 
     // Host abreviado: mostrar solo los 2 últimos octetos / segmentos
     const shortHost = host.length > 22 ? host.slice(0, 10) + '…' + host.slice(-8) : host;

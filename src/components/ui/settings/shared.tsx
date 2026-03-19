@@ -119,7 +119,8 @@ export const resizeImageToDataUrl = (file: File): Promise<string> =>
                 const canvas = document.createElement('canvas');
                 canvas.width = 128;
                 canvas.height = 128;
-                const ctx = canvas.getContext('2d')!;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Canvas context not available'));
                 const size = Math.min(img.width, img.height);
                 const sx = (img.width - size) / 2;
                 const sy = (img.height - size) / 2;

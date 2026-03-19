@@ -15,7 +15,7 @@ interface NavigationRailProps {
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
-    myIp,
+    myIp: _myIp,
     myAvatar,
     myInitial,
     onOpenSettings,

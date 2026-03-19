@@ -8,5 +8,12 @@ __pycache__
 *.pyc
 logs/
 *.log
+app.log
 coverage/
+coverage_report/
+test-results.json
+test-encrypted.db
+.agents/
+.deepseek/
+out/
 **/.vite

@@ -1,13 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleVaultDelivery } from '../../../src/main_process/network/handlers/vault.js';
-import * as db from '../../../src/main_process/storage/db.js';
+import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
+import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
+import { fileTransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as validation from '../../../src/main_process/security/validation.js';
 
 // Mocks
-vi.mock('../../../src/main_process/storage/db.js', () => ({
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveFileMessage: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', () => ({
+    fileTransferManager: {
+        handleMessage: vi.fn()
+    }
+}));
+
+vi.mock('../../../src/main_process/storage/shared.js', () => ({
+    getDb: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -23,7 +38,8 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
     issueVouch: vi.fn().mockResolvedValue(true),
     VouchType: {
         VAULT_RETRIEVED: 'VAULT_RETRIEVED',
-        INTEGRITY_FAIL: 'INTEGRITY_FAIL'
+        INTEGRITY_FAIL: 'INTEGRITY_FAIL',
+        VAULT_CHUNK: 'VAULT_CHUNK'
     }
 }));
 
@@ -31,6 +47,14 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
 vi.mock('../../../src/main_process/network/handlers/chat.js', () => ({
     handleChatMessage: vi.fn(),
     handleIncomingClear: vi.fn(),
+    handleChatDelete: vi.fn(),
+    handleChatAck: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/handlers/groups.js', () => ({
+    handleGroupMessage: vi.fn(),
+    handleGroupInvite: vi.fn(),
+    handleGroupUpdate: vi.fn(),
 }));
 
 describe('Vault Delivery Handler', () => {
@@ -44,7 +68,7 @@ describe('Vault Delivery Handler', () => {
 
     it('should discard non-array entries (DoS protection)', async () => {
         await handleVaultDelivery(custodianSid, { entries: null }, mockWin, mockSendResponse, '1.2.3.4');
-        expect(db.getContactByUpeerId).not.toHaveBeenCalled();
+        expect(contactsOps.getContactByUpeerId).not.toHaveBeenCalled();
     });
 
     it('should limit entries to MAX_DELIVERY_ENTRIES (50)', async () => {
@@ -53,12 +77,12 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex')
         });
 
-        (db.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pubkey' });
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pubkey' });
 
         await handleVaultDelivery(custodianSid, { entries: manyEntries }, mockWin, mockSendResponse, '1.2.3.4');
 
         // Solo debería procesar los primeros 50
-        expect(db.getContactByUpeerId).toHaveBeenCalledTimes(50);
+        expect(contactsOps.getContactByUpeerId).toHaveBeenCalledTimes(50);
     });
 
     it('should verify integrity of inner packets', async () => {
@@ -68,7 +92,7 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        (db.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
         (identity.verify as any).mockReturnValue(false); // Simular fallo de firma
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
@@ -86,7 +110,7 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        (db.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
         (identity.verify as any).mockReturnValue(true);
         (validation.validateMessage as any).mockReturnValue({ valid: false, error: 'invalid-structure' });
 
@@ -105,7 +129,7 @@ describe('Vault Delivery Handler', () => {
         };
 
         const mockContact = { upeerId: 'origin-id', publicKey: 'origin-pubkey' };
-        (db.getContactByUpeerId as any).mockResolvedValue(mockContact);
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue(mockContact);
         (identity.verify as any).mockReturnValue(true);
         (validation.validateMessage as any).mockReturnValue({ valid: true });
 
@@ -121,5 +145,172 @@ describe('Vault Delivery Handler', () => {
             '1.2.3.4',
             mockSendResponse
         );
+    });
+
+    it('should process CHAT_DELETE entries', async () => {
+        const innerPacket = { type: 'CHAT_DELETE', msgId: 'uuid', signature: 'sig' };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatDelete).toHaveBeenCalledWith('origin-id', expect.anything(), mockWin);
+    });
+
+    it('should process ACK and READ entries', async () => {
+        const ackPacket = { type: 'ACK', msgId: 'ack-1', signature: 'sig' };
+        const readPacket = { type: 'READ', msgId: 'read-1', signature: 'sig' };
+
+        const entries = [
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(ackPacket)).toString('hex') },
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(readPacket)).toString('hex') }
+        ];
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: entries }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatAck).toHaveBeenCalledTimes(2);
+        // READ se convierte en ACK con status: 'read'
+        expect(chatModule.handleChatAck).toHaveBeenLastCalledWith('origin-id', expect.objectContaining({ status: 'read' }), mockWin);
+    });
+
+    it('should process FILE_DATA_SMALL entries', async () => {
+        const innerPacket = {
+            type: 'FILE_DATA_SMALL',
+            fileHash: 'a'.repeat(64),
+            fileName: 'test.txt',
+            fileSize: 123,
+            mimeType: 'text/plain',
+            signature: 'sig'
+        };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(messagesOps.saveFileMessage).toHaveBeenCalledWith(
+            innerPacket.fileHash,
+            'origin-id',
+            false,
+            'test.txt',
+            innerPacket.fileHash,
+            123,
+            'text/plain',
+            undefined,
+            'delivered'
+        );
+    });
+
+    it('should delegate FILE_ prefixed types to fileTransferManager', async () => {
+        const innerPacket = { type: 'FILE_OFFER', fileHash: 'hash', signature: 'sig' };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_OFFER' }));
+    });
+
+    it('should process GROUP_MSG, GROUP_INVITE, and GROUP_UPDATE entries', async () => {
+        const msgPacket = { type: 'GROUP_MSG', groupId: 'g1', text: 'hi', signature: 'sig' };
+        const invitePacket = { type: 'GROUP_INVITE', groupId: 'g1', signature: 'sig' };
+        const updatePacket = { type: 'GROUP_UPDATE', groupId: 'g1', signature: 'sig' };
+
+        const entries = [
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(msgPacket)).toString('hex') },
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(invitePacket)).toString('hex') },
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(updatePacket)).toString('hex') }
+        ];
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: entries }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const groupsModule = await import('../../../src/main_process/network/handlers/groups.js');
+        expect(groupsModule.handleGroupMessage).toHaveBeenCalled();
+        expect(groupsModule.handleGroupInvite).toHaveBeenCalled();
+        expect(groupsModule.handleGroupUpdate).toHaveBeenCalled();
+    });
+
+    it('should handle raw file shards', async () => {
+        const entry = {
+            senderSid: 'origin-id',
+            payloadHash: 'shard:abc:0',
+            data: 'some-hex-data', // No es JSON
+            signature: null // No suele tener firma el outer entry si es raw shard (o se ignora)
+        };
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(messagesOps.saveFileMessage).toHaveBeenCalledWith(
+            'abc',
+            'origin-id',
+            false,
+            'abc',
+            'abc',
+            0,
+            'application/octet-stream',
+            undefined,
+            'delivered'
+        );
+    });
+
+    it('should request next page if data.hasMore is true', async () => {
+        const entry = {
+            senderSid: 'origin-id',
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'),
+            payloadHash: 'h1'
+        };
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry], hasMore: true, nextOffset: 50 }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+            type: 'VAULT_QUERY',
+            offset: 50
+        }));
+    });
+
+    it('should continue and log error if an entry fails to process', async () => {
+        const entries = [
+            { senderSid: 'origin-id', data: 'not-hex' }, // Provocará error al parsear o buffer
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'), payloadHash: 'h2' }
+        ];
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries }, mockWin, mockSendResponse, '1.2.3.4');
+
+        // El segundo debería procesarse aunque el primero falle
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatMessage).toHaveBeenCalled();
+    });
+
+    it('should ignore unknown original sender', async () => {
+        const entry = { senderSid: 'unknown-id', data: 'data' };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(identity.verify).not.toHaveBeenCalled();
+    });
+
+    it('should handle non-JSON data gracefully', async () => {
+        const entry = { senderSid: 'origin-id', data: Buffer.from('not-json').toString('hex'), payloadHash: 'h1' };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        // No debería haber crash, simplemente se considera procesado (aunque sin innerPacket)
+        expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+            type: 'VAULT_ACK',
+            payloadHashes: ['h1']
+        }));
     });
 });

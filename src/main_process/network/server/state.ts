@@ -1,6 +1,6 @@
 import net from 'node:net';
 import { BrowserWindow } from 'electron';
-import { KademliaDHT } from '../dht/kademlia/index.js';
+import { KademliaDHT } from '../dht/kademlia/main.js';
 
 export interface IPFailState {
     failures: number;

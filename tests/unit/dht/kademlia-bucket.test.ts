@@ -10,17 +10,35 @@ describe('Kademlia KBucket Tests', () => {
     });
 
     it('should add contacts correctly', () => {
-        const contact = { upeerId: 'id1', nodeId: Buffer.alloc(32, 1), address: '127.0.0.1:1' };
+        const contact = {
+            upeerId: 'id1',
+            nodeId: Buffer.alloc(32, 1),
+            address: '127.0.0.1:1',
+            publicKey: 'pk1',
+            lastSeen: Date.now()
+        };
         bucket.add(contact);
         expect(bucket.size).toBe(1);
     });
 
     it('should move existing contacts to the end (LRU)', () => {
-        const c1 = { upeerId: 'id1', nodeId: Buffer.alloc(32, 1), address: '' };
-        const c2 = { upeerId: 'id2', nodeId: Buffer.alloc(32, 2), address: '' };
+        const c1 = {
+            upeerId: 'id1',
+            nodeId: Buffer.alloc(32, 1),
+            address: '',
+            publicKey: 'pk1',
+            lastSeen: Date.now()
+        };
+        const c2 = {
+            upeerId: 'id2',
+            nodeId: Buffer.alloc(32, 2),
+            address: '',
+            publicKey: 'pk2',
+            lastSeen: Date.now()
+        };
         bucket.add(c1);
         bucket.add(c2);
-        
+
         // Re-añadir c1 debería moverlo al final
         bucket.add(c1);
         const all = bucket.all;
@@ -30,12 +48,24 @@ describe('Kademlia KBucket Tests', () => {
 
     it('should evict the oldest contact when full', () => {
         for (let i = 1; i <= K_SIZE; i++) {
-            bucket.add({ upeerId: `id${i}`, nodeId: Buffer.alloc(32, i), address: '' });
+            bucket.add({
+                upeerId: `id${i}`,
+                nodeId: Buffer.alloc(32, i),
+                address: '',
+                publicKey: `pk${i}`,
+                lastSeen: Date.now()
+            });
         }
         expect(bucket.size).toBe(K_SIZE);
 
         // Añadir uno nuevo debería eliminar id1 (el más antiguo)
-        bucket.add({ upeerId: 'new-id', nodeId: Buffer.alloc(32, 99), address: '' });
+        bucket.add({
+            upeerId: 'new-id',
+            nodeId: Buffer.alloc(32, 99),
+            address: '',
+            publicKey: 'pk-new',
+            lastSeen: Date.now()
+        });
         expect(bucket.size).toBe(K_SIZE);
         expect(bucket.all.find(c => c.upeerId === 'id1')).toBeUndefined();
         expect(bucket.all[K_SIZE - 1].upeerId).toBe('new-id');
@@ -44,9 +74,21 @@ describe('Kademlia KBucket Tests', () => {
     it('should find closest contacts to a target', () => {
         const target = Buffer.alloc(32, 10);
         // c1 es el más cercano al target 10
-        const c1 = { upeerId: 'near', nodeId: Buffer.alloc(32, 11), address: '' };
-        const c2 = { upeerId: 'far',  nodeId: Buffer.alloc(32, 20), address: '' };
-        
+        const c1 = {
+            upeerId: 'near',
+            nodeId: Buffer.alloc(32, 11),
+            address: '',
+            publicKey: 'pk-near',
+            lastSeen: Date.now()
+        };
+        const c2 = {
+            upeerId: 'far',
+            nodeId: Buffer.alloc(32, 20),
+            address: '',
+            publicKey: 'pk-far',
+            lastSeen: Date.now()
+        };
+
         bucket.add(c2);
         bucket.add(c1);
 
@@ -55,7 +97,13 @@ describe('Kademlia KBucket Tests', () => {
     });
 
     it('should remove contacts by upeerId', () => {
-        bucket.add({ upeerId: 'rm-me', nodeId: Buffer.alloc(32, 1), address: '' });
+        bucket.add({
+            upeerId: 'rm-me',
+            nodeId: Buffer.alloc(32, 1),
+            address: '',
+            publicKey: 'pk-rm',
+            lastSeen: Date.now()
+        });
         expect(bucket.size).toBe(1);
         bucket.remove('rm-me');
         expect(bucket.size).toBe(0);

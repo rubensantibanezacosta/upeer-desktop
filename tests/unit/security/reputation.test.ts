@@ -108,10 +108,46 @@ describe('Reputation - Vouches Pure Logic', () => {
         expect(VOUCH_POSITIVE[VouchType.INTEGRITY_FAIL]).toBe(false);
     });
 
-    it('should have higher negative weights for integrity fails than spam', () => {
+    it('should handle higher negative weights for integrity fails than spam', () => {
         const spamWeight = VOUCH_WEIGHTS[VouchType.SPAM];
         const integrityWeight = VOUCH_WEIGHTS[VouchType.INTEGRITY_FAIL];
 
         expect(integrityWeight).toBeGreaterThan(spamWeight);
+    });
+
+    it('should return 50 if no vouches are provided', () => {
+        const score = computeScorePure([], new Set());
+        expect(score).toBe(50);
+    });
+
+    it('should ignore vouches with unknown types and default to 1.0', () => {
+        const directContacts = new Set(['friend-1']);
+        const vouches: any[] = [
+            { fromId: 'friend-1', type: 'ALIEN_ATTACK', positive: true, timestamp: 100 }
+        ];
+        const score = computeScorePure(vouches, directContacts);
+        expect(score).toBe(51); // 50 + 1.0 (default)
+    });
+
+    it('should handle multiple senders within limits', () => {
+        const directContacts = new Set(['peer-A', 'peer-B']);
+        const vouches: any[] = [
+            { fromId: 'peer-A', type: VouchType.VAULT_CHUNK, positive: true, timestamp: 1 }, // +3
+            { fromId: 'peer-B', type: VouchType.SPAM, positive: false, timestamp: 2 },        // -5
+        ];
+        const score = computeScorePure(vouches, directContacts);
+        expect(score).toBe(48); // 50 + 3 - 5
+    });
+
+    it('should not allow score to drop below 0 even with extreme malicious activity', () => {
+        const directContacts = new Set(['peer-A']);
+        const vouches: any[] = Array.from({ length: 20 }, (_, i) => ({
+            fromId: 'peer-A',
+            type: VouchType.INTEGRITY_FAIL,
+            positive: false,
+            timestamp: i
+        }));
+        const score = computeScorePure(vouches, directContacts);
+        expect(score).toBe(0);
     });
 });

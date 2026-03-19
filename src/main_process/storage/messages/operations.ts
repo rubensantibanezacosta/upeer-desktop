@@ -1,5 +1,7 @@
-import { getDb, getSchema, eq, desc, or, and, lt, sql, runTransaction } from '../shared.js';
-import { updateMessageStatus } from './status.js';
+import { getDb, getSchema, eq, desc, and, lt, runTransaction } from '../shared.js';
+import { updateMessageStatus, getMessageStatus } from './status.js';
+
+export { updateMessageStatus, getMessageStatus };
 
 export async function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
     const db = getDb();
@@ -80,7 +82,7 @@ export function updateMessageContent(id: string, newMessage: string, signature?:
         .run();
 }
 
-export function deleteMessageLocally(id: string, timestamp?: number) {
+export function deleteMessageLocally(id: string, _timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
 
@@ -135,8 +137,8 @@ export function getMessageById(id: string) {
 }
 
 export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
-    const db = getDb();
-    const schema = getSchema();
+    const _db = getDb();
+    const _schema = getSchema();
 
     const messageJson = JSON.stringify({
         type: 'file',

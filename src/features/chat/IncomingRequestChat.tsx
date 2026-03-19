@@ -4,7 +4,6 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import ShieldIcon from '@mui/icons-material/Shield';
 import WarningIcon from '@mui/icons-material/Warning';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CloseIcon from '@mui/icons-material/Close';
 import BlockIcon from '@mui/icons-material/Block';
 
 interface IncomingRequestChatProps {

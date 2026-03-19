@@ -42,8 +42,12 @@ describe('useFileTransfer hook', () => {
         expect(result.current.transfers[0].fileId).toBe('1');
     });
 
-    it('should register event listeners on mount', () => {
+    it('should register event listeners on mount', async () => {
         renderHook(() => useFileTransfer());
+
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
 
         expect(mockUpeer.onFileTransferStarted).toHaveBeenCalled();
         expect(mockUpeer.onFileTransferProgress).toHaveBeenCalled();
@@ -71,7 +75,7 @@ describe('useFileTransfer hook', () => {
         // Simular evento de progreso
         const progressHandler = mockUpeer.onFileTransferProgress.mock.calls[0][0];
 
-        act(() => {
+        await act(async () => {
             progressHandler({
                 fileId: 'f1',
                 direction: 'receiving',
@@ -139,8 +143,12 @@ describe('useFileTransfer hook', () => {
         expect(mockUpeer.cancelFileTransfer).toHaveBeenCalledWith('f-cancel', 'User clicked cancel');
     });
 
-    it('should format progress correctly', () => {
+    it('should format progress correctly', async () => {
         const { result } = renderHook(() => useFileTransfer());
+
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
 
         const t1 = { state: 'completed', progress: 100 } as any;
         const t2 = { state: 'active', progress: 45.67 } as any;

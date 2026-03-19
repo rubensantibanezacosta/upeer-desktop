@@ -1,12 +1,13 @@
-import { protocol, net, session, app, BrowserWindow } from 'electron';
+import { protocol, session, app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
-import { pathToFileURL } from 'node:url';
 import { spawnYggstack, onYggstackAddress, onYggstackStatus } from '../sidecars/yggstack.js';
 import { initIdentity, isSessionLocked } from '../security/identity.js';
-import { initDB, getContacts } from '../storage/db.js';
-import { startUDPServer, broadcastDhtUpdate, checkHeartbeat } from '../network/server/index.js';
+import { initDB } from '../storage/init.js';
+import { getContacts } from '../storage/contacts/operations.js';
+import { startUDPServer } from '../network/server/tcpServer.js';
+import { broadcastDhtUpdate, checkHeartbeat } from '../network/messaging/heartbeat.js';
 import { startLanDiscovery } from '../network/lan/discovery.js';
 import { info, error as logError } from '../security/secure-logger.js';
 import { setMainWindow, getAllWindows } from './windowManager.js';
@@ -89,7 +90,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
       // BUG SEC-SD (Sensitive Data): Bloquear acceso a archivos sensibles multiplataforma
       const sensitivePatterns = [
-        /[\\\/]\.ssh[\\\/]/, /[\\\/]\.gnupg[\\\/]/, /[\\\/]\.aws[\\\/]/,
+        /[\\/]\.ssh[\\/]/, /[\\/]\.gnupg[\\/]/, /[\\/]\.aws[\\/]/,
         /\.env$/, /config\.json$/, /identity\.json$/,
         /dht-cache\.json$/, /ratchet-state\.json$/, /\.sqlite-wal$/, /\.sqlite-shm$/
       ];
@@ -98,7 +99,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
         return new Response('Access Denied', { status: 403 });
       }
 
-      console.log(`[Protocol] Requesting: ${filePath}, Range: ${request.headers.get('range') || 'none'}`);
+      info(`[Protocol] Requesting: ${filePath}, Range: ${request.headers.get('range') || 'none'}`, {}, 'network');
 
       try {
         const stats = await fs.promises.stat(filePath);
@@ -121,19 +122,17 @@ export async function initializeApp(baseDir: string): Promise<void> {
           start = parseInt(parts[0], 10);
           end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
           responseStatus = 206;
-          console.log(`[Protocol] Serving 206 Partial Content: ${start}-${end}/${stats.size}`);
+          info(`[Protocol] Serving 206 Partial Content: ${start}-${end}/${stats.size}`, {}, 'network');
         } else {
-          console.log(`[Protocol] Serving 200 OK (Full File): ${stats.size} bytes`);
+          info(`[Protocol] Serving 200 OK (Full File): ${stats.size} bytes`, {}, 'network');
         }
 
         const chunksize = (end - start) + 1;
         const stream = fs.createReadStream(filePath, { start, end });
 
-        // Convertir el stream de Node a un ReadableStream de la Web para la Response
-        // @ts-ignore
         const webStream = Readable.toWeb(stream);
 
-        return new Response(webStream as any, {
+        return new Response(webStream as unknown as ReadableStream, {
           status: responseStatus,
           statusText: responseStatus === 206 ? 'Partial Content' : 'OK',
           headers: {
@@ -143,8 +142,8 @@ export async function initializeApp(baseDir: string): Promise<void> {
             'Content-Range': responseStatus === 206 ? `bytes ${start}-${end}/${stats.size}` : undefined as any,
           }
         });
-      } catch (e) {
-        console.error(`[Protocol] Error sirviendo ${filePath}:`, e);
+      } catch (e: any) {
+        info(`[Protocol] Error sirviendo ${filePath}: ${e.message}`, {}, 'network');
         return new Response('File error', { status: 404 });
       }
     } catch (err) {

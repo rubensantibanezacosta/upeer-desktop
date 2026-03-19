@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Typography } from '@mui/joy';
+import { Box, IconButton } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import ImageIcon from '@mui/icons-material/Image';
@@ -27,7 +27,7 @@ interface FilePreviewCarouselProps {
     onAddMore: () => void;
 }
 
-const getFileIcon = (fileType: string, fileName: string, size: number = 24) => {
+const getFileIcon = (fileType: string, fileName: string, size = 24) => {
     let effectiveType = fileType;
     if (!effectiveType || effectiveType === 'application/octet-stream') {
         effectiveType = getMimeType(fileName);

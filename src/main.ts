@@ -35,6 +35,8 @@ import { registerIdentityHandlers } from './main_process/core/ipcHandlers/identi
 import { registerFileHandlers } from './main_process/core/ipcHandlers/files.js';
 import { registerFileTransferHandlers } from './main_process/core/ipcHandlers/fileTransfer.js';
 import { registerVaultHandlers } from './main_process/core/ipcHandlers/vault.js';
+import { registerSecurityHandlers } from './main_process/core/ipcHandlers/security.js';
+import { registerDeviceHandlers } from './main_process/core/ipcHandlers/devices.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +58,8 @@ registerIdentityHandlers();
 registerFileHandlers();
 registerFileTransferHandlers();
 registerVaultHandlers();
+registerSecurityHandlers();
+registerDeviceHandlers();
 
 // Configurar manejadores de ciclo de vida de la aplicación
 setupAppLifecycleHandlers();

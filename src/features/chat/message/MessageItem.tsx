@@ -118,7 +118,7 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
 const QUICK_EMOJIS_CONST = ['👍', '❤️', '😂', '😮', '😢', '👎'];
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({
-    msg, onReply, onReact, onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange
+    msg, onReply, onReact, onEdit: _onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange
 }) => {
     const isMe = msg.isMine;
     const [isHovered, setIsHovered] = useState(false);
@@ -130,7 +130,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         [msg.message, isMe, activeTransfers]);
     const isContactCard = !!cardData;
     const isFile = isJSONFile || (msg.message.startsWith('FILE_TRANSFER|') && !!fileData);
-    const isMediaFile = isFile && fileData && (fileData.mimeType?.startsWith('image/') || fileData.mimeType?.startsWith('video/'));
+    const _isMediaFile = isFile && fileData && (fileData.mimeType?.startsWith('image/') || fileData.mimeType?.startsWith('video/'));
 
     const scrollToOriginal = () => {
         if (msg.replyTo && onScrollToMessage) {
@@ -265,7 +265,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             <MessageReactions
                                 reactions={msg.reactions || []}
                                 isMe={isMe}
-                                onRemoveReact={(emoji) => onReact(msg.id!, emoji, true)}
+                                onRemoveReact={(emoji) => msg.id && onReact(msg.id, emoji, true)}
                             />
                         </Box>
 
@@ -321,7 +321,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                             {QUICK_EMOJIS.map(emoji => (
                                                 <Box
                                                     key={emoji}
-                                                    onClick={() => { onReact(msg.id!, emoji, false); setEmojiOpen(false); }}
+                                                    onClick={() => { if (msg.id) { onReact(msg.id, emoji, false); setEmojiOpen(false); } }}
                                                     sx={{
                                                         width: 32, height: 32,
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -340,12 +340,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                 </Box>
 
                                 <MessageContextMenu
-                                    msgId={msg.id!}
+                                    msgId={msg.id ?? ''}
                                     isMe={isMe}
                                     isFile={isFile}
                                     fileCompleted={fileData?.transferState === 'completed'}
                                     onReply={() => onReply(msg)}
-                                    onDelete={() => onDelete(msg.id!)}
+                                    onDelete={() => msg.id && onDelete(msg.id)}
                                     sx={{ position: 'static' }}
                                 />
                             </Box>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AttachmentType } from '../features/chat/input/index.js';
+import { AttachmentType } from '../features/chat/input/AttachmentButton.js';
 type FileTransferType = {
     startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
     cancelTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;

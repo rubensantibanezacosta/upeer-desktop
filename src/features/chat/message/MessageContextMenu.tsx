@@ -19,7 +19,6 @@ import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 interface MessageContextMenuProps {
-    msgId: string;
     isMe: boolean;
     isFile: boolean;
     fileCompleted: boolean;
@@ -29,7 +28,6 @@ interface MessageContextMenuProps {
 }
 
 export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
-    msgId,
     isMe,
     isFile,
     fileCompleted,

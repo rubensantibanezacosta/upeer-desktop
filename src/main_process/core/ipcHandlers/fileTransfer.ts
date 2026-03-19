@@ -1,8 +1,8 @@
 import { ipcMain, app } from 'electron';
 import path from 'node:path';
 import { error as logError } from '../../security/secure-logger.js';
-import { fileTransferManager } from '../../network/file-transfer/index.js';
-import { getContactByUpeerId } from '../../storage/db.js';
+import { fileTransferManager } from '../../network/file-transfer/transfer-manager.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 
 /**
  * Registra los manejadores IPC relacionados con transferencia de archivos
@@ -25,7 +25,7 @@ export function registerFileTransferHandlers(): void {
         return { success: false, error: 'Source file must be within home directory' };
       }
 
-      const { getGroupById } = await import('../../storage/db.js');
+      const { getGroupById } = await import('../../storage/groups/operations.js');
       const group = getGroupById(upeerId);
 
       if (group) {

@@ -1,9 +1,9 @@
 import { getDb, getSchema, eq } from '../shared.js';
 import { lt } from 'drizzle-orm';
-import { SurvivalKitData } from './types.js';
+import { SurvivalKitData as PulseSyncData } from './types.js';
 import { error } from '../../security/secure-logger.js';
 
-export function getAllSurvivalKits(): Array<{
+export function getAllPulseSyncs(): Array<{
     kitId: string;
     name: string;
     description?: string;
@@ -35,7 +35,7 @@ export function getAllSurvivalKits(): Array<{
     }));
 }
 
-export function updateSurvivalKit(kitId: string, data: SurvivalKitData): boolean {
+export function updatePulseSync(kitId: string, data: PulseSyncData): boolean {
     const db = getDb();
     const schema = getSchema();
 
@@ -49,12 +49,12 @@ export function updateSurvivalKit(kitId: string, data: SurvivalKitData): boolean
             .run();
         return true;
     } catch (err) {
-        error('Failed to update survival kit', err, 'backup');
+        error('Failed to update pulse sync', err, 'backup');
         return false;
     }
 }
 
-export function deleteSurvivalKit(kitId: string): boolean {
+export function deletePulseSync(kitId: string): boolean {
     const db = getDb();
     const schema = getSchema();
 
@@ -64,12 +64,12 @@ export function deleteSurvivalKit(kitId: string): boolean {
             .run();
         return true;
     } catch (err) {
-        error('Failed to delete survival kit', err, 'backup');
+        error('Failed to delete pulse sync', err, 'backup');
         return false;
     }
 }
 
-export function cleanupExpiredSurvivalKits(): number {
+export function cleanupExpiredPulseSyncs(): number {
     const db = getDb();
     const schema = getSchema();
 
@@ -79,8 +79,7 @@ export function cleanupExpiredSurvivalKits(): number {
         .where(eq(schema.backupSurvivalKit.isActive, false))
         .run();
 
-    // BUG BQ fix: eq(expires, now) comparaba por igualdad exacta al ms → nunca
-    // eliminaba nada. lt(expires, now) borra correctamente todos los kits vencidos.
+    // lt(expires, now) borra correctamente todos los registros vencidos.
     const expiredResult = db.delete(schema.backupSurvivalKit)
         .where(lt(schema.backupSurvivalKit.expires, now))
         .run();

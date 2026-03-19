@@ -8,13 +8,16 @@ import {
 } from '../../security/identity.js';
 import {
     getContactByUpeerId,
+} from '../../storage/contacts/operations.js';
+import {
     saveMessage,
-    updateMessageStatus,
+} from '../../storage/messages/operations.js';
+import {
     getGroupById,
     saveGroup,
     updateGroupMembers,
     updateGroupInfo,
-} from '../../storage/db.js';
+} from '../../storage/groups/operations.js';
 import { warn, error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -72,8 +75,7 @@ export async function sendGroupMessage(
         const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
         const { ciphertext, nonce } = encrypt(
             Buffer.from(message, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex'),
-            useEphemeral
+            Buffer.from(targetKeyHex, 'hex')
         );
 
         if (useEphemeral) incrementEphemeralMessageCounter();
@@ -84,8 +86,8 @@ export async function sendGroupMessage(
             groupId,
             groupName: group.name,
             senderUpeerId: myId,
-            content: ciphertext.toString('hex'),
-            nonce: nonce.toString('hex'),
+            content: ciphertext,
+            nonce: nonce,
             ephemeralPublicKey: ephPubKey,
             useRecipientEphemeral: useEphemeral,
             replyTo
@@ -162,19 +164,17 @@ export async function sendGroupMessage(
         // Offline members (y auto-sync): always use static key.
         const useEphemeral = false;
         const targetKeyHex = contact.publicKey;
-        const ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
             Buffer.from(message, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex'),
-            useEphemeral
+            Buffer.from(targetKeyHex, 'hex')
         );
         const offlinePacket = {
             type: 'GROUP_MSG',
             id: msgId,
             groupId,
             // groupName omitido por privacidad
-            content: ciphertext.toString('hex'),
-            nonce: nonce.toString('hex'),
+            content: ciphertext,
+            nonce: nonce,
             useRecipientEphemeral: useEphemeral,
             replyTo
         };
@@ -194,7 +194,7 @@ export async function sendGroupMessage(
         const nodes = await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
 
         if (!isSelf && nodes > 0) {
-            const { updateMessageStatus } = await import('../../storage/db.js');
+            const { updateMessageStatus } = await import('../../storage/messages/operations.js');
             if (await updateMessageStatus(msgId, 'vaulted' as any)) {
                 const { BrowserWindow } = await import('electron');
                 BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
@@ -277,8 +277,7 @@ export async function updateGroup(
         const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
         const { ciphertext, nonce } = encrypt(
             Buffer.from(sensitivePayload, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex'),
-            useEphemeral
+            Buffer.from(targetKeyHex, 'hex')
         );
         if (useEphemeral) incrementEphemeralMessageCounter();
 
@@ -286,8 +285,8 @@ export async function updateGroup(
             type: 'GROUP_UPDATE',
             groupId,
             adminUpeerId: myId,
-            payload: ciphertext.toString('hex'),
-            nonce: nonce.toString('hex'),
+            payload: ciphertext,
+            nonce: nonce,
             ephemeralPublicKey: ephPubKey,
             useRecipientEphemeral: useEphemeral,
         };
@@ -338,8 +337,7 @@ async function _sendGroupInvite(
     const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
     const { ciphertext, nonce } = encrypt(
         Buffer.from(sensitivePayload, 'utf-8'),
-        Buffer.from(targetKeyHex, 'hex'),
-        useEphemeral
+        Buffer.from(targetKeyHex, 'hex')
     );
     if (useEphemeral) incrementEphemeralMessageCounter();
 
@@ -347,8 +345,8 @@ async function _sendGroupInvite(
         type: 'GROUP_INVITE',
         groupId,
         adminUpeerId: myId,
-        payload: ciphertext.toString('hex'),
-        nonce: nonce.toString('hex'),
+        payload: ciphertext,
+        nonce: nonce,
         ephemeralPublicKey: ephPubKey,
         useRecipientEphemeral: useEphemeral,
     };
@@ -415,7 +413,8 @@ export async function leaveGroup(groupId: string): Promise<void> {
     }
 
     // Delete locally
-    const { deleteGroup, deleteMessagesByChatId } = await import('../../storage/db.js');
+    const { deleteGroup } = await import('../../storage/groups/operations.js');
+    const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
     deleteMessagesByChatId(groupId);
     deleteGroup(groupId);
 }

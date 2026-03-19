@@ -1,8 +1,8 @@
 import { app } from 'electron';
 import { stopYggstack } from '../sidecars/yggstack.js';
 import { stopPeerManager } from '../sidecars/peer-manager.js';
-import { closeDB } from '../storage/db.js';
-import { closeUDPServer } from '../network/server/index.js';
+import { closeDatabase as closeDB } from '../storage/shared.js';
+import { closeUDPServer } from '../network/server/tcpServer.js';
 import { stopLanDiscovery } from '../network/lan/discovery.js';
 import { stopHeartbeat } from './appInitializer.js';
 

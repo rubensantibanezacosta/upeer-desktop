@@ -1,8 +1,8 @@
-import { getMyPublicKeyHex, getMyUPeerId, getMyAlias, getMyAvatar, getMyEphemeralPublicKeyHex, getMySignedPreKeyBundle, sign } from '../../security/identity.js';
+import { getMyPublicKeyHex, getMyUPeerId, getMyAlias, getMyAvatar, getMyEphemeralPublicKeyHex, getMySignedPreKeyBundle } from '../../security/identity.js';
 import { AdaptivePow } from '../../security/pow.js';
-import { getContactByUpeerId, updateContactPublicKey } from '../../storage/db.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { updateContactPublicKey } from '../../storage/contacts/keys.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
-import { canonicalStringify } from '../utils.js';
 
 export async function sendContactRequest(targetIp: string) {
     // Generate PoW proof for Sybil resistance (light proof for mobile compatibility)

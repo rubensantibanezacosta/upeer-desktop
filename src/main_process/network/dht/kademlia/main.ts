@@ -99,6 +99,13 @@ export class KademliaDHT {
         return this.routingTable.findClosestContacts(targetUpeerId, limit);
     }
 
+    // === Multi-device Support ===
+
+    // Get a value from the local store
+    getLocalValue(key: Buffer): any | null {
+        return this.valueStore.get(key);
+    }
+
     // Store a value in the DHT
     async storeValue(key: Buffer, value: any, publisher: string, signature?: string): Promise<void> {
         await this.protocolHandler.storeValue(key, value, publisher, signature);

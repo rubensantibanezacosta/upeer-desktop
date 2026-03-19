@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('upeer', {
     // Identity / Wallet Auth
     identityStatus: () => ipcRenderer.invoke('identity-status'),
     generateMnemonic: () => ipcRenderer.invoke('generate-mnemonic'),
+    getMnemonic: (pin: string) => ipcRenderer.invoke('get-mnemonic', { pin }),
     createMnemonicIdentity: (mnemonic: string, alias?: string, avatar?: string) => ipcRenderer.invoke('create-mnemonic-identity', { mnemonic, alias, avatar }),
     unlockSession: (mnemonic: string) => ipcRenderer.invoke('unlock-session', { mnemonic }),
     lockSession: () => ipcRenderer.invoke('lock-session'),
@@ -168,4 +169,11 @@ contextBridge.exposeInMainWorld('upeer', {
     },
     // BUG FIX: Generador de miniaturas nativo
     generateVideoThumbnail: (filePath: string) => ipcRenderer.invoke('generate-video-thumbnail', { filePath }),
+    getMyDevices: () => ipcRenderer.invoke('get-my-devices'),
+    // PIN / Local security
+    isPinEnabled: () => ipcRenderer.invoke('is-pin-enabled'),
+    setPin: (args: { newPin: string, currentPin?: string }) => ipcRenderer.invoke('set-pin', args),
+    disablePin: (args: { pin: string }) => ipcRenderer.invoke('disable-pin', args),
+    verifyPin: (args: { pin: string }) => ipcRenderer.invoke('verify-pin', args),
+    getMnemonic: (pin: string) => ipcRenderer.invoke('get-mnemonic', { pin }),
 });

@@ -1,9 +1,10 @@
 import { BrowserWindow } from 'electron';
 import { randomBytes } from 'node:crypto';
 
-import { getContactByUpeerId, updateContactDhtLocation } from '../../storage/db.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.ts';
+import { updateContactDhtLocation } from '../../storage/contacts/location.ts';
 import { verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock, verifyRenewalToken } from '../utils.js';
-import { network, security, warn, error } from '../../security/secure-logger.js';
+import { network, security, error } from '../../security/secure-logger.js';
 import { AdaptivePow } from '../../security/pow.js';
 import { setKademliaInstance, getKademliaInstance } from './shared.js';
 
@@ -21,7 +22,7 @@ const pendingQueries = new Map<string, {
 }>();
 
 // Cleanup old pending queries
-function cleanupPendingQueries() {
+export function cleanupPendingQueries() {
     const now = Date.now();
     const timeout = 30000; // 30 seconds
     for (const [queryId, query] of pendingQueries.entries()) {
@@ -34,11 +35,13 @@ function cleanupPendingQueries() {
 
 // Handle DHT_FOUND_NODES and DHT_FOUND_VALUE responses
 export function handleDhtFoundNodes(data: any, senderAddress: string) {
-    if (data.queryId && pendingQueries.has(data.queryId)) {
-        const query = pendingQueries.get(data.queryId)!;
-        if (query.timeoutId) clearTimeout(query.timeoutId);
-        pendingQueries.delete(data.queryId);
-        query.resolve({ nodes: data.nodes, senderAddress });
+    if (data.queryId) {
+        const query = pendingQueries.get(data.queryId);
+        if (query) {
+            if (query.timeoutId) clearTimeout(query.timeoutId);
+            pendingQueries.delete(data.queryId);
+            query.resolve({ nodes: data.nodes, senderAddress });
+        }
     }
     // Also add received nodes to routing table
     const kademlia = getKademliaInstance();
@@ -54,11 +57,13 @@ export function handleDhtFoundNodes(data: any, senderAddress: string) {
 }
 
 export function handleDhtFoundValue(data: any, senderAddress: string) {
-    if (data.queryId && pendingQueries.has(data.queryId)) {
-        const query = pendingQueries.get(data.queryId)!;
-        if (query.timeoutId) clearTimeout(query.timeoutId);
-        pendingQueries.delete(data.queryId);
-        query.resolve({ value: data.value, senderAddress });
+    if (data.queryId) {
+        const query = pendingQueries.get(data.queryId);
+        if (query) {
+            if (query.timeoutId) clearTimeout(query.timeoutId);
+            pendingQueries.delete(data.queryId);
+            query.resolve({ value: data.value, senderAddress });
+        }
     }
 }
 
@@ -367,8 +372,8 @@ export async function publishLocationBlock(locationBlock: any): Promise<void> {
     if (!kademlia) return;
 
     await kademlia.storeLocationBlock(kademlia['upeerId'], locationBlock);
-    network('Published location block to Kademlia', undefined, { 
-        dhtSeq: locationBlock.dhtSeq, 
+    network('Published location block to Kademlia', undefined, {
+        dhtSeq: locationBlock.dhtSeq,
         hasRenewalToken: !!locationBlock.renewalToken,
         addresses: locationBlock.addresses?.length || 1
     }, 'kademlia');
@@ -464,7 +469,7 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
     // Set of already queried node addresses to avoid duplicates
     const queriedAddresses = new Set<string>();
     // List of candidate contacts (sorted by distance to target)
-    let candidates: Array<{ upeerId: string, address: string, publicKey: string, nodeId: Buffer }> = [];
+    const candidates: Array<{ upeerId: string, address: string, publicKey: string, nodeId: Buffer }> = [];
     // Map of address to contact info
     const addressToContact = new Map<string, any>();
 
@@ -558,7 +563,7 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
         // Process successful responses
         for (const result of results) {
             if (result.status === 'fulfilled') {
-                const { nodes, senderAddress } = result.value;
+                const { nodes, senderAddress: _senderAddress } = result.value;
                 // Add new nodes to candidates
                 if (nodes && Array.isArray(nodes)) {
                     for (const node of nodes) {

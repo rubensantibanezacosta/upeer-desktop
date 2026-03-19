@@ -2,26 +2,29 @@ import crypto from 'node:crypto';
 import {
     getMyPublicKeyHex,
     getMyUPeerId,
-    getMyAlias,
-    getMyAvatar,
     sign,
     encrypt,
     getMyEphemeralPublicKeyHex,
     incrementEphemeralMessageCounter,
     getMyIdentitySkBuffer,
-    getMyIdentityPkBuffer,
 } from '../../security/identity.js';
-import { 
-    getContactByUpeerId, 
+import {
+    getContactByUpeerId,
     getContacts,
-    saveMessage, 
-    updateMessageStatus, 
-    updateMessageContent, 
-    deleteMessageLocally, 
-    saveReaction, 
-    deleteReaction,
+} from '../../storage/contacts/operations.js';
+import {
     getGroupById
-} from '../../storage/db.js';
+} from '../../storage/groups/operations.js';
+import {
+    saveMessage,
+    updateMessageStatus,
+    updateMessageContent,
+    deleteMessageLocally,
+} from '../../storage/messages/operations.js';
+import {
+    saveReaction,
+    deleteReaction,
+} from '../../storage/messages/reactions.js';
 import { warn, error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -47,8 +50,8 @@ function getFanOutAddresses(contact: any): string[] {
     if (contact.address) addresses.add(contact.address);
     if (contact.knownAddresses) {
         try {
-            const known = typeof contact.knownAddresses === 'string' 
-                ? JSON.parse(contact.knownAddresses) 
+            const known = typeof contact.knownAddresses === 'string'
+                ? JSON.parse(contact.knownAddresses)
                 : contact.knownAddresses;
             if (Array.isArray(known)) {
                 known.forEach((a: string) => addresses.add(a));
@@ -95,7 +98,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     let useEphemeralFlag: boolean | undefined;
 
     try {
-        const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/index.js');
+        const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
         const { x3dhInitiator, ratchetInitAlice, ratchetEncrypt } = await import('../../security/ratchet.js');
 
         const sessionResult = getRatchetSession(upeerId);
@@ -105,7 +108,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         if (!session && contact.signedPreKey) {
             // No hay sesión pero el contacto tiene SPK → X3DH + iniciar como Alice
             const myIkSk = getMyIdentitySkBuffer();
-            const myIkPk = getMyIdentityPkBuffer();
+            const myIkPk = Buffer.from(getMyPublicKeyHex(), 'hex');
             const bobIkPk = Buffer.from(contact.publicKey, 'hex');
             const bobSpkPk = Buffer.from(contact.signedPreKey as string, 'hex');
 
@@ -138,13 +141,12 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
             Buffer.from(content, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex'),
-            useEphemeral
+            Buffer.from(targetKeyHex, 'hex')
         );
         if (useEphemeral) incrementEphemeralMessageCounter();
         useEphemeralFlag = useEphemeral;
-        contentHex = ciphertext.toString('hex');
-        nonceHex = nonce.toString('hex');
+        contentHex = ciphertext;
+        nonceHex = nonce;
     }
 
     const timestamp = Date.now();
@@ -169,7 +171,6 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
 
     const signature = sign(Buffer.from(canonicalStringify(data)));
     const isToSelf = upeerId === selfId;
-    // @ts-ignore
     await saveMessage(msgId, upeerId, true, content, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent', selfId, timestamp);
 
     // Multi-device sync: Identificar otras IPs propias para auto-envío
@@ -232,15 +233,14 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 const { encrypt: encStatic } = await import('../../security/identity.js');
                 const selfVaultEncrypted = encStatic(
                     Buffer.from(content, 'utf-8'),
-                    Buffer.from(myPublicKey, 'hex'),
-                    false
+                    Buffer.from(myPublicKey, 'hex')
                 );
 
                 const syncPacket = {
                     type: 'CHAT',
                     id: msgId,
-                    content: selfVaultEncrypted.ciphertext.toString('hex'),
-                    nonce: selfVaultEncrypted.nonce.toString('hex'),
+                    content: selfVaultEncrypted.ciphertext,
+                    nonce: selfVaultEncrypted.nonce,
                     replyTo,
                     senderUpeerId: selfId
                 };
@@ -264,8 +264,8 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     // una unhandled promise rejection silenciosa que no reintentaba el vault.
     setTimeout(async () => {
         try {
-            const { getMessageStatus } = await import('../../storage/db.js');
-            const status = await getMessageStatus(msgId);
+            const { getMessageStatus } = await import('../../storage/messages/status.js');
+            const status = getMessageStatus(msgId);
             if (status === 'sent') {
                 warn('Message not delivered, starting vault replication', { msgId, upeerId }, 'vault');
 
@@ -282,15 +282,14 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 const { encrypt: encStatic } = await import('../../security/identity.js');
                 const vaultEncrypted = encStatic(
                     Buffer.from(content, 'utf-8'),
-                    Buffer.from(freshContact.publicKey, 'hex'),
-                    false  // static key, no ephemeral — vault delivery siempre usa clave estática
+                    Buffer.from(freshContact.publicKey, 'hex')
                 );
 
                 const vaultData = {
                     type: 'CHAT',
                     id: msgId,
-                    content: vaultEncrypted.ciphertext.toString('hex'),
-                    nonce: vaultEncrypted.nonce.toString('hex'),
+                    content: vaultEncrypted.ciphertext,
+                    nonce: vaultEncrypted.nonce,
                     // No ratchetHeader: el receptor descifra con crypto_box al recibir del vault
                     replyTo: replyTo
                 };
@@ -312,7 +311,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 const nodes = await VaultManager.replicateToVaults(upeerId, innerPacket);
 
                 if (nodes > 0) {
-                    const { updateMessageStatus } = await import('../../storage/db.js');
+                    const { updateMessageStatus } = await import('../../storage/messages/operations.js');
                     if (await updateMessageStatus(msgId, 'vaulted' as any)) {
                         const { BrowserWindow } = await import('electron');
                         BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
@@ -334,11 +333,11 @@ export async function sendTypingIndicator(upeerId: string) {
     if (upeerId.startsWith('grp-')) {
         const group = getGroupById(upeerId);
         if (!group || group.status !== 'active') return;
-        
+
         // Fan-out to all group members
         const myId = getMyUPeerId();
         const data = { type: 'TYPING', groupId: upeerId }; // Include groupId
-        
+
         for (const memberId of group.members) {
             if (memberId === myId) continue;
             const contact = await getContactByUpeerId(memberId);
@@ -378,24 +377,24 @@ export async function sendReadReceipt(upeerId: string, id: string) {
     const contact = await getContactByUpeerId(targetId);
     if (!contact) return;
 
-    const data = { 
-        type: 'READ', 
-        id, 
-        senderUpeerId: myId, 
-        ...(upeerId.startsWith('grp-') ? { chatUpeerId: upeerId } : {}) 
+    const data = {
+        type: 'READ',
+        id,
+        senderUpeerId: myId,
+        ...(upeerId.startsWith('grp-') ? { chatUpeerId: upeerId } : {})
     };
     const signature = sign(Buffer.from(canonicalStringify(data)));
     const signedData = { ...data, signature: signature.toString('hex') };
 
     // Multi-device sync for myId... (omitted but already present in logic)
     const selfAddresses = await getSelfAddresses(myId);
-    
+
     // Almacenar y propagar
     const addresses = getFanOutAddresses(contact);
     for (const addr of addresses) {
         sendSecureUDPMessage(addr, signedData, contact.publicKey);
     }
-    
+
     const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
     for (const addr of selfAddresses) {
         sendSecureUDPMessage(addr, signedData, myPublicKey, true);
@@ -438,11 +437,11 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
     if (remove) deleteReaction(msgId, myId, emoji);
     else saveReaction(msgId, myId, emoji);
 
-    const data = { 
-        type: 'CHAT_REACTION', 
-        msgId, 
-        emoji, 
-        remove, 
+    const data = {
+        type: 'CHAT_REACTION',
+        msgId,
+        emoji,
+        remove,
         senderUpeerId: myId,
         ...(isGroup ? { chatUpeerId: upeerId } : {}) // Contexto de grupo para receptores
     };
@@ -546,8 +545,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
             Buffer.from(newContent, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex'),
-            useEphemeral
+            Buffer.from(targetKeyHex, 'hex')
         );
 
         if (useEphemeral) incrementEphemeralMessageCounter();
@@ -555,8 +553,8 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const data = {
             type: 'CHAT_UPDATE',
             msgId,
-            content: ciphertext.toString('hex'),
-            nonce: nonce.toString('hex'),
+            content: ciphertext,
+            nonce: nonce,
             version: newVersion,
             ephemeralPublicKey: ephPubKey,
             useRecipientEphemeral: useEphemeral,
@@ -609,7 +607,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     for (const addr of selfAddresses) {
         sendSecureUDPMessage(addr, signedSelfSync, myPublicKey, true);
     }
-    
+
     import('../vault/manager.js').then(({ VaultManager }) => {
         VaultManager.replicateToVaults(myId, signedSelfSync);
     });
@@ -719,7 +717,7 @@ export async function sendChatClear(upeerId: string, customTimestamp?: number) {
     };
 
     // 3. Ejecutar Limpieza LOCAL inmediata
-    const { deleteMessagesByChatId } = await import('../../storage/db.js');
+    const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
     deleteMessagesByChatId(upeerId, timestamp);
 
     import('../vault/manager.js').then(({ VaultManager }) => {

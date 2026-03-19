@@ -13,9 +13,9 @@ interface DragDropPlaceholderProps {
 
 export const DragDropPlaceholder: React.FC<DragDropPlaceholderProps> = ({
     onClose,
-    onDragOver,
-    onDragLeave,
-    onDrop,
+    onDragOver: _onDragOver,
+    onDragLeave: _onDragLeave,
+    onDrop: _onDrop,
     label = 'Suelta los archivos aquí',
 }) => (
     <>

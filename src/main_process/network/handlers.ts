@@ -11,15 +11,19 @@ import { debug, error, security, warn } from '../security/secure-logger.js';
 import { validateMessage } from '../security/validation.js';
 import {
     getContactByUpeerId,
+} from '../storage/contacts/operations.js';
+import {
     updateContactLocation,
+} from '../storage/contacts/location.js';
+import {
     updateLastSeen
-} from '../storage/db.js';
+} from '../storage/contacts/status.js';
 
 import { handleDhtPacket } from './dht/handlers.js';
-import { fileTransferManager } from './file-transfer/index.js';
+import { fileTransferManager } from './file-transfer/transfer-manager.js';
 
 // Import modular handlers
-import { handleAck, handleChatContact, handleChatMessage, handleIncomingDelete, handleIncomingReaction, handleIncomingUpdate, handleReadReceipt } from './handlers/chat.js';
+import { handleChatAck, handleChatMessage, handleChatEdit, handleChatDelete, handleChatReaction } from './handlers/chat.js';
 import { handleHandshakeAccept, handleHandshakeReq } from './handlers/contacts.js';
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
 import { handleReputationDeliver, handleReputationGossip, handleReputationRequest } from './handlers/reputation.js';
@@ -227,12 +231,12 @@ export async function handlePacket(
                 sendResponse(rinfo.address, { type: 'PONG' });
                 // Update contact alias/avatar if the peer included them
                 if (data.alias && typeof data.alias === 'string') {
-                    import('../storage/db.js').then(({ updateContactName }) => {
+                    import('../storage/contacts/operations.js').then(({ updateContactName }) => {
                         updateContactName?.(upeerId, (data.alias as string).slice(0, 100));
                     }).catch((err) => warn('Failed to update contact name', err, 'network'));
                 }
                 if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
-                    import('../storage/db.js').then(({ updateContactAvatar }) => {
+                    import('../storage/contacts/operations.js').then(({ updateContactAvatar }) => {
                         updateContactAvatar?.(upeerId, data.avatar);
                     }).catch(() => { });
                 }
@@ -260,30 +264,30 @@ export async function handlePacket(
                 handleChatMessage(upeerId, contact, data, win, signature, rinfo.address, sendResponse);
                 break;
             case 'ACK':
-                handleAck(upeerId, data, win);
+                handleChatAck(upeerId, data, win);
                 break;
             case 'READ':
-                handleReadReceipt(upeerId, data, win);
+                handleChatAck(upeerId, { ...data, status: 'read' }, win);
                 break;
             case 'TYPING':
                 win?.webContents.send('peer-typing', { upeerId: upeerId });
                 break;
             case 'CHAT_CONTACT':
-                handleChatContact(upeerId, data, win);
+                // handleChatContact(upeerId, data, win); // Dejado para implementar o redirigir
                 break;
             case 'CHAT_REACTION':
-                handleIncomingReaction(upeerId, data, win);
+                handleChatReaction(upeerId, data, win);
                 break;
             case 'CHAT_UPDATE':
-                handleIncomingUpdate(upeerId, contact, data, win, signature);
+                handleChatEdit(upeerId, data, win, signature);
                 break;
             case 'CHAT_DELETE':
-                handleIncomingDelete(upeerId, data, win);
+                handleChatDelete(upeerId, data, win);
                 break;
             case 'CHAT_CLEAR_ALL':
                 {
-                    const { handleIncomingClear } = await import('./handlers/chat.js');
-                    handleIncomingClear(upeerId, data, win);
+                    const { handleChatClear } = await import('./handlers/chat.js');
+                    handleChatClear(upeerId, data, win);
                 }
                 break;
             case 'IDENTITY_UPDATE':

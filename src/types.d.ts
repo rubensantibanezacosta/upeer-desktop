@@ -37,6 +37,7 @@ declare global {
             inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
+            onChatCleared: (callback: (data: { upeerId: string }) => void) => void;
             onGroupMessage: (callback: (data: any) => void) => void;
             onGroupInvite: (callback: (data: any) => void) => void;
             onGroupUpdated: (callback: (data: any) => void) => void;
@@ -111,6 +112,19 @@ declare global {
             onYggstackAddress: (callback: (address: string) => void) => void;
             /** Callback para cambios de estado de la red: 'connecting'|'up'|'down'|'reconnecting' */
             onYggstackStatus: (callback: (status: string, address?: string) => void) => void;
+            /** Obtiene la lista de dispositivos (nodos) activos ligados a esta Identidad */
+            getMyDevices: () => Promise<Array<{
+                deviceId: string;
+                isCurrent: boolean;
+                lastSeen: number;
+                address: string;
+            }>>;
+            /** PIN y seguridad local */
+            isPinEnabled: () => Promise<boolean>;
+            setPin: (args: { newPin: string; currentPin?: string }) => Promise<{ success: boolean; error?: string }>;
+            disablePin: (args: { pin: string }) => Promise<{ success: boolean; error?: string }>;
+            verifyPin: (args: { pin: string }) => Promise<boolean>;
+            getMnemonic: (pin: string) => Promise<{ success: boolean; mnemonic?: string; error?: string }>;
         }
     }
 }

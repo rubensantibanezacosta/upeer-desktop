@@ -4,12 +4,14 @@ import {
     addOrUpdateContact,
     deleteContact,
     isContactBlocked,
-    updateContactPublicKey,
-    updateContactEphemeralPublicKey,
     getContactByAddress,
     updateContactName,
     updateContactAvatar,
-} from '../../storage/db.js';
+} from '../../storage/contacts/operations.js';
+import {
+    updateContactPublicKey,
+    updateContactEphemeralPublicKey,
+} from '../../storage/contacts/keys.js';
 import {
     verify,
     getUPeerIdFromPublicKey,
@@ -101,7 +103,7 @@ export async function handleHandshakeReq(
 
     issueVouch(senderUpeerId, VouchType.HANDSHAKE).catch((err) => warn('Failed to issue vouch for handshake', err, 'reputation'));
 
-    const { getContacts: _gc } = await import('../../storage/db.js').catch(() => ({ getContacts: () => [] })) as any;
+    const { getContacts: _gc } = await import('../../storage/contacts/operations.js').catch(() => ({ getContacts: () => [] })) as any;
     const _contacts = _gc() as any[];
     const _directIds = new Set<string>(_contacts.filter((c: any) => c.status === 'connected' && c.upeerId).map((c: any) => c.upeerId as string));
     const vouchScore = computeScore(senderUpeerId, _directIds);
@@ -172,7 +174,7 @@ export async function handleHandshakeReq(
     if (isAlreadyConnected) {
         win?.webContents.send('contact-presence', { upeerId: senderUpeerId, lastSeen: new Date().toISOString() });
 
-        import('../server/index.js').then(({ acceptContactRequest }) => {
+        import('../messaging/contacts.js').then(({ acceptContactRequest }) => {
             acceptContactRequest(senderUpeerId, data.publicKey);
         }).catch(err => error('Failed to auto-accept known contact', err, 'network'));
         return;
@@ -254,11 +256,11 @@ export async function handleHandshakeAccept(
         try {
             keyResult = runTransaction<{ changed: boolean; oldKey?: string; newKey: string }>(() => {
                 const result = updateContactPublicKey(senderUpeerId, data.publicKey);
-                
+
                 if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
                     updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
                 }
-                
+
                 if (data.signedPreKey && typeof data.signedPreKey === 'object') {
                     const { spkPub, spkSig, spkId } = data.signedPreKey;
                     if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof spkId === 'number') {
@@ -278,27 +280,27 @@ export async function handleHandshakeAccept(
                         }
                     }
                 }
-                
+
                 if (data.alias && typeof data.alias === 'string') {
                     updateContactName(senderUpeerId, (data.alias as string).slice(0, 100));
                 }
 
                 const currentAddress = rinfo.address;
                 const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
-                
+
                 addOrUpdateContact(senderUpeerId, currentAddress, data.alias || existing.name, data.publicKey, 'connected', data.ephemeralPublicKey, undefined, undefined, undefined, incomingAddresses);
-                
+
                 if (data.avatar && typeof data.avatar === 'string' && data.avatar.startsWith('data:image/') && data.avatar.length <= 2_000_000) {
                     updateContactAvatar(senderUpeerId, data.avatar);
                 }
-                
+
                 return result;
             });
         } catch (err) {
             error('Transaction failed in handshake accept', err, 'db');
             return;
         }
-        
+
         const kr = keyResult;
         if (kr.changed && kr.oldKey) {
             win?.webContents.send('key-change-alert', {
@@ -310,7 +312,7 @@ export async function handleHandshakeAccept(
         }
 
         if (data.publicKey) {
-            flushPendingOutbox(senderUpeerId, data.publicKey).catch((err) => 
+            flushPendingOutbox(senderUpeerId, data.publicKey).catch((err) =>
                 warn('Failed to flush pending outbox', err, 'storage')
             );
         }

@@ -11,7 +11,6 @@ import MicIcon from '@mui/icons-material/Mic';
 import EditIcon from '@mui/icons-material/Edit';
 
 import CloseIcon from '@mui/icons-material/Close';
-import ReplyIcon from '@mui/icons-material/Reply';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 
@@ -60,7 +59,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
             boxSizing: 'border-box'
         }}>
             {replyToMessage && (
-                <Box 
+                <Box
                     onClick={() => replyToMessage?.id && onScrollToMessage?.(replyToMessage.id)}
                     sx={{
                         p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
@@ -81,7 +80,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     if (parsed.type === 'file' && (parsed.mimeType?.startsWith('image/') || parsed.mimeType?.startsWith('video/'))) {
                                         thumbnail = parsed.thumbnail;
                                     }
-                                } catch (_) { }
+                                } catch (_err) { /* ignore */ }
                             } else if (m.startsWith('FILE_TRANSFER|')) {
                                 const parts = m.split('|');
                                 if (parts.length >= 7 && (parts[4]?.startsWith('image/') || parts[4]?.startsWith('video/'))) {
@@ -135,7 +134,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                                     </Box>
                                                 );
                                             }
-                                        } catch (_) { }
+                                        } catch (_err) { /* ignore */ }
                                     }
                                     if (m.startsWith('FILE_TRANSFER|')) {
                                         const parts = m.split('|');

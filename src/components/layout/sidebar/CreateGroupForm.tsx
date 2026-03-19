@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Box, Typography, Input, FormControl, FormLabel, Stack,
     Button, Divider, List, ListItem, Checkbox, Avatar, Chip
@@ -38,7 +38,8 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                 const size = Math.min(img.width, img.height, 256);
                 canvas.width = size;
                 canvas.height = size;
-                const ctx = canvas.getContext('2d')!;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
                 const sx = (img.width - size) / 2;
                 const sy = (img.height - size) / 2;
                 ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);

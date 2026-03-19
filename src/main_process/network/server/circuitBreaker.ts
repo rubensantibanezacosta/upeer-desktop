@@ -1,4 +1,4 @@
-import { ipFailMap, IPFailState } from './state.js';
+import { ipFailMap } from './state.js';
 import { BACKOFF_STEPS_MS } from './constants.js';
 import { error } from '../../security/secure-logger.js';
 

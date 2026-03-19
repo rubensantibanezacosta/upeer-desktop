@@ -177,7 +177,7 @@ async function fullRefresh(cacheDir: string): Promise<void> {
     }
 
     // 2. Obtener lista pública con metadatos (country + uptime%)
-    let rawPeers = await fetchPeersWithMeta();
+    const rawPeers = await fetchPeersWithMeta();
     info(`${rawPeers.length} online peers parsed`, undefined, 'peers');
 
     // Añadir fallbacks (sin duplicar)

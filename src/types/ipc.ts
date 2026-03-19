@@ -589,15 +589,39 @@ export interface FileTransferStartedEvent {
     upeerId: string;
     fileName: string;
     fileSize: number;
-    direction: 'send' | 'receive';
+    mimeType?: string;
+    direction: 'sending' | 'receiving';
+    state: string;
+    phase: number;
+    chunksProcessed: number;
+    totalChunks: number;
     thumbnail?: string;
+    fileHash: string;
+    isVaulting?: boolean;
+    progress: number;
+    bytesTransferred: number;
+    totalBytes: number;
+    chunksTransferred: number;
 }
 
 export interface FileTransferProgressEvent {
     fileId: string;
-    transferredBytes: number;
+    upeerId: string;
+    fileName: string;
+    fileSize: number;
+    mimeType?: string;
+    direction: 'sending' | 'receiving';
+    state: 'active' | 'completed' | 'failed' | 'cancelled';
+    phase: number;
+    chunksProcessed: number;
+    totalChunks: number;
+    thumbnail?: string;
+    fileHash: string;
+    isVaulting?: boolean;
+    progress: number;
+    bytesTransferred: number;
     totalBytes: number;
-    chunksRemaining: number;
+    chunksTransferred: number;
 }
 
 export interface FileTransferCompletedEvent {
@@ -605,8 +629,19 @@ export interface FileTransferCompletedEvent {
     upeerId: string;
     fileName: string;
     fileSize: number;
-    direction: 'send' | 'receive';
-    checksum: string;
+    mimeType?: string;
+    direction: 'sending' | 'receiving';
+    state: string;
+    phase: number;
+    chunksProcessed: number;
+    totalChunks: number;
+    thumbnail?: string;
+    fileHash: string;
+    isVaulting?: boolean;
+    progress: number;
+    bytesTransferred: number;
+    totalBytes: number;
+    chunksTransferred: number;
 }
 
 export interface FileTransferCancelledEvent {

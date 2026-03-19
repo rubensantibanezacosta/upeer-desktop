@@ -1,11 +1,10 @@
 import {
-    getMyUPeerId,
     getMyAlias,
     getMyAvatar,
     getMyDhtSeq,
     isSessionLocked,
 } from '../../security/identity.js';
-import { getContacts } from '../../storage/db.js';
+import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
 import { getNetworkAddresses, generateSignedLocationBlock } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -20,8 +19,8 @@ function getFanOutAddresses(contact: any): string[] {
     if (contact.address) addresses.add(contact.address);
     if (contact.knownAddresses) {
         try {
-            const known = typeof contact.knownAddresses === 'string' 
-                ? JSON.parse(contact.knownAddresses) 
+            const known = typeof contact.knownAddresses === 'string'
+                ? JSON.parse(contact.knownAddresses)
                 : contact.knownAddresses;
             if (Array.isArray(known)) {
                 known.forEach((a: string) => addresses.add(a));
@@ -59,8 +58,6 @@ export function checkHeartbeat(contacts: any[]) {
 // ========================
 
 export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
-    const myId = getMyUPeerId();
-
     // 1. Exchange location blocks
     await exchangeLocationBlocks(contact, sendSecureUDPMessage);
 
@@ -206,7 +203,7 @@ async function shareBlocks(contact: any, blocksToShare: any[], sendSecureUDPMess
     }
 }
 
-export function wrappedBroadcastDhtUpdate() {
+export function broadcastDhtUpdate() {
     if (isSessionLocked()) return;
     coreBroadcastDhtUpdate(sendSecureUDPMessage);
 }

@@ -1,7 +1,7 @@
 import {
     getContacts,
     getContactByUpeerId
-} from '../../storage/db.js';
+} from '../../storage/contacts/operations.js';
 import {
     getMyUPeerId,
     incrementMyDhtSeq
@@ -20,15 +20,15 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any)
     if (addresses.length === 0) return;
 
     // Check if the set of addresses has changed
-    const hasChanged = addresses.length !== lastKnownAddresses.length || 
-                      !addresses.every(addr => lastKnownAddresses.includes(addr));
+    const hasChanged = addresses.length !== lastKnownAddresses.length ||
+        !addresses.every(addr => lastKnownAddresses.includes(addr));
 
     if (hasChanged) {
         lastKnownAddresses = [...addresses];
         const newSeq = incrementMyDhtSeq();
 
         network('Network addresses changed', undefined, { addresses, newSeq }, 'dht');
-        
+
         // Generate signed block with ALL addresses
         const locBlock = generateSignedLocationBlock(addresses, newSeq);
 
@@ -79,7 +79,7 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                 const dbContact = await getContactByUpeerId(c.upeerId);
                 // BUG BP fix: el campo Drizzle es dhtExpiresAt (columna dht_expires_at),
                 // no expiresAt. renewalToken se almacena JSON.stringify → parsear al leer.
-                
+
                 let known: string[] | undefined;
                 if (dbContact?.knownAddresses) {
                     try { known = JSON.parse(dbContact.knownAddresses); } catch { /* ignore */ }

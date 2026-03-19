@@ -53,13 +53,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     networkStatus,
     activeSection,
     onSectionChange,
-    onClose,
+    onClose: _onClose,
     onLockSession,
     onIdentityUpdate,
 }) => {
     const active = activeSection;
     const setActive = onSectionChange;
-    const activeItem = SECTIONS.find(s => s.id === active);
 
     const renderSection = () => {
         switch (active) {

@@ -6,7 +6,7 @@ import {
     getVouchesByIds,
     getVouchesForNode,
     countRecentVouchesByFrom,
-} from '../../storage/reputation/index.js';
+} from '../../storage/reputation/operations.js';
 import {
     VouchType,
     VOUCH_WEIGHTS,
@@ -127,7 +127,7 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
 
         // 7. Verificar firma con la clave pública del emisor (sólo contactos conocidos)
         const { verify } = await import('../identity.js');
-        const { getContactByUpeerId } = await import('../../storage/db.js');
+        const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
         const contact = await getContactByUpeerId(vouch.fromId);
         if (!contact?.publicKey) {
             warn('Vouch de contacto desconocido ignorado', { fromId: vouch.fromId }, 'reputation');
@@ -182,7 +182,7 @@ export function computeScore(
  */
 export async function getVouchScore(toId: string): Promise<number> {
     try {
-        const { getContacts } = await import('../../storage/db.js');
+        const { getContacts } = await import('../../storage/contacts/operations.js');
         const contacts = getContacts() as any[];
         const directContactIds = new Set<string>(
             contacts

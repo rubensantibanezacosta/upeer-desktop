@@ -129,9 +129,12 @@ export function getMaxRestartAttempts(): number {
  */
 export async function forceRestart(): Promise<void> {
     if (yggstackProcess) {
-        info('forceRestart: process already running, ignoring', undefined, 'yggstack');
-        return;
+        info('forceRestart: forcing termination of current process', undefined, 'yggstack');
+        isQuitting = true;
+        yggstackProcess.kill();
+        yggstackProcess = null;
     }
+
     info('forceRestart: restarting by user request…', undefined, 'yggstack');
     restartAttempts = 0;
     isQuitting = false;
@@ -320,7 +323,7 @@ export async function spawnYggstack(): Promise<void> {
         warn(`Process terminated unexpectedly. Code: ${code ?? 'N/A'}, Signal: ${signal ?? 'N/A'}`, undefined, 'yggstack');
         yggstackProcess = null;
         detectedAddress = null;
-        emitStatus('down');
+        emitStatus('reconnecting');
         scheduleRestart();
     });
 
@@ -329,7 +332,7 @@ export async function spawnYggstack(): Promise<void> {
         if (!isQuitting) {
             yggstackProcess = null;
             detectedAddress = null;
-            emitStatus('down');
+            emitStatus('reconnecting');
             scheduleRestart();
         }
     });
@@ -365,12 +368,9 @@ function scheduleRestart(): void {
 
 /**
  * Detiene el proceso yggstack de forma ordenada (SIGTERM → SIGKILL).
- * Es idempotente: si no hay proceso activo, no hace nada.
- *
- * Debe llamarse en `app.on('before-quit')` para liberar el puerto SOCKS5
- * correctamente antes de que la aplicación cierre.
+ * Devuelve una promesa que se resuelve cuando el proceso termina realmente.
  */
-export function stopYggstack(): void {
+export async function stopYggstack(): Promise<void> {
     if (!yggstackProcess) {
         info('stopYggstack: no active process to stop', undefined, 'yggstack');
         return;
@@ -382,9 +382,6 @@ export function stopYggstack(): void {
     restartAttempts = 0;
 
     // BUG AW fix: guardar referencia local ANTES de anular yggstackProcess.
-    // Sin esto, el forceKillTimer disparaba 3 s después con yggstackProcess === null,
-    // haciendo imposible enviar SIGKILL a un proceso que no respondió a SIGTERM.
-    // Un proceso colgado quedaba zombi hasta que el usuario matara manualmente la app.
     const proc = yggstackProcess;
 
     // Limpiar la referencia de módulo ahora para que nuevos spawns puedan arrancar
@@ -393,23 +390,28 @@ export function stopYggstack(): void {
     currentConfPath = null;
     stopPeerManager();
 
-    // Forzar SIGKILL si el proceso no termina en 3 segundos tras SIGTERM
-    const forceKillTimer = setTimeout(() => {
-        warn('Process did not respond to SIGTERM → forcing SIGKILL…', undefined, 'yggstack');
-        try { proc.kill('SIGKILL'); } catch { /* ya terminó */ }
-    }, 3000);
+    return new Promise<void>((resolve) => {
+        // Forzar SIGKILL si el proceso no termina en 3 segundos tras SIGTERM
+        const forceKillTimer = setTimeout(() => {
+            warn('Process did not respond to SIGTERM → forcing SIGKILL…', undefined, 'yggstack');
+            try { proc.kill('SIGKILL'); } catch { /* ya terminó */ }
+        }, 3000);
 
-    proc.once('exit', () => {
-        clearTimeout(forceKillTimer);
-        info('Sidecar stopped correctly', undefined, 'yggstack');
+        proc.once('exit', () => {
+            clearTimeout(forceKillTimer);
+            info('Sidecar stopped correctly', undefined, 'yggstack');
+            emitStatus('down'); // Notificar que ahora está caído intencionalmente
+            resolve();
+        });
+
+        try {
+            proc.kill('SIGTERM');
+        } catch (err) {
+            error('Error sending SIGTERM', err, 'yggstack');
+            clearTimeout(forceKillTimer);
+            resolve();
+        }
     });
-
-    try {
-        proc.kill('SIGTERM');
-    } catch (err) {
-        error('Error sending SIGTERM', err, 'yggstack');
-        clearTimeout(forceKillTimer);
-    }
 }
 
 // ── Helpers privados ─────────────────────────────────────────────────────────

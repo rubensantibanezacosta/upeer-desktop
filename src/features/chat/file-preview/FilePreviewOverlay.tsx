@@ -106,55 +106,34 @@ const useFilesPreview = (files: FileInfo[]) => {
     useEffect(() => {
         let isMounted = true;
         const load = async () => {
-            setIsGenerating(true);
+            if (isMounted) setIsGenerating(true);
             for (const file of files) {
                 if (!isMounted) break;
-                
                 let effectiveType = file.type;
-                if (!effectiveType || effectiveType === 'application/octet-stream') {
-                    effectiveType = getMimeType(file.name);
-                }
-
-                if (!effectiveType.startsWith('image/') && !effectiveType.startsWith('video/')) continue;
+                if (!effectiveType) effectiveType = getMimeType(file.name);
+                if (!effectiveType.startsWith("image/") && !effectiveType.startsWith("video/")) continue;
                 if (previews[file.path]) continue;
-
                 try {
                     const mediaUrl = `media://${file.path}`;
-                    console.log(`[Preview] Processing ${file.name} (${effectiveType}), path: ${file.path}`);
-                    
-                    let thumbnail = '';
-                    if (effectiveType.startsWith('image/')) {
+                    let thumbnail = "";
+                    if (effectiveType.startsWith("image/")) {
                         thumbnail = await generateThumbnail(mediaUrl);
-                    } else if (effectiveType.startsWith('video/')) {
+                    } else if (effectiveType.startsWith("video/")) {
                         try {
-                            console.log(`[Preview] Requesting native thumbnail for ${file.name}`);
                             const result = await (window as any).upeer.generateVideoThumbnail(file.path);
-                            if (result.success) {
-                                console.log(`[Preview] Native thumbnail success for ${file.name}`);
-                                thumbnail = result.dataUrl;
-                            } else {
-                                console.warn(`[Preview] Native thumbnail failed, falling back to renderer: ${result.error}`);
-                                thumbnail = await generateVideoThumbnail(mediaUrl);
-                            }
-                        } catch (err) {
-                            console.error('[Preview] Main process thumbnail failed, trying renderer fallback', err);
-                            thumbnail = await generateVideoThumbnail(mediaUrl);
-                        }
+                            thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(mediaUrl);
+                        } catch { thumbnail = await generateVideoThumbnail(mediaUrl); }
                     }
-                    
                     if (isMounted) {
-                        console.log(`[Preview] Setting preview for ${file.path}`);
                         setPreviews(prev => ({ ...prev, [file.path]: { previewUrl: mediaUrl, thumbnail } }));
                     }
-                } catch (e) {
-                    console.error('[Preview] Error loading preview for', file.name, e);
-                }
+                } catch { /* ignore */ }
             }
             if (isMounted) setIsGenerating(false);
         };
         load();
         return () => { isMounted = false; };
-    }, [files]);
+    }, [files, previews]);
 
     return { previews, isGenerating };
 };
@@ -249,16 +228,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
     };
 
     return (
-        <Box 
+        <Box
             onMouseMove={handleMouseMove}
             onMouseLeave={() => isPlaying && setShowControls(false)}
-            sx={{ 
-                position: 'relative', 
-                width: '100%', 
-                maxWidth: '90%', 
-                maxHeight: '60vh', 
-                display: 'flex', 
-                justifyContent: 'center', 
+            sx={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '90%',
+                maxHeight: '60vh',
+                display: 'flex',
+                justifyContent: 'center',
                 alignItems: 'center',
                 borderRadius: '8px',
                 overflow: 'hidden',
@@ -288,7 +267,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
 
 
             {/* Controls Bar */}
-            <Box 
+            <Box
                 className="video-controls"
                 sx={{
                     position: 'absolute',
@@ -340,7 +319,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </Typography>
                     </Box>
-                    
+
                     <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.5)', pr: 1, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {name}
                     </Typography>

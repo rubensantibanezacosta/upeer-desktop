@@ -2,7 +2,7 @@ import {
     getMyUPeerId,
     sign
 } from '../../security/identity.js';
-import { error, network } from '../../security/secure-logger.js';
+import { error } from '../../security/secure-logger.js';
 import { getYggstackAddress, onYggstackAddress, onYggstackStatus } from '../../sidecars/yggstack.js';
 import { SEALED_TYPES, sealPacket } from '../sealed.js';
 import {
@@ -59,7 +59,7 @@ onYggstackAddress(() => {
     drainSendQueue();
 });
 
-export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?: string, isInternalSync: boolean = false) {
+export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?: string, isInternalSync = false) {
     if (!getTcpServer()) return;
 
     const myId = getMyUPeerId();

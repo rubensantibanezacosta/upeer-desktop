@@ -8,19 +8,20 @@ import {
   getMyAvatar,
   setMyAvatar,
   generateMnemonic,
-  createMnemonicIdentity,
   unlockWithMnemonic,
   lockSession,
   isSessionLocked,
   isMnemonicMode,
+  getMnemonic,
   sign
 } from '../../security/identity.js';
-import { getContacts } from '../../storage/db.js';
+import { verifyAccessPin } from '../../security/pin.js';
+import { getContacts } from '../../storage/contacts/operations.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
-import { closeUDPServer, startUDPServer } from '../../network/server/index.js';
+import { closeUDPServer, startUDPServer } from '../../network/server/tcpServer.js';
 import { stopPeerManager } from '../../sidecars/peer-manager.js';
 import { stopLanDiscovery, startLanDiscovery } from '../../network/lan/discovery.js';
-import { clearUserData } from '../../storage/db.js';
+import { clearUserData } from '../../storage/shared.js';
 import { getMainWindow } from '../windowManager.js';
 
 /**
@@ -66,6 +67,20 @@ export function registerIdentityHandlers(): void {
   ipcMain.handle('generate-mnemonic', () => ({
     mnemonic: generateMnemonic(),
   }));
+
+  ipcMain.handle('get-mnemonic', (event, { pin }) => {
+    // Verificación obligatoria de PIN para exponer el mnemonic
+    // BUG FIX: El PIN viene como 'pin' en el objeto desestructurado
+    if (!verifyAccessPin(pin)) {
+      warn('Intento fallido de ver mnemonic: PIN incorrecto', {}, 'security');
+      return { success: false, error: 'PIN incorrecto' };
+    }
+    const mnemonic = getMnemonic();
+    if (!mnemonic) {
+      return { success: false, error: 'No hay mnemonic en la sesión activa' };
+    }
+    return { success: true, mnemonic };
+  });
 
   ipcMain.handle('set-my-alias', async (event, { alias }) => {
     // BUG DS fix: limitar longitud del alias para evitar consumo excesivo de memoria/disco
@@ -145,26 +160,31 @@ export function registerIdentityHandlers(): void {
       stopLanDiscovery();
       clearUserData();
     }
-    const result = await createMnemonicIdentity(mnemonic, alias, avatar);
-    if (result.success) {
+    const mnemonicToUse = mnemonic || generateMnemonic();
+    const success = unlockWithMnemonic(mnemonicToUse);
+    if (success) {
+      if (alias) setMyAlias(alias);
+      if (avatar) setMyAvatar(avatar);
       const mainWindow = getMainWindow();
       if (mainWindow) {
         startUDPServer(mainWindow);
         try { await startLanDiscovery(); } catch (e) { /* ignore */ }
       }
+      return { success: true, mnemonic: mnemonicToUse };
     }
-    return result;
+    return { success: false, error: 'Identity initialization failed' };
   });
 
   ipcMain.handle('unlock-session', async (event, { mnemonic }) => {
-    const result = await unlockWithMnemonic(mnemonic);
-    if (result.success) {
+    const successResult = await unlockWithMnemonic(mnemonic);
+    if (successResult) {
       // Kick off network services now that we have a valid identity
       const mainWindow = getMainWindow();
       if (mainWindow) startUDPServer(mainWindow);
       try { await startLanDiscovery(); } catch (e) { /* ignore if already started */ }
+      return { success: true };
     }
-    return result;
+    return { success: false, error: 'Mnemonic unlock failed' };
   });
 
   ipcMain.handle('lock-session', () => {

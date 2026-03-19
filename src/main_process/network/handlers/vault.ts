@@ -1,8 +1,6 @@
 import { BrowserWindow } from 'electron';
-import {
-    getContactByUpeerId,
-    saveFileMessage,
-} from '../../storage/db.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { saveFileMessage } from '../../storage/messages/operations.js';
 import {
     getMyUPeerId,
     verify,
@@ -11,11 +9,7 @@ import { canonicalStringify } from '../utils.js';
 import { validateMessage } from '../../security/validation.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { debug, security, warn, error } from '../../security/secure-logger.js';
-import { fileTransferManager } from '../file-transfer/index.js';
-import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
-
-// Rate limiter instance (shared with core)
-const rateLimiter = new IdentityRateLimiter();
+import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 
 export async function handleVaultDelivery(
     senderSid: string,
@@ -59,13 +53,13 @@ export async function handleVaultDelivery(
 
                 // If it's a signed inner packet (CHAT, FILE_DATA_SMALL, etc.)
                 if (innerPacket && innerPacket.signature) {
-                    const { signature: innerSig, senderUpeerId, ...innerData } = innerPacket;
+                    const { signature: innerSig, senderUpeerId: _senderUpeerId, ...innerData } = innerPacket;
 
                     // End-to-End Integrity Verification
-                    const isInnerValid = verify(
+                    const isInnerValid = originalContact.publicKey && verify(
                         Buffer.from(canonicalStringify(innerData)),
                         Buffer.from(innerSig, 'hex'),
-                        Buffer.from(originalContact.publicKey!, 'hex')
+                        Buffer.from(originalContact.publicKey, 'hex')
                     );
 
                     if (!isInnerValid) {
@@ -93,35 +87,38 @@ export async function handleVaultDelivery(
                         const { handleChatMessage } = await import('./chat.js');
                         await handleChatMessage(entry.senderSid, originalContact, innerPacket, win, innerSig, fromAddress, sendResponse);
                     } else if (innerPacket.type === 'CHAT_CLEAR_ALL') {
-                        const { handleIncomingClear } = await import('./chat.js');
-                        await handleIncomingClear(entry.senderSid, innerPacket, win);
+                        const { handleChatClear } = await import('./chat.js');
+                        await handleChatClear(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'FILE_DATA_SMALL') {
-                        // BUG FJ fix: innerPacket.fileHash se usaba directamente como ID de mensaje en DB
-                        // sin validar el formato. Un peer puede enviar fileHash = UUID de otro mensaje
-                        // y onConflictDoUpdate lo sobrescribe (message spoofing). SHA-256 = 64 hex chars.
                         if (typeof innerPacket.fileHash !== 'string' || !/^[0-9a-f]{64}$/i.test(innerPacket.fileHash)) {
                             security('Vault FILE_DATA_SMALL: fileHash inválido', { sender: entry.senderSid }, 'vault');
                             continue;
                         }
-                        await saveFileMessage(innerPacket.fileHash, entry.senderSid, false, {
-                            fileHash: innerPacket.fileHash,
-                            data: innerPacket.data,
-                            state: 'completed'
-                        } as any);
-                    } else if (innerPacket.type.startsWith('FILE_')) {
+                        await saveFileMessage(
+                            innerPacket.fileHash,
+                            entry.senderSid,
+                            false,
+                            innerPacket.fileName || 'file',
+                            innerPacket.fileHash,
+                            innerPacket.fileSize || 0,
+                            innerPacket.mimeType || 'application/octet-stream',
+                            undefined,
+                            'delivered'
+                        );
+                    } else if (innerPacket?.type?.startsWith('FILE_')) {
                         fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket);
-                    } else if (innerPacket.type === 'GROUP_MSG') {
+                    } else if (innerPacket?.type === 'GROUP_MSG') {
                         const { handleGroupMessage } = await import('./groups.js');
                         await handleGroupMessage(entry.senderSid, originalContact, innerPacket, win);
                     } else if (innerPacket.type === 'CHAT_DELETE') {
-                        const { handleIncomingDelete } = await import('./chat.js');
-                        await handleIncomingDelete(entry.senderSid, innerPacket, win);
+                        const { handleChatDelete } = await import('./chat.js');
+                        await handleChatDelete(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'ACK') {
-                        const { handleAck } = await import('./chat.js');
-                        await handleAck(entry.senderSid, innerPacket, win);
+                        const { handleChatAck } = await import('./chat.js');
+                        await handleChatAck(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'READ') {
-                        const { handleReadReceipt } = await import('./chat.js');
-                        await handleReadReceipt(entry.senderSid, innerPacket, win);
+                        const { handleChatAck } = await import('./chat.js');
+                        await handleChatAck(entry.senderSid, { ...innerPacket, status: 'read' }, win);
                     } else if (innerPacket.type === 'GROUP_INVITE') {
                         const { handleGroupInvite } = await import('./groups.js');
                         await handleGroupInvite(entry.senderSid, innerPacket, win);
@@ -139,24 +136,26 @@ export async function handleVaultDelivery(
                         // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)
                         const parts = entry.payloadHash.split(':');
                         const fileHash = parts[1];
-                        let segIdx = 0;
                         let shardIndex = 0;
 
                         if (parts.length === 4) {
-                            segIdx = parseInt(parts[2]);
                             shardIndex = parseInt(parts[3]);
                         } else {
                             shardIndex = parseInt(parts[2]);
                         }
 
                         if (fileHash && !isNaN(shardIndex)) {
-                            await saveFileMessage(fileHash, entry.senderSid, false, {
+                            await saveFileMessage(
                                 fileHash,
-                                segIdx,
-                                shardIndex,
-                                data: entry.data,
-                                state: 'completed'
-                            } as any);
+                                entry.senderSid,
+                                false,
+                                fileHash, // Usamos hash como nombre temporal si no viene
+                                fileHash,
+                                0, // Tamaño desconocido para shard individual
+                                'application/octet-stream',
+                                undefined,
+                                'delivered'
+                            );
                         }
                     }
                 }

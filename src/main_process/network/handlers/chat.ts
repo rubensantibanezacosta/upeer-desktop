@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
 import {
-    updateContactEphemeralPublicKey,
     saveMessage,
     updateMessageStatus,
     updateMessageContent,
     deleteMessageLocally,
+    getMessageById,
+} from '../../storage/messages/operations.js';
+import {
     saveReaction,
     deleteReaction,
-    getMessageById,
-} from '../../storage/db.js';
+} from '../../storage/messages/reactions.js';
+import {
+    updateContactEphemeralPublicKey,
+} from '../../storage/contacts/keys.js';
 import {
     decrypt,
     getMyUPeerId,
@@ -51,7 +55,7 @@ export async function handleChatMessage(
     let displayContent = data.content;
     if (data.ratchetHeader) {
         try {
-            const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/index.js');
+            const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
             const { x3dhResponder, ratchetInitBob, ratchetDecrypt } = await import('../../security/ratchet.js');
             const { getMyIdentitySkBuffer, getSpkBySpkId } = await import('../../security/identity.js');
 
@@ -63,10 +67,10 @@ export async function handleChatMessage(
                 const { ekPub, ikPub, spkId: x3dhSpkId } = data.x3dhInit;
                 const aliceIkPk = Buffer.from(ikPub as string, 'hex');
                 const aliceEkPk = Buffer.from(ekPub as string, 'hex');
-                
+
                 const bobIkSk = getMyIdentitySkBuffer();
                 const spkEntry = getSpkBySpkId(x3dhSpkId as number);
-                
+
                 if (!spkEntry) {
                     error('X3DH: SPK no encontrado por ID', { x3dhSpkId, upeerId }, 'security');
                     throw new Error('spk-not-found');
@@ -158,6 +162,16 @@ export async function handleChatAck(
     }
 }
 
+export async function handleChatClear(
+    upeerId: string,
+    data: any,
+    win: BrowserWindow | null
+) {
+    const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
+    deleteMessagesByChatId(upeerId, data.clearTimestamp);
+    win?.webContents.send('chat-cleared', { upeerId });
+}
+
 export async function handleChatEdit(
     upeerId: string,
     data: any,
@@ -173,6 +187,19 @@ export async function handleChatEdit(
             newContent: data.newContent
         });
     }
+}
+
+export async function handleReadReceipt(
+    upeerId: string,
+    data: any,
+    win: BrowserWindow | null
+) {
+    if (!data.id || !_UUID_RE.test(String(data.id))) return;
+    updateMessageStatus(data.id, 'read');
+    win?.webContents.send('message-status-updated', {
+        id: data.id,
+        status: 'read'
+    });
 }
 
 export async function handleChatDelete(

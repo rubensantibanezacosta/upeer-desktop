@@ -2,14 +2,14 @@ import net from 'node:net';
 import { app } from 'electron';
 import { BrowserWindow } from 'electron';
 import { network, error } from '../../security/secure-logger.js';
-import { getMyUPeerId, getMyEphemeralPublicKeyHex } from '../../security/identity.js';
-import { getContacts } from '../../storage/db.js';
-import { getYggstackAddress, onYggstackAddress, onYggstackStatus } from '../../sidecars/yggstack.js';
+import { getMyUPeerId } from '../../security/identity.js';
+import { getContacts } from '../../storage/contacts/operations.js';
+import { onYggstackAddress } from '../../sidecars/yggstack.js';
 import { handlePacket } from '../handlers.js';
 import { startDhtSearch } from '../dht/core.js';
-import { KademliaDHT } from '../dht/kademlia/index.js';
+import { KademliaDHT } from '../dht/kademlia/main.js';
 import { setKademliaInstance, performDhtMaintenance } from '../dht/handlers.js';
-import { fileTransferManager } from '../file-transfer/index.js';
+import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 import { getNetworkAddress } from '../utils.js';
 
 import { YGG_PORT, MAX_FRAME_BYTES } from './constants.js';
@@ -23,7 +23,6 @@ import {
     getMainWindow,
 } from './state.js';
 import { sendSecureUDPMessage } from './transport.js';
-import { encodeFrame } from './socks5.js';
 import { drainSendQueue } from './transport.js';
 
 export function startUDPServer(win: BrowserWindow) {
@@ -108,7 +107,7 @@ export function startUDPServer(win: BrowserWindow) {
             error('DHT maintenance error', err, 'dht');
         });
 
-        import('../../storage/vault/index.js').then(({ cleanupExpiredVaultEntries }) => {
+        import('../../storage/vault/operations.js').then(({ cleanupExpiredVaultEntries }) => {
             cleanupExpiredVaultEntries().catch(err => {
                 error('Vault cleanup error', err, 'vault');
             });

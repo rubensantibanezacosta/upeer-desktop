@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ChatMessage, Contact, Group, MediaItem } from '../types/chat.js';
+import { ChatMessage, Contact, Group } from '../types/chat.js';
 
 interface ChatState {
     // Identity
@@ -274,7 +274,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     handleSendGroupMessage: async (msg: string) => {
-        const { activeGroupId, myIdentity, replyByConversation } = get();
+        const { activeGroupId, myIdentity } = get();
         if (!activeGroupId || !msg) return;
 
         const sentId = await window.upeer.sendGroupMessage(activeGroupId, msg);
@@ -304,7 +304,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         const { targetUpeerId, activeGroupId, myIdentity } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
-        
+
         window.upeer.sendChatReaction(effectiveId, msgId, emoji, remove);
 
         const myId = myIdentity?.upeerId || 'me';
@@ -331,11 +331,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         const { targetUpeerId, activeGroupId } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
-        
+
         window.upeer.sendChatUpdate(effectiveId, msgId, newContent);
-        
+
         const updateFn = (msg: any) => msg.id === msgId ? { ...msg, message: newContent, isEdited: true } : msg;
-        
+
         set(state => ({
             chatHistory: state.chatHistory.map(updateFn),
             groupChatHistory: state.groupChatHistory.map(updateFn)
@@ -346,11 +346,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         const { targetUpeerId, activeGroupId } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
-        
+
         window.upeer.sendChatDelete(effectiveId, msgId);
-        
+
         const updateFn = (msg: any) => msg.id === msgId ? { ...msg, message: "Mensaje eliminado", isDeleted: true } : msg;
-        
+
         set(state => ({
             chatHistory: state.chatHistory.map(updateFn),
             groupChatHistory: state.groupChatHistory.map(updateFn)
@@ -511,7 +511,10 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                             const updated = { ...parsed, ...updates };
                             return { ...msg, message: JSON.stringify(updated) };
                         }
-                    } catch (e) { /* ignore */ }
+                    } catch {
+                        // Si falla el parseo, simplemente devolvemos el mensaje sin cambios
+                        return msg;
+                    }
                 }
                 return msg;
             };
@@ -664,7 +667,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         window.upeer.onMessageDeleted && window.upeer.onMessageDeleted((data: { id: string, upeerId: string, chatUpeerId: string }) => {
             const { targetUpeerId, activeGroupId } = get();
             const updateFn = (msg: any) => msg.id === data.id ? { ...msg, message: "Mensaje eliminado", isDeleted: true } : msg;
-            
+
             if (data.chatUpeerId === targetUpeerId) {
                 set(state => ({
                     chatHistory: state.chatHistory.map(updateFn)
@@ -677,7 +680,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             }
         });
 
-        // @ts-ignore
+
         window.upeer.onChatCleared && window.upeer.onChatCleared((data: { upeerId: string }) => {
             const { targetUpeerId, activeGroupId } = get();
             if (data.upeerId === targetUpeerId) {

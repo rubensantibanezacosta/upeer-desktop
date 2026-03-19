@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, AspectRatio, Avatar, Tooltip } from '@mui/joy';
+import React, { useEffect, useState, useRef } from 'react';
+import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, Avatar, Tooltip } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -240,6 +240,14 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
         setLoading(false);
     }, [currentIndex, currentItem]);
 
+    const handleNext = React.useCallback(() => {
+        if (currentIndex < items.length - 1) setCurrentIndex(currentIndex + 1);
+    }, [currentIndex, items.length]);
+
+    const handlePrev = React.useCallback(() => {
+        if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+    }, [currentIndex]);
+
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -249,26 +257,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentIndex]);
-
-    // Close emoji menu on outside click
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (emojiOpen && emojiMenuRef.current && !emojiMenuRef.current.contains(event.target as Node)) {
-                setEmojiOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [emojiOpen]);
-
-    const handleNext = () => {
-        if (currentIndex < items.length - 1) setCurrentIndex(currentIndex + 1);
-    };
-
-    const handlePrev = () => {
-        if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-    };
+    }, [handleNext, handlePrev, onClose]);
 
     // Scroll carousel into view
     const carouselRef = useRef<HTMLDivElement>(null);

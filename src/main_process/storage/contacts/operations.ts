@@ -69,7 +69,7 @@ export function addOrUpdateContact(
 
     let known: string[] = [];
     try { known = JSON.parse(existing?.knownAddresses ?? '[]'); } catch { known = []; }
-    
+
     // Merge provided addresses and the primary address
     const incomingAddresses = addresses || [address];
     for (const addr of incomingAddresses) {
@@ -77,7 +77,7 @@ export function addOrUpdateContact(
         if (idx !== -1) known.splice(idx, 1);
         known.unshift(addr); // Most recent to the front
     }
-    
+
     // Ensure the designated primary address is at the very front
     const pIdx = known.indexOf(address);
     if (pIdx !== -1) {
@@ -86,12 +86,12 @@ export function addOrUpdateContact(
     }
 
     if (known.length > 20) known = known.slice(0, 20);
-    const knownAddresses = JSON.stringify(known);
+    const kAddresses = JSON.stringify(known);
 
     const now = new Date().toISOString();
     const ephemeralPublicKeyUpdatedAt = ephemeralPublicKey ? now : undefined;
 
-    return db.insert(schema.contacts).values({
+    const valuesToInsert = {
         upeerId,
         address,
         name,
@@ -101,9 +101,11 @@ export function addOrUpdateContact(
         dhtSeq,
         dhtSignature,
         dhtExpiresAt,
-        knownAddresses,
+        knownAddresses: kAddresses,
         status
-    }).onConflictDoUpdate({
+    };
+
+    return db.insert(schema.contacts).values(valuesToInsert).onConflictDoUpdate({
         target: schema.contacts.upeerId,
         set: {
             address,
@@ -113,7 +115,7 @@ export function addOrUpdateContact(
             dhtSeq,
             dhtSignature,
             dhtExpiresAt,
-            knownAddresses,
+            knownAddresses: kAddresses,
             status
         }
     }).run();

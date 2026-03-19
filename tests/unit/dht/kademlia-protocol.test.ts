@@ -113,4 +113,76 @@ describe('Kademlia ProtocolHandler', () => {
         const updatedContact = routingTable.findContact(senderId);
         expect(updatedContact?.lastSeen).toBeGreaterThan(initialLastSeen!);
     });
+
+    it('should handle DHT_STORE with replication', async () => {
+        const key = Buffer.alloc(20, 10);
+        const alice = 'aliceAliceAliceAliceAliceAlice0';
+        const bob = 'bobBobBobBobBobBobBobBobBobBo0';
+
+        // Add a contact to replicate to
+        routingTable.addContact({
+            nodeId: Buffer.alloc(20, 11),
+            upeerId: bob,
+            address: '2.2.2.2',
+            publicKey: 'pub-bob',
+            lastSeen: Date.now()
+        });
+
+        await handler.storeValue(key, 'replicated-data', alice);
+
+        expect(mockSendMessage).toHaveBeenCalledWith('2.2.2.2', expect.objectContaining({
+            type: 'DHT_STORE',
+            value: 'replicated-data',
+            publisher: alice
+        }));
+    });
+
+    it('should handle unknown message types gracefully', async () => {
+        const response = await handler.handleMessage('sender', { type: 'UNKNOWN' }, '1.1.1.1');
+        expect(response).toBeNull();
+    });
+
+    it('should include queryId in responses if provided', async () => {
+        const qId = 'query-123';
+        const key = Buffer.alloc(20, 12).toString('hex');
+
+        // FIND_NODE with queryId
+        const resNode = await handler.handleMessage('sender', { type: 'DHT_FIND_NODE', targetId: key, queryId: qId }, '1.1.1.1');
+        expect(resNode.queryId).toBe(qId);
+
+        // FIND_VALUE with queryId (when found)
+        valueStore.set(Buffer.from(key, 'hex'), 'val', 'pub');
+        const resVal = await handler.handleMessage('sender', { type: 'DHT_FIND_VALUE', key, queryId: qId }, '1.1.1.1');
+        expect(resVal.queryId).toBe(qId);
+    });
+
+    it('should handle findValue locally and remotely', async () => {
+        const key = Buffer.alloc(20, 15);
+
+        // Test local hit
+        valueStore.set(key, 'local-val', 'me');
+        const localRes = await handler.findValue(key);
+        expect(localRes.value).toBe('local-val');
+
+        // Test remote query (via mock)
+        const remoteKey = Buffer.alloc(20, 16);
+        routingTable.addContact({
+            nodeId: Buffer.alloc(20, 17),
+            upeerId: 'remote-peer',
+            address: '3.3.3.3',
+            publicKey: 'pub',
+            lastSeen: Date.now()
+        });
+
+        const findPromise = handler.findValue(remoteKey);
+
+        // Ensure message was sent
+        expect(mockSendMessage).toHaveBeenCalledWith('3.3.3.3', expect.objectContaining({
+            type: 'DHT_FIND_VALUE',
+            key: remoteKey.toString('hex')
+        }));
+
+        // Simular respuesta exitosa inyectando en pendingQueries (esto requeriría mockear pendingQueries o usar el handler real)
+        // Por ahora, cubrimos la ruta de envío.
+    });
 });

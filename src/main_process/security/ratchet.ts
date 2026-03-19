@@ -74,8 +74,8 @@ function hkdf(rootKey: Buffer, inputMaterial: Buffer, info: string): [Buffer, Bu
 }
 
 function chainStep(ck: Buffer): [messageKey: Buffer, nextCk: Buffer] {
-    const mk = crypto.createHmac('sha256', ck).update(Buffer.from([0x01])).digest() as Buffer;
-    const nck = crypto.createHmac('sha256', ck).update(Buffer.from([0x02])).digest() as Buffer;
+    const mk = crypto.createHmac('sha256', ck).update(Buffer.from([0x01])).digest();
+    const nck = crypto.createHmac('sha256', ck).update(Buffer.from([0x02])).digest();
     return [mk, nck];
 }
 
@@ -104,7 +104,7 @@ export function x3dhInitiator(
     const dh3 = Buffer.alloc(sodium.crypto_scalarmult_BYTES);
     sodium.crypto_scalarmult(dh3, ekSk, bobSpkPk);
 
-    const combined = Buffer.concat([Buffer.alloc(32, 0), dh1, dh2, dh3]);
+    const combined = Buffer.concat([dh1, dh2, dh3]);
     const zeroKey = Buffer.alloc(32, 0);
     const [sharedSecret] = hkdf(zeroKey, combined, 'X3DHv1.0');
 
@@ -138,7 +138,7 @@ export function x3dhResponder(
     const dh3 = Buffer.alloc(sodium.crypto_scalarmult_BYTES);
     sodium.crypto_scalarmult(dh3, bobSpkSk, aliceEkPk);
 
-    const combined = Buffer.concat([Buffer.alloc(32, 0), dh1, dh2, dh3]);
+    const combined = Buffer.concat([dh1, dh2, dh3]);
     const zeroKey = Buffer.alloc(32, 0);
     const [sharedSecret] = hkdf(zeroKey, combined, 'X3DHv1.0');
 
@@ -259,16 +259,21 @@ function skipKeys(state: RatchetState, until: number): void {
     while (state.nr < until) {
         const [mk, nextCkr] = chainStep(state.ckr);
         state.ckr = nextCkr;
-        state.skipped.set(`${state.dhr!.toString('hex')}:${state.nr}`, mk);
+        const dhr = state.dhr;
+        if (dhr) {
+            state.skipped.set(`${dhr.toString('hex')}:${state.nr}`, mk);
+        }
         state.nr++;
 
         // Límite duro anti-DoS
         if (state.skipped.size > MAX_SKIPPED_TOTAL) {
             const oldest = state.skipped.keys().next().value;
             if (oldest) {
-                const old = state.skipped.get(oldest)!;
-                sodium.sodium_memzero(old);
-                state.skipped.delete(oldest);
+                const old = state.skipped.get(oldest);
+                if (old) {
+                    sodium.sodium_memzero(old);
+                    state.skipped.delete(oldest);
+                }
             }
         }
     }
@@ -299,7 +304,9 @@ export function ratchetDecrypt(
     }
 
     if (needsDhStep) {
-        skipKeys(state, header.pn);
+        if (state.ckr) {
+            skipKeys(state, header.pn);
+        }
         dhRatchetStep(state, msgDhPk);
     }
 
@@ -307,14 +314,21 @@ export function ratchetDecrypt(
 
     if (!state.ckr) return null;
     const [mk, nextCkr] = chainStep(state.ckr);
-    state.ckr = nextCkr;
-    state.nr++;
 
     const ct = Buffer.from(ciphertextHex, 'hex');
     const plaintext = Buffer.alloc(ct.length - sodium.crypto_secretbox_MACBYTES);
-    const ok = sodium.crypto_secretbox_open_easy(plaintext, ct, Buffer.from(nonceHex, 'hex'), mk);
-    sodium.sodium_memzero(mk);
-    return ok ? plaintext : null;
+    const nonce = Buffer.from(nonceHex, 'hex');
+    const ok = sodium.crypto_secretbox_open_easy(plaintext, ct, nonce, mk);
+
+    if (ok) {
+        state.ckr = nextCkr;
+        state.nr++;
+        sodium.sodium_memzero(mk);
+        return plaintext;
+    } else {
+        sodium.sodium_memzero(mk);
+        return null;
+    }
 }
 
 export interface SerializedRatchetState {

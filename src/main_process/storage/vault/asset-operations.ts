@@ -11,7 +11,7 @@ export async function trackDistributedAsset(
     shardIndex: number,
     totalShards: number,
     custodianSid: string,
-    segmentIndex: number = 0
+    segmentIndex = 0
 ) {
     const db = getDb();
     return db.insert(distributedAssets).values({

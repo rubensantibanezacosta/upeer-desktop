@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import sodium from 'sodium-native';
 import * as schema from './schema.js';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { info, error } from '../security/secure-logger.js';
+import { error } from '../security/secure-logger.js';
 import { setDatabase } from './shared.js';
 
 // ── SQLCipher key derivation ──────────────────────────────────────────────────
@@ -93,7 +93,8 @@ export async function initDB(userDataPath: string) {
             if (electronApp?.isPackaged) {
                 migrationsPath = path.join(process.resourcesPath, 'drizzle');
             }
-        } catch (e) {
+        } catch (_e) {
+            // Ignored, might be running in a test environment without electron
         }
 
         migrate(db, { migrationsFolder: migrationsPath });

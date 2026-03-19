@@ -1,8 +1,8 @@
 import {
     getContactByUpeerId,
-    updateContactDhtLocation,
     getContacts,
-} from '../../storage/db.js';
+} from '../../storage/contacts/operations.js';
+import { updateContactDhtLocation } from '../../storage/contacts/location.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { verifyLocationBlock } from '../utils.js';
 import { network, security } from '../../security/secure-logger.js';

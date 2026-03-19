@@ -6,7 +6,6 @@ import {
     Avatar,
     Button,
     Tooltip,
-    Badge,
     Input
 } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
@@ -14,7 +13,6 @@ import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import LockIcon from '@mui/icons-material/Lock';
 import GroupsIcon from '@mui/icons-material/Groups';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
@@ -23,7 +21,6 @@ import SecurityIcon from '@mui/icons-material/Security';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
 
 interface TopHeaderProps {
     contactName?: string;
@@ -45,7 +42,7 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-    contactName, avatar, onDelete, onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity,
+    contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
     isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup
 }) => {
     const avatarFileRef = useRef<HTMLInputElement>(null);
@@ -74,7 +71,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = 256; canvas.height = 256;
-                const ctx = canvas.getContext('2d')!;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
                 const side = Math.min(img.width, img.height);
                 const sx = (img.width - side) / 2;
                 const sy = (img.height - side) / 2;

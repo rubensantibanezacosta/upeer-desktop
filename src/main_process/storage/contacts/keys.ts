@@ -10,7 +10,8 @@ export function computeKeyFingerprint(pubKeyHex: string): string {
     sodium.crypto_generichash(hash, Buffer.from(pubKeyHex, 'hex'));
     // Format: XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX (8 groups of 4 hex chars)
     const hex = hash.toString('hex');
-    return hex.match(/.{4}/g)!.join(' ').toUpperCase();
+    const matches = hex.match(/.{4}/g);
+    return matches ? matches.join(' ').toUpperCase() : hex.toUpperCase();
 }
 
 /**

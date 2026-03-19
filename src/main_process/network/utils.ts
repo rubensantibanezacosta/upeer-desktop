@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { getMyUPeerId, sign, verify, getMyAlias } from '../security/identity.js';
 import { getKademliaInstance } from './dht/shared.js';
 import { getYggstackAddress } from '../sidecars/yggstack.js';
-import { network, security, info, warn, error, debug } from '../security/secure-logger.js';
+import { network, warn, error, debug } from '../security/secure-logger.js';
 import type { RenewalToken } from './types.js';
 
 /**
@@ -15,16 +15,26 @@ export function validateAddress(address: string): void {
     if (!ipv4Regex.test(address) && !ipv6Regex.test(address)) {
         throw new Error(`Invalid network address format: ${address}`);
     }
+    // Deep IPv4 check for octets > 255
+    if (ipv4Regex.test(address)) {
+        const octets = address.split('.').map(Number);
+        if (octets.some(o => o > 255)) {
+            throw new Error(`Invalid IPv4 address: octet > 255 in ${address}`);
+        }
+    }
 }
 
 /**
  * Prioritizes Yggdrasil/IPv6 addresses over IPv4 for sorting.
  * This ensures Yggdrasil is used as the 'primary' address in legacy fields.
  */
-function prioritizeYggdrasil(a: string, b: string): number {
+/**
+ * Sorts an array of IP addresses prioritizing Yggdrasil (200::/7) addresses.
+ */
+export function prioritizeYggdrasil(a: string, b: string): number {
     const isAYgg = a.startsWith('2') || a.startsWith('3') || a.includes(':');
     const isBYgg = b.startsWith('2') || b.startsWith('3') || b.includes(':');
-    
+
     if (isAYgg && !isBYgg) return -1;
     if (!isAYgg && isBYgg) return 1;
     return a.localeCompare(b);
@@ -98,7 +108,7 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
     // Signature includes upeerId, addresses (plural), dhtSeq, expiresAt
     const data = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt };
     const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
-    
+
     // For backward compatibility in object keys, we keep 'address' as the primary one (first)
     // Thanks to prioritizeYggdrasil, addresses[0] will be Yggdrasil if available.
     return { address: sortedAddresses[0], addresses: sortedAddresses, dhtSeq, expiresAt, signature: sig, renewalToken: finalRenewalToken, alias: getMyAlias() || undefined };
@@ -119,7 +129,7 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
 export function verifyLocationBlock(upeerId: string, block: { address: string, addresses?: string[], dhtSeq: number, signature: string, expiresAt?: number, renewalToken?: RenewalToken }, publicKeyHex: string): boolean {
     // Audit Note: Removed legacy fallbacks for blocks without expiresAt.
     // Modern protocol requires expiresAt and consistent canonical serialization.
-    
+
     if (block.expiresAt === undefined) {
         warn('Rejected legacy location block (missing expiresAt)', { upeerId }, 'dht');
         return false;
@@ -127,16 +137,15 @@ export function verifyLocationBlock(upeerId: string, block: { address: string, a
 
     // First check if block is expired
     if (block.expiresAt < Date.now()) {
-        if (block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-            return true; // Allow renewal path
-        }
+        // Un bloque expirado no es válido para su uso normal, incluso si tiene
+        // un renewalToken (que sirve para pedir uno nuevo, no para validar el viejo).
         return false;
     }
 
     try {
         // Multi-channel support: use 'addresses' if present, fallback to 'address'
         const inputAddresses = block.addresses || [block.address];
-        const sortedAddresses = [...new Set(inputAddresses)].sort();
+        const sortedAddresses = [...new Set(inputAddresses)].sort(prioritizeYggdrasil);
         sortedAddresses.forEach(addr => validateAddress(addr));
 
         // Attempt verification with the modern 'addresses' array
@@ -319,7 +328,7 @@ export function verifyRenewalToken(token: RenewalToken, publicKeyHex: string): b
     // privada de Alice, por lo que nunca puede ser re-firmado. Incluyéndolo
     // la verición fallaba después del primer renewal (0→1).
     // La protección real contra renovaciones infinitas es allowedUntil (60 días).
-    const { signature, renewalsUsed, ...signedData } = token;
+    const { signature, renewalsUsed: _renewalsUsed, ...signedData } = token;
     try {
         const isValid = verify(
             Buffer.from(canonicalStringify(signedData)),

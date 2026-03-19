@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import { EmptyChat } from './EmptyChat.js';
-import { MessageItem } from './message/index.js';
+import { MessageItem } from './message/MessageItem.js';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 interface ChatMessage {
@@ -38,7 +38,7 @@ interface ChatAreaProps {
     onTransferStateChange?: (fileId: string, updates: any) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp, contacts, onReply, onReact, onEdit, onDelete, activeTransfers = [], onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, activeTransfers = [], onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);

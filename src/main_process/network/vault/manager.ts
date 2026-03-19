@@ -1,10 +1,10 @@
-import { getContacts } from '../../storage/db.js';
+import { getContacts } from '../../storage/contacts/operations.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { info, warn, debug } from '../../security/secure-logger.js';
 import crypto from 'node:crypto';
 import { getKademliaInstance } from '../dht/shared.js';
-import { createVaultPointerKey } from '../dht/kademlia/index.js';
+import { createVaultPointerKey } from '../dht/kademlia/store.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 
 export const VAULT_TTL_MS = 60 * 24 * 60 * 60 * 1000;
@@ -19,7 +19,7 @@ export class VaultManager {
     private static async getDynamicReplicationFactor(recipientSid: string): Promise<number> {
         try {
             const score = await getVouchScore(recipientSid);
-            const { getContactByUpeerId } = await import('../../storage/db.js');
+            const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
             const contact = await getContactByUpeerId(recipientSid);
 
             const now = Date.now();
@@ -122,11 +122,11 @@ export class VaultManager {
         });
 
         const results = await Promise.all(sendPromises);
-        results.forEach(id => { if (id) custodianIds.push(id); });
+        const successfulIds = results.filter((id): id is string => !!id);
 
-        if (kademlia && custodianIds.length > 0) {
+        if (kademlia && successfulIds.length > 0) {
             const ptrKey = createVaultPointerKey(recipientSid);
-            const ptrValue = { custodians: custodianIds, updatedAt: Date.now() };
+            const ptrValue = { custodians: successfulIds, updatedAt: Date.now() };
             kademlia.storeValue(ptrKey, ptrValue, myId).catch(err => {
                 warn('Failed to publish vault pointer to DHT', err, 'vault');
             });
@@ -134,12 +134,12 @@ export class VaultManager {
 
         info('Message replicated to vaults', {
             recipient: recipientSid,
-            nodes: candidates.length,
+            nodes: successfulIds.length,
             hash: payloadHash.slice(0, 8),
             dht: !!kademlia
         }, 'vault');
 
-        return candidates.length;
+        return successfulIds.length;
     }
 
     static async queryOwnVaults() {

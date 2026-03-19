@@ -9,7 +9,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 /**
  * Returns the appropriate MUI icon based on the file's MIME type and name.
  */
-export const getFileIcon = (mimeType: string, fileName: string = '') => {
+export const getFileIcon = (mimeType: string, fileName = '') => {
     const type = mimeType.toLowerCase();
     const name = fileName.toLowerCase();
 

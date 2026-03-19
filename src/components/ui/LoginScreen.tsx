@@ -8,7 +8,6 @@ import {
     CircularProgress,
     Textarea,
     IconButton,
-    Tooltip,
     LinearProgress,
     Chip,
 } from '@mui/joy';
@@ -25,7 +24,6 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockIcon from '@mui/icons-material/Lock';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 
 type Screen = 'home' | 'create-explain' | 'create-generate' | 'create-confirm' | 'import' | 'switch-warn';
@@ -405,7 +403,8 @@ const resizeImageToDataUrl = (file: File, size = 128): Promise<string> =>
                 const canvas = document.createElement('canvas');
                 canvas.width = size;
                 canvas.height = size;
-                const ctx = canvas.getContext('2d')!;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(''); // Fallback silencioso
                 // Centrar y recortar en cuadrado
                 const scale = Math.max(size / img.width, size / img.height);
                 const w = img.width * scale;
@@ -699,7 +698,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
         }).catch(() => {
             setInitializing(false);
         });
-    }, []);
+    }, [onUnlocked]);
 
     const handleGenerateMnemonic = async () => {
         const result = await window.upeer.generateMnemonic();

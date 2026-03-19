@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ValueStore } from '../../../src/main_process/network/dht/kademlia/store.js';
+import { ValueStore, createLocationBlockKey, createVaultPointerKey } from '../../../src/main_process/network/dht/kademlia/store.js';
 
 describe('Kademlia ValueStore', () => {
     let store: ValueStore;
@@ -11,12 +11,24 @@ describe('Kademlia ValueStore', () => {
     it('should store and retrieve values', () => {
         const key = Buffer.from('test-key-12345678901234567890');
         const value = { data: 'hello' };
-        store.set(key, value, 'peer1');
+        store.set(key, value, 'peer1', 'sig1');
 
         const retrieved = store.get(key);
         expect(retrieved).not.toBeNull();
         expect(retrieved?.value).toEqual(value);
         expect(retrieved?.publisher).toBe('peer1');
+        expect(retrieved?.signature).toBe('sig1');
+        expect(store.has(key)).toBe(true);
+    });
+
+    it('should delete keys', () => {
+        const key = Buffer.from('delete-me-12345678901234567890');
+        store.set(key, 'val', 'p');
+        expect(store.has(key)).toBe(true);
+        expect(store.delete(key)).toBe(true);
+        expect(store.has(key)).toBe(false);
+        expect(store.get(key)).toBeNull();
+        expect(store.delete(key)).toBe(false);
     });
 
     it('should respect MAX_STORE_ENTRIES and evict oldest', () => {
@@ -76,8 +88,6 @@ describe('Kademlia ValueStore', () => {
         store.set(key, 'val', 'peer');
 
         // Fast forward 31 days (TTL is usually around that)
-        // Let's check TTL_MS from types or assume standard 24h/30d
-        // If I don't know TTL_MS, I'll check it or just jump a lot.
         vi.advanceTimersByTime(1000 * 60 * 60 * 24 * 31); // 31 days
 
         const removed = store.cleanupExpiredValues();
@@ -85,5 +95,45 @@ describe('Kademlia ValueStore', () => {
         expect(store.has(key)).toBe(false);
 
         vi.useRealTimers();
+    });
+
+    it('should return all values with getAll', () => {
+        const k1 = Buffer.from('k1-12345678901234567890');
+        const k2 = Buffer.from('k2-12345678901234567890');
+        store.set(k1, 'v1', 'p1');
+        store.set(k2, 'v2', 'p2');
+
+        const all = store.getAll();
+        expect(all).toHaveLength(2);
+        expect(all[0].value).toBe('v1');
+        expect(all[1].value).toBe('v2');
+    });
+
+    describe('key creation helpers', () => {
+        it('should create valid LocationBlock keys', () => {
+            const k = createLocationBlockKey('upeer1');
+            expect(Buffer.isBuffer(k)).toBe(true);
+            expect(k.length).toBe(20);
+        });
+
+        it('should create valid Vault Pointer keys', () => {
+            const k = createVaultPointerKey('recipient1');
+            expect(Buffer.isBuffer(k)).toBe(true);
+            expect(k.length).toBe(20);
+        });
+
+        it('should create unique Vault Pointer keys each day', () => {
+            const k1 = createVaultPointerKey('recipient1');
+
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-01'));
+            const kA = createVaultPointerKey('recipient1');
+
+            vi.setSystemTime(new Date('2025-01-02'));
+            const kB = createVaultPointerKey('recipient1');
+
+            expect(kA.toString('hex')).not.toBe(kB.toString('hex'));
+            vi.useRealTimers();
+        });
     });
 });

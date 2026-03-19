@@ -14,7 +14,6 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
-import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import { FileTransfer } from '../../../hooks/useFileTransfer.js';
 
 
@@ -56,11 +55,12 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
             case 'completed': return 'success';
             case 'failed': return 'danger';
             case 'cancelled': return 'neutral';
-            case 'active':
+            case 'active': {
                 const phase = (transfer as any).phase;
                 if (phase === 3) return 'warning'; // Replicating
                 if (phase === 4) return 'primary'; // Vaulted
                 return 'primary';
+            }
             case 'pending': return 'warning';
             default: return 'neutral';
         }
@@ -74,13 +74,14 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
                 return <ErrorIcon sx={{ color: 'danger.500', fontSize: '1.2rem' }} />;
             case 'cancelled':
                 return <CloseIcon sx={{ color: 'neutral.500', fontSize: '1.2rem' }} />;
-            case 'active':
+            case 'active': {
                 const phase = (transfer as any).phase;
                 if (phase === 3) return <CloudUploadIcon sx={{ color: 'warning.500', fontSize: '1.2rem', animation: 'pulse 1s infinite' }} />;
                 if (phase === 4) return <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
                 return direction === 'sending'
                     ? <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />
                     : <CloudDownloadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
+            }
             case 'pending':
                 return <CircularProgress size="sm" thickness={3} />;
             default:

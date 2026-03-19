@@ -2,10 +2,10 @@ import net from 'node:net';
 import { SOCKS5_HOST, SOCKS5_PORT } from './constants.js';
 
 export function parseIPv6ToBuffer(addr: string): Buffer {
-    addr = addr.replace(/[\[\]]/g, '');
+    addr = addr.replace(/[[\]]/g, '');
     const halves = addr.split('::');
     let groups: string[] = [];
-    
+
     if (halves.length === 2) {
         const left = halves[0] ? halves[0].split(':') : [];
         const right = halves[1] ? halves[1].split(':') : [];
@@ -14,7 +14,7 @@ export function parseIPv6ToBuffer(addr: string): Buffer {
     } else {
         groups = addr.split(':');
     }
-    
+
     const buf = Buffer.alloc(16);
     for (let i = 0; i < 8; i++) {
         const val = parseInt(groups[i] || '0', 16);
@@ -36,11 +36,11 @@ export function socks5Connect(host: string, port: number): Promise<net.Socket> {
         let buf = Buffer.alloc(0);
 
         socket.setTimeout(8000);
-        socket.on('timeout', () => { 
-            socket.destroy(); 
-            reject(new Error('SOCKS5 timeout')); 
+        socket.on('timeout', () => {
+            socket.destroy();
+            reject(new Error('SOCKS5 timeout'));
         });
-        
+
         socket.on('error', (err) => {
             socket.destroy();
             reject(err);
@@ -68,9 +68,9 @@ export function socks5Connect(host: string, port: number): Promise<net.Socket> {
                     const portBuf = Buffer.alloc(2);
                     portBuf.writeUInt16BE(port, 0);
                     socket.write(Buffer.concat([Buffer.from([0x05, 0x01, 0x00, 0x04]), addrBuf, portBuf]));
-                } catch (e) { 
-                    socket.destroy(); 
-                    reject(e); 
+                } catch (e) {
+                    socket.destroy();
+                    reject(e);
                 }
                 return;
             }

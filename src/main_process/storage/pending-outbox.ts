@@ -68,8 +68,7 @@ export async function flushPendingOutbox(
             // Re-cifrar con la clave estática recién recibida
             const { ciphertext, nonce } = encrypt(
                 Buffer.from(entry.plaintext, 'utf-8'),
-                Buffer.from(recipientPublicKeyHex, 'hex'),
-                false  // siempre estática para vault — nunca ephemeral
+                Buffer.from(recipientPublicKeyHex, 'hex')
             );
 
             // BUG J fix: usar el msgId original grabado en la outbox en vez de generar
@@ -78,8 +77,8 @@ export async function flushPendingOutbox(
             const vaultData = {
                 type: 'CHAT',
                 id: entry.msgId,
-                content: ciphertext.toString('hex'),
-                nonce: nonce.toString('hex'),
+                content: ciphertext,
+                nonce: nonce,
                 replyTo: entry.replyTo ?? undefined,
             };
 
@@ -91,7 +90,9 @@ export async function flushPendingOutbox(
             };
 
             await VaultManager.replicateToVaults(recipientSid, innerPacket);
-            await deletePendingOutboxMessage(entry.id!);
+            if (entry.id) {
+                await deletePendingOutboxMessage(entry.id);
+            }
 
             debug('Pending outbox: message vaulted and removed', { id: entry.id, recipientSid }, 'vault');
         } catch (err) {

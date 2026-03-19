@@ -8,9 +8,10 @@ import {
   blockContact,
   unblockContact,
   getBlockedContacts,
-  deleteMessagesByChatId
-} from '../../storage/db.js';
-import { sendContactRequest, acceptContactRequest, sendChatClear } from '../../network/server/index.js';
+} from '../../storage/contacts/operations.js';
+import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
+import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
+import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore } from '../../security/reputation/vouches.js';
 
 /**
@@ -30,8 +31,8 @@ export function registerContactHandlers(): void {
       let known: string[] = [];
       if (contact.knownAddresses) {
         try {
-          known = typeof contact.knownAddresses === 'string' 
-            ? JSON.parse(contact.knownAddresses) 
+          known = typeof contact.knownAddresses === 'string'
+            ? JSON.parse(contact.knownAddresses)
             : contact.knownAddresses;
         } catch { /* ignore */ }
       }

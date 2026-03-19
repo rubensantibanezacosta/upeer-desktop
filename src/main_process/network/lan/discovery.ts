@@ -1,9 +1,8 @@
 import dgram from 'node:dgram';
-import os from 'node:os';
 import { getMyUPeerId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock } from '../utils.js';
 import { getMyDhtSeq } from '../../security/identity.js';
-import { addOrUpdateContact } from '../../storage/db.js';
+import { addOrUpdateContact } from '../../storage/contacts/operations.js';
 import { isContactBlocked } from '../../storage/contacts/operations.js';
 import { network, info, warn } from '../../security/secure-logger.js';
 import { RateLimiter } from '../../security/rate-limiter.js';
@@ -39,8 +38,6 @@ export class LanDiscovery {
         'LAN_DISCOVERY': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
     });
 
-    constructor() { }
-
     // Start LAN discovery
     async start(): Promise<void> {
         if (this.isRunning) return;
@@ -58,10 +55,13 @@ export class LanDiscovery {
 
             // Bind to all interfaces on LAN discovery port
             await new Promise<void>((resolve, reject) => {
-                this.socket!.bind(LAN_DISCOVERY_PORT, '::', () => {
+                const s = this.socket;
+                if (!s) return reject(new Error('Socket not initialized'));
+
+                s.bind(LAN_DISCOVERY_PORT, '::', () => {
                     // Join multicast group for IPv6
                     try {
-                        this.socket!.addMembership(LAN_MULTICAST_GROUP);
+                        s.addMembership(LAN_MULTICAST_GROUP);
                         info('LAN discovery started', { port: LAN_DISCOVERY_PORT, multicastGroup: LAN_MULTICAST_GROUP }, 'lan');
                         resolve();
                     } catch (error) {
@@ -207,7 +207,7 @@ export class LanDiscovery {
     }
 
     // Validate LAN message
-    private validateLanMessage(message: LanDiscoveryMessage, rinfo: any): boolean {
+    private validateLanMessage(message: LanDiscoveryMessage, _rinfo: any): boolean {
         if (!message.upeerId || !message.publicKey || !message.address || !message.timestamp || !message.signature) {
             return false;
         }

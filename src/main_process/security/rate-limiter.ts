@@ -112,13 +112,13 @@ export class RateLimiter {
         }
 
         const now = Date.now();
-        const bucketKey = `${ip}:${messageType}`;
 
         // Get or create bucket for this IP and message type
         if (!this.buckets.has(ip)) {
             this.buckets.set(ip, new Map());
         }
-        const ipBuckets = this.buckets.get(ip)!;
+        const ipBuckets = this.buckets.get(ip);
+        if (!ipBuckets) return true;
 
         if (!ipBuckets.has(messageType)) {
             ipBuckets.set(messageType, {
@@ -127,7 +127,8 @@ export class RateLimiter {
             });
         }
 
-        const bucket = ipBuckets.get(messageType)!;
+        const bucket = ipBuckets.get(messageType);
+        if (!bucket) return true;
 
         // Refill tokens based on elapsed time
         const elapsedMs = now - bucket.lastRefill;
@@ -172,7 +173,7 @@ export class RateLimiter {
      * Clean up old entries to prevent memory leak
      * Should be called periodically (e.g., every hour)
      */
-    cleanup(maxAgeMs: number = 3600000): void {
+    cleanup(maxAgeMs = 3600000): void {
         const now = Date.now();
         const toDelete: string[] = [];
 

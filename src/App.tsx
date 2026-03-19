@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CssVarsProvider, Sheet, Box, Typography, Stack } from '@mui/joy';
+import { CssVarsProvider, Sheet, Box, Typography } from '@mui/joy';
 import { Sidebar } from './components/layout/Sidebar.js';
 import { ChatArea } from './features/chat/ChatArea.js';
 import { IncomingRequestChat } from './features/chat/IncomingRequestChat.js';
 import { TopHeader } from './components/layout/TopHeader.js';
-import { InputArea } from './features/chat/input/index.js';
+import { InputArea } from './features/chat/input/InputArea.js';
 import { AddContactModal } from './components/ui/AddContactModal.js';
 import { NavigationRail } from './components/layout/NavigationRail.js';
 import { IdentityModal } from './components/ui/IdentityModal.js';
@@ -17,10 +17,11 @@ import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
-import { AttachmentType } from './features/chat/input/index.js';
+import { AttachmentType } from './features/chat/input/AttachmentButton.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
-import { FilePreviewOverlay } from './features/chat/file-preview/index.js';
-import { MediaViewerOverlay } from './features/chat/media-viewer/index.js';
+import { FilePreviewOverlay } from './features/chat/file-preview/FilePreviewOverlay.js';
+import { MediaViewerOverlay } from './features/chat/media-viewer/MediaViewerOverlay.js';
+import { AppLock } from './components/ui/AppLock.js';
 import { getMimeType } from './utils/fileUtils.js';
 import { parseMessage } from './features/chat/message/MessageItem.js';
 import { Contact } from './types/chat.js';
@@ -36,7 +37,6 @@ export default function App() {
         isSecurityModalOpen, setSecurityModalOpen,
         isCreateGroupModalOpen, setCreateGroupModalOpen,
         isFilePickerOpen, setFilePickerOpen,
-        isTransfersExpanded, setTransfersExpanded,
         viewerMediaList, viewerInitialIndex, openMediaViewer, closeMediaViewer
     } = useNavigationStore();
 
@@ -61,7 +61,6 @@ export default function App() {
         typingStatus,
         myIdentity,
         incomingRequests,
-        untrustworthyAlert,
         untrustworthyAlerts,
         pendingFiles, setPendingFiles,
         isDragging, setIsDragging,
@@ -74,12 +73,18 @@ export default function App() {
     } = useChatStore();
 
     const [editingMessage, setEditingMessage] = useState<any>(null);
+    const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
 
     // File transfer hook remains local to get instance but syncs with store
     const fileTransfer = useFileTransfer(updateFileTransferMessage);
 
     // Initialization
     useEffect(() => {
+        // First check if PIN is enabled to lock the app early
+        window.upeer.isPinEnabled().then((enabled: boolean) => {
+            setIsAppLocked(enabled);
+        });
+
         checkAuth();
         initListeners();
         refreshData();
@@ -93,15 +98,15 @@ export default function App() {
             }
         });
         window.upeer.onYggstackAddress(setYggAddress);
-        window.upeer.onYggstackStatus((status: string, addr?: string) => {
+        window.upeer.onYggstackStatus((status: string, _addr?: string) => {
             const s = status as YggNetworkStatus;
             setNetworkStatus(s);
             if (s === 'up') {
                 setFirstConnect(false);
-                if (addr) setYggAddress(addr);
+                if (_addr) setYggAddress(_addr);
             }
         });
-    }, []);
+    }, [checkAuth, initListeners, refreshData, refreshGroups, setFirstConnect, setNetworkStatus, setYggAddress]);
 
     // Derived values
     const message = activeGroupId ? (messagesByConversation[activeGroupId] || '') : (messagesByConversation[targetUpeerId] || '');
@@ -171,7 +176,7 @@ export default function App() {
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
         const mappedFiles = droppedFilesRaw.map((f: any) => {
             const filePath = window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path;
-            let type = f.type || getMimeType(f.name);
+            const type = f.type || getMimeType(f.name);
             return { path: filePath, name: f.name, size: f.size, type, lastModified: f.lastModified };
         }).filter(f => !!f.path);
         if (mappedFiles.length > 0) {
@@ -186,11 +191,11 @@ export default function App() {
         const allMedia = currentHistory.map(msg => {
             const { fileData } = parseMessage(msg.message, msg.isMine, currentTransfers);
             if (!fileData) return null;
-            let senderName = msg.isMine ? 'Tú' : (activeGroupId ? (contacts.find(c => c.upeerId === msg.senderUpeerId)?.name || msg.senderName) : activeContact?.name);
-            let senderAvatar = msg.isMine ? myIdentity?.avatar : (activeGroupId ? contacts.find(c => c.upeerId === msg.senderUpeerId)?.avatar : activeContactAvatar);
+            const senderName = msg.isMine ? 'Tú' : (activeGroupId ? (contacts.find(c => c.upeerId === msg.senderUpeerId)?.name || msg.senderName) : activeContact?.name);
+            const senderAvatar = msg.isMine ? myIdentity?.avatar : (activeGroupId ? contacts.find(c => c.upeerId === msg.senderUpeerId)?.avatar : activeContactAvatar);
             return { ...fileData, messageId: msg.id, senderName, senderAvatar, timestamp: msg.timestamp };
         }).filter((f): f is any => f && (f.mimeType?.startsWith('image/') || f.mimeType?.startsWith('video/')) && f.savedPath)
-            .map(f => ({ url: f.savedPath!, fileName: f.fileName, mimeType: f.mimeType, fileId: f.fileId, messageId: f.messageId, thumbnail: f.thumbnail, senderName: f.senderName, senderAvatar: f.senderAvatar, timestamp: f.timestamp }));
+            .map(f => ({ url: f.savedPath ?? '', fileName: f.fileName, mimeType: f.mimeType, fileId: f.fileId, messageId: f.messageId, thumbnail: f.thumbnail, senderName: f.senderName, senderAvatar: f.senderAvatar, timestamp: f.timestamp }));
 
         const initialIndex = allMedia.findIndex(m => m.fileId === media.fileId);
         if (initialIndex !== -1) openMediaViewer(allMedia, initialIndex);
@@ -222,6 +227,10 @@ export default function App() {
 
     return (
         <CssVarsProvider defaultMode="dark">
+            {isAppLocked && (
+                <AppLock onUnlock={() => setIsAppLocked(false)} />
+            )}
+
             {isAuthenticated === null && (
                 <Box sx={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'background.body' }}>
                     <Box sx={{ width: 36, height: 36, border: '3px solid', borderColor: 'primary.500', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} />
@@ -337,7 +346,7 @@ export default function App() {
                                                     message={message}
                                                     setMessage={(val) => setMessage(activeGroupId || targetUpeerId, val)}
                                                     onSend={editingMessage
-                                                        ? () => { handleUpdateMessage(editingMessage.id!, message); setEditingMessage(null); }
+                                                        ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); }
                                                         : (activeGroupId ? () => handleSendGroupMessage(message) : handleSend)
                                                     }
                                                     onTyping={handleTyping}
@@ -400,12 +409,12 @@ export default function App() {
                             <ShareContactModal open={isShareModalOpen} onClose={() => setShareModalOpen(false)} contacts={contacts} onShare={(contact) => { if (targetUpeerId) window.upeer.sendContactCard(targetUpeerId, contact); }} />
 
                             {isSecurityModalOpen && activeContact && (
-                                <SecurityModal 
-                                    open={isSecurityModalOpen} 
-                                    onClose={() => setSecurityModalOpen(false)} 
-                                    contactName={activeContact.name} 
-                                    contactPublicKey={activeContact.publicKey || ''} 
-                                    myPublicKey={myIdentity?.publicKey || ''} 
+                                <SecurityModal
+                                    open={isSecurityModalOpen}
+                                    onClose={() => setSecurityModalOpen(false)}
+                                    contactName={activeContact.name}
+                                    contactPublicKey={activeContact.publicKey || ''}
+                                    myPublicKey={myIdentity?.publicKey || ''}
                                     knownAddresses={activeContact.knownAddresses}
                                 />
                             )}
@@ -428,7 +437,7 @@ export default function App() {
                                         closeMediaViewer();
                                     }}
                                     onReact={(item: any, emoji: string) => { if (item.messageId) handleReaction(item.messageId, emoji, false); }}
-                                    onForward={(item: any) => console.log('Forwarding', item)}
+                                    onForward={(_item: any) => { /* logic to be implemented */ }}
                                     onGoToMessage={(item: any) => {
                                         if (item.messageId) {
                                             closeMediaViewer();

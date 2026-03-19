@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 // usamos any para sqlite y conservamos tipado fuerte solo para drizzle.
 import * as schema from './schema.js';
 import { eq, desc, or, and, lt, sql } from 'drizzle-orm';
-import { warn, error } from '../security/secure-logger.js';
+import { error } from '../security/secure-logger.js';
 
 // Shared database instance
 let sqlite: any | null = null;

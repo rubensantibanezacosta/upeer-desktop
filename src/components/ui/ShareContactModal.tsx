@@ -4,7 +4,6 @@ import {
     ModalDialog,
     DialogTitle,
     DialogContent,
-    Stack,
     Typography,
     Box,
     ListItem,

@@ -8,7 +8,10 @@ import {
     Box,
     Typography,
     Divider,
+    Stack,
+    Alert,
 } from '@mui/joy';
+import SecurityIcon from '@mui/icons-material/Security';
 
 interface InfoModalProps {
     open: boolean;
@@ -84,45 +87,43 @@ export const ReputacionModalContent: React.FC = () => (
 // ─── Contenido del modal de Almacenamiento cedido ────────────────────────────
 
 export const AlmacenamientoModalContent: React.FC = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Stack spacing={2}>
         <Typography level="body-sm" color="neutral">
-            Cuando alguien te manda un mensaje y tú no estás conectado, alguien tiene que guardarlo
-            hasta que vuelvas. Tu app puede hacer eso mismo por tus contactos, y ellos lo hacen por ti.
-            Es la forma en que esta app funciona sin depender de ningún servidor.
+            Esta aplicación funciona sin servidores centrales. Para que tus contactos reciban mensajes mientras están desconectados, los nodos de la red P2P (como el tuyo) "ceden" un pequeño espacio para guardar temporalmente esos datos cifrados.
         </Typography>
 
-        <Divider />
+        <Alert variant="soft" color="primary" startDecorator={<SecurityIcon />}>
+            <Typography level="body-xs">
+                Todo el contenido está cifrado de extremo a extremo (E2EE) con llaves que solo el destinatario posee. <b>Tú no puedes leer lo que almacenas</b>, ni nadie puede leer tus mensajes guardados en otros nodos.
+            </Typography>
+        </Alert>
 
-        {[
-            {
-                label: '¿Cómo funciona?',
-                desc: 'Si un contacto te manda algo mientras tu móvil está apagado o sin internet, otro dispositivo de confianza guarda el mensaje temporalmente. Cuando vuelves a conectarte, te llega automáticamente.',
-            },
-            {
-                label: '¿Por qué participo yo?',
-                desc: 'Tu app guarda mensajes de tus contactos cuando ellos están desconectados, igual que ellos lo hacen por ti. Es un sistema de ayuda mutua: cuanto más participas, mejor te va a ti también.',
-            },
-            {
-                label: '¿Pueden leer mis mensajes?',
-                desc: 'No. Los mensajes están bloqueados con cifrado y solo el destinatario puede abrirlos. El dispositivo que los guarda no puede leer nada, es como guardar un sobre cerrado.',
-            },
-            {
-                label: 'Espacio y limpieza',
-                desc: 'El máximo que usa la app es 1 GB. Los mensajes antiguos se borran solos cuando ya no son necesarios. También puedes liberar espacio manualmente desde la sección Almacenamiento.',
-            },
-        ].map(({ label, desc }) => (
-            <Box key={label}>
-                <Typography level="body-sm" sx={{ fontWeight: 600, mb: 0.4 }}>{label}</Typography>
-                <Typography level="body-sm" color="neutral">{desc}</Typography>
+        <Typography level="title-sm" sx={{ mt: 1 }}>Cuotas Dinámicas</Typography>
+        <Typography level="body-xs">
+            El sistema no usa un límite global fijo, sino <b>cuotas basadas en la confianza (Vouch Score)</b> para proteger tu equipo:
+        </Typography>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 0.5 }}>
+            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Invitados</Typography>
+                <Typography level="body-sm" sx={{ fontWeight: 800 }}>50 MB</Typography>
             </Box>
-        ))}
+            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Confiables</Typography>
+                <Typography level="body-sm" sx={{ fontWeight: 800 }}>500 MB</Typography>
+            </Box>
+            <Box sx={{ gridColumn: 'span 2', p: 1, borderRadius: 'sm', bgcolor: 'background.level2', border: '1px solid', borderColor: 'primary.outlinedBorder' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.main' }}>Amigos Íntimos (Score 80+)</Typography>
+                <Typography level="body-sm" sx={{ fontWeight: 800, color: 'primary.main' }}>Hasta 2.5 GB por persona</Typography>
+            </Box>
+        </Box>
 
         <Divider />
 
-        <Typography level="body-xs" color="neutral" sx={{ opacity: 0.7 }}>
-            No se guarda ninguna información sobre quién eres ni a quién le escribes. Solo el mensaje cifrado y su fecha de expiración.
+        <Typography level="body-xs" color="neutral" sx={{ fontStyle: 'italic', opacity: 0.8 }}>
+            Tu nodo prioriza siempre el almacenamiento de tus contactos directos. Los datos expiran automáticamente si no son reclamados en 60 días.
         </Typography>
-    </Box>
+    </Stack>
 );
 
 // ─── Contenido del modal de Direccion de contacto ────────────────────────────

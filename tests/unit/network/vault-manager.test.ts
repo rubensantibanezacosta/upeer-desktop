@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VaultManager } from '../../../src/main_process/network/vault/manager.js';
-import * as db from '../../../src/main_process/storage/db.js';
-import * as identity from '../../../src/main_process/security/identity.js';
-import * as shared from '../../../src/main_process/network/dht/shared.js';
 
 // Mocks
-vi.mock('../../../src/main_process/storage/db.js', () => ({
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
     getContactByUpeerId: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/shared.js', () => ({
+    getDb: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -59,7 +60,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
         vi.mocked(getVouchScore).mockResolvedValue(50);
 
-        const { getContactByUpeerId } = await import('../../../src/main_process/storage/db.js');
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         vi.mocked(getContactByUpeerId).mockResolvedValue({
             upeerId: 'target-id',
             createdAt: new Date().toISOString(), // New
@@ -73,7 +74,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
     });
 
     it('should correctly select candidates for replication and send messages', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/db.js');
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
 
         const mockContacts = [
@@ -113,7 +114,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
     });
 
     it('should only include successful custodians in DHT pointer', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/db.js');
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
 
