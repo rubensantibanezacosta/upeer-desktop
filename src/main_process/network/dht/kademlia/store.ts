@@ -13,15 +13,38 @@ export class ValueStore {
 
     // Store a value
     set(key: Buffer, value: any, publisher: string, signature?: string): void {
+        const keyHex = key.toString('hex');
+
+        // Multi-device support: if the value is a location block with deviceId,
+        // we store a list of blocks for the same upeerId instead of a single value.
+        let finalValue = value;
+        if (value && value.deviceId) {
+            const existing = this.store.get(keyHex);
+            let list = [];
+            if (existing && Array.isArray(existing.value)) {
+                list = existing.value;
+            } else if (existing && existing.value && !Array.isArray(existing.value)) {
+                // Migration: convert single old block to list if it had no deviceId but same upeerId
+                list = [existing.value];
+            }
+
+            // Remove old entry for the same deviceId if it exists
+            list = list.filter((b: any) => b.deviceId !== value.deviceId);
+            // Add new block
+            list.push(value);
+            // Sort by dhtSeq descending and limit to 10 devices per user to prevent abuse
+            list.sort((a: any, b: any) => (b.dhtSeq || 0) - (a.dhtSeq || 0));
+            finalValue = list.slice(0, 10);
+        }
+
         const storedEntry: StoredValue = {
             key,
-            value,
+            value: finalValue,
             publisher,
             timestamp: Date.now(),
             signature
         };
 
-        const keyHex = key.toString('hex');
         // Si la clave ya existe, solo actualizar (no aumenta el tamaño del mapa).
         // Si es nueva y alcanzamos el límite, desalojar la entrada más antigua.
         if (!this.store.has(keyHex) && this.store.size >= MAX_STORE_ENTRIES) {

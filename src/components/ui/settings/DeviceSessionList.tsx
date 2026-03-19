@@ -10,6 +10,12 @@ interface Device {
     isCurrent: boolean;
     lastSeen: number;
     address: string;
+    metadata?: {
+        clientName?: string;
+        clientVersion?: string;
+        platform?: string;
+        deviceClass?: 'desktop' | 'mobile' | 'tablet' | 'web';
+    };
 }
 
 export const DeviceSessionList: React.FC = () => {
@@ -32,9 +38,20 @@ export const DeviceSessionList: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const getDeviceIcon = (id: string) => {
+    const getDeviceIcon = (device: Device) => {
+        const deviceClass = device.metadata?.deviceClass;
+        if (deviceClass === 'mobile' || deviceClass === 'tablet') return <SmartphoneIcon />;
+        const id = device.deviceId.toLowerCase();
         if (id.includes('mobile') || id.includes('android') || id.includes('ios')) return <SmartphoneIcon />;
         return <LaptopIcon />;
+    };
+
+    const getDeviceLabel = (device: Device) => {
+        if (device.isCurrent) return 'Este dispositivo';
+        if (device.metadata?.clientName) {
+            return `${device.metadata.clientName} (${device.metadata.platform || 'P2P Node'})`;
+        }
+        return `Sesión ${(device.deviceId || '').slice(0, 8)}`;
     };
 
     if (loading && devices.length === 0) {
@@ -63,17 +80,22 @@ export const DeviceSessionList: React.FC = () => {
                         borderColor: 'divider'
                     }}>
                         <ListItemDecorator sx={{ color: device.isCurrent ? 'primary.main' : 'neutral.500' }}>
-                            {getDeviceIcon(device.deviceId)}
+                            {getDeviceIcon(device)}
                         </ListItemDecorator>
                         <Box sx={{ flex: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Typography level="title-sm">
-                                    {device.isCurrent ? 'Este dispositivo' : `Sesión ${(device.deviceId || '').slice(0, 8)}`}
+                                    {getDeviceLabel(device)}
                                 </Typography>
                                 {device.isCurrent && <Chip size="sm" color="primary" variant="soft" sx={{ fontSize: '0.65rem' }}>Actual</Chip>}
+                                {device.metadata?.clientVersion && (
+                                    <Typography level="body-xs" sx={{ ml: 'auto', opacity: 0.5 }}>
+                                        v{device.metadata.clientVersion}
+                                    </Typography>
+                                )}
                             </Box>
                             <Typography level="body-xs" sx={{ fontFamily: 'monospace', mt: 0.25, opacity: 0.7 }}>
-                                {(device.address || '').slice(0, 20)}...
+                                {(device.address || '').slice(0, 24)}...
                             </Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>

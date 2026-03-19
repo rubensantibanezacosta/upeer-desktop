@@ -18,7 +18,7 @@ vi.mock('../../../src/main_process/security/secure-logger', () => ({
 }));
 
 describe('TDD: Ubicación y Metadatos de Dispositivo', () => {
-    
+
     it('debe generar un bloque de ubicación que incluya metadatos de dispositivo opcionales', () => {
         const addresses = ['200:1234::1'];
         const dhtSeq = 1;
@@ -41,7 +41,7 @@ describe('TDD: Ubicación y Metadatos de Dispositivo', () => {
         const addresses = ['200:1234::1'];
         const dhtSeq = 1;
         const deviceMeta = { platform: 'macos', deviceClass: 'laptop' };
-        
+
         const block = generateSignedLocationBlock(addresses, dhtSeq, undefined, undefined, deviceMeta);
         const publicKey = 'a'.repeat(64); // mock pk hex
 
@@ -53,9 +53,9 @@ describe('TDD: Ubicación y Metadatos de Dispositivo', () => {
     it('debe permitir que los metadatos sean nulos o indefinidos para retrocompatibilidad', () => {
         const addresses = ['200:1234::1'];
         const block = generateSignedLocationBlock(addresses, 1);
-        
+
         expect(block.deviceMeta).toBeUndefined();
-        
+
         const isValid = verifyLocationBlock('test-upeer-id', block, 'a'.repeat(64));
         expect(isValid).toBe(true);
     });
