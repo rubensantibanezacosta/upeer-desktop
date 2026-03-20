@@ -47,6 +47,7 @@ export interface FileTransfer {
     // File data
     tempPath?: string;
     filePath?: string;
+    sanitizedPath?: string;
     isVaulting?: boolean;
 
     // Adaptive congestion control state (sender only)

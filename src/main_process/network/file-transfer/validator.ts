@@ -141,7 +141,7 @@ export class TransferValidator {
         }
     }
 
-    private detectMimeType(fileName: string): string {
+    detectMimeType(fileName: string): string {
         const ext = path.extname(fileName).toLowerCase();
         const mimeMap: Record<string, string> = {
             '.jpg': 'image/jpeg',

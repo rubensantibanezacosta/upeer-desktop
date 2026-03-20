@@ -4,6 +4,7 @@ import path from 'node:path';
 import { FileTransfer } from './types.js';
 import { FileChunkData } from '../types.js';
 import { warn } from '../../security/secure-logger.js';
+import { metadataSanitizer } from './metadata-sanitizer.js';
 
 export class FileChunker {
     private chunkSize: number;
@@ -107,9 +108,12 @@ export class FileChunker {
                 const tempDir = path.dirname(transfer.tempPath);
                 await fs.rmdir(tempDir);
             } catch (error) {
-                // Ignore cleanup errors, log silently
                 warn('Error cleaning up temp file', error, 'file-transfer');
             }
+        }
+
+        if (transfer.sanitizedPath) {
+            await metadataSanitizer.cleanup(transfer.sanitizedPath);
         }
     }
 

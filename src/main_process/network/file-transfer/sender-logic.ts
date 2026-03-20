@@ -5,6 +5,7 @@ import { canonicalStringify } from '../utils.js';
 import { TransferPhase, FileTransfer } from './types.js';
 import { generateTransferKey, sealTransferKey, encryptChunk } from './crypto.js';
 import { saveTransferToDB, updateTransferMessageStatus } from './db-helper.js';
+import { metadataSanitizer } from './metadata-sanitizer.js';
 import type { TransferManager } from './transfer-manager.js';
 
 export async function startSend(
@@ -16,13 +17,31 @@ export async function startSend(
     caption?: string
 ): Promise<string> {
     try {
-        const fileInfo = await this.validator.validateAndPrepareFile(filePath);
+        const preliminaryMime = this.validator.detectMimeType(filePath);
+        let effectivePath = filePath;
+        let sanitizationResult = null;
+
+        if (metadataSanitizer.canSanitize(preliminaryMime)) {
+            sanitizationResult = await metadataSanitizer.sanitizeFile(filePath, preliminaryMime);
+            effectivePath = sanitizationResult.sanitizedPath;
+            
+            if (sanitizationResult.wasProcessed && sanitizationResult.metadataRemoved.length > 0) {
+                debug('Metadata stripped from file', {
+                    fileName: filePath,
+                    removed: sanitizationResult.metadataRemoved
+                }, 'metadata-sanitizer');
+            }
+        }
+
+        const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
         const totalChunks = this.chunker.calculateChunks(fileInfo.size);
+
+        const originalFileName = filePath.split('/').pop() || fileInfo.name;
 
         const transfer = this.store.createTransfer({
             upeerId,
             peerAddress: address,
-            fileName: fileInfo.name,
+            fileName: originalFileName,
             fileSize: fileInfo.size,
             mimeType: fileInfo.mimeType,
             totalChunks,
@@ -31,7 +50,8 @@ export async function startSend(
             thumbnail,
             caption,
             direction: 'sending' as const,
-            filePath
+            filePath: effectivePath,
+            sanitizedPath: sanitizationResult?.wasProcessed ? effectivePath : undefined
         });
 
         this.store.updateTransfer(transfer.fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });

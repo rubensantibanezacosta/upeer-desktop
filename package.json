@@ -72,6 +72,7 @@
     "@journeyapps/sqlcipher": "^5.3.1",
     "@mui/icons-material": "^7.3.8",
     "@mui/joy": "^5.0.0-beta.52",
+    "@types/sharp": "^0.31.1",
     "@vscode/sudo-prompt": "^9.3.2",
     "better-sqlite3": "^12.6.2",
     "better-sqlite3-multiple-ciphers": "^12.6.2",
@@ -83,6 +84,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-simple-maps": "^3.0.0",
+    "sharp": "^0.34.5",
     "sodium-native": "^5.0.10",
     "world-atlas": "^2.0.2",
     "zustand": "^5.0.11"

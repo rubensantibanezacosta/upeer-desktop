@@ -13,11 +13,14 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 vi.mock('node:path', () => ({
-    join: vi.fn((...args) => args.join('/')),
+    default: { join: (...args: string[]) => args.join('/'), extname: (p: string) => p.slice(p.lastIndexOf('.')) },
+    join: (...args: string[]) => args.join('/'),
+    extname: (p: string) => p.slice(p.lastIndexOf('.')),
 }));
 
 vi.mock('node:os', () => ({
-    tmpdir: vi.fn(() => '/tmp'),
+    default: { tmpdir: () => '/tmp' },
+    tmpdir: () => '/tmp',
 }));
 
 // Mocks de dependencias
@@ -45,6 +48,20 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     updateMessageStatus: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/file-transfer/metadata-sanitizer.js', () => ({
+    metadataSanitizer: {
+        canSanitize: vi.fn(() => false),
+        sanitizeFile: vi.fn(async (path: string) => ({
+            sanitizedPath: path,
+            originalPath: path,
+            wasProcessed: false,
+            metadataRemoved: []
+        })),
+        cleanup: vi.fn().mockResolvedValue(undefined),
+        cleanupAll: vi.fn().mockResolvedValue(undefined),
+    }
+}));
+
 vi.mock('../../../src/main_process/network/file-transfer/validator.js', () => {
     return {
         TransferValidator: class {
@@ -54,6 +71,7 @@ vi.mock('../../../src/main_process/network/file-transfer/validator.js', () => {
                 mimeType: 'image/jpeg',
                 hash: 'hash123'
             }));
+            detectMimeType = vi.fn(() => 'image/jpeg');
             validateIncomingFile = vi.fn();
             verifyFileHash = vi.fn().mockResolvedValue(true);
         }
@@ -100,7 +118,7 @@ describe('TransferManager - Core Orchestration', () => {
             'ygg-address',
             expect.objectContaining({
                 type: 'FILE_PROPOSAL',
-                fileName: 'test.jpg'
+                fileName: 'file.jpg'
             }),
             expect.any(String)
         );

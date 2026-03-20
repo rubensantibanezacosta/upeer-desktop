@@ -65,7 +65,7 @@ uPeer P2P ha completado la **Fase 15** con las siguientes capacidades validadas:
 - **Competitividad**: Expectativa básica en apps de mensajería modernas.
 - **Privacidad**: Opción de eliminar metadatos EXIF (GPS, etc.).
 
-**Estado Actual**: ❌ No implementado
+**Estado Actual**: ✅ Stripping de metadatos EXIF implementado (JPEG, PNG, WebP, TIFF, AVIF)
 **Dependencias**: Protocolo de fragmentos (1.1)
 
 #### 1.3 Mensajes de voz - Grabación y envío de audio comprimido

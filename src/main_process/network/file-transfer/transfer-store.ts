@@ -18,6 +18,7 @@ export class FileTransferStore {
         direction: 'sending' | 'receiving';
         filePath?: string;
         caption?: string;
+        sanitizedPath?: string;
     }): FileTransfer {
         const fileId = data.fileId || crypto.randomUUID();
 
@@ -41,10 +42,11 @@ export class FileTransferStore {
             lastActivity: Date.now(),
             pendingChunks: new Set(),
             filePath: data.filePath,
-            windowSize: 40, // initialWindowSize (increased for better start)
-            ssthresh: 128,  // slow start threshold
-            srtt: 200,      // smoothed RTT (slightly more optimistic)
-            rto: 400,       // initial retransmission timeout
+            sanitizedPath: data.sanitizedPath,
+            windowSize: 40,
+            ssthresh: 128,
+            srtt: 200,
+            rto: 400,
             consecutiveAcks: 0,
             nextChunkIndex: 0
         };
