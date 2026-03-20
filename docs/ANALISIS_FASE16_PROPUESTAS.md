@@ -65,7 +65,10 @@ uPeer P2P ha completado la **Fase 15** con las siguientes capacidades validadas:
 - **Competitividad**: Expectativa básica en apps de mensajería modernas.
 - **Privacidad**: Opción de eliminar metadatos EXIF (GPS, etc.).
 
-**Estado Actual**: ✅ Stripping de metadatos EXIF implementado (JPEG, PNG, WebP, TIFF, AVIF)
+**Estado Actual**: ✅ Stripping de metadatos implementado:
+- **Imágenes** (sharp): JPEG, PNG, WebP, TIFF, AVIF - elimina EXIF/ICC/IPTC/XMP
+- **Videos** (ffmpeg): MP4, WebM, MOV, AVI, MKV, OGV, 3GP - elimina metadata/chapters/location
+- **Audio** (ffmpeg): MP3, OGG, WAV, FLAC, AAC, M4A, WebA - elimina tags ID3/metadata
 **Dependencias**: Protocolo de fragmentos (1.1)
 
 #### 1.3 Mensajes de voz - Grabación y envío de audio comprimido

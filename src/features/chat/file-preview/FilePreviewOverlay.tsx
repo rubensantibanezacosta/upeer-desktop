@@ -399,9 +399,9 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             )}
 
             {/* Header */}
-            <Box sx={{ 
-                p: 2, 
-                display: 'flex', 
+            <Box sx={{
+                p: 2,
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
@@ -409,7 +409,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                 <IconButton variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <CloseIcon />
                 </IconButton>
-                
+
                 {/* Toolbar centrada - solo para imágenes */}
                 {currentPreview?.previewUrl && (currentFile.type.startsWith('image/') || getMimeType(currentFile.name).startsWith('image/')) ? (
                     <Box sx={{ display: 'flex', gap: 1, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }} onClick={e => e.stopPropagation()}>
@@ -450,7 +450,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                         </Tooltip>
                     </Box>
                 ) : null}
-                
+
                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 'md', ml: 'auto' }}>
                     {currentFile.name}
                 </Typography>

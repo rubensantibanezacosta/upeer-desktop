@@ -24,7 +24,7 @@ export async function startSend(
         if (metadataSanitizer.canSanitize(preliminaryMime)) {
             sanitizationResult = await metadataSanitizer.sanitizeFile(filePath, preliminaryMime);
             effectivePath = sanitizationResult.sanitizedPath;
-            
+
             if (sanitizationResult.wasProcessed && sanitizationResult.metadataRemoved.length > 0) {
                 debug('Metadata stripped from file', {
                     fileName: filePath,

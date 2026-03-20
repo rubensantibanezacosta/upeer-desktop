@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'node:path';
 import os from 'node:os';
+import { EventEmitter } from 'node:events';
 
 const mockSharpInstance = {
     metadata: vi.fn().mockResolvedValue({
@@ -20,6 +21,22 @@ const mockSharpInstance = {
 
 vi.mock('sharp', () => ({
     default: vi.fn(() => mockSharpInstance)
+}));
+
+const createMockFFmpegProcess = (exitCode = 0) => {
+    const proc = new EventEmitter() as any;
+    proc.stderr = new EventEmitter();
+    proc.stdio = ['ignore', 'pipe', 'pipe'];
+    setTimeout(() => {
+        proc.stderr.emit('data', Buffer.from('Metadata: creation_time encoder location'));
+        proc.emit('close', exitCode);
+    }, 10);
+    return proc;
+};
+
+vi.mock('node:child_process', () => ({
+    default: { spawn: vi.fn(() => createMockFFmpegProcess(0)) },
+    spawn: vi.fn(() => createMockFFmpegProcess(0))
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -59,23 +76,38 @@ describe('MetadataSanitizer', () => {
             expect(sanitizer.canSanitize('image/avif')).toBe(true);
         });
 
+        it('should return true for supported video types', () => {
+            expect(sanitizer.canSanitize('video/mp4')).toBe(true);
+            expect(sanitizer.canSanitize('video/webm')).toBe(true);
+            expect(sanitizer.canSanitize('video/quicktime')).toBe(true);
+            expect(sanitizer.canSanitize('video/x-matroska')).toBe(true);
+        });
+
+        it('should return true for supported audio types', () => {
+            expect(sanitizer.canSanitize('audio/mpeg')).toBe(true);
+            expect(sanitizer.canSanitize('audio/mp3')).toBe(true);
+            expect(sanitizer.canSanitize('audio/ogg')).toBe(true);
+            expect(sanitizer.canSanitize('audio/wav')).toBe(true);
+            expect(sanitizer.canSanitize('audio/flac')).toBe(true);
+        });
+
         it('should return false for unsupported types', () => {
             expect(sanitizer.canSanitize('image/gif')).toBe(false);
-            expect(sanitizer.canSanitize('video/mp4')).toBe(false);
             expect(sanitizer.canSanitize('application/pdf')).toBe(false);
             expect(sanitizer.canSanitize('text/plain')).toBe(false);
         });
 
         it('should be case insensitive', () => {
             expect(sanitizer.canSanitize('IMAGE/JPEG')).toBe(true);
-            expect(sanitizer.canSanitize('Image/Png')).toBe(true);
+            expect(sanitizer.canSanitize('Video/MP4')).toBe(true);
+            expect(sanitizer.canSanitize('AUDIO/MPEG')).toBe(true);
         });
     });
 
     describe('sanitizeFile', () => {
         it('should return unprocessed result for unsupported types', async () => {
             const result = await sanitizer.sanitizeFile('/path/to/file.gif', 'image/gif');
-            
+
             expect(result.wasProcessed).toBe(false);
             expect(result.sanitizedPath).toBe('/path/to/file.gif');
             expect(result.originalPath).toBe('/path/to/file.gif');
@@ -84,7 +116,7 @@ describe('MetadataSanitizer', () => {
 
         it('should sanitize supported image types and report removed metadata', async () => {
             const result = await sanitizer.sanitizeFile('/path/to/photo.jpg', 'image/jpeg');
-            
+
             expect(result.wasProcessed).toBe(true);
             expect(result.originalPath).toBe('/path/to/photo.jpg');
             expect(result.sanitizedPath).toContain('chat-p2p-sanitized');
@@ -105,19 +137,37 @@ describe('MetadataSanitizer', () => {
             const webpResult = await sanitizer.sanitizeFile('/path/photo.webp', 'image/webp');
             expect(webpResult.sanitizedPath).toMatch(/\.webp$/);
         });
+
+        it('should sanitize video files using ffmpeg', async () => {
+            const result = await sanitizer.sanitizeFile('/path/to/video.mp4', 'video/mp4');
+            
+            expect(result.wasProcessed).toBe(true);
+            expect(result.originalPath).toBe('/path/to/video.mp4');
+            expect(result.sanitizedPath).toContain('chat-p2p-sanitized');
+            expect(result.sanitizedPath).toContain('.mp4');
+        });
+
+        it('should sanitize audio files using ffmpeg', async () => {
+            const result = await sanitizer.sanitizeFile('/path/to/audio.mp3', 'audio/mpeg');
+            
+            expect(result.wasProcessed).toBe(true);
+            expect(result.originalPath).toBe('/path/to/audio.mp3');
+            expect(result.sanitizedPath).toContain('chat-p2p-sanitized');
+            expect(result.sanitizedPath).toContain('.mp3');
+        });
     });
 
     describe('cleanup', () => {
         it('should only attempt cleanup for files in temp directory', async () => {
             const tempDir = path.join(os.tmpdir(), 'chat-p2p-sanitized');
             const testPath = path.join(tempDir, 'test-file.jpg');
-            
+
             await expect(sanitizer.cleanup(testPath)).resolves.not.toThrow();
         });
 
         it('should not throw for files outside temp directory', async () => {
             const outsidePath = '/home/user/important-file.jpg';
-            
+
             await expect(sanitizer.cleanup(outsidePath)).resolves.not.toThrow();
         });
     });
