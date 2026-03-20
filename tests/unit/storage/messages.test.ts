@@ -430,6 +430,34 @@ describe('Storage - Message Operations', () => {
         const parsedMsg = JSON.parse(valuesCall.message);
         expect(parsedMsg.type).toBe('file');
         expect(parsedMsg.fileName).toBe('test.pdf');
+        expect(parsedMsg.isVoiceNote).toBeUndefined();
+    });
+
+    it('should save a voice note file message with isVoiceNote=true in JSON', async () => {
+        const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+        const mockInsertValuesResult = {
+            onConflictDoUpdate: vi.fn().mockReturnValue({ run: mockRun }),
+            onConflictDoNothing: vi.fn().mockReturnValue({ run: mockRun }),
+            run: mockRun
+        };
+        mockDb.insert.mockReturnValue({
+            values: vi.fn().mockReturnValue(mockInsertValuesResult)
+        });
+        mockDb.select.mockReturnValue({
+            from: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                    get: vi.fn().mockReturnValue(null)
+                })
+            })
+        });
+
+        await saveFileMessage('msg-voice-1', 'contact-1', true, 'voice.webm', 'file-456', 512, 'audio/webm', undefined, undefined, 'sent', undefined, undefined, undefined, undefined, true);
+
+        expect(mockDb.insert).toHaveBeenCalled();
+        const valuesCall = mockDb.insert().values.mock.calls[0][0];
+        const parsedMsg = JSON.parse(valuesCall.message);
+        expect(parsedMsg.type).toBe('file');
+        expect(parsedMsg.isVoiceNote).toBe(true);
     });
 
     describe('Message Status Logic', () => {

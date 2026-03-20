@@ -128,7 +128,7 @@ describe('useFileTransfer hook', () => {
             startResult = await result.current.startTransfer(startParams);
         });
 
-        expect(mockUpeer.startFileTransfer).toHaveBeenCalledWith('peer1', '/path/to/file.jpg', 'thumb-data', undefined);
+        expect(mockUpeer.startFileTransfer).toHaveBeenCalledWith('peer1', '/path/to/file.jpg', 'thumb-data', undefined, undefined);
         expect(startResult?.success).toBe(true);
     });
 

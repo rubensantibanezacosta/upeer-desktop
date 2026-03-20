@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MediaFileMessage } from './MediaFileMessage.js';
 import { DocumentFileMessage } from './DocumentFileMessage.js';
+import { AudioPlayer } from './AudioPlayer.js';
 
 export interface FileMessageData {
     fileId: string;
@@ -17,6 +18,7 @@ export interface FileMessageData {
     savedPath?: string;
     timestamp?: string;
     isVaulting?: boolean;
+    isVoiceNote?: boolean;
 }
 
 interface FileMessageItemProps {
@@ -90,6 +92,10 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
 
     if (isImage || isVideo) {
         return <MediaFileMessage {...sharedProps} thumbnail={thumbnail} isImage={isImage} isVideo={isVideo} />;
+    }
+
+    if (data.isVoiceNote) {
+        return <AudioPlayer url={isTransferComplete && (fullPath || savedPath) ? `media://${fullPath || savedPath}` : ''} isMe={isMe} timestamp={timestamp} status={status} />;
     }
 
     return <DocumentFileMessage {...sharedProps} />;

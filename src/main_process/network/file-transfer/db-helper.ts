@@ -26,7 +26,8 @@ export async function saveTransferToDB(transfer: FileTransfer) {
             myId, // senderUpeerId
             undefined, // timestamp
             transfer.thumbnail,
-            transfer.caption
+            transfer.caption,
+            transfer.isVoiceNote
         );
     } catch (err) {
         warn('Failed to save file transfer to DB', err, 'file-transfer');

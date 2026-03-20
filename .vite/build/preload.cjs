@@ -124,11 +124,13 @@ electron.contextBridge.exposeInMainWorld("upeer", {
     electron.ipcRenderer.on("peer-typing", (event, data) => callback(data));
   },
   // File transfer API (Phase 16)
-  startFileTransfer: (upeerId, filePath, thumbnail, caption) => electron.ipcRenderer.invoke("start-file-transfer", { upeerId, filePath, thumbnail, caption }),
+  startFileTransfer: (upeerId, filePath, thumbnail, caption, isVoiceNote) => electron.ipcRenderer.invoke("start-file-transfer", { upeerId, filePath, thumbnail, caption, isVoiceNote }),
   cancelFileTransfer: (fileId, reason) => electron.ipcRenderer.invoke("cancel-file-transfer", { fileId, reason: reason || "User cancelled" }),
   retryFileTransfer: (fileId) => electron.ipcRenderer.invoke("retry-file-transfer", { fileId }),
   getFileTransfers: () => electron.ipcRenderer.invoke("get-file-transfers"),
   saveTransferredFile: (fileId, destinationPath) => electron.ipcRenderer.invoke("save-transferred-file", { fileId, destinationPath }),
+  saveBufferToTemp: (data) => electron.ipcRenderer.invoke("save-buffer-to-temp", data),
+  persistInternalAsset: (data) => electron.ipcRenderer.invoke("persist-internal-asset", data),
   onFileTransferStarted: (callback) => {
     electron.ipcRenderer.removeAllListeners("file-transfer-started");
     electron.ipcRenderer.on("file-transfer-started", (event, data) => callback(data));
@@ -162,6 +164,8 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   showSaveDialog: (options) => electron.ipcRenderer.invoke("show-save-dialog", options),
   // BUG EC fix: abrir un archivo ya guardado con la app predeterminada del SO.
   openFile: (filePath) => electron.ipcRenderer.invoke("open-file", { filePath }),
+  openExternal: (url) => electron.ipcRenderer.invoke("open-external", { url }),
+  fetchOgPreview: (url) => electron.ipcRenderer.invoke("fetch-og-preview", { url }),
   onYggstackAddress: (callback) => {
     electron.ipcRenderer.removeAllListeners("yggstack-address");
     electron.ipcRenderer.on("yggstack-address", (_event, address) => callback(address));

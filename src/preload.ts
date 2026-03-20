@@ -124,11 +124,13 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.on('peer-typing', (event, data) => callback(data));
     },
     // File transfer API (Phase 16)
-    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption }),
+    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption, isVoiceNote }),
     cancelFileTransfer: (fileId: string, reason?: string) => ipcRenderer.invoke('cancel-file-transfer', { fileId, reason: reason || 'User cancelled' }),
     retryFileTransfer: (fileId: string) => ipcRenderer.invoke('retry-file-transfer', { fileId }),
     getFileTransfers: () => ipcRenderer.invoke('get-file-transfers'),
     saveTransferredFile: (fileId: string, destinationPath: string) => ipcRenderer.invoke('save-transferred-file', { fileId, destinationPath }),
+    saveBufferToTemp: (data: { base64: string; fileName: string }) => ipcRenderer.invoke('save-buffer-to-temp', data),
+    persistInternalAsset: (data: { filePath: string; fileName: string }) => ipcRenderer.invoke('persist-internal-asset', data),
     onFileTransferStarted: (callback: (data: any) => void) => {
         ipcRenderer.removeAllListeners('file-transfer-started');
         ipcRenderer.on('file-transfer-started', (event, data) => callback(data));
@@ -163,6 +165,8 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.invoke('show-save-dialog', options),
     // BUG EC fix: abrir un archivo ya guardado con la app predeterminada del SO.
     openFile: (filePath: string) => ipcRenderer.invoke('open-file', { filePath }),
+    openExternal: (url: string) => ipcRenderer.invoke('open-external', { url }),
+    fetchOgPreview: (url: string) => ipcRenderer.invoke('fetch-og-preview', { url }),
     onYggstackAddress: (callback: (address: string) => void) => {
         ipcRenderer.removeAllListeners('yggstack-address');
         ipcRenderer.on('yggstack-address', (_event, address: string) => callback(address));

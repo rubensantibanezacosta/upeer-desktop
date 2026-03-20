@@ -51,6 +51,10 @@ function resolveBetterSqlite3(): Plugin {
 // https://vitejs.dev/config
 export default defineConfig({
     plugins: [stubTestOnlyPackages(), resolveBetterSqlite3()],
+    define: {
+        __dirname: 'import.meta.dirname',
+        __filename: 'import.meta.filename',
+    },
     build: {
         lib: {
             entry: 'src/main.ts',
@@ -70,13 +74,14 @@ export default defineConfig({
                 'electron/main',
                 'electron/common',
                 'electron-squirrel-startup',
-                // Módulos nativos con binarios .node: se cargan desde node_modules
-                // en tiempo de ejecución. No se pueden bundlear porque usan
-                // require(dinamicPath) para localizar el binario .node.
-                '@journeyapps/sqlcipher', // mantenido por si se reintroduce sqlcipher
+                '@journeyapps/sqlcipher',
                 'better-sqlite3-multiple-ciphers',
                 'sodium-native',
                 '@vscode/sudo-prompt',
+                'sharp',
+                /^@img\/sharp-.*/,
+                '@ffmpeg-installer/ffmpeg',
+                /^@ffmpeg-installer\/.*/,
             ],
         },
     },

@@ -156,7 +156,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
         >
             {reversedHistory.map((msg, index) => {
                 const nextMsg = reversedHistory[index + 1];
+                const prevMsg = index > 0 ? reversedHistory[index - 1] : undefined;
                 const showSeparator = !nextMsg || new Date(msg.date).toDateString() !== new Date(nextMsg.date).toDateString();
+
+                const sameAsPrev = prevMsg && !prevMsg.isSystem && prevMsg.isMine === msg.isMine && prevMsg.senderUpeerId === msg.senderUpeerId;
+                const sameAsNext = nextMsg && !nextMsg.isSystem && nextMsg.isMine === msg.isMine && nextMsg.senderUpeerId === msg.senderUpeerId;
+                const isFirstInGroupChain = !sameAsNext;
+                const isLastInGroupChain = !sameAsPrev;
 
                 return (
                     <React.Fragment key={msg.id || index}>
@@ -175,6 +181,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 onCancelTransfer={onCancelTransfer}
                                 onMediaClick={onMediaClick}
                                 isGroup={isGroup}
+                                isFirstInGroupChain={isFirstInGroupChain}
+                                isLastInGroupChain={isLastInGroupChain}
                                 onTransferStateChange={onTransferStateChange}
                             />
                         ) : (

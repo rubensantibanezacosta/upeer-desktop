@@ -38,6 +38,7 @@ vi.mock('@mui/icons-material/MoreVert', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Add', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/InsertDriveFile', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Image', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Language', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/VideoFile', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/AudioFile', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Description', () => ({ default: () => null }));

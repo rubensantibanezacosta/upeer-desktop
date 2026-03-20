@@ -48,4 +48,16 @@ export function registerNetworkHandlers(): void {
 
   // Permite al usuario forzar un reinicio de yggstack desde la UI
   ipcMain.handle('restart-yggstack', async () => { await forceRestart(); });
+
+  ipcMain.handle('fetch-og-preview', async (_event, { url }) => {
+    try {
+      if (typeof url !== 'string' || !url) return null;
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+      const { fetchOgPreview } = await import('../../network/og-fetcher.js');
+      return await fetchOgPreview(url);
+    } catch {
+      return null;
+    }
+  });
 }

@@ -142,7 +142,7 @@ export function getMessageById(id: string) {
         .get();
 }
 
-export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string) {
+export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string, isVoiceNote?: boolean) {
     const _db = getDb();
     const _schema = getSchema();
 
@@ -154,7 +154,8 @@ export async function saveFileMessage(id: string, chatUpeerId: string, isMine: b
         mimeType,
         savedPath,
         thumbnail,
-        caption
+        caption,
+        ...(isVoiceNote ? { isVoiceNote: true } : {})
     });
 
     return saveMessage(id, chatUpeerId, isMine, messageJson, undefined, signature, status, senderUpeerId, timestamp);

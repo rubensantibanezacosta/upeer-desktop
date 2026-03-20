@@ -1,18 +1,18 @@
-import React from 'react';
-import {
-    Box,
-    Input,
-    IconButton,
-    Typography
-} from '@mui/joy';
+import React, { useState } from 'react';
+import { Box, IconButton, Typography } from '@mui/joy';
 import SendIcon from '@mui/icons-material/Send';
 import MicIcon from '@mui/icons-material/Mic';
 import EditIcon from '@mui/icons-material/Edit';
-
 import CloseIcon from '@mui/icons-material/Close';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
 import { EmojiPicker } from './EmojiPicker.js';
-import { getFileIcon } from '../../../utils/fileIcons.js';
+import { RecordingBar } from './RecordingBar.js';
+import { ReplyBar } from './ReplyBar.js';
+import { RichInput } from './RichInput.js';
+import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
+import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
+import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
+import { useInputPreview } from '../../../hooks/useInputPreview.js';
 
 interface InputAreaProps {
     message: string;
@@ -24,156 +24,61 @@ interface InputAreaProps {
     onCancelReply?: () => void;
     editingMessage?: { id?: string; message: string } | null;
     onCancelEdit?: () => void;
-
     onAttachFile?: (type: AttachmentType) => void;
     onScrollToMessage?: (msgId: string) => void;
+    onSendVoiceNote?: (file: File) => Promise<void>;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
-    message,
-    setMessage,
-    onSend,
-    onTyping,
-    disabled,
-    replyToMessage,
-    onCancelReply,
-    editingMessage,
-    onCancelEdit,
-    onAttachFile,
-    onScrollToMessage
+    message, setMessage, onSend, onTyping, disabled,
+    replyToMessage, onCancelReply, editingMessage, onCancelEdit,
+    onAttachFile, onScrollToMessage, onSendVoiceNote
 }) => {
+    const { isRecording, duration, stream, startRecording, stopRecording, cancelRecording } = useAudioRecorder();
+    const canvasRef = useRecordingWaveform(isRecording, stream);
+    const [voiceError, setVoiceError] = useState<string | null>(null);
+    const [isSending, setIsSending] = useState(false);
+    const { linkPreview, isLoadingPreview, hasMd, dismissPreview } = useInputPreview(message);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setMessage(e.target.value);
+    const handleChange = (val: string) => {
+        setMessage(val);
         if (onTyping) onTyping();
     };
 
-    return (
-        <Box sx={{
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.surface',
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
-            boxSizing: 'border-box'
-        }}>
-            {replyToMessage && (
-                <Box
-                    onClick={() => replyToMessage?.id && onScrollToMessage?.(replyToMessage.id)}
-                    sx={{
-                        p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
-                        backgroundColor: 'background.level1', borderLeft: '4px solid',
-                        borderColor: 'primary.main', mx: 2, mt: 1, borderRadius: '4px',
-                        position: 'relative', overflow: 'hidden',
-                        cursor: replyToMessage?.id ? 'pointer' : 'default',
-                        '&:hover': replyToMessage?.id ? { backgroundColor: 'background.level2' } : {}
-                    }}
-                >
-                    <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                        {(() => {
-                            const m = replyToMessage.message;
-                            let thumbnail = '';
-                            if (m.startsWith('{') && m.endsWith('}')) {
-                                try {
-                                    const parsed = JSON.parse(m);
-                                    if (parsed.type === 'file' && (parsed.mimeType?.startsWith('image/') || parsed.mimeType?.startsWith('video/'))) {
-                                        thumbnail = parsed.thumbnail;
-                                    }
-                                } catch (_err) { /* ignore */ }
-                            } else if (m.startsWith('FILE_TRANSFER|')) {
-                                const parts = m.split('|');
-                                if (parts.length >= 7 && (parts[4]?.startsWith('image/') || parts[4]?.startsWith('video/'))) {
-                                    thumbnail = parts[6] !== 'undefined' ? parts[6] : '';
-                                }
-                            }
+    const handleMicClick = async () => {
+        if (!isRecording) {
+            setVoiceError(null);
+            await startRecording();
+        } else {
+            const file = await stopRecording();
+            if (file && onSendVoiceNote) {
+                setIsSending(true);
+                setVoiceError(null);
+                try {
+                    await onSendVoiceNote(file);
+                } catch (err: any) {
+                    setVoiceError(err?.message || 'Error al enviar la nota de voz');
+                } finally {
+                    setIsSending(false);
+                }
+            }
+        }
+    };
 
-                            if (thumbnail) {
-                                return (
-                                    <Box
-                                        sx={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: '4px',
-                                            overflow: 'hidden',
-                                            flexShrink: 0,
-                                            backgroundColor: 'background.level2',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                        }}
-                                    >
-                                        <img
-                                            src={thumbnail.startsWith('data:') ? thumbnail : `media://${thumbnail}`}
-                                            alt="preview"
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        />
-                                    </Box>
-                                );
-                            }
-                            return null;
-                        })()}
-                        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                            <Typography level="body-xs" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                                {replyToMessage.isMine ? 'Tú' : (replyToMessage.senderName || 'Contacto')}
-                            </Typography>
-                            <Typography level="body-sm" noWrap sx={{ opacity: 0.8 }}>
-                                {(() => {
-                                    const m = replyToMessage.message;
-                                    if (m.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
-                                    if (m.startsWith('{') && m.endsWith('}')) {
-                                        try {
-                                            const parsed = JSON.parse(m);
-                                            if (parsed.type === 'file') {
-                                                return (
-                                                    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                                                        <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
-                                                            {getFileIcon(parsed.mimeType || '', parsed.fileName || '')}
-                                                        </Box>
-                                                        <span>{parsed.fileName}</span>
-                                                    </Box>
-                                                );
-                                            }
-                                        } catch (_err) { /* ignore */ }
-                                    }
-                                    if (m.startsWith('FILE_TRANSFER|')) {
-                                        const parts = m.split('|');
-                                        if (parts.length >= 6) {
-                                            return (
-                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
-                                                        {getFileIcon(parts[4] || '', parts[2] || '')}
-                                                    </Box>
-                                                    <span>{parts[2]}</span>
-                                                </Box>
-                                            );
-                                        }
-                                    }
-                                    return m;
-                                })()}
-                            </Typography>
-                        </Box>
-                    </Box>
-                    <IconButton size="sm" variant="plain" color="neutral" onClick={onCancelReply}>
-                        <CloseIcon sx={{ fontSize: '18px' }} />
-                    </IconButton>
-                </Box>
+    const showPreviewBar = !isRecording && (linkPreview !== null || isLoadingPreview);
+
+    return (
+        <Box sx={{ borderTop: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
+            {replyToMessage && (
+                <ReplyBar replyToMessage={replyToMessage} onCancel={onCancelReply!} onScrollTo={onScrollToMessage} />
             )}
 
             {editingMessage && (
-                <Box sx={{
-                    p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
-                    backgroundColor: 'background.level1', borderLeft: '4px solid',
-                    borderColor: 'warning.main', mx: 2, mt: 1, borderRadius: '4px',
-                }}>
+                <Box sx={{ p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5, backgroundColor: 'background.level1', borderLeft: '4px solid', borderColor: 'warning.main', mx: 2, mt: 1, borderRadius: '4px' }}>
                     <EditIcon sx={{ fontSize: '18px', color: 'warning.main' }} />
                     <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                        <Typography level="body-xs" sx={{ fontWeight: 600, color: 'warning.main' }}>
-                            Editando mensaje
-                        </Typography>
-                        <Typography level="body-sm" noWrap sx={{ opacity: 0.8 }}>
-                            {editingMessage.message}
-                        </Typography>
+                        <Typography level="body-xs" sx={{ fontWeight: 600, color: 'warning.main' }}>Editando mensaje</Typography>
+                        <Typography level="body-sm" noWrap sx={{ opacity: 0.8 }}>{editingMessage.message}</Typography>
                     </Box>
                     <IconButton size="sm" variant="plain" color="neutral" onClick={onCancelEdit}>
                         <CloseIcon sx={{ fontSize: '18px' }} />
@@ -181,54 +86,56 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{
-                px: 2,
-                py: 1,
-                display: 'flex',
-                gap: 1.5,
-                alignItems: 'center',
-                height: '62px',
-                boxSizing: 'border-box'
-            }}>
-                <EmojiPicker
-                    onSelect={(emoji) => setMessage(message + emoji)}
-                    disabled={disabled}
-                />
-                <AttachmentButton
-                    onSelect={(type) => {
-                        if (onAttachFile) onAttachFile(type);
-                    }}
-                    disabled={disabled}
-                />
-                <Input
-                    placeholder={editingMessage ? "Edita tu mensaje..." : "Escribe un mensaje..."}
-                    value={message}
-                    onChange={handleChange}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSend()}
-                    sx={{
-                        flexGrow: 1,
-                        borderRadius: '8px',
-                        '--Input-focusedThickness': '0px',
-                        backgroundColor: 'background.level1',
-                        border: 'none',
-                        px: 2
-                    }}
-                    variant="plain"
-                    autoComplete="off"
-                    disabled={disabled}
-                />
-                <IconButton
-                    variant="plain"
-                    color="neutral"
-                    onClick={message ? onSend : undefined}
-                    disabled={disabled}
-                >
-                    {message ? (
-                        editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />
-                    ) : (
-                        <MicIcon />
+            {voiceError && (
+                <Box sx={{ px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'danger.softBg', mx: 2, mt: 1, borderRadius: '4px' }}>
+                    <Typography level="body-xs" sx={{ color: 'danger.plainColor' }}>{voiceError}</Typography>
+                    <IconButton size="sm" variant="plain" color="danger" onClick={() => setVoiceError(null)}>
+                        <CloseIcon sx={{ fontSize: '14px' }} />
+                    </IconButton>
+                </Box>
+            )}
+
+            {showPreviewBar && (
+                <Box sx={{ mx: 2, mt: 1, p: 1.5, backgroundColor: 'background.level1', borderRadius: 'md', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {isLoadingPreview && (
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Cargando vista previa…</Typography>
                     )}
-                </IconButton>
+                    {linkPreview && (
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <LinkPreviewCard data={linkPreview} />
+                            </Box>
+                            <IconButton size="sm" variant="plain" color="neutral" onClick={dismissPreview} sx={{ flexShrink: 0 }}>
+                                <CloseIcon sx={{ fontSize: '14px' }} />
+                            </IconButton>
+                        </Box>
+                    )}
+                </Box>
+            )}
+
+            <Box sx={{ px: 2, py: 1, display: 'flex', gap: 1.5, alignItems: 'center', height: '62px', boxSizing: 'border-box' }}>
+                {isRecording ? (
+                    <RecordingBar duration={duration} onCancel={cancelRecording} onSend={handleMicClick} disabled={disabled} isSending={isSending} canvasRef={canvasRef} />
+                ) : (
+                    <>
+                        <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
+                        <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} />
+                        <RichInput
+                            value={message}
+                            onChange={handleChange}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSend()}
+                            placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
+                            autoComplete="off"
+                            disabled={disabled}
+                        />
+                        <IconButton variant="plain" color="neutral" onClick={message ? onSend : handleMicClick} disabled={disabled}>
+                            {message
+                                ? (editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />)
+                                : <MicIcon color="primary" />
+                            }
+                        </IconButton>
+                    </>
+                )}
             </Box>
         </Box>
     );

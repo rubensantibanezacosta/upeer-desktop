@@ -10,7 +10,9 @@ import * as path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: '**/node_modules/{sharp,@img,@ffmpeg-installer}/**',
+    },
     extraResource: [
       './resources/bin',
       './drizzle',

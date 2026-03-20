@@ -12,16 +12,16 @@ export interface PendingFile {
 }
 
 interface FileTransferApi {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string }) => Promise<{ success: boolean; fileId?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean }) => Promise<{ success: boolean; fileId?: string }>;
 }
 
 export function useFilePersistence(fileTransfer: FileTransferApi) {
-    const { 
-        contacts, targetUpeerId, pendingFiles, setPendingFiles, 
-        setIsDragging, addFileTransferMessage 
+    const {
+        contacts, targetUpeerId, pendingFiles, setPendingFiles,
+        setIsDragging, addFileTransferMessage
     } = useChatStore();
     const { setFilePickerOpen } = useNavigationStore();
-    
+
     const activeContact = contacts.find(c => c.upeerId === targetUpeerId);
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -39,7 +39,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         e.preventDefault(); e.stopPropagation();
         setIsDragging(false);
         if (!targetUpeerId || activeContact?.status !== 'connected') return;
-        
+
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
         const mappedFiles = droppedFilesRaw.map((f: any) => {
             const filePath = window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path;
@@ -106,11 +106,50 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         setPendingFiles([]);
     };
 
+    const handleSendVoiceNote = async (file: File): Promise<void> => {
+        if (!targetUpeerId) throw new Error('No hay un destinatario activo');
+
+        const base64full = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Error al leer el audio'));
+            reader.readAsDataURL(file);
+        });
+
+        const tempResult = await window.upeer.saveBufferToTemp({
+            base64: base64full.split(',')[1],
+            fileName: file.name
+        });
+
+        if (!tempResult.success || !tempResult.path) {
+            throw new Error(tempResult.error || 'Error al guardar el audio temporalmente');
+        }
+
+        const persistResult = await window.upeer.persistInternalAsset({
+            filePath: tempResult.path,
+            fileName: file.name
+        });
+
+        const finalPath = persistResult.success && persistResult.path ? persistResult.path : tempResult.path;
+
+        const result = await fileTransfer.startTransfer({
+            upeerId: targetUpeerId,
+            filePath: finalPath,
+            isVoiceNote: true,
+        });
+
+        if (result.success && result.fileId) {
+            const tempHash = `voicemail-${Date.now()}`;
+            addFileTransferMessage(targetUpeerId, result.fileId, file.name, file.size, file.type, tempHash, '', '', true, finalPath, true);
+        }
+    };
+
     return {
         handleDragOver,
         handleDragLeave,
         handleDrop,
         handleAttachFile,
-        handleFileSubmit
+        handleFileSubmit,
+        handleSendVoiceNote
     };
 }

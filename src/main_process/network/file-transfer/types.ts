@@ -49,6 +49,7 @@ export interface FileTransfer {
     filePath?: string;
     sanitizedPath?: string;
     isVaulting?: boolean;
+    isVoiceNote?: boolean;
 
     // Adaptive congestion control state (sender only)
     windowSize?: number;

@@ -17,8 +17,8 @@ export default function App() {
 
     const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage);
 
-    const { 
-        handleAttachFile, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave 
+    const {
+        handleAttachFile, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave, handleSendVoiceNote
     } = useFilePersistence(fileTransfer);
 
     useEffect(() => {
@@ -100,7 +100,7 @@ export default function App() {
 
     return (
         <CssVarsProvider defaultMode="dark">
-            <MainLayout 
+            <MainLayout
                 isAppLocked={isAppLocked}
                 setIsAppLocked={setIsAppLocked}
                 isAuthenticated={appStore.isAuthenticated}
@@ -139,6 +139,7 @@ export default function App() {
                 pendingFiles={chatStore.pendingFiles}
                 setPendingFiles={chatStore.setPendingFiles}
                 handleFileSubmit={handleFileSubmit}
+                handleSendVoiceNote={handleSendVoiceNote}
                 fileTransfer={fileTransfer}
                 editingMessage={editingMessage}
                 setEditingMessage={setEditingMessage}

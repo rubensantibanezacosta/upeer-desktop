@@ -13,6 +13,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { formatFileSize } from '../../../utils/fileUtils.js';
+import { RichText } from '../../../components/ui/RichText.js';
 
 interface MediaFileMessageProps {
     fileId: string;
@@ -246,7 +247,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                     rowGap: 0,
                     alignItems: 'flex-end'
                 }}>
-                    <Typography level="body-md" sx={{
+                    <RichText isMe={isMe} level="body-md" sx={{
                         wordBreak: 'break-word',
                         whiteSpace: 'pre-wrap',
                         color: 'inherit',
@@ -255,7 +256,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         pb: 0.2
                     }}>
                         {caption}
-                    </Typography>
+                    </RichText>
                     {timestamp && (
                         <Box sx={{
                             display: 'flex',

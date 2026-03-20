@@ -87,6 +87,7 @@
     "react-simple-maps": "^3.0.0",
     "sharp": "^0.34.5",
     "sodium-native": "^5.0.10",
+    "wavesurfer.js": "^7.12.4",
     "world-atlas": "^2.0.2",
     "zustand": "^5.0.11"
   }

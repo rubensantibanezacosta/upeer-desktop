@@ -19,6 +19,7 @@ export class FileTransferStore {
         filePath?: string;
         caption?: string;
         sanitizedPath?: string;
+        isVoiceNote?: boolean;
     }): FileTransfer {
         const fileId = data.fileId || crypto.randomUUID();
 
@@ -43,6 +44,7 @@ export class FileTransferStore {
             pendingChunks: new Set(),
             filePath: data.filePath,
             sanitizedPath: data.sanitizedPath,
+            isVoiceNote: data.isVoiceNote,
             windowSize: 40,
             ssthresh: 128,
             srtt: 200,

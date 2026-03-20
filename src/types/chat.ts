@@ -1,3 +1,11 @@
+export interface LinkPreview {
+    url: string;
+    title?: string;
+    description?: string;
+    imageBase64?: string;
+    domain?: string;
+}
+
 export interface ChatMessage {
     id?: string;
     upeerId: string;
@@ -16,6 +24,7 @@ export interface ChatMessage {
     // Group message extras
     senderUpeerId?: string;
     senderName?: string;
+    senderAvatar?: string;
     groupId?: string;
     isSystem?: boolean;
     date: number;

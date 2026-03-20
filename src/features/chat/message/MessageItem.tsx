@@ -7,6 +7,9 @@ import { ContactCard } from '../ContactCard.js';
 import { FileMessageItem, FileMessageData } from '../file/FileMessageItem.js';
 import { MessageContextMenu } from './MessageContextMenu.js';
 import { MessageReactions } from './MessageReactions.js';
+import { RichText } from '../../../components/ui/RichText.js';
+import { LinkPreviewCard } from './LinkPreviewCard.js';
+import type { LinkPreview } from '../../../types/chat.js';
 
 interface MessageItemProps {
     msg: {
@@ -36,6 +39,8 @@ interface MessageItemProps {
     onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
     originalSenderName?: string;
     isGroup?: boolean;
+    isFirstInGroupChain?: boolean;
+    isLastInGroupChain?: boolean;
     onTransferStateChange?: (fileId: string, updates: any) => void;
 }
 
@@ -44,6 +49,8 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
     let cardData: any = null;
     let fileData: any = null;
     let isJSONFile = false;
+    let linkPreviewData: LinkPreview | null = null;
+    let textContent: string | null = null;
 
     if (message.startsWith('CONTACT_CARD|')) {
         const parts = message.split('|');
@@ -74,11 +81,15 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
                     progress: activeTransfer ? (transferState === 'completed' ? 100 : activeTransfer.progress) : (parsed.state === 'completed' || !parsed.state ? 100 : 0),
                     direction,
                     isVaulting: activeTransfer?.isVaulting,
+                    isVoiceNote: parsed.isVoiceNote || activeTransfer?.isVoiceNote,
                     // BUG EC fix: propagar la ruta del archivo para que el botón "Abrir" funcione tras reiniciar.
                     // Priorizamos savedPath del mensaje guardado (persistence fix), luego el estado activo de la transferencia.
                     savedPath: parsed.savedPath || activeTransfer?.savedPath ||
                         (direction === 'sending' ? (parsed.filePath || activeTransfer?.filePath) : (parsed.tempPath || activeTransfer?.tempPath)),
                 };
+            } else if (parsed.linkPreview && typeof parsed.text === 'string') {
+                linkPreviewData = parsed.linkPreview as LinkPreview;
+                textContent = parsed.text;
             }
         } catch (_) { /* not a file */ }
     }
@@ -111,20 +122,20 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
         }
     }
 
-    return { cardData, fileData, isJSONFile };
+    return { cardData, fileData, isJSONFile, linkPreviewData, textContent };
 }
 
 const QUICK_EMOJIS_CONST = ['👍', '❤️', '😂', '😮', '😢', '👎'];
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({
-    msg, onReply, onReact, onEdit: _onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange
+    msg, onReply, onReact, onEdit: _onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, isFirstInGroupChain = true, isLastInGroupChain = true, onTransferStateChange
 }) => {
     const isMe = msg.isMine;
     const [isHovered, setIsHovered] = useState(false);
     const [emojiOpen, setEmojiOpen] = useState(false);
     const QUICK_EMOJIS = QUICK_EMOJIS_CONST;
 
-    const { cardData, fileData, isJSONFile } = useMemo(() =>
+    const { cardData, fileData, isJSONFile, linkPreviewData, textContent } = useMemo(() =>
         parseMessage(msg.message, isMe, activeTransfers),
         [msg.message, isMe, activeTransfers]);
     const isContactCard = !!cardData;
@@ -159,18 +170,21 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         >
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
                 {isGroup && !isMe && (
-                    <Avatar
-                        size="sm"
-                        src={msg.senderAvatar}
-                        variant="soft"
-                        sx={{ mt: 0.5, borderRadius: 'sm', width: 28, height: 28 }}
-                    >
-                        {msg.senderName ? msg.senderName[0] : '?'}
-                    </Avatar>
+                    isLastInGroupChain ? (
+                        <Avatar
+                            size="sm"
+                            src={msg.senderAvatar}
+                            variant="soft"
+                            sx={{ mt: 0.5, borderRadius: 'sm', width: 28, height: 28, flexShrink: 0 }}
+                        >
+                            {msg.senderName ? msg.senderName[0].toUpperCase() : '?'}
+                        </Avatar>
+                    ) : (
+                        <Box sx={{ width: 28, flexShrink: 0 }} />
+                    )
                 )}
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-                    {/* Sender name for group messages */}
-                    {isGroup && !isMe && msg.senderName && (
+                    {isGroup && !isMe && msg.senderName && isFirstInGroupChain && (
                         <Typography
                             level="body-xs"
                             color="primary"
@@ -242,16 +256,23 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                         px: 1.5,
                                         pb: 0.5
                                     }}>
-                                        <Typography
+                                        <RichText
+                                            isMe={isMe}
                                             level="body-md"
                                             sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', fontStyle: msg.isDeleted ? 'italic' : 'normal', pb: 0.5 }}
                                         >
                                             {(() => {
                                                 if (isFile && fileData && fileData.caption) return fileData.caption;
                                                 if (isJSONFile) return '';
+                                                if (textContent !== null) return textContent;
                                                 return msg.message;
                                             })()}
-                                        </Typography>
+                                        </RichText>
+                                        {linkPreviewData && !msg.isDeleted && (
+                                            <Box sx={{ width: '100%', mt: 1 }}>
+                                                <LinkPreviewCard data={linkPreviewData} />
+                                            </Box>
+                                        )}
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
                                             {msg.isEdited && !msg.isDeleted && (
                                                 <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(editado)</Typography>

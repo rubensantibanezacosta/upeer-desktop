@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 import { formatFileSize } from '../../../utils/fileUtils.js';
+import { RichText } from '../../../components/ui/RichText.js';
 
 interface DocumentFileMessageProps {
     fileName: string;
@@ -156,7 +157,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                     width: '100%',
                     boxSizing: 'border-box'
                 }}>
-                    <Typography level="body-md" sx={{
+                    <RichText isMe={isMe} level="body-md" sx={{
                         wordBreak: 'break-word',
                         whiteSpace: 'pre-wrap',
                         color: 'inherit',
@@ -164,7 +165,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                         pb: 0.5
                     }}>
                         {caption}
-                    </Typography>
+                    </RichText>
                     {timestamp && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.8, opacity: 0.8 }}>
                             <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px' }}>

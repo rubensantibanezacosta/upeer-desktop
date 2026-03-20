@@ -217,9 +217,21 @@ export function registerFileHandlers(): void {
     }
   });
 
-  // BUG EC fix: abrir un archivo guardado con la aplicación predeterminada del
-  // sistema. Incluye la misma validación de ruta que el resto de handlers de
-  // archivos (solo dentro del homeDir del usuario).
+  ipcMain.handle('open-external', async (_event, { url }) => {
+    try {
+      if (typeof url !== 'string' || !url) return { success: false, error: 'URL inválida' };
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { success: false, error: 'Protocolo no permitido' };
+      }
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (err: any) {
+      logError('open-external failed', { err: String(err) }, 'security');
+      return { success: false, error: String(err) };
+    }
+  });
+
   ipcMain.handle('open-file', async (event, { filePath }) => {
     try {
       if (typeof filePath !== 'string' || !filePath) {
@@ -233,9 +245,9 @@ export function registerFileHandlers(): void {
       const tempDir = app.getPath('temp');
       const tempDirNormalized = tempDir.endsWith(path.sep) ? tempDir : tempDir + path.sep;
 
-      if (!resolvedPath.startsWith(assetsDirNormalized) && 
-          !resolvedPath.startsWith(downloadsDirNormalized) && 
-          !resolvedPath.startsWith(tempDirNormalized)) {
+      if (!resolvedPath.startsWith(assetsDirNormalized) &&
+        !resolvedPath.startsWith(downloadsDirNormalized) &&
+        !resolvedPath.startsWith(tempDirNormalized)) {
         return { success: false, error: 'Acceso denegado: el archivo debe estar en assets, descargas o temporal.' };
       }
 
@@ -243,9 +255,9 @@ export function registerFileHandlers(): void {
       try {
         await fs.access(resolvedPath);
       } catch (err) {
-        return { 
-          success: false, 
-          error: 'El archivo ya no existe en la ruta original. Es posible que haya sido movido o eliminado.' 
+        return {
+          success: false,
+          error: 'El archivo ya no existe en la ruta original. Es posible que haya sido movido o eliminado.'
         };
       }
 
@@ -257,16 +269,33 @@ export function registerFileHandlers(): void {
     }
   });
 
+  ipcMain.handle('save-buffer-to-temp', async (event, { base64, fileName }) => {
+    try {
+      const tempDir = path.join(app.getPath('temp'), 'upeer-voicemail');
+      const exists = fsSync.existsSync(tempDir);
+      if (!exists) {
+        await fs.mkdir(tempDir, { recursive: true });
+      }
+      const filePath = path.join(tempDir, fileName);
+      const buffer = Buffer.from(base64, 'base64');
+      await fs.writeFile(filePath, buffer);
+      return { success: true, path: filePath };
+    } catch (err) {
+      logError('Error saving buffer to temp file', { fileName, err: String(err) }, 'ipc');
+      return { success: false, error: String(err) };
+    }
+  });
+
   // Copia un archivo a la carpeta interna de assets para persistencia
   ipcMain.handle('persist-internal-asset', async (event, { filePath, fileName }) => {
     try {
       if (typeof filePath !== 'string' || !filePath) {
         return { success: false, error: 'Ruta de archivo inválida' };
       }
-      
+
       const resolvedSource = path.resolve(filePath);
       const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
-      
+
       if (!fsSync.existsSync(internalAssetsDir)) {
         await fs.mkdir(internalAssetsDir, { recursive: true });
       }
@@ -277,7 +306,7 @@ export function registerFileHandlers(): void {
       const targetPath = path.join(internalAssetsDir, uniqueName);
 
       await fs.copyFile(resolvedSource, targetPath);
-      
+
       return { success: true, path: targetPath };
     } catch (error) {
       logError('Error persistiendo asset interno', { err: String(error) }, 'ipc');

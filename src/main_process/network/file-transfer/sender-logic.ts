@@ -14,7 +14,8 @@ export async function startSend(
     address: string,
     filePath: string,
     thumbnail?: string,
-    caption?: string
+    caption?: string,
+    isVoiceNote?: boolean
 ): Promise<string> {
     try {
         const preliminaryMime = this.validator.detectMimeType(filePath);
@@ -61,6 +62,7 @@ export async function startSend(
             fileHash: fileInfo.hash,
             thumbnail,
             caption,
+            isVoiceNote,
             direction: 'sending' as const,
             filePath: effectivePath,
             sanitizedPath: sanitizationResult?.wasProcessed ? effectivePath : undefined

@@ -1,4 +1,4 @@
-import { protocol, session, app, BrowserWindow } from 'electron';
+import { protocol, session, app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
@@ -214,6 +214,16 @@ export async function initializeApp(baseDir: string): Promise<void> {
   }
 
   setMainWindow(mainWindow);
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (['http:', 'https:'].includes(parsed.protocol)) {
+        shell.openExternal(url);
+      }
+    } catch { /* URL malformada — ignorar */ }
+    return { action: 'deny' };
+  });
 
   // Solo arrancar la red si ya tenemos identidad (sesión auto-restaurada).
   // En primera ejecución se arranca desde los handlers de create/unlock.

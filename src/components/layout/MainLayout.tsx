@@ -24,13 +24,13 @@ interface MainLayoutProps {
     setIsAppLocked: (locked: boolean) => void;
     isAuthenticated: boolean | null;
     setAuthenticated: (auth: boolean) => void;
-    
+
     // UI State
     isDragging: boolean;
     handleDragOver: (e: React.DragEvent) => void;
     handleDragLeave: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
-    
+
     // Chat Context
     activeContact: any;
     activeGroup: any;
@@ -39,14 +39,14 @@ interface MainLayoutProps {
     activeGroupId: string;
     message: string;
     setMessage: (val: string) => void;
-    
+
     // Handlers
     handleSend: () => void;
     handleSendGroupMessage: () => void;
     handleAttachFile: (type: any) => void;
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
-    
+
     // Complex State
     currentReplyToMessage: any;
     setReplyToMessage: (id: string, msg: any) => void;
@@ -58,20 +58,21 @@ interface MainLayoutProps {
     handleUpdateMessage: (id: string, msg: string) => void;
     handleDeleteMessage: (id: string) => void;
     handleMediaClick: (media: any) => void;
-    
+
     // Modals & Navigation
     navigation: any;
     appStore: any;
     chatStore: any;
-    
+
     // Files
     isFilePickerOpen: boolean;
     setFilePickerOpen: (open: boolean) => void;
     pendingFiles: any[];
     setPendingFiles: (files: any[]) => void;
     handleFileSubmit: (files: any[], thumbnails?: any[], captions?: any[]) => void;
+    handleSendVoiceNote: (file: File) => Promise<void>;
     fileTransfer: any;
-    
+
     // Message Editing
     editingMessage: any;
     setEditingMessage: (msg: any) => void;
@@ -87,7 +88,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     handleAcceptContact, handleDeleteContact, handleBlockContact,
     handleReaction, handleUpdateMessage, handleDeleteMessage, handleMediaClick,
     navigation, appStore, chatStore,
-    isFilePickerOpen, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit,
+    isFilePickerOpen, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
     if (isAppLocked === null) {
@@ -99,7 +100,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     }
 
     if (isAppLocked) return <AppLock onUnlock={() => setIsAppLocked(false)} />;
-    
+
     if (isAuthenticated === null) {
         return (
             <Box sx={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'background.body' }}>
@@ -117,10 +118,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
     return (
         <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }}
-             onDragOver={handleDragOver}
-             onDragLeave={handleDragLeave}
-             onDrop={handleDrop}>
-            
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}>
+
             {isDragging && (
                 <Box sx={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -170,7 +171,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         onLeaveGroup={chatStore.handleLeaveGroup}
                         typingStatus={chatStore.typingStatus}
                     />
-                    
+
                     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, backgroundColor: 'background.body', position: 'relative', overflow: 'hidden' }}>
                         {(targetUpeerId || activeGroupId) ? (
                             <>
@@ -240,6 +241,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                             }
                                             onTyping={handleTyping}
                                             onAttachFile={handleAttachFile}
+                                            onSendVoiceNote={handleSendVoiceNote}
                                             disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? activeContact?.status !== 'connected' : false)}
                                             replyToMessage={currentReplyToMessage ? {
                                                 ...currentReplyToMessage,
