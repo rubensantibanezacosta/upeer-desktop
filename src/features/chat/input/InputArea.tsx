@@ -6,12 +6,12 @@ import {
     Typography
 } from '@mui/joy';
 import SendIcon from '@mui/icons-material/Send';
-import MoodIcon from '@mui/icons-material/Mood';
 import MicIcon from '@mui/icons-material/Mic';
 import EditIcon from '@mui/icons-material/Edit';
 
 import CloseIcon from '@mui/icons-material/Close';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
+import { EmojiPicker } from './EmojiPicker.js';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 
 interface InputAreaProps {
@@ -190,7 +190,10 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 height: '62px',
                 boxSizing: 'border-box'
             }}>
-                <IconButton variant="plain" color="neutral"><MoodIcon /></IconButton>
+                <EmojiPicker
+                    onSelect={(emoji) => setMessage(message + emoji)}
+                    disabled={disabled}
+                />
                 <AttachmentButton
                     onSelect={(type) => {
                         if (onAttachFile) onAttachFile(type);
