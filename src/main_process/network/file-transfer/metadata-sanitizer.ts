@@ -80,10 +80,12 @@ export interface SanitizationResult {
     originalPath: string;
     wasProcessed: boolean;
     metadataRemoved: string[];
+    securityWarning?: string;
 }
 
 export class MetadataSanitizer {
     private tempDir: string;
+    private ffmpegAvailable: boolean | null = null;
 
     constructor() {
         this.tempDir = path.join(os.tmpdir(), 'chat-p2p-sanitized');
@@ -98,11 +100,27 @@ export class MetadataSanitizer {
         }
     }
 
+    private async checkFfmpegAvailable(): Promise<boolean> {
+        if (this.ffmpegAvailable !== null) return this.ffmpegAvailable;
+
+        return new Promise((resolve) => {
+            const proc = spawn('ffmpeg', ['-version'], { stdio: ['ignore', 'ignore', 'ignore'] });
+            proc.on('close', (code) => {
+                this.ffmpegAvailable = code === 0;
+                resolve(this.ffmpegAvailable);
+            });
+            proc.on('error', () => {
+                this.ffmpegAvailable = false;
+                resolve(false);
+            });
+        });
+    }
+
     canSanitize(mimeType: string): boolean {
         const normalized = mimeType.toLowerCase();
-        return SUPPORTED_IMAGE_TYPES.has(normalized) || 
-               SUPPORTED_VIDEO_TYPES.has(normalized) || 
-               SUPPORTED_AUDIO_TYPES.has(normalized);
+        return SUPPORTED_IMAGE_TYPES.has(normalized) ||
+            SUPPORTED_VIDEO_TYPES.has(normalized) ||
+            SUPPORTED_AUDIO_TYPES.has(normalized);
     }
 
     private isImage(mimeType: string): boolean {
@@ -123,8 +141,23 @@ export class MetadataSanitizer {
                 sanitizedPath: filePath,
                 originalPath: filePath,
                 wasProcessed: false,
-                metadataRemoved: []
+                metadataRemoved: [],
+                securityWarning: `Tipo de archivo ${mimeType} no soportado para limpieza de metadatos`
             };
+        }
+
+        if (this.isVideoOrAudio(normalizedMime)) {
+            const ffmpegOk = await this.checkFfmpegAvailable();
+            if (!ffmpegOk) {
+                warn('FFmpeg not available, cannot sanitize video/audio', { mimeType }, 'metadata-sanitizer');
+                return {
+                    sanitizedPath: filePath,
+                    originalPath: filePath,
+                    wasProcessed: false,
+                    metadataRemoved: [],
+                    securityWarning: 'FFmpeg no disponible - el archivo puede contener metadatos de ubicación'
+                };
+            }
         }
 
         await this.ensureTempDir();
@@ -135,7 +168,7 @@ export class MetadataSanitizer {
 
         try {
             let metadataRemoved: string[];
-            
+
             if (this.isImage(normalizedMime)) {
                 metadataRemoved = await this.stripImageMetadata(filePath, sanitizedPath, normalizedMime);
             } else if (this.isVideoOrAudio(normalizedMime)) {
@@ -147,6 +180,11 @@ export class MetadataSanitizer {
                     wasProcessed: false,
                     metadataRemoved: []
                 };
+            }
+
+            const verified = await this.verifySanitization(sanitizedPath);
+            if (!verified) {
+                throw new Error('Sanitization verification failed');
             }
 
             debug('File metadata sanitized', {
@@ -161,17 +199,21 @@ export class MetadataSanitizer {
                 metadataRemoved
             };
         } catch (err) {
-            warn('Failed to sanitize file, using original', { err: String(err), filePath }, 'metadata-sanitizer');
+            logError('Failed to sanitize file - BLOCKING for security', { err: String(err), filePath }, 'metadata-sanitizer');
             try {
                 await fs.unlink(sanitizedPath);
             } catch (_e) { /* ignore */ }
 
-            return {
-                sanitizedPath: filePath,
-                originalPath: filePath,
-                wasProcessed: false,
-                metadataRemoved: []
-            };
+            throw new Error(`Sanitization failed: ${String(err)}. File NOT sent to protect privacy.`);
+        }
+    }
+
+    private async verifySanitization(outputPath: string): Promise<boolean> {
+        try {
+            const stats = await fs.stat(outputPath);
+            return stats.size > 0;
+        } catch {
+            return false;
         }
     }
 
@@ -227,7 +269,7 @@ export class MetadataSanitizer {
             ];
 
             const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-            
+
             let stderr = '';
             ffmpeg.stderr?.on('data', (data: Buffer) => {
                 stderr += data.toString();

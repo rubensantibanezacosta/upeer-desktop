@@ -43,11 +43,13 @@ vi.mock('node:fs/promises', () => ({
     default: {
         mkdir: vi.fn().mockResolvedValue(undefined),
         unlink: vi.fn().mockResolvedValue(undefined),
-        readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png'])
+        readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png']),
+        stat: vi.fn().mockResolvedValue({ size: 1000 })
     },
     mkdir: vi.fn().mockResolvedValue(undefined),
     unlink: vi.fn().mockResolvedValue(undefined),
-    readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png'])
+    readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png']),
+    stat: vi.fn().mockResolvedValue({ size: 1000 })
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -105,13 +107,14 @@ describe('MetadataSanitizer', () => {
     });
 
     describe('sanitizeFile', () => {
-        it('should return unprocessed result for unsupported types', async () => {
+        it('should return unprocessed result with security warning for unsupported types', async () => {
             const result = await sanitizer.sanitizeFile('/path/to/file.gif', 'image/gif');
 
             expect(result.wasProcessed).toBe(false);
             expect(result.sanitizedPath).toBe('/path/to/file.gif');
             expect(result.originalPath).toBe('/path/to/file.gif');
             expect(result.metadataRemoved).toEqual([]);
+            expect(result.securityWarning).toBeDefined();
         });
 
         it('should sanitize supported image types and report removed metadata', async () => {
@@ -140,7 +143,7 @@ describe('MetadataSanitizer', () => {
 
         it('should sanitize video files using ffmpeg', async () => {
             const result = await sanitizer.sanitizeFile('/path/to/video.mp4', 'video/mp4');
-            
+
             expect(result.wasProcessed).toBe(true);
             expect(result.originalPath).toBe('/path/to/video.mp4');
             expect(result.sanitizedPath).toContain('chat-p2p-sanitized');
@@ -149,7 +152,7 @@ describe('MetadataSanitizer', () => {
 
         it('should sanitize audio files using ffmpeg', async () => {
             const result = await sanitizer.sanitizeFile('/path/to/audio.mp3', 'audio/mpeg');
-            
+
             expect(result.wasProcessed).toBe(true);
             expect(result.originalPath).toBe('/path/to/audio.mp3');
             expect(result.sanitizedPath).toContain('chat-p2p-sanitized');

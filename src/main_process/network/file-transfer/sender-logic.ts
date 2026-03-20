@@ -31,6 +31,18 @@ export async function startSend(
                     removed: sanitizationResult.metadataRemoved
                 }, 'metadata-sanitizer');
             }
+
+            if (sanitizationResult.securityWarning) {
+                warn('Security warning during file send', {
+                    warning: sanitizationResult.securityWarning,
+                    fileName: filePath
+                }, 'metadata-sanitizer');
+            }
+        } else {
+            warn('File type cannot be sanitized - potential metadata leak', {
+                mimeType: preliminaryMime,
+                fileName: filePath
+            }, 'metadata-sanitizer');
         }
 
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
