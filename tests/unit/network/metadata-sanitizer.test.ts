@@ -45,6 +45,10 @@ vi.mock('node:child_process', () => ({
     spawn: vi.fn(() => createMockFFmpegProcess(mockSpawnBehavior.exitCode, mockSpawnBehavior.emitError))
 }));
 
+vi.mock('@ffmpeg-installer/ffmpeg', () => ({
+    default: { path: '/mocked/ffmpeg' }
+}));
+
 const mockStatBehavior = { shouldFail: false, size: 1000 };
 
 vi.mock('node:fs/promises', () => ({

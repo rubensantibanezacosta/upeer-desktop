@@ -4,7 +4,10 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import sharp from 'sharp';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { debug, warn, error as logError } from '../../security/secure-logger.js';
+
+const FFMPEG_PATH = ffmpegInstaller.path;
 
 const SUPPORTED_IMAGE_TYPES = new Set([
     'image/jpeg',
@@ -104,13 +107,17 @@ export class MetadataSanitizer {
         if (this.ffmpegAvailable !== null) return this.ffmpegAvailable;
 
         return new Promise((resolve) => {
-            const proc = spawn('ffmpeg', ['-version'], { stdio: ['ignore', 'ignore', 'ignore'] });
+            const proc = spawn(FFMPEG_PATH, ['-version'], { stdio: ['ignore', 'ignore', 'ignore'] });
             proc.on('close', (code) => {
                 this.ffmpegAvailable = code === 0;
+                if (this.ffmpegAvailable) {
+                    debug('FFmpeg available (bundled)', { path: FFMPEG_PATH }, 'metadata-sanitizer');
+                }
                 resolve(this.ffmpegAvailable);
             });
             proc.on('error', () => {
                 this.ffmpegAvailable = false;
+                warn('FFmpeg not available', { path: FFMPEG_PATH }, 'metadata-sanitizer');
                 resolve(false);
             });
         });
@@ -274,7 +281,7 @@ export class MetadataSanitizer {
                 outputPath
             ];
 
-            const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+            const ffmpeg = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
             let stderr = '';
             ffmpeg.stderr?.on('data', (data: Buffer) => {
