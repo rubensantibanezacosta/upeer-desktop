@@ -199,12 +199,18 @@ export class MetadataSanitizer {
                 metadataRemoved
             };
         } catch (err) {
-            logError('Failed to sanitize file - BLOCKING for security', { err: String(err), filePath }, 'metadata-sanitizer');
+            warn('Sanitization failed, sending original file', { err: String(err), filePath }, 'metadata-sanitizer');
             try {
                 await fs.unlink(sanitizedPath);
             } catch (_e) { /* ignore */ }
 
-            throw new Error(`Sanitization failed: ${String(err)}. File NOT sent to protect privacy.`);
+            return {
+                sanitizedPath: filePath,
+                originalPath: filePath,
+                wasProcessed: false,
+                metadataRemoved: [],
+                securityWarning: `No se pudieron eliminar los metadatos: ${String(err)}. El archivo puede contener información de ubicación.`
+            };
         }
     }
 
