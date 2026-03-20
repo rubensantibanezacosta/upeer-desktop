@@ -78,7 +78,7 @@ interface ChatActions {
     handleRetryMessage: (msgId: string) => Promise<void>;
 
     // File Transfer Messages
-    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string) => void;
+    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string, isVoiceNote?: boolean) => void;
     updateFileTransferMessage: (fileId: string, updates: any) => void;
 
     // IPC Listener Initialization
@@ -252,15 +252,15 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             return;
         }
 
-        const sentMessageId = await window.upeer.sendMessage(targetUpeerId, msg, replyTo?.id);
+        const sendResult = await window.upeer.sendMessage(targetUpeerId, msg, replyTo?.id);
 
-        if (sentMessageId) {
+        if (sendResult) {
             set(state => ({
                 chatHistory: [...state.chatHistory, {
-                    id: sentMessageId,
+                    id: sendResult.id,
                     upeerId: targetUpeerId,
                     isMine: true,
-                    message: msg,
+                    message: sendResult.savedMessage,
                     status: targetUpeerId === myIdentity?.upeerId ? 'read' : 'sent',
                     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     replyTo: replyTo?.id,
@@ -433,8 +433,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         if (!msg || !msg.isMine || !targetUpeerId) return;
 
         // Intentar reenviar el mensaje
-        const sentId = await window.upeer.sendMessage(targetUpeerId, msg.message, msg.replyTo);
-        if (sentId) {
+        const retryResult = await window.upeer.sendMessage(targetUpeerId, msg.message, msg.replyTo);
+        if (retryResult) {
             set(state => ({
                 chatHistory: state.chatHistory.map(m =>
                     m.id === msgId ? { ...m, status: 'sent', date: Date.now() } : m
@@ -447,7 +447,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     setPendingFiles: (files) => set({ pendingFiles: files }),
     setIsDragging: (dragging) => set({ isDragging: dragging }),
 
-    addFileTransferMessage: (upeerId, fileId, fileName, fileSize, mimeType, fileHash, thumbnail, caption, isMine = true, filePath) => {
+    addFileTransferMessage: (upeerId, fileId, fileName, fileSize, mimeType, fileHash, thumbnail, caption, isMine = true, filePath, isVoiceNote) => {
         const fileMessage = {
             type: 'file',
             transferId: fileId,
@@ -458,7 +458,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             thumbnail: thumbnail || '',
             caption: caption || '',
             direction: isMine ? 'sending' : 'receiving',
-            filePath: isMine ? filePath : undefined
+            filePath: isMine ? filePath : undefined,
+            isVoiceNote
         };
         const messageContent = JSON.stringify(fileMessage);
         const { replyByConversation, activeGroupId, myIdentity } = get();

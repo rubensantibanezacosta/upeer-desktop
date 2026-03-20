@@ -11,7 +11,7 @@ declare global {
             unblockContact: (upeerId: string) => Promise<any>;
             clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
-            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<string>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<{ id: string; savedMessage: string } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
@@ -84,6 +84,8 @@ declare global {
             // BUG EC fix: nuevos métodos para descargar y abrir archivos recibidos
             showSaveDialog: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
             openFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+            openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+            fetchOgPreview: (url: string) => Promise<{ url: string; title?: string; description?: string; imageBase64?: string; domain?: string } | null>;
             onFileTransferStarted: (callback: (data: any) => void) => void;
             onFileTransferProgress: (callback: (data: any) => void) => void;
             onFileTransferCompleted: (callback: (data: any) => void) => void;
@@ -129,6 +131,13 @@ declare global {
             persistInternalAsset: (args: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             /** Eliminar identidad */
             deleteIdentity: () => Promise<{ success: boolean; error?: string }>;
+            /** Persistir un buffer a un archivo temporal */
+            saveBufferToTemp: (data: { base64: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
+            /** Mantenimiento de la red */
+            isPinEnabled: () => Promise<boolean>;
+            onYggstackAddress: (callback: (addr: string) => void) => void;
+            onYggstackStatus: (callback: (status: string, addr?: string) => void) => void;
+            persistInternalAsset: (data: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
         }
     }
 }

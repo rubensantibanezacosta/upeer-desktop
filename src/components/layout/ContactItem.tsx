@@ -254,6 +254,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                                                 </Box>
                                                             );
                                                         }
+                                                        if (typeof parsed.text === 'string') return parsed.text || '';
                                                     } catch (e) { /* ignore */ }
                                                 }
 

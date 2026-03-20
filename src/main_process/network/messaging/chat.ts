@@ -61,7 +61,7 @@ function getFanOutAddresses(contact: any): string[] {
     return Array.from(addresses);
 }
 
-export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<string | undefined> {
+export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<{ id: string; savedMessage: string } | undefined> {
     const selfId = getMyUPeerId();
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
@@ -84,9 +84,20 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
             const { savePendingOutboxMessage } = await import('../../storage/pending-outbox.js');
             await savePendingOutboxMessage(upeerId, msgId, content, replyTo);
             warn('No pubkey for contact, message queued in pending outbox', { upeerId }, 'vault');
-            return msgId;
+            return { id: msgId, savedMessage: content };
         }
         return undefined;
+    }
+
+    const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
+    const urlMatch = URL_FIRST_RE.exec(content);
+    let payload = content;
+    if (urlMatch) {
+        const { fetchOgPreview } = await import('../og-fetcher.js');
+        const preview = await fetchOgPreview(urlMatch[1]);
+        if (preview) {
+            payload = JSON.stringify({ text: content, linkPreview: preview });
+        }
     }
 
     // ── Cifrado: Double Ratchet (preferido) o crypto_box (fallback) ──────────
@@ -126,7 +137,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         }
 
         if (session) {
-            const { header, ciphertext, nonce } = ratchetEncrypt(session, Buffer.from(content, 'utf-8'));
+            const { header, ciphertext, nonce } = ratchetEncrypt(session, Buffer.from(payload, 'utf-8'));
             saveRatchetSession(upeerId, session, usedSpkId);
             ratchetHeader = header as unknown as Record<string, unknown>;
             contentHex = ciphertext;
@@ -140,7 +151,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
         ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
-            Buffer.from(content, 'utf-8'),
+            Buffer.from(payload, 'utf-8'),
             Buffer.from(targetKeyHex, 'hex')
         );
         if (useEphemeral) incrementEphemeralMessageCounter();
@@ -171,7 +182,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
 
     const signature = sign(Buffer.from(canonicalStringify(data)));
     const isToSelf = upeerId === selfId;
-    await saveMessage(msgId, upeerId, true, content, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent', selfId, timestamp);
+    await saveMessage(msgId, upeerId, true, payload, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent', selfId, timestamp);
 
     // Multi-device sync: Identificar otras IPs propias para auto-envío
     const selfAddresses: string[] = [];
@@ -326,7 +337,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         }
     }, 5000);
 
-    return msgId;
+    return { id: msgId, savedMessage: payload };
 }
 
 export async function sendTypingIndicator(upeerId: string) {

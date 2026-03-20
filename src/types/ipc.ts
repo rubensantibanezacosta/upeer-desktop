@@ -183,9 +183,8 @@ export interface SendMessageRequest {
 }
 
 export interface SendMessageResponse {
-    success: boolean;
-    msgId?: string;
-    error?: string;
+    id: string;
+    savedMessage: string;
 }
 
 export interface SendTypingIndicatorRequest {
