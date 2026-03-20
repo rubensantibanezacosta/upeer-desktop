@@ -15,5 +15,13 @@ test-results.json
 test-encrypted.db
 .agents/
 .deepseek/
+.vite/
 out/
-**/.vite
+resources/bin/darwin-arm64/yggstack
+resources/bin/darwin-x64/yggstack
+resources/bin/linux-arm64/yggstack
+resources/bin/linux-x64/yggstack
+resources/bin/win32-x64/yggstack.exe
+frontend-coverage.json
+coverage-output.txt
+coverage-summary.txt
