@@ -23,33 +23,47 @@ vi.mock('sharp', () => ({
     default: vi.fn(() => mockSharpInstance)
 }));
 
-const createMockFFmpegProcess = (exitCode = 0) => {
+const createMockFFmpegProcess = (exitCode = 0, emitError = false) => {
     const proc = new EventEmitter() as any;
     proc.stderr = new EventEmitter();
     proc.stdio = ['ignore', 'pipe', 'pipe'];
     setTimeout(() => {
-        proc.stderr.emit('data', Buffer.from('Metadata: creation_time encoder location'));
-        proc.emit('close', exitCode);
+        if (emitError) {
+            proc.emit('error', new Error('FFmpeg spawn failed'));
+        } else {
+            proc.stderr.emit('data', Buffer.from('Metadata: creation_time encoder location'));
+            proc.emit('close', exitCode);
+        }
     }, 10);
     return proc;
 };
 
+const mockSpawnBehavior = { exitCode: 0, emitError: false };
+
 vi.mock('node:child_process', () => ({
-    default: { spawn: vi.fn(() => createMockFFmpegProcess(0)) },
-    spawn: vi.fn(() => createMockFFmpegProcess(0))
+    default: { spawn: vi.fn(() => createMockFFmpegProcess(mockSpawnBehavior.exitCode, mockSpawnBehavior.emitError)) },
+    spawn: vi.fn(() => createMockFFmpegProcess(mockSpawnBehavior.exitCode, mockSpawnBehavior.emitError))
 }));
+
+const mockStatBehavior = { shouldFail: false, size: 1000 };
 
 vi.mock('node:fs/promises', () => ({
     default: {
         mkdir: vi.fn().mockResolvedValue(undefined),
         unlink: vi.fn().mockResolvedValue(undefined),
         readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png']),
-        stat: vi.fn().mockResolvedValue({ size: 1000 })
+        stat: vi.fn().mockImplementation(() => {
+            if (mockStatBehavior.shouldFail) return Promise.reject(new Error('File not found'));
+            return Promise.resolve({ size: mockStatBehavior.size });
+        })
     },
     mkdir: vi.fn().mockResolvedValue(undefined),
     unlink: vi.fn().mockResolvedValue(undefined),
     readdir: vi.fn().mockResolvedValue(['file1.jpg', 'file2.png']),
-    stat: vi.fn().mockResolvedValue({ size: 1000 })
+    stat: vi.fn().mockImplementation(() => {
+        if (mockStatBehavior.shouldFail) return Promise.reject(new Error('File not found'));
+        return Promise.resolve({ size: mockStatBehavior.size });
+    })
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -66,6 +80,11 @@ describe('MetadataSanitizer', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         sanitizer = new MetadataSanitizer();
+        mockSpawnBehavior.exitCode = 0;
+        mockSpawnBehavior.emitError = false;
+        mockStatBehavior.shouldFail = false;
+        mockStatBehavior.size = 1000;
+        mockSharpInstance.toFile.mockResolvedValue({ size: 1000 });
     });
 
     describe('canSanitize', () => {
@@ -157,6 +176,47 @@ describe('MetadataSanitizer', () => {
             expect(result.originalPath).toBe('/path/to/audio.mp3');
             expect(result.sanitizedPath).toContain('chat-p2p-sanitized');
             expect(result.sanitizedPath).toContain('.mp3');
+        });
+
+        it('should return securityWarning when ffmpeg is not available for video', async () => {
+            mockSpawnBehavior.emitError = true;
+            const freshSanitizer = new MetadataSanitizer();
+
+            const result = await freshSanitizer.sanitizeFile('/path/to/video.mp4', 'video/mp4');
+
+            expect(result.wasProcessed).toBe(false);
+            expect(result.sanitizedPath).toBe('/path/to/video.mp4');
+            expect(result.securityWarning).toContain('FFmpeg no disponible');
+        });
+
+        it('should return securityWarning when sanitization fails', async () => {
+            mockSharpInstance.toFile.mockRejectedValueOnce(new Error('Sharp processing error'));
+
+            const result = await sanitizer.sanitizeFile('/path/to/photo.jpg', 'image/jpeg');
+
+            expect(result.wasProcessed).toBe(false);
+            expect(result.sanitizedPath).toBe('/path/to/photo.jpg');
+            expect(result.securityWarning).toContain('No se pudieron eliminar los metadatos');
+        });
+
+        it('should return securityWarning when verification fails (empty file)', async () => {
+            mockStatBehavior.size = 0;
+
+            const result = await sanitizer.sanitizeFile('/path/to/photo.jpg', 'image/jpeg');
+
+            expect(result.wasProcessed).toBe(false);
+            expect(result.securityWarning).toBeDefined();
+        });
+
+        it('should return securityWarning when ffmpeg exits with error code', async () => {
+            mockSpawnBehavior.exitCode = 1;
+            const freshSanitizer = new MetadataSanitizer();
+            (freshSanitizer as any).ffmpegAvailable = true;
+
+            const result = await freshSanitizer.sanitizeFile('/path/to/video.mp4', 'video/mp4');
+
+            expect(result.wasProcessed).toBe(false);
+            expect(result.securityWarning).toContain('No se pudieron eliminar los metadatos');
         });
     });
 
