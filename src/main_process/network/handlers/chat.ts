@@ -44,7 +44,7 @@ export async function handleChatMessage(
     if (data.id && _UUID_RE.test(String(data.id))) {
         const collision = await getMessageById(data.id);
         if (collision) {
-            sendResponse(fromAddress, { type: 'CHAT_ACK', id: data.id, status: 'delivered' });
+            sendResponse(fromAddress, { type: 'ACK', id: data.id, status: 'delivered' });
             return;
         }
     }
@@ -200,7 +200,7 @@ export async function handleChatMessage(
     }
 
     sendResponse(fromAddress, {
-        type: 'CHAT_ACK',
+        type: 'ACK',
         id: data.id,
         status: 'delivered'
     });

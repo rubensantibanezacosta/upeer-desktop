@@ -30,6 +30,11 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'my-peer-id'),
     getSpkBySpkId: vi.fn(),
     getMyIdentitySkBuffer: vi.fn(),
+    getMySignedPreKeyBundle: vi.fn(() => ({
+        signedPreKeyPublic: 'ab'.repeat(32),
+        signedPreKeySig: 'cd'.repeat(64),
+        signedPreKeyId: Date.now(),
+    })),
 }));
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
@@ -50,6 +55,7 @@ vi.mock('../../../src/main_process/security/ratchet.js', async () => {
 vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     getRatchetSession: vi.fn(() => null),
     saveRatchetSession: vi.fn(),
+    deleteRatchetSession: vi.fn(),
 }));
 
 // Mock de Electron
@@ -103,7 +109,7 @@ describe('Chat Handlers', () => {
             }));
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
-                type: 'CHAT_ACK',
+                type: 'ACK',
                 status: 'delivered'
             }));
 
@@ -174,7 +180,7 @@ describe('Chat Handlers', () => {
 
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
             expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
-                type: 'CHAT_ACK',
+                type: 'ACK',
                 status: 'delivered'
             }));
         });
