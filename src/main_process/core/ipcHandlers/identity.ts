@@ -20,7 +20,7 @@ import { getContacts } from '../../storage/contacts/operations.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { closeUDPServer, startUDPServer } from '../../network/server/tcpServer.js';
 import { stopPeerManager } from '../../sidecars/peer-manager.js';
-import { stopLanDiscovery, startLanDiscovery } from '../../network/lan/discovery.js';
+
 import { clearUserData } from '../../storage/shared.js';
 import { getMainWindow } from '../windowManager.js';
 import { warn } from '../../security/secure-logger.js';
@@ -158,7 +158,6 @@ export function registerIdentityHandlers(): void {
     if (isMnemonicMode()) {
       closeUDPServer();
       stopPeerManager();
-      stopLanDiscovery();
       clearUserData();
     }
     const mnemonicToUse = mnemonic || generateMnemonic();
@@ -169,7 +168,6 @@ export function registerIdentityHandlers(): void {
       const mainWindow = getMainWindow();
       if (mainWindow) {
         startUDPServer(mainWindow);
-        try { await startLanDiscovery(); } catch (e) { /* ignore */ }
       }
       return { success: true, mnemonic: mnemonicToUse };
     }
@@ -182,7 +180,6 @@ export function registerIdentityHandlers(): void {
       // Kick off network services now that we have a valid identity
       const mainWindow = getMainWindow();
       if (mainWindow) startUDPServer(mainWindow);
-      try { await startLanDiscovery(); } catch (e) { /* ignore if already started */ }
       return { success: true };
     }
     return { success: false, error: 'Mnemonic unlock failed' };

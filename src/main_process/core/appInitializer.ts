@@ -8,7 +8,6 @@ import { initDB } from '../storage/init.js';
 import { getContacts } from '../storage/contacts/operations.js';
 import { startUDPServer } from '../network/server/tcpServer.js';
 import { broadcastDhtUpdate, checkHeartbeat } from '../network/messaging/heartbeat.js';
-import { startLanDiscovery } from '../network/lan/discovery.js';
 import { startRenewalService } from '../network/dht/renewal.js';
 import { info, error as logError } from '../security/secure-logger.js';
 import { setMainWindow, getAllWindows } from './windowManager.js';
@@ -242,10 +241,9 @@ export async function initializeApp(baseDir: string): Promise<void> {
   // Solo arrancar LAN discovery si hay identidad activa (igual que UDP)
   if (!isSessionLocked()) {
     try {
-      await startLanDiscovery();
-      startRenewalService(); // Iniciar renovación automática de bloques DHT
+      startRenewalService();
     } catch (err) {
-      logError('[LAN] Error starting LAN discovery', { err: String(err) }, 'lan');
+      logError('[Renewal] Error starting renewal service', { err: String(err) }, 'dht');
     }
   }
 

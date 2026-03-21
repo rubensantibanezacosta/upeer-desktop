@@ -7,7 +7,8 @@ import { getYggstackAddress, onYggstackAddress, onYggstackStatus } from '../../s
 import { SEALED_TYPES, sealPacket } from '../sealed.js';
 import {
     canonicalStringify,
-    getNetworkAddress
+    getNetworkAddress,
+    isYggdrasilAddress
 } from '../utils.js';
 import {
     isIPBlocked,
@@ -61,6 +62,7 @@ onYggstackAddress(() => {
 
 export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?: string, isInternalSync = false) {
     if (!getTcpServer()) return;
+    if (!isYggdrasilAddress(ip)) return;
 
     const myId = getMyUPeerId();
     const fieldsToExclude = ['contactCache', 'renewalToken'];
