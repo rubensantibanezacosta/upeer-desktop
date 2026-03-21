@@ -14,7 +14,7 @@ let spkSecretKey: Buffer;
 let spkId = 0;
 const SPK_ROTATION_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 let spkRotationInterval: NodeJS.Timeout | null = null;
-const MAX_PREVIOUS_SPK = 2;
+const MAX_PREVIOUS_SPK = 5;
 const previousSpkEntries: Array<{ spkId: number; spkPk: Buffer; spkSk: Buffer }> = [];
 const MAX_PREVIOUS_EPH_KEYS = 6;
 const previousEphemeralSecretKeys: Buffer[] = [];
@@ -37,6 +37,7 @@ const SESSION_ENC_FILE = 'identity.enc';
 const SESSION_LOCKED_FILE = 'session.locked';
 const ALIAS_FILE = 'identity.alias';
 const AVATAR_FILE = 'identity.avatar';
+const SPK_STATE_FILE = 'spk.enc';
 
 function _getOrCreateDeviceKey(userDataPath: string): Buffer {
     const p = path.join(userDataPath, DEVICE_KEY_FILE);
@@ -161,6 +162,7 @@ export function initIdentity(userDataPath: string) {
         _isLocked = false;
         info('Sesión restaurada desde disco.', { upeerId }, 'identity');
         _rotateEphemeralKey();
+        _loadSpkState();
         _rotateSpk();
         spkRotationInterval = setInterval(() => _rotateSpk(), SPK_ROTATION_INTERVAL_MS);
         ephemeralKeyRotationInterval = setInterval(() => _rotateEphemeralKey(), EPHEMERAL_KEY_ROTATION_INTERVAL_MS);
@@ -200,6 +202,9 @@ export function incrementDhtSeq(): number {
 }
 
 function _rotateSpk() {
+    if (spkPublicKey && (Date.now() - spkId) < SPK_ROTATION_INTERVAL_MS) {
+        return;
+    }
     if (spkPublicKey) {
         previousSpkEntries.unshift({ spkId, spkPk: spkPublicKey, spkSk: spkSecretKey });
         if (previousSpkEntries.length > MAX_PREVIOUS_SPK) previousSpkEntries.pop();
@@ -211,6 +216,58 @@ function _rotateSpk() {
     spkSecretKey = sk;
     spkId = Date.now();
     debug('Signed PreKey rotada', { spkId }, 'identity');
+    _saveSpkState();
+}
+
+function _saveSpkState(): void {
+    if (!_userDataPath || !spkPublicKey) return;
+    try {
+        const devKey = _getOrCreateDeviceKey(_userDataPath);
+        const nonce = Buffer.alloc(sodium.crypto_secretbox_NONCEBYTES);
+        sodium.randombytes_buf(nonce);
+        const payload = Buffer.from(JSON.stringify({
+            spkPub: spkPublicKey.toString('hex'),
+            spkSk: spkSecretKey.toString('hex'),
+            spkId,
+            prev: previousSpkEntries.map(e => ({
+                id: e.spkId, pk: e.spkPk.toString('hex'), sk: e.spkSk.toString('hex'),
+            })),
+        }), 'utf8');
+        const cipher = Buffer.alloc(payload.length + sodium.crypto_secretbox_MACBYTES);
+        sodium.crypto_secretbox_easy(cipher, payload, nonce, devKey);
+        fs.writeFileSync(path.join(_userDataPath, SPK_STATE_FILE), Buffer.concat([nonce, cipher]), { mode: 0o600 });
+    } catch (e) {
+        error('Failed to save SPK state', e, 'identity');
+    }
+}
+
+function _loadSpkState(): boolean {
+    if (!_userDataPath) return false;
+    const p = path.join(_userDataPath, SPK_STATE_FILE);
+    if (!fs.existsSync(p)) return false;
+    try {
+        const devKey = _getOrCreateDeviceKey(_userDataPath);
+        const blob = fs.readFileSync(p);
+        const nonce = blob.subarray(0, sodium.crypto_secretbox_NONCEBYTES);
+        const cipher = blob.subarray(sodium.crypto_secretbox_NONCEBYTES);
+        const plain = Buffer.alloc(cipher.length - sodium.crypto_secretbox_MACBYTES);
+        if (!sodium.crypto_secretbox_open_easy(plain, cipher, nonce, devKey)) return false;
+        const d = JSON.parse(plain.toString('utf8'));
+        spkPublicKey = Buffer.from(d.spkPub, 'hex');
+        spkSecretKey = Buffer.from(d.spkSk, 'hex');
+        spkId = d.spkId;
+        previousSpkEntries.length = 0;
+        if (Array.isArray(d.prev)) {
+            for (const e of d.prev) {
+                previousSpkEntries.push({ spkId: e.id, spkPk: Buffer.from(e.pk, 'hex'), spkSk: Buffer.from(e.sk, 'hex') });
+            }
+        }
+        debug('SPK state restored from disk', { spkId }, 'identity');
+        return true;
+    } catch (e) {
+        error('Failed to load SPK state', e, 'identity');
+        return false;
+    }
 }
 
 function _rotateEphemeralKey() {
@@ -243,6 +300,7 @@ export function unlockSession(mnemonic: string): boolean {
     fs.writeFileSync(path.join(_userDataPath, MNEMONIC_MODE_FLAG), '1');
     _saveEncryptedSession(_userDataPath);
     _rotateEphemeralKey();
+    _loadSpkState();
     _rotateSpk();
     if (spkRotationInterval) clearInterval(spkRotationInterval);
     if (ephemeralKeyRotationInterval) clearInterval(ephemeralKeyRotationInterval);
@@ -259,6 +317,14 @@ export function lockSession(): void {
             fs.unlinkSync(encPath);
         } catch (err) {
             error('Error al eliminar sesión cifrada al bloquear', err, 'identity');
+        }
+    }
+    const spkEncPath = path.join(_userDataPath, SPK_STATE_FILE);
+    if (fs.existsSync(spkEncPath)) {
+        try {
+            fs.unlinkSync(spkEncPath);
+        } catch (err) {
+            error('Error al eliminar estado SPK al bloquear', err, 'identity');
         }
     }
     fs.writeFileSync(path.join(_userDataPath, SESSION_LOCKED_FILE), '1');

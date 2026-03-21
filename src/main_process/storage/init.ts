@@ -134,6 +134,12 @@ function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {
         sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
         sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('dr_recovery_v2', '1')`).run();
     }
+
+    const spkRotationFix = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'spk_rotation_fix'`).get() as { value: string } | undefined;
+    if (!spkRotationFix) {
+        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('spk_rotation_fix', '1')`).run();
+    }
 }
 
 export function closeDB() {
