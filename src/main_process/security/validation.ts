@@ -238,8 +238,8 @@ export function validateChatDelete(data: any): ValidationResult {
 }
 
 export function validateChatClear(data: any): ValidationResult {
-    if (!data.chatUpeerId || typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length !== 32) {
-        return { valid: false, error: 'Invalid chatUpeerId (expected 32 chars)' };
+    if (!data.chatUpeerId || typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length !== 64) {
+        return { valid: false, error: 'Invalid chatUpeerId (expected 64 hex chars)' };
     }
     if (data.timestamp !== undefined && (typeof data.timestamp !== 'number' || data.timestamp < 0)) {
         return { valid: false, error: 'Invalid timestamp' };
@@ -252,14 +252,14 @@ export function validateChatClear(data: any): ValidationResult {
 }
 
 export function validateDhtQuery(data: any): ValidationResult {
-    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 32) {
+    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 64) {
         return { valid: false, error: 'Invalid targetId' };
     }
     return { valid: true };
 }
 
 export function validateDhtResponse(data: any): ValidationResult {
-    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 32) {
+    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 64) {
         return { valid: false, error: 'Invalid targetId' };
     }
     // locationBlock or neighbors are optional
@@ -316,7 +316,7 @@ export function validateDhtExchange(data: any): ValidationResult {
     }
     // Basic validation of each peer (more thorough validation done elsewhere)
     for (const peer of data.peers) {
-        if (!peer.upeerId || typeof peer.upeerId !== 'string' || peer.upeerId.length !== 32) {
+        if (!peer.upeerId || typeof peer.upeerId !== 'string' || peer.upeerId.length !== 64) {
             return { valid: false, error: 'Invalid peer upeerId' };
         }
         if (!peer.publicKey || typeof peer.publicKey !== 'string' || peer.publicKey.length !== 64) {
@@ -619,7 +619,7 @@ export function validateChatContact(data: any): ValidationResult {
     if (!data.id || typeof data.id !== 'string' || data.id.length > 100) {
         return { valid: false, error: 'Invalid id' };
     }
-    if (!data.upeerId || typeof data.upeerId !== 'string' || data.upeerId.length !== 32) {
+    if (!data.upeerId || typeof data.upeerId !== 'string' || data.upeerId.length !== 64) {
         return { valid: false, error: 'Invalid upeerId' };
     }
     if (data.contactName && (typeof data.contactName !== 'string' || data.contactName.length > 100)) {
