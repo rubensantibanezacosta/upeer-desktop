@@ -1,4 +1,5 @@
 import { getDb, getSchema, eq } from '../shared.js';
+import { isYggdrasilAddress } from '../../network/utils.js';
 
 export async function updateContactLocation(upeerId: string, address: string) {
     const db = getDb();
@@ -41,7 +42,9 @@ export function updateContactDhtLocation(
     const db = getDb();
     const schema = getSchema();
 
-    const incoming = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+    const rawIncoming = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+    const incoming = rawIncoming.filter(isYggdrasilAddress);
+    if (incoming.length === 0) return;
     const primary = incoming[0];
 
     // Merge logic: newest IPs at the front, limit to 20

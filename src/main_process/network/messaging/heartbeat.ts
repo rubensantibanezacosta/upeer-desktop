@@ -6,7 +6,7 @@ import {
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
-import { getNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata } from '../utils.js';
+import { getNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
@@ -16,16 +16,18 @@ import { isIPBlocked } from '../server/circuitBreaker.js';
  */
 function getFanOutAddresses(contact: any): string[] {
     const addresses = new Set<string>();
-    if (contact.address) addresses.add(contact.address);
+    if (contact.address && isYggdrasilAddress(contact.address)) addresses.add(contact.address);
     if (contact.knownAddresses) {
         try {
             const known = typeof contact.knownAddresses === 'string'
                 ? JSON.parse(contact.knownAddresses)
                 : contact.knownAddresses;
             if (Array.isArray(known)) {
-                known.forEach((a: string) => addresses.add(a));
+                known.filter(isYggdrasilAddress).forEach((a: string) => addresses.add(a));
             }
-        } catch { /* ignore */ }
+        } catch (err) {
+            warn('Failed to parse knownAddresses', err, 'heartbeat');
+        }
     }
     return Array.from(addresses);
 }

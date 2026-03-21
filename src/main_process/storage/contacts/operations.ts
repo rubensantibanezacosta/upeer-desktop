@@ -1,4 +1,5 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
+import { isYggdrasilAddress } from '../../network/utils.js';
 
 export function getContactByUpeerId(upeerId: string) {
     const db = getDb();
@@ -70,8 +71,8 @@ export function addOrUpdateContact(
     let known: string[] = [];
     try { known = JSON.parse(existing?.knownAddresses ?? '[]'); } catch { known = []; }
 
-    // Merge provided addresses and the primary address
-    const incomingAddresses = addresses || [address];
+    // Solo almacenar direcciones Yggdrasil: las IPs locales no son canales válidos
+    const incomingAddresses = (addresses || [address]).filter(isYggdrasilAddress);
     for (const addr of incomingAddresses) {
         const idx = known.indexOf(addr);
         if (idx !== -1) known.splice(idx, 1);

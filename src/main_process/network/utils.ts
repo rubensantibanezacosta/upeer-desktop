@@ -6,6 +6,12 @@ import { getYggstackAddress } from '../sidecars/yggstack.js';
 import { network, warn, error, debug } from '../security/secure-logger.js';
 import type { RenewalToken, DeviceMetadata } from './types.js';
 
+const YGG_ADDR_REGEX = /^[23][0-9a-f]{2}:/i;
+
+export function isYggdrasilAddress(address: string): boolean {
+    return YGG_ADDR_REGEX.test(address) && address.split(':').length === 8;
+}
+
 /**
  * Validation utility for IP addresses (IPv4 or IPv6/Yggdrasil).
  */

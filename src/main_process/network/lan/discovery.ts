@@ -1,6 +1,6 @@
 import dgram from 'node:dgram';
 import { getMyUPeerId, getMyPublicKeyHex, getMyEphemeralPublicKeyHex, sign, verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
-import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock, getDeviceMetadata } from '../utils.js';
+import { getNetworkAddresses, canonicalStringify, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
 import { getMyDhtSeq } from '../../security/identity.js';
 import { addOrUpdateContact } from '../../storage/contacts/operations.js';
 import { isContactBlocked } from '../../storage/contacts/operations.js';
@@ -23,9 +23,6 @@ export interface LanDiscoveryMessage {
     timestamp: number;
     signature: string;
 }
-
-// Yggdrasil 200::/7 range: first segment starts with 2xx or 3xx in hex (not fe80:: link-local)
-const YGG_REGEX = /^[23][0-9a-f]{2}:/i;
 
 export class LanDiscovery {
     private socket: dgram.Socket | null = null;
@@ -140,7 +137,7 @@ export class LanDiscovery {
             publicKey,
             ephemeralPublicKey,
             address: locBlock.address, // Primaria (compatible)
-            addresses: locBlock.addresses, // Lista completa
+            addresses: locBlock.addresses.filter(isYggdrasilAddress),
             timestamp: Date.now()
         };
 
@@ -245,8 +242,7 @@ export class LanDiscovery {
         // (rango 200::/7, 8 segmentos). Sin esto, un peer con clave legítima puede firmar un
         // paquete con address='127.0.0.1' o cualquier IP y la firma pasaría; esa dirección
         // quedaría almacenada en contactos y redigiría conexiones futuras a localhost.
-        const addrSegments = message.address.split(':');
-        if (!YGG_REGEX.test(message.address) || addrSegments.length !== 8) {
+        if (!isYggdrasilAddress(message.address)) {
             warn('LAN message: address is not a valid Yggdrasil IPv6 address', { address: message.address }, 'lan');
             return false;
         }
@@ -289,13 +285,14 @@ export class LanDiscovery {
         if (myAddresses.length === 0) return;
 
         // Create response data without signature
+        const yggAddresses = myAddresses.filter(isYggdrasilAddress);
         const responseData = {
             type: 'LAN_DISCOVERY_RESPONSE' as const,
             upeerId: getMyUPeerId(),
             publicKey: getMyPublicKeyHex(),
             ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
-            address: myAddresses[0],
-            addresses: myAddresses,
+            address: yggAddresses[0] || myAddresses[0],
+            addresses: yggAddresses.length > 0 ? yggAddresses : [myAddresses[0]],
             timestamp: Date.now()
         };
 
