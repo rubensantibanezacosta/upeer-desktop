@@ -65,7 +65,7 @@ export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?:
     if (!isYggdrasilAddress(ip)) return;
 
     const myId = getMyUPeerId();
-    const fieldsToExclude = ['contactCache', 'renewalToken'];
+    const fieldsToExclude = ['contactCache', 'renewalToken', 'signature'];
     const dataForSignature = { ...data };
     fieldsToExclude.forEach(field => {
         if (field in dataForSignature) delete dataForSignature[field];
