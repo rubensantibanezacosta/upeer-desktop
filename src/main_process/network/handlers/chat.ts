@@ -90,6 +90,9 @@ export async function handleChatMessage(
                     saveRatchetSession(upeerId, session, usedSpkId);
                     displayContent = plaintext.toString('utf-8');
                 } else {
+                    const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
+                    deleteRatchetSession(upeerId);
+                    sendResponse(fromAddress, { type: 'DR_RESET' });
                     displayContent = '🔒 [Error de descifrado DR]';
                     error('Double Ratchet decrypt returned null', { upeerId }, 'security');
                 }

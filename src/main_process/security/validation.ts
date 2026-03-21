@@ -771,6 +771,8 @@ export function validateMessage(type: string, data: any): ValidationResult {
             return validateReputationRequest(data);
         case 'REPUTATION_DELIVER':
             return validateReputationDeliver(data);
+        case 'DR_RESET':
+            return { valid: true };
         default:
             // Unknown message type - reject
             return { valid: false, error: `Unknown message type: ${type}` };

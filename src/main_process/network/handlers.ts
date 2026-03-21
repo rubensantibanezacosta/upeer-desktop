@@ -7,7 +7,7 @@ import {
     verify
 } from '../security/identity.js';
 
-import { debug, error, security, warn } from '../security/secure-logger.js';
+import { debug, error, info, security, warn } from '../security/secure-logger.js';
 import { validateMessage } from '../security/validation.js';
 import {
     getContactByUpeerId,
@@ -342,6 +342,13 @@ export async function handlePacket(
             case 'REPUTATION_DELIVER':
                 handleReputationDeliver(upeerId, data);
                 break;
+
+            case 'DR_RESET': {
+                const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
+                deleteRatchetSession(upeerId);
+                info('DR session reset by peer', { upeerId }, 'security');
+                break;
+            }
 
             default:
                 warn('Unknown packet', { upeerId, type: data.type, ip: rinfo.address }, 'network');
