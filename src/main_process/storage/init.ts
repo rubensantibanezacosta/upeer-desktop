@@ -138,6 +138,7 @@ function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {
     const spkRotationFix = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'spk_rotation_fix'`).get() as { value: string } | undefined;
     if (!spkRotationFix) {
         sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+        sqlite.prepare(`UPDATE contacts SET signed_pre_key = NULL, signed_pre_key_sig = NULL, signed_pre_key_id = NULL`).run();
         sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('spk_rotation_fix', '1')`).run();
     }
 }
