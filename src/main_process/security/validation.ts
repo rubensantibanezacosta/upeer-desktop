@@ -670,8 +670,8 @@ export function validateReputationDeliver(data: any): ValidationResult {
     if (data.vouches.length > 50) return { valid: false, error: 'Demasiados vouches' };
     for (const v of data.vouches) {
         if (!v.id || typeof v.id !== 'string' || v.id.length !== 64) return { valid: false, error: 'id inválido' };
-        if (!v.fromId || typeof v.fromId !== 'string' || v.fromId.length !== 32) return { valid: false, error: 'fromId inválido' };
-        if (!v.toId || typeof v.toId !== 'string' || v.toId.length !== 32) return { valid: false, error: 'toId inválido' };
+        if (!v.fromId || typeof v.fromId !== 'string' || v.fromId.length !== 64) return { valid: false, error: 'fromId inválido' };
+        if (!v.toId || typeof v.toId !== 'string' || v.toId.length !== 64) return { valid: false, error: 'toId inválido' };
         if (!v.type || typeof v.type !== 'string') return { valid: false, error: 'type inválido' };
         if (typeof v.timestamp !== 'number') return { valid: false, error: 'timestamp inválido' };
         if (!v.signature || typeof v.signature !== 'string' || v.signature.length !== 128) return { valid: false, error: 'signature inválida' };
