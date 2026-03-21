@@ -104,6 +104,8 @@ export async function initDB(userDataPath: string) {
 
     setDatabase(db, sqlite);
 
+    _runOneTimeMigrations(sqlite);
+
     try {
         performDatabaseBackup(userDataPath);
         scheduleBackups(userDataPath, 24);
@@ -116,6 +118,17 @@ export async function initDB(userDataPath: string) {
 
 import { closeDatabase } from './shared.js';
 import { performDatabaseBackup, scheduleBackups } from './backup.js';
+import type BetterSqlite3Type from 'better-sqlite3-multiple-ciphers';
+
+function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {
+    sqlite.exec(`CREATE TABLE IF NOT EXISTS _app_flags (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+
+    const sealedFixed = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'sealed_crypto_fixed'`).get() as { value: string } | undefined;
+    if (!sealedFixed) {
+        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('sealed_crypto_fixed', '1')`).run();
+    }
+}
 
 export function closeDB() {
     closeDatabase();
