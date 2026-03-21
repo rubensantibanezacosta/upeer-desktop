@@ -55,6 +55,7 @@ export async function handleChatMessage(
 
     let displayContent = data.content;
     if (data.ratchetHeader) {
+        const { getMySignedPreKeyBundle: _getSpk } = await import('../../security/identity.js');
         try {
             const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
             const { x3dhResponder, ratchetInitBob, ratchetDecrypt } = await import('../../security/ratchet.js');
@@ -92,18 +93,21 @@ export async function handleChatMessage(
                 } else {
                     const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
                     deleteRatchetSession(upeerId);
-                    sendResponse(fromAddress, { type: 'DR_RESET' });
+                    sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: _getSpk() });
                     displayContent = '🔒 [Error de descifrado DR]';
                     error('Double Ratchet decrypt returned null', { upeerId }, 'security');
                 }
             } else {
-                sendResponse(fromAddress, { type: 'DR_RESET' });
+                sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: _getSpk() });
                 displayContent = '🔒 [Sin sesión Double Ratchet]';
                 warn('No DR session and no x3dhInit, sent DR_RESET', { upeerId }, 'security');
             }
         } catch (err) {
+            const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
+            deleteRatchetSession(upeerId);
+            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: _getSpk() });
             displayContent = '🔒 [Error crítico DR]';
-            error('Double Ratchet decrypt failed', err, 'security');
+            error('Double Ratchet decrypt failed, sent DR_RESET', err, 'security');
         }
     } else if (data.nonce) {
         try {

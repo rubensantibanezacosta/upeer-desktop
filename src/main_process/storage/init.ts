@@ -128,6 +128,12 @@ function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {
         sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
         sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('sealed_crypto_fixed', '1')`).run();
     }
+
+    const drRecoveryV2 = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'dr_recovery_v2'`).get() as { value: string } | undefined;
+    if (!drRecoveryV2) {
+        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('dr_recovery_v2', '1')`).run();
+    }
 }
 
 export function closeDB() {
