@@ -97,7 +97,9 @@ export async function handleChatMessage(
                     error('Double Ratchet decrypt returned null', { upeerId }, 'security');
                 }
             } else {
+                sendResponse(fromAddress, { type: 'DR_RESET' });
                 displayContent = '🔒 [Sin sesión Double Ratchet]';
+                warn('No DR session and no x3dhInit, sent DR_RESET', { upeerId }, 'security');
             }
         } catch (err) {
             displayContent = '🔒 [Error crítico DR]';
