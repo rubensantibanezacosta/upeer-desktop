@@ -90,6 +90,35 @@ export async function handleChatMessage(
                 if (plaintext) {
                     saveRatchetSession(upeerId, session, usedSpkId);
                     displayContent = plaintext.toString('utf-8');
+                } else if (data.x3dhInit) {
+                    const { ekPub, ikPub, spkId: x3dhSpkId } = data.x3dhInit;
+                    const spkEntry = getSpkBySpkId(x3dhSpkId as number);
+                    if (spkEntry) {
+                        const bobIkSk = getMyIdentitySkBuffer();
+                        const aliceIkPk = Buffer.from(ikPub as string, 'hex');
+                        const aliceEkPk = Buffer.from(ekPub as string, 'hex');
+                        const sharedSecret = x3dhResponder(bobIkSk, spkEntry.spkSk, aliceIkPk, aliceEkPk);
+                        const freshSession = ratchetInitBob(sharedSecret, spkEntry.spkPk, spkEntry.spkSk);
+                        sharedSecret.fill(0);
+                        const retry = ratchetDecrypt(freshSession, data.ratchetHeader, data.content, data.nonce);
+                        if (retry) {
+                            saveRatchetSession(upeerId, freshSession, x3dhSpkId as number);
+                            displayContent = retry.toString('utf-8');
+                            info('DR race resolved: replaced stale Alice session with Bob session', { upeerId }, 'security');
+                        } else {
+                            const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
+                            deleteRatchetSession(upeerId);
+                            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: _getSpk() });
+                            displayContent = '🔒 [Error de descifrado DR]';
+                            error('Double Ratchet decrypt returned null after x3dh retry', { upeerId }, 'security');
+                        }
+                    } else {
+                        const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
+                        deleteRatchetSession(upeerId);
+                        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: _getSpk() });
+                        displayContent = '🔒 [Error de descifrado DR]';
+                        error('Double Ratchet decrypt null, x3dh SPK not found', { upeerId }, 'security');
+                    }
                 } else {
                     const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
                     deleteRatchetSession(upeerId);

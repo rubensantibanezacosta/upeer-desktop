@@ -187,6 +187,16 @@ export function validatePingPong(data: any): ValidationResult {
     if (data.alias && (typeof data.alias !== 'string' || data.alias.length > 100)) {
         return { valid: false, error: 'Alias too long or invalid in PING' };
     }
+    if (data.signedPreKey !== undefined && data.signedPreKey !== null) {
+        const spk = data.signedPreKey;
+        if (typeof spk !== 'object') return { valid: false, error: 'signedPreKey must be an object' };
+        if (spk.spkPub !== undefined && (typeof spk.spkPub !== 'string' || spk.spkPub.length !== 64))
+            return { valid: false, error: 'Invalid signedPreKey.spkPub in PING' };
+        if (spk.spkSig !== undefined && (typeof spk.spkSig !== 'string' || spk.spkSig.length !== 128))
+            return { valid: false, error: 'Invalid signedPreKey.spkSig in PING' };
+        if (spk.spkId !== undefined && (typeof spk.spkId !== 'number' || !Number.isInteger(spk.spkId) || spk.spkId < 0))
+            return { valid: false, error: 'Invalid signedPreKey.spkId in PING' };
+    }
     return { valid: true };
 }
 
@@ -418,6 +428,67 @@ export function validateDhtStoreAck(data: any): ValidationResult {
         || (data.key.length !== 40 && data.key.length !== 64)) {
         return { valid: false, error: 'Invalid key (expected 40 or 64 hex chars)' };
     }
+    return { valid: true };
+}
+
+export function validateDhtFoundNodes(data: any): ValidationResult {
+    if (!Array.isArray(data.nodes)) return { valid: false, error: 'Missing or invalid nodes array' };
+    if (data.nodes.length > 20) return { valid: false, error: 'Too many nodes (max 20)' };
+    for (const node of data.nodes) {
+        if (typeof node !== 'object' || node === null) return { valid: false, error: 'Invalid node entry' };
+        if (typeof node.upeerId !== 'string' || !/^[0-9a-f]+$/i.test(node.upeerId) || node.upeerId.length > 128)
+            return { valid: false, error: 'Invalid node.upeerId' };
+        if (typeof node.address !== 'string' || node.address.length > 100)
+            return { valid: false, error: 'Invalid node.address' };
+    }
+    return { valid: true };
+}
+
+export function validateDhtFoundValue(data: any): ValidationResult {
+    if (data.key !== undefined && (typeof data.key !== 'string' || !/^[0-9a-f]+$/i.test(data.key) || (data.key.length !== 40 && data.key.length !== 64)))
+        return { valid: false, error: 'Invalid key' };
+    if (data.value === undefined && data.nodes === undefined)
+        return { valid: false, error: 'Missing value or nodes' };
+    if (data.value !== undefined) {
+        try {
+            const serialized = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
+            if (serialized.length > 10_000) return { valid: false, error: 'Value too large' };
+        } catch {
+            return { valid: false, error: 'Value not serializable' };
+        }
+    }
+    return { valid: true };
+}
+
+export function validateDhtPing(data: any): ValidationResult {
+    if (data.nodeId !== undefined && (typeof data.nodeId !== 'string' || !/^[0-9a-f]+$/i.test(data.nodeId) || data.nodeId.length > 128))
+        return { valid: false, error: 'Invalid nodeId' };
+    return { valid: true };
+}
+
+export function validateDhtPong(data: any): ValidationResult {
+    if (data.nodeId !== undefined && (typeof data.nodeId !== 'string' || !/^[0-9a-f]+$/i.test(data.nodeId) || data.nodeId.length > 128))
+        return { valid: false, error: 'Invalid nodeId' };
+    return { valid: true };
+}
+
+export function validateSyncPulse(data: any): ValidationResult {
+    if (!data.action || typeof data.action !== 'string' || data.action.length > 50)
+        return { valid: false, error: 'Invalid action' };
+    if (data.deviceId !== undefined && (typeof data.deviceId !== 'string' || data.deviceId.length > 128))
+        return { valid: false, error: 'Invalid deviceId' };
+    if (data.messageId !== undefined && typeof data.messageId !== 'string')
+        return { valid: false, error: 'Invalid messageId' };
+    if (data.newContent !== undefined && (typeof data.newContent !== 'string' || data.newContent.length > 50_000))
+        return { valid: false, error: 'newContent too large' };
+    return { valid: true };
+}
+
+export function validateIdentityUpdate(data: any): ValidationResult {
+    if (data.alias !== undefined && (typeof data.alias !== 'string' || data.alias.length > 100))
+        return { valid: false, error: 'Invalid alias' };
+    if (data.avatar !== undefined && (typeof data.avatar !== 'string' || !data.avatar.startsWith('data:image/') || data.avatar.length > 2_000_000))
+        return { valid: false, error: 'Invalid avatar' };
     return { valid: true };
 }
 
@@ -725,6 +796,18 @@ export function validateMessage(type: string, data: any): ValidationResult {
             return validateDhtStore(data);
         case 'DHT_STORE_ACK':
             return validateDhtStoreAck(data);
+        case 'DHT_FOUND_NODES':
+            return validateDhtFoundNodes(data);
+        case 'DHT_FOUND_VALUE':
+            return validateDhtFoundValue(data);
+        case 'DHT_PING':
+            return validateDhtPing(data);
+        case 'DHT_PONG':
+            return validateDhtPong(data);
+        case 'SYNC_PULSE':
+            return validateSyncPulse(data);
+        case 'IDENTITY_UPDATE':
+            return validateIdentityUpdate(data);
         case 'FILE_PROPOSAL':
         case 'FILE_START':
             return validateFileProposal(data);
@@ -771,8 +854,19 @@ export function validateMessage(type: string, data: any): ValidationResult {
             return validateReputationRequest(data);
         case 'REPUTATION_DELIVER':
             return validateReputationDeliver(data);
-        case 'DR_RESET':
+        case 'DR_RESET': {
+            if (data.signedPreKey !== undefined && data.signedPreKey !== null) {
+                const spk = data.signedPreKey;
+                if (typeof spk !== 'object') return { valid: false, error: 'signedPreKey must be an object' };
+                if (spk.spkPub !== undefined && (typeof spk.spkPub !== 'string' || spk.spkPub.length !== 64))
+                    return { valid: false, error: 'Invalid signedPreKey.spkPub' };
+                if (spk.spkSig !== undefined && (typeof spk.spkSig !== 'string' || spk.spkSig.length !== 128))
+                    return { valid: false, error: 'Invalid signedPreKey.spkSig' };
+                if (spk.spkId !== undefined && (typeof spk.spkId !== 'number' || !Number.isInteger(spk.spkId) || spk.spkId < 0))
+                    return { valid: false, error: 'Invalid signedPreKey.spkId' };
+            }
             return { valid: true };
+        }
         default:
             // Unknown message type - reject
             return { valid: false, error: `Unknown message type: ${type}` };
