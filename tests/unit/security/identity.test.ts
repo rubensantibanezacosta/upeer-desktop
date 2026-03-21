@@ -81,11 +81,13 @@ describe('IdentityManager', () => {
 
     it('should rotate keys after some time', () => {
         initIdentity(tempDir);
-        unlockSession(bip39.generateMnemonic());
+        const mnemonic = bip39.generateMnemonic();
+        unlockSession(mnemonic);
         const initialSpkId = getMySignedPreKey().spkId;
 
         // Avanzar tiempo más allá del intervalo de rotación
         vi.advanceTimersByTime(SPK_ROTATION_INTERVAL_MS + 1000);
+        unlockSession(mnemonic);
 
         const newSpkId = getMySignedPreKey().spkId;
         expect(newSpkId).not.toBe(initialSpkId);
@@ -221,7 +223,8 @@ describe('IdentityManager', () => {
 
     it('should handle X3DH decryption and rotation', () => {
         initIdentity(tempDir);
-        unlockSession(bip39.generateMnemonic());
+        const xMnemonic = bip39.generateMnemonic();
+        unlockSession(xMnemonic);
 
         const spk = getMySignedPreKey();
         const msg = Buffer.from('x3dh-secret');
@@ -245,6 +248,7 @@ describe('IdentityManager', () => {
 
         // Rotar SPK (avanzar una semana)
         vi.advanceTimersByTime(SPK_ROTATION_INTERVAL_MS + 1000);
+        unlockSession(xMnemonic);
         const newSpk = getMySignedPreKey();
         expect(newSpk.spkId).not.toBe(spk.spkId);
 
@@ -270,12 +274,12 @@ describe('IdentityManager', () => {
         const ciphertext = Buffer.alloc(msg.length + sodium.crypto_box_SEALBYTES);
         sodium.crypto_box_seal(ciphertext, msg, encryptPk);
 
-        const decrypted = decryptSealed(Buffer.alloc(32), Buffer.alloc(24), ciphertext);
+        const decrypted = decryptSealed(ciphertext);
         expect(decrypted).not.toBeNull();
         expect(decrypted?.toString()).toBe('top-secret');
 
         lockSession();
-        expect(decryptSealed(Buffer.alloc(32), Buffer.alloc(24), ciphertext)).toBeNull();
+        expect(decryptSealed(ciphertext)).toBeNull();
     });
 });
 

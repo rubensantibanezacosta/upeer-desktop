@@ -2,6 +2,7 @@ import {
     getMyAlias,
     getMyAvatar,
     getMyDhtSeq,
+    getMySignedPreKeyBundle,
     isSessionLocked,
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
@@ -43,6 +44,7 @@ export function checkHeartbeat(contacts: any[]) {
                     type: 'PING',
                     alias: getMyAlias() || undefined,
                     avatar: getMyAvatar() || undefined,
+                    signedPreKey: getMySignedPreKeyBundle(),
                 }, contact.publicKey);
             }
             sendDhtExchange(contact.upeerId, sendSecureUDPMessage);

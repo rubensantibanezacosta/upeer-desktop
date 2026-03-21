@@ -60,11 +60,13 @@ describe('Storage Init Unit Tests', () => {
         vi.clearAllMocks();
         mockSqlite = {
             prepare: vi.fn().mockReturnValue({
-                get: vi.fn()
+                get: vi.fn(),
+                run: vi.fn(),
             }),
             pragma: vi.fn(),
             close: vi.fn(),
-            transaction: vi.fn()
+            transaction: vi.fn(),
+            exec: vi.fn(),
         };
         // Mock BetterSqlite3 to be a class that returns mockSqlite
         (BetterSqlite3 as any).mockImplementation(function () {

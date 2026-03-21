@@ -29,20 +29,18 @@ describe('Sealed Sender Unit Tests', () => {
         const sealed = sealPacket(innerPacket, recipientPkHex);
 
         expect(sealed.type).toBe('SEALED');
-        expect(sealed.senderEphPub).toBeDefined();
-        expect(sealed.nonce).toBeDefined();
         expect(sealed.ciphertext).toBeDefined();
 
         // 2. Des-sellar (Descifrar)
-        // Función mock que realiza el descifrado real usando la clave secreta del receptor
-        const myEdSkFn = (senderEphPub: Buffer, nonce: Buffer, ciphertext: Buffer): Buffer | null => {
-            // Convertir claves receptor Ed25519 -> Curve25519
+        // myEdSkFn usa crypto_box_seal_open con la clave secreta del receptor
+        const myEdSkFn = (ciphertext: Buffer): Buffer | null => {
             const myCurveSk = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+            const myCurvePk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
             sodium.crypto_sign_ed25519_sk_to_curve25519(myCurveSk, recipientSk);
+            sodium.crypto_sign_ed25519_pk_to_curve25519(myCurvePk, recipientPk);
 
-            // Convertir clave efímera remitente Ed25519 -> Curve25519 (sealPacket ya genera Curve25519 ephPub internamente)
-            const plaintext = Buffer.alloc(ciphertext.length - sodium.crypto_box_MACBYTES);
-            const ok = sodium.crypto_box_open_easy(plaintext, ciphertext, nonce, senderEphPub, myCurveSk);
+            const plaintext = Buffer.alloc(ciphertext.length - sodium.crypto_box_SEALBYTES);
+            const ok = sodium.crypto_box_seal_open(plaintext, ciphertext, myCurvePk, myCurveSk);
 
             sodium.sodium_memzero(myCurveSk);
             return ok ? plaintext : null;
@@ -84,11 +82,12 @@ describe('Sealed Sender Unit Tests', () => {
     });
 
     it('should correctly handle Ed25519 to Curve25519 conversion', () => {
-        // Este test verifica que sealPacket usa la clave EdPk convertida correctamente
+        // Este test verifica que sealPacket usa crypto_box_seal correctamente
         const innerPacket = { foo: 'bar' };
         const sealed = sealPacket(innerPacket, recipientPkHex);
 
-        expect(sealed.senderEphPub).toHaveLength(64); // hex pk
-        expect(sealed.nonce).toHaveLength(48); // hex nonce
+        expect(sealed.type).toBe('SEALED');
+        expect(sealed.ciphertext).toBeDefined();
+        expect(typeof sealed.ciphertext).toBe('string');
     });
 });

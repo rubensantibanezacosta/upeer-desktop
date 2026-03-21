@@ -47,7 +47,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, i
                 borderColor: isMe ? 'divider' : 'transparent',
                 boxShadow: isMe ? 'sm' : 'none',
                 backdropFilter: isMe ? 'blur(8px)' : 'none',
-            
+            hj
             }}
         >
             {Object.entries(grouped).map(([emoji, { count, hasMine }]) => (

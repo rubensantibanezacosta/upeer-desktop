@@ -146,7 +146,7 @@ describe('Security Validation - Comprehensive Tests', () => {
         });
 
         it('should validate validateDhtResponse', () => {
-            const valid = { targetId: 'a'.repeat(32) };
+            const valid = { targetId: 'a'.repeat(64) };
             expect(validateDhtResponse(valid).valid).toBe(true);
             expect(validateDhtResponse({ ...valid, neighbors: 'not-an-array' }).valid).toBe(false);
 
@@ -158,7 +158,7 @@ describe('Security Validation - Comprehensive Tests', () => {
 
     describe('DHT & Vault Operations (Uncovered Branches)', () => {
         it('should validate validateDhtExchange', () => {
-            const valid = { peers: [{ upeerId: 'a'.repeat(32), publicKey: 'b'.repeat(64), locationBlock: { address: '200::1', dhtSeq: 1, signature: 'c'.repeat(128) } }] };
+            const valid = { peers: [{ upeerId: 'a'.repeat(64), publicKey: 'b'.repeat(64), locationBlock: { address: '200::1', dhtSeq: 1, signature: 'c'.repeat(128) } }] };
             expect(validateDhtExchange(valid).valid).toBe(true);
             expect(validateDhtExchange({ peers: 'not-an-array' }).valid).toBe(false);
             expect(validateDhtExchange({ peers: new Array(51) }).valid).toBe(false);
@@ -239,13 +239,13 @@ describe('Security Validation - Comprehensive Tests', () => {
         it('should validate locationBlock in validateDhtUpdate/Response', () => {
             const lb = { address: 'addr', dhtSeq: 1, signature: 'a'.repeat(128) };
             // Optional powProof format
-            expect(validateDhtResponse({ targetId: 'a'.repeat(32), locationBlock: { ...lb, powProof: '{ "s": "hex" }' } }).valid).toBe(true);
+            expect(validateDhtResponse({ targetId: 'a'.repeat(64), locationBlock: { ...lb, powProof: '{ "s": "hex" }' } }).valid).toBe(true);
             // Para que falle el regex !/^[0-9a-f]+$/i debe tener un caracter no hex que NO sea {
             expect(validateHandshakeReq({ publicKey: 'a'.repeat(64), powProof: 'z' }).valid).toBe(false);
         });
 
         it('should validate peer locationBlock in validateDhtExchange', () => {
-            const peer = { upeerId: 'a'.repeat(32), publicKey: 'b'.repeat(64) };
+            const peer = { upeerId: 'a'.repeat(64), publicKey: 'b'.repeat(64) };
             const lb = { address: 'addr', dhtSeq: 1, signature: 'c'.repeat(128) };
             // peer.locationBlock.powProof
             expect(validateDhtExchange({ peers: [{ ...peer, locationBlock: { ...lb, powProof: 'z' } }] }).valid).toBe(false);

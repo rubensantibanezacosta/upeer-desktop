@@ -25,6 +25,10 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     eq: (a: any, b: any) => ({ column: a, value: b })
 }));
 
+vi.mock('../../../src/main_process/network/utils.js', () => ({
+    isYggdrasilAddress: vi.fn(() => true),
+}));
+
 import { updateContactLocation, updateContactDhtLocation } from '../../../src/main_process/storage/contacts/location.js';
 
 describe('storage/contacts/location.ts', () => {

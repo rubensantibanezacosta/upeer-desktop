@@ -26,6 +26,7 @@ vi.mock('../../../src/main_process/network/sealed.js', () => ({
 vi.mock('../../../src/main_process/network/utils.js', () => ({
     canonicalStringify: vi.fn((o) => JSON.stringify(o)),
     getNetworkAddress: vi.fn(),
+    isYggdrasilAddress: vi.fn(() => true),
 }));
 
 vi.mock('../../../src/main_process/network/server/circuitBreaker.js', () => ({

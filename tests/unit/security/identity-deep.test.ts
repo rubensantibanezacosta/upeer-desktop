@@ -74,8 +74,11 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         sodium.crypto_box_easy(ciphertext, msg, nonce, spk1Pk, ephemeralSk);
 
         // Now unlock again or find a way to rotate? 
-        // Re-unlocking calls _rotateSpk
+        // Re-unlocking calls _rotateSpk — need to advance time first
+        vi.useFakeTimers();
+        vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000 + 1000);
         identity.unlockSession(mnemonic);
+        vi.useRealTimers();
         const spk2 = identity.getMySignedPreKeyBundle();
         expect(spk2.spkId).not.toBe(spk1.spkId);
 
@@ -118,7 +121,7 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         const ciphertext = Buffer.alloc(msg.length + sodium.crypto_box_SEALBYTES);
         sodium.crypto_box_seal(ciphertext, msg, curvePk);
 
-        const decrypted = identity.decryptSealed(Buffer.alloc(0), Buffer.alloc(0), ciphertext);
+        const decrypted = identity.decryptSealed(ciphertext);
         expect(decrypted?.toString()).toBe('sealed-secret');
     });
 

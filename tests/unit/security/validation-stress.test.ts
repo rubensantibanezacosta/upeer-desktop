@@ -130,14 +130,14 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should validate DhtExchange peers array strictly', () => {
-            const peer = { upeerId: 'p'.repeat(32), publicKey: 'k'.repeat(64) };
+            const peer = { upeerId: 'p'.repeat(64), publicKey: 'k'.repeat(64) };
             expect(validateMessage('DHT_EXCHANGE', { peers: [peer] }).valid).toBe(true);
             expect(validateMessage('DHT_EXCHANGE', { peers: new Array(51).fill(peer) }).valid).toBe(false);
             expect(validateMessage('DHT_EXCHANGE', { peers: [{ ...peer, upeerId: 'short' }] }).valid).toBe(false);
         });
 
         it('should validate ChatClear signature (BUG DD/Clear fix)', () => {
-            const base = { chatUpeerId: 'a'.repeat(32) };
+            const base = { chatUpeerId: 'a'.repeat(64) };
             expect(validateChatClear({ ...base, signature: 's'.repeat(128) }).valid).toBe(true);
             expect(validateChatClear({ ...base, signature: 'short' }).valid).toBe(false);
             expect(validateChatClear(base).valid).toBe(false); // missing sig
@@ -179,7 +179,7 @@ describe('Security Validation - Stress & Edge Cases', () => {
 
         it('should validate ReputationDeliver vouches strictly', () => {
             const validVouch = {
-                id: 'a'.repeat(64), fromId: 'b'.repeat(32), toId: 'c'.repeat(32),
+                id: 'a'.repeat(64), fromId: 'b'.repeat(64), toId: 'c'.repeat(64),
                 type: 't', timestamp: Date.now(), signature: 's'.repeat(128)
             };
             expect(validateReputationDeliver({ vouches: [validVouch] }).valid).toBe(true);
@@ -187,7 +187,7 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should validate ChatContact fields', () => {
-            const valid = { id: 'msg1', upeerId: 'a'.repeat(32), contactPublicKey: 'b'.repeat(64) };
+            const valid = { id: 'msg1', upeerId: 'a'.repeat(64), contactPublicKey: 'b'.repeat(64) };
             expect(validateChatContact(valid).valid).toBe(true);
             expect(validateChatContact({ ...valid, upeerId: 'wrong' }).valid).toBe(false);
         });

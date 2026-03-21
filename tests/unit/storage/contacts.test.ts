@@ -53,6 +53,10 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     desc: (a: any) => ({ column: a, order: 'desc' })
 }));
 
+vi.mock('../../../src/main_process/network/utils.js', () => ({
+    isYggdrasilAddress: vi.fn(() => true),
+}));
+
 describe('Contacts Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();

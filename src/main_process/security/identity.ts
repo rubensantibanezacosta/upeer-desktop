@@ -244,7 +244,13 @@ function _saveSpkState(): void {
 function _loadSpkState(): boolean {
     if (!_userDataPath) return false;
     const p = path.join(_userDataPath, SPK_STATE_FILE);
-    if (!fs.existsSync(p)) return false;
+    if (!fs.existsSync(p)) {
+        spkPublicKey = null as any;
+        spkSecretKey = null as any;
+        spkId = 0;
+        previousSpkEntries.length = 0;
+        return false;
+    }
     try {
         const devKey = _getOrCreateDeviceKey(_userDataPath);
         const blob = fs.readFileSync(p);

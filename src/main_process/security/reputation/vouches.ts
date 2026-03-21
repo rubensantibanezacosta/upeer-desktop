@@ -52,7 +52,9 @@ export async function issueVouch(
         const fromId = getMyUPeerId();
         if (!fromId) return null;
 
-        const timestamp = Date.now();
+        const timestamp = type === VouchType.HANDSHAKE
+            ? Math.floor(Date.now() / ONE_DAY_MS) * ONE_DAY_MS
+            : Date.now();
         const positive = VOUCH_POSITIVE[type];
         const id = computeVouchId(fromId, toId, type, timestamp);
 

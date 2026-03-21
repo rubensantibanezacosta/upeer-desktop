@@ -7,9 +7,11 @@ import { Sidebar } from '../../../src/components/layout/Sidebar';
 const mockStore = {
     sidebarView: 'list',
     sidebarFilter: 'all',
+    sidebarSearch: '',
     newChatSearch: '',
     setSidebarView: vi.fn(),
     setSidebarFilter: vi.fn(),
+    setSidebarSearch: vi.fn(),
     setNewChatSearch: vi.fn(),
     openNewChat: vi.fn(),
     backToList: vi.fn(),

@@ -22,10 +22,10 @@ export async function updateContactLocation(upeerId: string, address: string) {
     if (known.length > 20) known = known.slice(0, 20);
 
     return db.update(schema.contacts)
-        .set({ 
+        .set({
             address, // Set as primary
             knownAddresses: JSON.stringify(known),
-            lastSeen: new Date().toISOString() 
+            lastSeen: new Date().toISOString()
         })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();

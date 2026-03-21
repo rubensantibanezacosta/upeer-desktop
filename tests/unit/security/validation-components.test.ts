@@ -105,7 +105,7 @@ describe('Validation - Advanced Components', () => {
 
     describe('Chat Contact Validation', () => {
         it('should validate Chat Contact', () => {
-            const valid = { id: '1', upeerId: 'a'.repeat(32), contactPublicKey: 'b'.repeat(64), contactName: 'N', contactAddress: 'A' };
+            const valid = { id: '1', upeerId: 'a'.repeat(64), contactPublicKey: 'b'.repeat(64), contactName: 'N', contactAddress: 'A' };
             expect(validateChatContact(valid).valid).toBe(true);
             expect(validateChatContact({ ...valid, id: 'a'.repeat(101) }).valid).toBe(false);
             expect(validateChatContact({ ...valid, upeerId: 'short' }).valid).toBe(false);
@@ -130,8 +130,8 @@ describe('Validation - Advanced Components', () => {
         it('should validate Reputation Deliver', () => {
             const validVouch = {
                 id: 'a'.repeat(64),
-                fromId: 'b'.repeat(32),
-                toId: 'c'.repeat(32),
+                fromId: 'b'.repeat(64),
+                toId: 'c'.repeat(64),
                 type: 'vouch',
                 timestamp: Date.now(),
                 signature: 's'.repeat(128)
@@ -155,15 +155,15 @@ describe('Validation - Advanced Components', () => {
             expect(validateMessage('TYPING', {}).valid).toBe(true);
             expect(validateMessage('PING', {}).valid).toBe(true);
             expect(validateMessage('PONG', {}).valid).toBe(true);
-            expect(validateMessage('CHAT_CONTACT', { id: '1', upeerId: 'a'.repeat(32), contactPublicKey: 'b'.repeat(64) }).valid).toBe(true);
+            expect(validateMessage('CHAT_CONTACT', { id: '1', upeerId: 'a'.repeat(64), contactPublicKey: 'b'.repeat(64) }).valid).toBe(true);
             expect(validateMessage('CHAT_REACTION', { msgId: '1', emoji: '👍', remove: false }).valid).toBe(true);
             expect(validateMessage('CHAT_UPDATE', { msgId: '1', content: 'c' }).valid).toBe(true);
             expect(validateMessage('CHAT_DELETE', { msgId: '1' }).valid).toBe(true);
-            expect(validateMessage('CHAT_CLEAR_ALL', { chatUpeerId: 'a'.repeat(32), signature: 's'.repeat(128) }).valid).toBe(true);
+            expect(validateMessage('CHAT_CLEAR_ALL', { chatUpeerId: 'a'.repeat(64), signature: 's'.repeat(128) }).valid).toBe(true);
 
             // DHT types
-            expect(validateMessage('DHT_QUERY', { targetId: 'a'.repeat(32) }).valid).toBe(true);
-            expect(validateMessage('DHT_RESPONSE', { targetId: 'a'.repeat(32) }).valid).toBe(true);
+            expect(validateMessage('DHT_QUERY', { targetId: 'a'.repeat(64) }).valid).toBe(true);
+            expect(validateMessage('DHT_RESPONSE', { targetId: 'a'.repeat(64) }).valid).toBe(true);
             expect(validateMessage('DHT_UPDATE', { locationBlock: { address: 'a', dhtSeq: 1, signature: 's'.repeat(128) } }).valid).toBe(true);
             expect(validateMessage('DHT_EXCHANGE', { peers: [] }).valid).toBe(true);
             expect(validateMessage('DHT_FIND_NODE', { targetId: 'abc' }).valid).toBe(true);

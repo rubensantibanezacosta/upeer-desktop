@@ -16,7 +16,8 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
     getNetworkAddresses: vi.fn().mockReturnValue(['201:1:1:1:1:1:1:1']),
     canonicalStringify: (obj: any) => JSON.stringify(obj),
     generateSignedLocationBlock: vi.fn().mockReturnValue({ address: '201:1:1:1:1:1:1:1', addresses: ['201:1:1:1:1:1:1:1'] }),
-    getDeviceMetadata: vi.fn().mockReturnValue({ clientName: 'Test' })
+    getDeviceMetadata: vi.fn().mockReturnValue({ clientName: 'Test' }),
+    isYggdrasilAddress: vi.fn((addr: string) => typeof addr === 'string' && addr.includes(':')),
 }));
 
 import * as identity from '../../../src/main_process/security/identity.js';

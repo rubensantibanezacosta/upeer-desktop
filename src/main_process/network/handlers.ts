@@ -241,6 +241,23 @@ export async function handlePacket(
                         updateContactAvatar?.(upeerId, data.avatar);
                     }).catch(() => { });
                 }
+                if (data.signedPreKey && typeof data.signedPreKey === 'object') {
+                    const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
+                    if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof newSpkId === 'number') {
+                        if (!contact.signedPreKeyId || newSpkId > contact.signedPreKeyId) {
+                            const spkValid = verify(
+                                Buffer.from(spkPub, 'hex'),
+                                Buffer.from(spkSig, 'hex'),
+                                Buffer.from(contact.publicKey, 'hex')
+                            );
+                            if (spkValid) {
+                                import('../storage/contacts/keys.js').then(({ updateContactSignedPreKey }) => {
+                                    updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
+                                }).catch(err => warn('Failed to update SPK from PING', err, 'security'));
+                            }
+                        }
+                    }
+                }
                 break;
             case 'PONG':
                 // Presence is already updated by updateLastSeen(upeerId) above
@@ -346,6 +363,20 @@ export async function handlePacket(
             case 'DR_RESET': {
                 const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
                 deleteRatchetSession(upeerId);
+                if (data.signedPreKey && typeof data.signedPreKey === 'object') {
+                    const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
+                    if (typeof spkPub === 'string' && typeof spkSig === 'string' && typeof newSpkId === 'number') {
+                        const spkValid = verify(
+                            Buffer.from(spkPub, 'hex'),
+                            Buffer.from(spkSig, 'hex'),
+                            Buffer.from(contact.publicKey, 'hex')
+                        );
+                        if (spkValid) {
+                            const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
+                            updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
+                        }
+                    }
+                }
                 info('DR session reset by peer', { upeerId }, 'security');
                 break;
             }
