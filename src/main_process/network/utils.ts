@@ -238,33 +238,10 @@ export async function verifyLocationBlockWithDHT(
 
     try {
         const inputAddresses = block.addresses || [block.address];
-        const sortedAddresses = [...new Set(inputAddresses)].sort();
+        const sortedAddresses = [...new Set(inputAddresses)].sort(prioritizeYggdrasil);
         sortedAddresses.forEach(addr => validateAddress(addr));
 
-        // Modern check
-        const data = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
-        let isValid = verify(
-            Buffer.from(canonicalStringify(data)),
-            safeBufferFromHex(block.signature, 64, 'signature'),
-            safeBufferFromHex(publicKeyHex, 32, 'publicKey')
-        );
-
-        if (!isValid) {
-            // Legacy check
-            const legacyData = { upeerId, address: block.address, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
-            isValid = verify(
-                Buffer.from(canonicalStringify(legacyData)),
-                safeBufferFromHex(block.signature, 64, 'signature'),
-                safeBufferFromHex(publicKeyHex, 32, 'publicKey')
-            );
-        }
-
-        if (isValid && block.renewalToken) {
-            if (!verifyRenewalToken(block.renewalToken, publicKeyHex)) {
-                return false;
-            }
-        }
-        return isValid;
+        return verifyLocationBlock(upeerId, block, publicKeyHex);
     } catch (err: any) {
         debug('DHT verification error', { error: err.message }, 'dht');
         return false;

@@ -60,7 +60,7 @@ export async function handlePacket(
             if (!rateLimiter.checkIp(rinfo.address, 'SEALED')) {
                 return;
             }
-            const inner = unsealPacket(fullPacket, (ephPub, nonce, ct) => decryptSealed(ephPub, nonce, ct));
+            const inner = unsealPacket(fullPacket, (ct) => decryptSealed(ct));
             if (!inner) {
                 security('SEALED: failed to decrypt', { ip: rinfo.address }, 'network');
                 return;

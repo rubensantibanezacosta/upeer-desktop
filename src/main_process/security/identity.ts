@@ -364,7 +364,7 @@ export function decryptX3DH(nonce: Buffer, ciphertext: Buffer, senderEphemeralPu
     return ok ? plaintext : null;
 }
 
-export function decryptSealed(ephemeralPublicKeyAtSender: Buffer, nonceIgnored: Buffer, ciphertext: Buffer): Buffer | null {
+export function decryptSealed(ciphertext: Buffer): Buffer | null {
     if (_isLocked || !secretKey) return null;
     const boxPk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
     const boxSk = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);

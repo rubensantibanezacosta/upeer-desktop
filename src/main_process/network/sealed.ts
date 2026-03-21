@@ -47,32 +47,16 @@ export const SEALED_TYPES = new Set([
  * @returns Paquete outer SEALED
  */
 export function sealPacket(signedPacket: Record<string, unknown>, recipientEdPkHex: string): Record<string, unknown> {
-    // Convertir Ed25519 → X25519 para DH
     const recipientEdPk = Buffer.from(recipientEdPkHex, 'hex');
     const recipientCurvePk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
     sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePk, recipientEdPk);
 
-    // Generar par efímero del remitente (nunca reutilizado)
-    const senderEphPk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
-    const senderEphSk = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
-    sodium.crypto_box_keypair(senderEphPk, senderEphSk);
-
-    // Nonce aleatorio
-    const nonce = Buffer.allocUnsafe(sodium.crypto_box_NONCEBYTES);
-    sodium.randombytes_buf(nonce);
-
-    // Cifrar el inner packet
     const payload = Buffer.from(JSON.stringify(signedPacket));
-    const ciphertext = Buffer.alloc(payload.length + sodium.crypto_box_MACBYTES);
-    sodium.crypto_box_easy(ciphertext, payload, nonce, recipientCurvePk, senderEphSk);
-
-    // Limpiar la clave efímera privada
-    sodium.sodium_memzero(senderEphSk);
+    const ciphertext = Buffer.alloc(payload.length + sodium.crypto_box_SEALBYTES);
+    sodium.crypto_box_seal(ciphertext, payload, recipientCurvePk);
 
     return {
         type: 'SEALED',
-        senderEphPub: senderEphPk.toString('hex'),
-        nonce: nonce.toString('hex'),
         ciphertext: ciphertext.toString('hex'),
     };
 }
@@ -86,17 +70,13 @@ export function sealPacket(signedPacket: Record<string, unknown>, recipientEdPkH
  * @returns El inner packet descifrado, o null si falla
  */
 export function unsealPacket(
-    data: { senderEphPub: string; nonce: string; ciphertext: string },
-    myEdSkFn: (senderEphPub: Buffer, nonce: Buffer, ciphertext: Buffer) => Buffer | null
+    data: { ciphertext: string },
+    myEdSkFn: (ciphertext: Buffer) => Buffer | null
 ): Record<string, unknown> | null {
     try {
-        const senderEphPub = Buffer.from(data.senderEphPub, 'hex');
-        const nonce = Buffer.from(data.nonce, 'hex');
         const ciphertext = Buffer.from(data.ciphertext, 'hex');
-
-        const plaintext = myEdSkFn(senderEphPub, nonce, ciphertext);
+        const plaintext = myEdSkFn(ciphertext);
         if (!plaintext) return null;
-
         return JSON.parse(plaintext.toString('utf-8')) as Record<string, unknown>;
     } catch {
         return null;
