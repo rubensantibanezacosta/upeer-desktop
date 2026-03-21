@@ -17,6 +17,7 @@ import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
 interface MessageContextMenuProps {
     msgId?: string;
@@ -25,6 +26,8 @@ interface MessageContextMenuProps {
     fileCompleted: boolean;
     onReply: () => void;
     onDelete: () => void;
+    onEdit?: () => void;
+    onForward?: () => void;
     sx?: any;
 }
 
@@ -35,6 +38,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     fileCompleted,
     onReply,
     onDelete,
+    onEdit,
+    onForward,
     sx,
 }) => {
     return (
@@ -90,7 +95,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     </MenuItem>
                 )}
 
-                <MenuItem>
+                <MenuItem onClick={() => setTimeout(() => onForward?.(), 0)}>
                     <ListItemDecorator sx={{ color: 'inherit' }}><ShortcutOutlinedIcon /></ListItemDecorator>
                     Reenviar
                 </MenuItem>
@@ -114,8 +119,15 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     Reportar
                 </MenuItem>
 
+                {onEdit && (
+                    <MenuItem onClick={onEdit}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><EditOutlinedIcon /></ListItemDecorator>
+                        Editar
+                    </MenuItem>
+                )}
+
                 {isMe && (
-                    <MenuItem onClick={onDelete}>
+                    <MenuItem onClick={onDelete} color="danger">
                         <ListItemDecorator sx={{ color: 'inherit' }}><DeleteOutlineIcon /></ListItemDecorator>
                         Eliminar
                     </MenuItem>

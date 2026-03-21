@@ -19,6 +19,7 @@ interface NavigationState {
     sidebarView: SidebarView;
     sidebarFilter: SidebarFilter;
     newChatSearch: string;
+    sidebarSearch: string; // Búsqueda en la lista principal
 
     // Modals
     isAddModalOpen: boolean;
@@ -34,6 +35,9 @@ interface NavigationState {
     // Media Viewer
     viewerMediaList: MediaItem[];
     viewerInitialIndex: number;
+
+    // Scroll pendiente a mensaje (desde búsqueda)
+    pendingScrollMsgId: string | null;
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
@@ -50,6 +54,7 @@ interface NavigationActions {
     setSidebarView: (view: SidebarView) => void;
     setSidebarFilter: (filter: SidebarFilter) => void;
     setNewChatSearch: (q: string) => void;
+    setSidebarSearch: (q: string) => void;
     openNewChat: () => void;           // list → new (limpia búsqueda)
     backToList: () => void;            // cualquier vista → list
 
@@ -67,6 +72,9 @@ interface NavigationActions {
     // Media Viewer
     openMediaViewer: (items: MediaItem[], index: number) => void;
     closeMediaViewer: () => void;
+
+    // Scroll pendiente
+    setPendingScrollMsgId: (id: string | null) => void;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -77,6 +85,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
     sidebarView: 'list',
     sidebarFilter: 'all',
     newChatSearch: '',
+    sidebarSearch: '',
 
     isAddModalOpen: false,
     isIdentityModalOpen: false,
@@ -89,6 +98,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
 
     viewerMediaList: [],
     viewerInitialIndex: 0,
+    pendingScrollMsgId: null,
 
     // ── Acciones vista principal
     goToChat: () => set({ appView: 'chat', sidebarView: 'list', newChatSearch: '' }),
@@ -116,9 +126,10 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
     setSidebarView: (view) => set({ sidebarView: view }),
     setSidebarFilter: (filter) => set({ sidebarFilter: filter }),
     setNewChatSearch: (q) => set({ newChatSearch: q }),
+    setSidebarSearch: (q) => set({ sidebarSearch: q }),
 
     openNewChat: () => set({ sidebarView: 'new', newChatSearch: '' }),
-    backToList: () => set({ sidebarView: 'list' }),
+    backToList: () => set({ sidebarView: 'list', newChatSearch: '', sidebarSearch: '' }),
 
     // ── Acciones Modals
     setAddModalOpen: (open) => set({ isAddModalOpen: open }),
@@ -134,4 +145,5 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
     // ── Acciones Media Viewer
     openMediaViewer: (items, index) => set({ viewerMediaList: items, viewerInitialIndex: index }),
     closeMediaViewer: () => set({ viewerMediaList: [], viewerInitialIndex: 0 }),
+    setPendingScrollMsgId: (id) => set({ pendingScrollMsgId: id }),
 }));

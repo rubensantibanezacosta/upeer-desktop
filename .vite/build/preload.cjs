@@ -29,6 +29,8 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   sendChatUpdate: (upeerId, msgId, newContent) => electron.ipcRenderer.invoke("send-chat-update", { upeerId, msgId, newContent }),
   sendChatDelete: (upeerId, msgId) => electron.ipcRenderer.invoke("send-chat-delete", { upeerId, msgId }),
   getMessages: (upeerId) => electron.ipcRenderer.invoke("get-messages", upeerId),
+  searchMessages: (query) => electron.ipcRenderer.invoke("search-messages", { query }),
+  getMessagesAround: (chatUpeerId, targetMsgId) => electron.ipcRenderer.invoke("get-messages-around", { chatUpeerId, targetMsgId }),
   getContacts: () => electron.ipcRenderer.invoke("get-contacts"),
   // Multi-device API
   getDevices: () => electron.ipcRenderer.invoke("get-devices"),
@@ -122,6 +124,10 @@ electron.contextBridge.exposeInMainWorld("upeer", {
   onTyping: (callback) => {
     electron.ipcRenderer.removeAllListeners("peer-typing");
     electron.ipcRenderer.on("peer-typing", (event, data) => callback(data));
+  },
+  onFocusConversation: (callback) => {
+    electron.ipcRenderer.removeAllListeners("focus-conversation");
+    electron.ipcRenderer.on("focus-conversation", (event, data) => callback(data));
   },
   // File transfer API (Phase 16)
   startFileTransfer: (upeerId, filePath, thumbnail, caption, isVoiceNote) => electron.ipcRenderer.invoke("start-file-transfer", { upeerId, filePath, thumbnail, caption, isVoiceNote }),

@@ -43,7 +43,7 @@ _Última actualización: 12 Marzo 2026_
 
 - [x] Mensajes de texto E2EE con ACK, entrega y lectura (doble check azul)
 - [x] Reacciones con emoji — protocolo CHAT_REACTION firmado, UI con selector rápido
-- [x] Edición de mensajes — CHAT_UPDATE con indicador "(editado)"
+- [x] Edición de mensajes — CHAT_UPDATE con indicador "(Editado)"
 - [x] Eliminación para todos — CHAT_DELETE firmado, marcado visual
 - [x] Respuestas/citas — por UUID con vista previa del mensaje original
 - [x] Indicador "Escribiendo…" — en tiempo real con debounce (2,5 s)

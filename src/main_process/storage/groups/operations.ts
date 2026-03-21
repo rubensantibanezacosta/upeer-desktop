@@ -10,6 +10,8 @@ export interface GroupRecord {
     createdAt?: string | null;
     lastMessage?: string;
     lastMessageTime?: string;
+    lastMessageStatus?: string;
+    lastMessageIsMine?: boolean;
 }
 
 function parseGroup(raw: any): GroupRecord {
@@ -87,6 +89,8 @@ export function getGroups(): GroupRecord[] {
             ...g,
             lastMessage: lastMsgObj?.message as string | undefined,
             lastMessageTime: lastMsgObj?.timestamp as string | undefined,
+            lastMessageStatus: lastMsgObj?.status as string | undefined,
+            lastMessageIsMine: !!lastMsgObj?.isMine
         };
     });
     result.sort((a, b) => {

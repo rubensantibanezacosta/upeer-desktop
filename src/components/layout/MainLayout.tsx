@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography } from '@mui/joy';
 import { Sidebar } from './Sidebar.js';
 import { ChatArea } from '../../features/chat/ChatArea.js';
@@ -17,6 +17,7 @@ import { MediaViewerOverlay } from '../../features/chat/media-viewer/MediaViewer
 import { CreateGroupModal } from '../ui/CreateGroupModal.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
+import { ForwardModal } from '../../features/chat/message/ForwardModal.js';
 
 interface MainLayoutProps {
     // State & Stores
@@ -91,6 +92,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     isFilePickerOpen, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
+    const [forwardingMsg, setForwardingMsg] = useState<any>(null);
+
     if (isAppLocked === null) {
         return (
             <Box sx={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'background.body' }}>
@@ -115,6 +118,29 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || chatStore.incomingRequests[targetUpeerId]?.untrustworthy;
+
+    const handleForward = async (targets: { id: string; isGroup: boolean }[]) => {
+        if (!forwardingMsg) return;
+        let content = forwardingMsg.message;
+        if (content.startsWith('{') && content.endsWith('}')) {
+            try {
+                const parsed = JSON.parse(content);
+                if (typeof parsed.text === 'string') content = parsed.text;
+            } catch { /* forward raw */ }
+        }
+
+        for (const target of targets) {
+            if (target.isGroup) {
+                await window.upeer.sendGroupMessage(target.id, content);
+            } else {
+                await window.upeer.sendMessage(target.id, content);
+            }
+        }
+
+        // Refrescar contactos y grupos para actualizar el preview del último mensaje
+        chatStore.refreshContacts();
+        chatStore.refreshGroups();
+    };
 
     return (
         <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }}
@@ -223,8 +249,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                 contacts={chatStore.contacts.map((c: any) => ({ address: c.address, name: c.name }))}
                                                 onReply={(msg: any) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
                                                 onReact={handleReaction}
-                                                onEdit={(msg: any) => { setEditingMessage(msg); setMessage(msg.message); }}
+                                                onEdit={(msg: any) => {
+                                                    let editText = msg.message;
+                                                    if (editText.startsWith('{') && editText.endsWith('}')) {
+                                                        try {
+                                                            const parsed = JSON.parse(editText);
+                                                            if (typeof parsed.text === 'string') editText = parsed.text;
+                                                            else if (parsed.type === 'file' && typeof parsed.caption === 'string') editText = parsed.caption;
+                                                        } catch { /* ignore */ }
+                                                    }
+                                                    setEditingMessage(msg);
+                                                    setMessage(editText);
+                                                }}
                                                 onDelete={handleDeleteMessage}
+                                                onForward={(msg: any) => setForwardingMsg(msg)}
                                                 onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
                                                 onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
                                                 onMediaClick={handleMediaClick}
@@ -236,7 +274,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                             message={message}
                                             setMessage={setMessage}
                                             onSend={editingMessage
-                                                ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); }
+                                                ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); setMessage(''); }
                                                 : (activeGroupId ? () => handleSendGroupMessage() : handleSend)
                                             }
                                             onTyping={handleTyping}
@@ -303,6 +341,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     )}
 
                     <CreateGroupModal open={navigation.isCreateGroupModalOpen} onClose={() => navigation.setCreateGroupModalOpen(false)} contacts={chatStore.contacts} onCreate={chatStore.handleCreateGroup} />
+
+                    <ForwardModal
+                        open={!!forwardingMsg}
+                        onClose={() => setForwardingMsg(null)}
+                        contacts={chatStore.contacts}
+                        groups={chatStore.groups}
+                        onSend={handleForward}
+                    />
 
                     {navigation.viewerMediaList.length > 0 && (
                         <MediaViewerOverlay

@@ -15,6 +15,10 @@ vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => <div data-
 vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => <div data-testid="DeleteSweepIcon" /> }));
 vi.mock('@mui/icons-material/ExitToApp', () => ({ default: () => <div data-testid="ExitToAppIcon" /> }));
 vi.mock('@mui/icons-material/WarningRounded', () => ({ default: () => <div data-testid="WarningRoundedIcon" /> }));
+vi.mock('@mui/icons-material/Done', () => ({ default: () => <div data-testid="DoneIcon" /> }));
+vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => <div data-testid="DoneAllIcon" /> }));
+vi.mock('@mui/icons-material/Mic', () => ({ default: () => <div data-testid="MicIcon" /> }));
+vi.mock('../../../src/utils/fileIcons.js', () => ({ getFileIcon: () => <div data-testid="FileIcon" /> }));
 
 import { GroupItem } from '../../../src/components/layout/GroupItem.js';
 
@@ -57,6 +61,25 @@ describe('GroupItem Component', () => {
     it('renders Groups icon when no avatar is provided', () => {
         render(<GroupItem {...defaultProps} />);
         expect(screen.getByTestId('GroupsIcon')).toBeDefined();
+    });
+
+    it('shows DoneIcon when last message is mine and status is sent', () => {
+        const groupWithAck = { ...mockGroup, lastMessageIsMine: true, lastMessageStatus: 'sent' };
+        render(<GroupItem {...defaultProps} group={groupWithAck} />);
+        expect(screen.getByTestId('DoneIcon')).toBeDefined();
+    });
+
+    it('shows DoneAllIcon when last message is mine and status is delivered', () => {
+        const groupWithAck = { ...mockGroup, lastMessageIsMine: true, lastMessageStatus: 'delivered' };
+        render(<GroupItem {...defaultProps} group={groupWithAck} />);
+        expect(screen.getByTestId('DoneAllIcon')).toBeDefined();
+    });
+
+    it('does not show ack icon when last message is not mine', () => {
+        const groupWithAck = { ...mockGroup, lastMessageIsMine: false, lastMessageStatus: 'delivered' };
+        render(<GroupItem {...defaultProps} group={groupWithAck} />);
+        expect(screen.queryByTestId('DoneIcon')).toBeNull();
+        expect(screen.queryByTestId('DoneAllIcon')).toBeNull();
     });
 
     it('opens leave group modal', async () => {

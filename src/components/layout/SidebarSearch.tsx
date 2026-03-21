@@ -2,13 +2,16 @@ import React from 'react';
 import { Box, Input, IconButton, Chip, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
 
 interface SidebarSearchProps {
+    value: string;
+    onChange: (val: string) => void;
     activeFilter: string;
     onFilterChange: (filter: string) => void;
 }
 
-export const SidebarSearch: React.FC<SidebarSearchProps> = ({ activeFilter, onFilterChange }) => {
+export const SidebarSearch: React.FC<SidebarSearchProps> = ({ value, onChange, activeFilter, onFilterChange }) => {
     const filters = [
         { label: 'Todos', value: 'all' },
         { label: 'No leídos', value: 'unread' },
@@ -38,6 +41,9 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({ activeFilter, onFi
                         size="sm"
                         placeholder="Buscar un chat o iniciar uno nuevo"
                         variant="plain"
+                        value={value}
+                        slotProps={{ input: { maxLength: 80 } }}
+                        onChange={(e) => onChange(e.target.value)}
                         sx={{
                             flexGrow: 1,
                             backgroundColor: 'transparent',
@@ -48,8 +54,17 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({ activeFilter, onFi
                             '& input': { outline: 'none' },
                         }}
                     />
+                    {value && (
+                        <IconButton
+                            size="sm"
+                            variant="plain"
+                            onClick={() => onChange('')}
+                            sx={{ '--IconButton-size': '24px' }}
+                        >
+                            <ClearIcon sx={{ fontSize: '16px' }} />
+                        </IconButton>
+                    )}
                 </Box>
-                <IconButton size="sm" variant="plain" color="neutral"><FilterListIcon /></IconButton>
             </Box>
 
             <Stack direction="row" spacing={1} sx={{ mt: 0.5, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>

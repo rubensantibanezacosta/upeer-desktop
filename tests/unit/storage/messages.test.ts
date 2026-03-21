@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { saveMessage, getMessages, updateMessageContent, deleteMessageLocally, deleteMessagesByChatId, getMessageById, saveFileMessage } from '../../../src/main_process/storage/messages/operations.js';
+import { saveMessage, getMessages, updateMessageContent, deleteMessageLocally, deleteMessagesByChatId, getMessageById, saveFileMessage, searchMessages, getMessagesAround } from '../../../src/main_process/storage/messages/operations.js';
 import { updateMessageStatus, getMessageStatus } from '../../../src/main_process/storage/messages/status.js';
 import { saveReaction, deleteReaction } from '../../../src/main_process/storage/messages/reactions.js';
 import { getDb, getSchema } from '../../../src/main_process/storage/shared.js';
+
+vi.mock('drizzle-orm', () => ({
+    like: (a: any, b: any) => ({ type: 'like', a, b }),
+    gte: (a: any, b: any) => ({ type: 'gte', a, b }),
+    lte: (a: any, b: any) => ({ type: 'lte', a, b }),
+}));
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
@@ -525,6 +531,176 @@ describe('Storage - Message Operations', () => {
 
             const status = getMessageStatus('msg1');
             expect(status).toBe('delivered');
+        });
+    });
+
+    describe('searchMessages', () => {
+        it('should return empty array when no messages match', () => {
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        orderBy: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockReturnValue({
+                                all: vi.fn().mockReturnValue([])
+                            })
+                        })
+                    })
+                })
+            });
+
+            const result = searchMessages('nomatch');
+            expect(result).toEqual([]);
+        });
+
+        it('should return matching messages', () => {
+            const mockMsgs = [
+                { id: 'msg-1', chatUpeerId: 'peer-1', message: 'hello world', timestamp: 1000 },
+                { id: 'msg-2', chatUpeerId: 'peer-2', message: 'hello there', timestamp: 900 },
+            ];
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        orderBy: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockReturnValue({
+                                all: vi.fn().mockReturnValue(mockMsgs)
+                            })
+                        })
+                    })
+                })
+            });
+
+            const result = searchMessages('hello');
+            expect(result).toHaveLength(2);
+            expect(result[0].id).toBe('msg-1');
+        });
+
+        it('should respect custom limit', () => {
+            const limitMock = vi.fn().mockReturnValue({ all: vi.fn().mockReturnValue([]) });
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        orderBy: vi.fn().mockReturnValue({ limit: limitMock })
+                    })
+                })
+            });
+
+            searchMessages('hello', 10);
+            expect(limitMock).toHaveBeenCalledWith(10);
+        });
+    });
+
+    describe('getMessagesAround', () => {
+        it('should return empty array when target message does not exist', () => {
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue(null)
+                    })
+                })
+            });
+
+            const result = getMessagesAround('peer-1', 'non-existent-id');
+            expect(result).toEqual([]);
+        });
+
+        it('should return messages centred around target when it exists', () => {
+            const before = [
+                { id: 'msg-1', chatUpeerId: 'peer-1', message: 'older', timestamp: 900 },
+                { id: 'msg-2', chatUpeerId: 'peer-1', message: 'target', timestamp: 1000 },
+            ];
+            const after = [
+                { id: 'msg-3', chatUpeerId: 'peer-1', message: 'newer', timestamp: 1100 },
+            ];
+
+            let callCount = 0;
+            mockDb.select.mockImplementation(() => ({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ timestamp: 1000 }),
+                        all: vi.fn().mockReturnValue([]),
+                        orderBy: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockReturnValue({
+                                all: vi.fn().mockImplementation(() => {
+                                    callCount++;
+                                    if (callCount === 1) return before;
+                                    if (callCount === 2) return after;
+                                    return [];
+                                })
+                            })
+                        })
+                    })
+                })
+            }));
+
+            const result = getMessagesAround('peer-1', 'msg-2');
+            const ids = result.map((m: any) => m.id);
+            expect(ids).toContain('msg-1');
+            expect(ids).toContain('msg-2');
+            expect(ids).toContain('msg-3');
+        });
+
+        it('should deduplicate messages present in both before and after', () => {
+            const shared = { id: 'msg-2', chatUpeerId: 'peer-1', message: 'target', timestamp: 1000 };
+            const before = [shared, { id: 'msg-1', chatUpeerId: 'peer-1', message: 'older', timestamp: 900 }];
+            const after = [shared];
+
+            let callCount = 0;
+            mockDb.select.mockImplementation(() => ({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ timestamp: 1000 }),
+                        all: vi.fn().mockReturnValue([]),
+                        orderBy: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockReturnValue({
+                                all: vi.fn().mockImplementation(() => {
+                                    callCount++;
+                                    if (callCount === 1) return before;
+                                    if (callCount === 2) return after;
+                                    return [];
+                                })
+                            })
+                        })
+                    })
+                })
+            }));
+
+            const result = getMessagesAround('peer-1', 'msg-2');
+            const ids = result.map((m: any) => m.id);
+            expect(ids.filter((id: string) => id === 'msg-2')).toHaveLength(1);
+        });
+
+        it('should return messages sorted by ascending timestamp', () => {
+            const before = [
+                { id: 'msg-2', chatUpeerId: 'peer-1', message: 'target', timestamp: 1000 },
+                { id: 'msg-1', chatUpeerId: 'peer-1', message: 'older', timestamp: 900 },
+            ];
+            const after = [
+                { id: 'msg-3', chatUpeerId: 'peer-1', message: 'newer', timestamp: 1100 },
+            ];
+
+            let callCount = 0;
+            mockDb.select.mockImplementation(() => ({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ timestamp: 1000 }),
+                        all: vi.fn().mockReturnValue([]),
+                        orderBy: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockReturnValue({
+                                all: vi.fn().mockImplementation(() => {
+                                    callCount++;
+                                    if (callCount === 1) return before;
+                                    if (callCount === 2) return after;
+                                    return [];
+                                })
+                            })
+                        })
+                    })
+                })
+            }));
+
+            const result = getMessagesAround('peer-1', 'msg-2');
+            const timestamps = result.map((m: any) => m.timestamp);
+            expect(timestamps).toEqual([...timestamps].sort((a, b) => a - b));
         });
     });
 });

@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 import { ChatMessage, Contact, Group } from '../types/chat.js';
+import { useNavigationStore } from './useNavigationStore.js';
+import { useNotificationStore } from './useNotificationStore.js';
+import { playNotificationSound } from '../utils/notificationSound.js';
+
+let navGeneration = 0;
 
 interface ChatState {
     // Identity
@@ -15,6 +20,8 @@ interface ChatState {
     // Messaging
     chatHistory: ChatMessage[];
     groupChatHistory: ChatMessage[];
+    searchResults: ChatMessage[]; // Mensajes encontrados en la búsqueda global
+    isWindowedHistory: boolean; // true cuando el historial muestra una ventana alrededor de un mensaje antiguo
     messagesByConversation: Record<string, string>; // draft messages
     replyByConversation: Record<string, ChatMessage | null>;
     typingStatus: Record<string, NodeJS.Timeout>;
@@ -43,6 +50,9 @@ interface ChatActions {
     setReplyToMessage: (id: string, val: ChatMessage | null) => void;
     setChatHistory: (history: ChatMessage[]) => void;
     setGroupChatHistory: (history: ChatMessage[]) => void;
+    handleSearchGlobal: (query: string) => Promise<void>;
+    loadHistoryAround: (targetMsgId: string) => Promise<void>;
+    reloadLatestHistory: () => Promise<void>;
 
     // Data Refresh
     refreshContacts: () => Promise<void>;
@@ -94,6 +104,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     activeGroupId: '',
     chatHistory: [],
     groupChatHistory: [],
+    searchResults: [],
+    isWindowedHistory: false,
     messagesByConversation: {},
     replyByConversation: {},
     typingStatus: {},
@@ -106,67 +118,72 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     setMyIdentity: (identity) => set({ myIdentity: identity }),
     setNetworkAddress: (addr) => set({ networkAddress: addr }),
     setTargetUpeerId: (id) => {
-        set({ targetUpeerId: id, activeGroupId: '' });
-        if (id) {
+        set({ targetUpeerId: id, activeGroupId: '', isWindowedHistory: false });
+        if (!id) return;
+        const gen = ++navGeneration;
+        const { pendingScrollMsgId } = useNavigationStore.getState();
+        const mapContact = (m: any) => {
+            if (!m.isMine && m.status !== 'read') {
+                window.upeer.sendReadReceipt(id, m.id);
+                m.status = 'read';
+            }
+            return {
+                id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
+                message: m.message, status: m.status,
+                timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                replyTo: m.replyTo, reactions: m.reactions,
+                isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
+            };
+        };
+        if (pendingScrollMsgId) {
+            window.upeer.getMessagesAround(id, pendingScrollMsgId).then(msgs => {
+                if (navGeneration !== gen) return;
+                set({ chatHistory: msgs.map(mapContact), isWindowedHistory: true });
+            });
+        } else {
             window.upeer.getMessages(id).then(msgs => {
-                set({
-                    chatHistory: msgs.reverse().map((m: any) => {
-                        if (!m.isMine && m.status !== 'read') {
-                            window.upeer.sendReadReceipt(id, m.id);
-                            m.status = 'read';
-                        }
-                        return {
-                            id: m.id,
-                            upeerId: m.chatUpeerId,
-                            isMine: !!m.isMine,
-                            message: m.message,
-                            status: m.status,
-                            timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            replyTo: m.replyTo,
-                            reactions: m.reactions,
-                            isEdited: !!m.isEdited,
-                            isDeleted: !!m.isDeleted,
-                            date: m.timestamp
-                        };
-                    })
-                });
+                if (navGeneration !== gen) return;
+                set({ chatHistory: msgs.reverse().map(mapContact) });
             });
         }
     },
     setActiveGroupId: (id) => {
-        set({ activeGroupId: id, targetUpeerId: '' });
-        if (id) {
+        set({ activeGroupId: id, targetUpeerId: '', isWindowedHistory: false });
+        if (!id) return;
+        const gen = ++navGeneration;
+        const { pendingScrollMsgId } = useNavigationStore.getState();
+        const mapGroup = (msgs: any[]) => {
+            const contacts = get().contacts;
+            const myIdentity = get().myIdentity;
+            return msgs.map((m: any) => {
+                if (!m.isMine && m.status !== 'read') {
+                    window.upeer.sendReadReceipt(id, m.id);
+                    m.status = 'read';
+                }
+                const sender = m.isMine ? myIdentity : (contacts as any[]).find((c: any) => c.upeerId === m.senderUpeerId);
+                return {
+                    id: m.id, upeerId: id, groupId: id, isMine: !!m.isMine,
+                    message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
+                    isSystem: m.message?.startsWith('__SYS__|') || undefined,
+                    status: m.status,
+                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    replyTo: m.replyTo, reactions: m.reactions,
+                    isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
+                    senderUpeerId: m.senderUpeerId,
+                    senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
+                    senderAvatar: (sender as any)?.avatar, date: m.timestamp
+                };
+            });
+        };
+        if (pendingScrollMsgId) {
+            window.upeer.getMessagesAround(id, pendingScrollMsgId).then(msgs => {
+                if (navGeneration !== gen) return;
+                set({ groupChatHistory: mapGroup(msgs), isWindowedHistory: true });
+            });
+        } else {
             window.upeer.getMessages(id).then(async (msgs: any[]) => {
-                const contacts = get().contacts;
-                const myIdentity = get().myIdentity;
-
-                set({
-                    groupChatHistory: msgs.reverse().map((m: any) => {
-                        if (!m.isMine && m.status !== 'read') {
-                            window.upeer.sendReadReceipt(id, m.id);
-                            m.status = 'read';
-                        }
-                        const sender = m.isMine ? myIdentity : (contacts as any[]).find((c: any) => c.upeerId === m.senderUpeerId);
-                        return {
-                            id: m.id,
-                            upeerId: id,
-                            groupId: id,
-                            isMine: !!m.isMine,
-                            message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
-                            isSystem: m.message?.startsWith('__SYS__|') || undefined,
-                            status: m.status,
-                            timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            replyTo: m.replyTo,
-                            reactions: m.reactions,
-                            isEdited: !!m.isEdited,
-                            isDeleted: !!m.isDeleted,
-                            senderUpeerId: m.senderUpeerId,
-                            senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
-                            senderAvatar: (sender as any)?.avatar,
-                            date: m.timestamp
-                        };
-                    })
-                });
+                if (navGeneration !== gen) return;
+                set({ groupChatHistory: mapGroup(msgs.reverse()) });
             });
         }
     },
@@ -179,6 +196,124 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     })),
     setChatHistory: (history) => set({ chatHistory: history }),
     setGroupChatHistory: (history) => set({ groupChatHistory: history }),
+
+    handleSearchGlobal: async (query: string) => {
+        if (!query.trim()) {
+            set({ searchResults: [] });
+            return;
+        }
+
+        const { contacts, groups, myIdentity } = get();
+        const raw = await window.upeer.searchMessages(query);
+
+        set({
+            searchResults: raw
+                .filter((m: any) => !m.message?.startsWith('{'))
+                .map((m: any) => {
+                    const isGroup = m.chatUpeerId?.startsWith('grp-');
+                    const group = isGroup ? groups.find((g: any) => g.groupId === m.chatUpeerId) : undefined;
+                    const contact = !isGroup ? contacts.find((c: any) => c.upeerId === m.chatUpeerId) : undefined;
+                    const senderContact = contacts.find((c: any) => c.upeerId === m.senderUpeerId);
+                    const conversationName = group?.name || contact?.name || m.chatUpeerId;
+                    const senderName = m.isMine
+                        ? 'Tú'
+                        : (senderContact?.name || contact?.name || 'Desconocido');
+                    return {
+                        id: m.id,
+                        upeerId: m.chatUpeerId,
+                        groupId: isGroup ? m.chatUpeerId : undefined,
+                        isMine: !!m.isMine,
+                        message: m.message,
+                        status: m.status,
+                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        senderName: conversationName,
+                        senderAvatar: isGroup ? group?.avatar : contact?.avatar,
+                        senderDisplayName: senderName,
+                        date: m.timestamp
+                    };
+                })
+        });
+    },
+
+    loadHistoryAround: async (targetMsgId: string) => {
+        const { targetUpeerId, activeGroupId, contacts, groups, myIdentity } = get();
+        const chatId = activeGroupId || targetUpeerId;
+        if (!chatId) return;
+
+        const raw = await window.upeer.getMessagesAround(chatId, targetMsgId);
+        const isGroup = !!activeGroupId;
+
+        if (isGroup) {
+            set({
+                groupChatHistory: raw.map((m: any) => {
+                    const sender = m.isMine ? myIdentity : (contacts as any[]).find((c: any) => c.upeerId === m.senderUpeerId);
+                    return {
+                        id: m.id, upeerId: chatId, groupId: chatId, isMine: !!m.isMine,
+                        message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
+                        isSystem: m.message?.startsWith('__SYS__|') || undefined,
+                        status: m.status,
+                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        replyTo: m.replyTo, reactions: m.reactions, isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
+                        senderUpeerId: m.senderUpeerId,
+                        senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
+                        senderAvatar: (sender as any)?.avatar, date: m.timestamp
+                    };
+                }),
+                isWindowedHistory: true
+            });
+        } else {
+            set({
+                chatHistory: raw.map((m: any) => ({
+                    id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
+                    message: m.message, status: m.status,
+                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    replyTo: m.replyTo, reactions: m.reactions,
+                    isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
+                })),
+                isWindowedHistory: true
+            });
+        }
+    },
+
+    reloadLatestHistory: async () => {
+        const { targetUpeerId, activeGroupId, contacts, myIdentity } = get();
+        const chatId = activeGroupId || targetUpeerId;
+        if (!chatId) return;
+
+        const raw = await window.upeer.getMessages(chatId);
+        const isGroup = !!activeGroupId;
+
+        if (isGroup) {
+            set({
+                groupChatHistory: raw.reverse().map((m: any) => {
+                    const sender = m.isMine ? myIdentity : (contacts as any[]).find((c: any) => c.upeerId === m.senderUpeerId);
+                    return {
+                        id: m.id, upeerId: chatId, groupId: chatId, isMine: !!m.isMine,
+                        message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
+                        isSystem: m.message?.startsWith('__SYS__|') || undefined,
+                        status: m.status,
+                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        replyTo: m.replyTo, reactions: m.reactions, isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
+                        senderUpeerId: m.senderUpeerId,
+                        senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
+                        senderAvatar: (sender as any)?.avatar, date: m.timestamp
+                    };
+                }),
+                isWindowedHistory: false
+            });
+        } else {
+            set({
+                chatHistory: raw.reverse().map((m: any) => ({
+                    id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
+                    message: m.message, status: m.status,
+                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    replyTo: m.replyTo, reactions: m.reactions,
+                    isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
+                })),
+                isWindowedHistory: false
+            });
+        }
+    },
 
     refreshContacts: async () => {
         const loaded = await window.upeer.getContacts();
@@ -328,13 +463,27 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     handleUpdateMessage: (msgId, newContent) => {
-        const { targetUpeerId, activeGroupId } = get();
+        const { targetUpeerId, activeGroupId, chatHistory, groupChatHistory } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
 
-        window.upeer.sendChatUpdate(effectiveId, msgId, newContent);
+        const existing = [...chatHistory, ...groupChatHistory].find(m => m.id === msgId);
+        let savedContent = newContent;
+        if (existing) {
+            const raw = existing.message;
+            if (raw.startsWith('{') && raw.endsWith('}')) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.type === 'file') {
+                        savedContent = JSON.stringify({ ...parsed, caption: newContent });
+                    }
+                } catch { /* ignore */ }
+            }
+        }
 
-        const updateFn = (msg: any) => msg.id === msgId ? { ...msg, message: newContent, isEdited: true } : msg;
+        window.upeer.sendChatUpdate(effectiveId, msgId, savedContent);
+
+        const updateFn = (msg: any) => msg.id === msgId ? { ...msg, message: savedContent, isEdited: true } : msg;
 
         set(state => ({
             chatHistory: state.chatHistory.map(updateFn),
@@ -549,6 +698,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         }]
                     };
                 });
+            } else {
+                const { msgNotif, sound } = useNotificationStore.getState();
+                if (msgNotif && sound && !document.hidden) playNotificationSound();
             }
         });
 
@@ -568,6 +720,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         }
                     }
                 }));
+                const { reqNotif, sound } = useNotificationStore.getState();
+                if (reqNotif && sound && !document.hidden) playNotificationSound();
             }
             get().refreshContacts();
         });
@@ -598,6 +752,10 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         window.upeer.onGroupMessage((data: any) => {
             get().refreshGroups();
             const { activeGroupId, contacts, myIdentity } = get();
+            if (data.groupId !== activeGroupId) {
+                const { msgNotif, sound } = useNotificationStore.getState();
+                if (msgNotif && sound && !document.hidden) playNotificationSound();
+            }
             if (data.groupId === activeGroupId) {
                 set(state => {
                     if (data.id && state.groupChatHistory.some(m => m.id === data.id)) return state;
@@ -725,6 +883,15 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     chatHistory: state.chatHistory.map(updateFn),
                     groupChatHistory: state.groupChatHistory.map(updateFn)
                 }));
+            }
+        });
+
+        window.upeer.onFocusConversation && window.upeer.onFocusConversation((data: { upeerId?: string; groupId?: string }) => {
+            useNavigationStore.getState().goToChat();
+            if (data.groupId) {
+                get().setActiveGroupId(data.groupId);
+            } else if (data.upeerId) {
+                get().setTargetUpeerId(data.upeerId);
             }
         });
 

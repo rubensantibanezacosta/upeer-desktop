@@ -3,6 +3,8 @@ import { Box, IconButton, Typography } from '@mui/joy';
 import { EmptyChat } from './EmptyChat.js';
 import { MessageItem } from './message/MessageItem.js';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { useNavigationStore } from '../../store/useNavigationStore.js';
+import { useChatStore } from '../../store/useChatStore.js';
 
 interface ChatMessage {
     id?: string;
@@ -30,6 +32,7 @@ interface ChatAreaProps {
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
     onEdit: (msg: ChatMessage) => void;
     onDelete: (msgId: string) => void;
+    onForward?: (msg: ChatMessage) => void;
     activeTransfers?: any[];
     onRetryTransfer?: (fileId: string) => void;
     onCancelTransfer?: (fileId: string) => void;
@@ -38,25 +41,46 @@ interface ChatAreaProps {
     onTransferStateChange?: (fileId: string, updates: any) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, activeTransfers = [], onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
+    const { pendingScrollMsgId, setPendingScrollMsgId } = useNavigationStore();
+    const { isWindowedHistory, reloadLatestHistory } = useChatStore();
+    const pendingScrollRef = useRef(pendingScrollMsgId);
+    pendingScrollRef.current = pendingScrollMsgId;
+
+    React.useLayoutEffect(() => {
+        if (!pendingScrollMsgId) return;
+        if (chatHistory.length === 0) return;
+        const msg = chatHistory.find(m => m.id === pendingScrollMsgId);
+        if (!msg) return;
+        const element = document.getElementById(`msg-${pendingScrollMsgId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const bubble = element.querySelector('.MuiSheet-root') as HTMLElement;
+            if (bubble) {
+                bubble.style.outline = '2px solid var(--joy-palette-primary-500)';
+                bubble.style.outlineOffset = '2px';
+                setTimeout(() => { bubble.style.outline = ''; bubble.style.outlineOffset = ''; }, 1500);
+            }
+            setPendingScrollMsgId(null);
+        }
+    }, [chatHistory, pendingScrollMsgId, setPendingScrollMsgId]);
 
     React.useEffect(() => {
         const container = scrollRef.current;
         if (!container) return;
 
         const handleScroll = () => {
-            // In column-reverse, scrollTop is 0 at the bottom and negative as you scroll up.
-            // Some browsers use positive values, so we check both or just use the absolute distance.
             const isNearBottom = Math.abs(container.scrollTop) < 50;
             setShowScrollButton(!isNearBottom);
+            if (isWindowedHistory && isNearBottom) reloadLatestHistory();
         };
 
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [isWindowedHistory, reloadLatestHistory]);
 
     const scrollToBottom = () => {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -67,20 +91,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
         if (!container) return;
 
         const isNewMessage = chatHistory.length > lastMsgCount.current;
-        const lastMessage = chatHistory[chatHistory.length - 1];
-
-        if (isNewMessage && lastMessage) {
-            // In column-reverse, scrollTop: 0 is the BOTTOM.
-            // Check if we were already at the bottom (or very close to it)
-            // or if the message is from me.
-            const isAtBottom = container.scrollTop > -10; // 0 is bottom, column-reverse makes it stay at 0
-
-            if (lastMessage.isMine || isAtBottom) {
-                container.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }
-
         lastMsgCount.current = chatHistory.length;
+
+        if (!isNewMessage) return;
+        if (pendingScrollRef.current) return;
+
+        const lastMessage = chatHistory[chatHistory.length - 1];
+        if (!lastMessage) return;
+
+        const isAtBottom = container.scrollTop > -10;
+        if (lastMessage.isMine || isAtBottom) {
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }, [chatHistory]);
 
     const getMessageById = (id: string) => chatHistory.find(m => m.id === id);
@@ -173,6 +195,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 onReact={onReact}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
+                                onForward={onForward}
                                 originalMessage={msg.replyTo ? getMessageById(msg.replyTo)?.message : undefined}
                                 originalSenderName={msg.replyTo ? (getMessageById(msg.replyTo)?.isMine ? 'Tú' : getMessageById(msg.replyTo)?.senderName) : undefined}
                                 activeTransfers={activeTransfers}
@@ -240,13 +263,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                     size="md"
                     onClick={scrollToBottom}
                     sx={{
-                        position: 'fixed',
-                        bottom: 90,
+                        position: 'absolute',
+                        bottom: 24,
                         right: 48,
                         borderRadius: 'md',
                         boxShadow: 'md',
                         zIndex: 1100,
-
                     }}
                 >
                     <KeyboardArrowDownIcon />

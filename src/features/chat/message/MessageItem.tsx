@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Box, IconButton, Sheet, Typography, Avatar } from '@mui/joy';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Box, IconButton, Sheet, Typography, Avatar, Tooltip } from '@mui/joy';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import { MessageStatus } from './MessageStatus.js';
 import { MessageReply } from './MessageReply.js';
@@ -31,6 +31,7 @@ interface MessageItemProps {
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
     onEdit: (msg: any) => void;
     onDelete: (msgId: string) => void;
+    onForward?: (msg: any) => void;
     originalMessage?: string;
     activeTransfers?: any[];
     onScrollToMessage?: (msgId: string) => void;
@@ -128,18 +129,32 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
 const QUICK_EMOJIS_CONST = ['👍', '❤️', '😂', '😮', '😢', '👎'];
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({
-    msg, onReply, onReact, onEdit: _onEdit, onDelete, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, isFirstInGroupChain = true, isLastInGroupChain = true, onTransferStateChange
+    msg, onReply, onReact, onEdit, onDelete, onForward, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, isFirstInGroupChain = true, isLastInGroupChain = true, onTransferStateChange
 }) => {
     const isMe = msg.isMine;
     const [isHovered, setIsHovered] = useState(false);
     const [emojiOpen, setEmojiOpen] = useState(false);
+    const emojiPickerRef = useRef<HTMLDivElement>(null);
     const QUICK_EMOJIS = QUICK_EMOJIS_CONST;
+
+    useEffect(() => {
+        if (!emojiOpen) return;
+        const handle = (e: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+                setEmojiOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handle);
+        return () => document.removeEventListener('mousedown', handle);
+    }, [emojiOpen]);
 
     const { cardData, fileData, isJSONFile, linkPreviewData, textContent } = useMemo(() =>
         parseMessage(msg.message, isMe, activeTransfers),
         [msg.message, isMe, activeTransfers]);
     const isContactCard = !!cardData;
     const isFile = isJSONFile || (msg.message.startsWith('FILE_TRANSFER|') && !!fileData);
+    const canEdit = isMe && !msg.isDeleted && !isContactCard &&
+        (!isFile || (!!fileData?.caption && fileData.transferState === 'completed'));
     const _isMediaFile = isFile && fileData && (
         fileData.mimeType?.startsWith('image/') ||
         fileData.mimeType?.startsWith('video/') ||
@@ -158,7 +173,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         <Box
             id={`msg-${msg.id}`}
             onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => { setIsHovered(false); setEmojiOpen(false); }}
+            onMouseLeave={() => setIsHovered(false)}
             sx={{
                 alignSelf: 'stretch',
                 width: '100%',
@@ -201,7 +216,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                 variant="soft"
                                 color={isMe ? 'primary' : 'neutral'}
                                 sx={{
-                                    p: 0.5,
+                                    p: 0,
                                     overflow: 'hidden',
                                     borderRadius: '12px',
                                     borderTopRightRadius: isMe ? '4px' : '12px',
@@ -214,11 +229,15 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                 }}
                             >
                                 {!!msg.replyTo && !msg.isDeleted && (
-                                    <MessageReply isMe={isMe} originalMessage={originalMessage} originalSenderName={originalSenderName} onClick={scrollToOriginal} />
+                                    <Box sx={{ p: 0.5, pb: 0 }}>
+                                        <MessageReply isMe={isMe} originalMessage={originalMessage} originalSenderName={originalSenderName} onClick={scrollToOriginal} />
+                                    </Box>
                                 )}
 
                                 {isContactCard && cardData && !msg.isDeleted ? (
-                                    <ContactCard name={cardData.name} address={cardData.address} upeerId={cardData.upeerId} isMe={isMe} />
+                                    <Box sx={{ p: 0.5 }}>
+                                        <ContactCard name={cardData.name} address={cardData.address} upeerId={cardData.upeerId} isMe={isMe} />
+                                    </Box>
                                 ) : isFile && fileData && !msg.isDeleted ? (
                                     <FileMessageItem
                                         data={{ ...fileData, timestamp: msg.timestamp } as any}
@@ -247,14 +266,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                     <Box sx={{
                                         display: 'flex',
                                         flexWrap: 'wrap',
-                                        columnGap: 1.5,
+                                        columnGap: 1,
                                         rowGap: 0,
                                         alignItems: 'flex-end',
                                         minWidth: '80px',
-                                        p: 1,
-                                        pt: msg.replyTo ? 0.5 : 1,
-                                        px: 1.5,
-                                        pb: 0.5
+                                        p: 0.5,
+                                        pt: msg.replyTo ? 0 : 0.5,
+                                        px: 1,
+                                        pb: 0.25
                                     }}>
                                         <RichText
                                             isMe={isMe}
@@ -275,7 +294,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                         )}
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
                                             {msg.isEdited && !msg.isDeleted && (
-                                                <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(editado)</Typography>
+                                                <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(Editado)</Typography>
                                             )}
                                             <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px', opacity: 0.8 }}>
                                                 {msg.timestamp}
@@ -300,10 +319,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 0.5,
-                                pointerEvents: (isHovered || emojiOpen) ? 'auto' : 'none'
+                                pointerEvents: isHovered || emojiOpen ? 'auto' : 'none'
                             }}>
-                                {/* Quick Reaction Button */}
-                                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <Box ref={emojiPickerRef} sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                     <IconButton
                                         size="sm"
                                         variant="plain"
@@ -314,13 +332,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                             borderRadius: 'sm',
                                             flexShrink: 0,
                                             opacity: 0.7,
-                                            '&:hover': {
-                                                opacity: 1,
-                                                backgroundColor: 'background.level1'
-                                            },
-                                            '&:active': {
-                                                backgroundColor: 'background.level2'
-                                            }
+                                            '&:hover': { opacity: 1, backgroundColor: 'background.level1' },
+                                            '&:active': { backgroundColor: 'background.level2' },
                                         }}
                                     >
                                         <AddReactionOutlinedIcon sx={{ fontSize: '18px' }} />
@@ -329,8 +342,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                         <Box sx={{
                                             position: 'absolute',
                                             [isMe ? 'right' : 'left']: 0,
-                                            bottom: '100%',
-                                            mb: 1,
+                                            bottom: 'calc(100% + 6px)',
                                             display: 'flex',
                                             gap: 0.5,
                                             backgroundColor: 'background.surface',
@@ -339,25 +351,30 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                             borderRadius: 'lg',
                                             p: 0.75,
                                             boxShadow: 'lg',
-                                            zIndex: 1200,
+                                            zIndex: 1300,
                                             whiteSpace: 'nowrap',
                                         }}>
                                             {QUICK_EMOJIS.map(emoji => (
-                                                <Box
-                                                    key={emoji}
-                                                    onClick={() => { if (msg.id) { onReact(msg.id, emoji, false); setEmojiOpen(false); } }}
-                                                    sx={{
-                                                        width: 32, height: 32,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        fontSize: '18px',
-                                                        cursor: 'pointer',
-                                                        borderRadius: 'md',
-                                                        transition: 'background-color 0.1s ease, transform 0.1s ease',
-                                                        '&:hover': { backgroundColor: 'background.level1', transform: 'scale(1.15)' },
-                                                    }}
-                                                >
-                                                    {emoji}
-                                                </Box>
+                                                <Tooltip key={emoji} title={emoji === '👍' ? 'Me gusta' : emoji === '❤️' ? 'Me encanta' : emoji === '😂' ? 'Me divierte' : emoji === '😮' ? 'Me asombra' : emoji === '😢' ? 'Me entristece' : 'No me gusta'} variant="soft">
+                                                    <Box
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (msg.id) onReact(msg.id, emoji, false);
+                                                            setEmojiOpen(false);
+                                                        }}
+                                                        sx={{
+                                                            width: 32, height: 32,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontSize: '18px',
+                                                            cursor: 'pointer',
+                                                            borderRadius: 'md',
+                                                            transition: 'background-color 0.1s ease',
+                                                            '&:hover': { backgroundColor: 'background.level1' },
+                                                        }}
+                                                    >
+                                                        {emoji}
+                                                    </Box>
+                                                </Tooltip>
                                             ))}
                                         </Box>
                                     )}
@@ -369,6 +386,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                     isFile={isFile}
                                     fileCompleted={fileData?.transferState === 'completed'}
                                     onReply={() => onReply(msg)}
+                                    onEdit={canEdit && onEdit ? () => onEdit(msg) : undefined}
+                                    onForward={!msg.isDeleted && onForward ? () => onForward(msg) : undefined}
                                     onDelete={() => msg.id && onDelete(msg.id)}
                                     sx={{ position: 'static' }}
                                 />

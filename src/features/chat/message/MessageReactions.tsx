@@ -15,7 +15,7 @@ interface MessageReactionsProps {
 
 export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, isMe, onRemoveReact }) => {
     const myUpeerId = useChatStore((state: any) => state.myIdentity?.upeerId);
-    
+
     if (!reactions || reactions.length === 0) return null;
 
     const grouped = reactions.reduce((acc: Record<string, { count: number, hasMine: boolean }>, r) => {
@@ -40,18 +40,14 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, i
                 bottom: -20,
                 [isMe ? 'right' : 'left']: 8,
                 zIndex: 2,
-                backgroundColor: 'background.surface',
                 borderRadius: 'md',
-                border: '1px solid',
-                borderColor: 'divider',
-                boxShadow: 'sm',
                 overflow: 'hidden',
-                // Premium glass effect
-                backdropFilter: 'blur(8px)',
-                background: 'rgba(255, 255, 255, 0.8)',
-                '.dark &': {
-                    background: 'rgba(21, 21, 21, 0.8)',
-                }
+                backgroundColor: isMe ? 'background.surface' : 'background.level2',
+                border: isMe ? '1px solid' : 'none',
+                borderColor: isMe ? 'divider' : 'transparent',
+                boxShadow: isMe ? 'sm' : 'none',
+                backdropFilter: isMe ? 'blur(8px)' : 'none',
+            
             }}
         >
             {Object.entries(grouped).map(([emoji, { count, hasMine }]) => (
@@ -72,8 +68,8 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, i
                         fontWeight: 600,
                         fontSize: '11px',
                         transition: 'all 0.2s',
-                        '&:hover': { 
-                            backgroundColor: hasMine ? 'primary.softHoverBg' : 'background.level1' 
+                        '&:hover': {
+                            backgroundColor: hasMine ? 'primary.softHoverBg' : 'background.level1'
                         },
                     }}
                 >

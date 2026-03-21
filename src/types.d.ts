@@ -3,6 +3,8 @@ declare global {
         upeer: {
             getMyNetworkAddress: () => Promise<string>;
             getMessages: (upeerId: string) => Promise<any[]>;
+            searchMessages: (query: string) => Promise<any[]>;
+            getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<any[]>;
             getContacts: () => Promise<any[]>;
             addContact: (address: string, name: string) => Promise<{ success: boolean, upeerId: string }>;
             acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;

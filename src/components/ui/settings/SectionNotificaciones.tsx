@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { List } from '@mui/joy';
 import { ToggleRow } from './shared.js';
+import { useNotificationStore } from '../../../store/useNotificationStore.js';
 
 export const SectionNotificaciones: React.FC = () => {
-    const [msgNotif, setMsgNotif] = useState(true);
-    const [reqNotif, setReqNotif] = useState(true);
-    const [sound, setSound] = useState(true);
+    const { msgNotif, reqNotif, sound, setMsgNotif, setReqNotif, setSound } = useNotificationStore();
 
     return (
         <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>

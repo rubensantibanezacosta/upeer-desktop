@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('upeer', {
     sendChatUpdate: (upeerId: string, msgId: string, newContent: string) => ipcRenderer.invoke('send-chat-update', { upeerId, msgId, newContent }),
     sendChatDelete: (upeerId: string, msgId: string) => ipcRenderer.invoke('send-chat-delete', { upeerId, msgId }),
     getMessages: (upeerId: string) => ipcRenderer.invoke('get-messages', upeerId),
+    searchMessages: (query: string) => ipcRenderer.invoke('search-messages', { query }),
+    getMessagesAround: (chatUpeerId: string, targetMsgId: string) => ipcRenderer.invoke('get-messages-around', { chatUpeerId, targetMsgId }),
     getContacts: () => ipcRenderer.invoke('get-contacts'),
     // Multi-device API
     getDevices: () => ipcRenderer.invoke('get-devices'),
@@ -122,6 +124,10 @@ contextBridge.exposeInMainWorld('upeer', {
     onTyping: (callback: (data: { upeerId: string }) => void) => {
         ipcRenderer.removeAllListeners('peer-typing');
         ipcRenderer.on('peer-typing', (event, data) => callback(data));
+    },
+    onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => {
+        ipcRenderer.removeAllListeners('focus-conversation');
+        ipcRenderer.on('focus-conversation', (event, data) => callback(data));
     },
     // File transfer API (Phase 16)
     startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption, isVoiceNote }),

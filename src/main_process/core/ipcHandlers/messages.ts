@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getMessages } from '../../storage/messages/operations.js';
+import { getMessages, searchMessages, getMessagesAround } from '../../storage/messages/operations.js';
 import {
   sendUDPMessage,
   sendTypingIndicator,
@@ -15,6 +15,8 @@ import {
  */
 export function registerMessageHandlers(): void {
   ipcMain.handle('get-messages', (_event, upeerId) => getMessages(upeerId));
+  ipcMain.handle('search-messages', (_event, { query }) => searchMessages(query));
+  ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
 
   ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo }) =>
     await sendUDPMessage(upeerId, message, replyTo)

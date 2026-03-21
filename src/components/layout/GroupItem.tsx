@@ -28,18 +28,24 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import DoneIcon from '@mui/icons-material/Done';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import { getFileIcon } from '../../utils/fileIcons.js';
+import MicIcon from '@mui/icons-material/Mic';
 import { Group } from '../../types/chat.js';
+import { highlightText } from '../../utils/highlightText.js';
 
 interface GroupItemProps {
     group: Group;
     isSelected: boolean;
     onSelect: (groupId: string) => void;
     onLeaveGroup?: (groupId: string) => void;
+    highlight?: string;
 }
 
-export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onLeaveGroup }) => {
+export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onLeaveGroup, highlight = '' }) => {
     const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
 
     const formatTime = (iso?: string) => {
@@ -97,7 +103,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <Typography level="body-md" sx={{ fontWeight: 500 }} noWrap>
-                            {group.name}
+                            {highlight ? highlightText(group.name, highlight) : group.name}
                         </Typography>
                         <Typography level="body-xs" color="neutral" sx={{ ml: 1, minWidth: 'max-content' }}>
                             {timeStr}
@@ -108,17 +114,86 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                             level="body-sm"
                             color="neutral"
                             noWrap
+                            component="div"
                             sx={{
                                 flexGrow: 1,
-                                display: 'block',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
                             }}
                         >
-                            {group.lastMessage
-                                ? group.lastMessage
-                                : `${group.members.length} miembro${group.members.length !== 1 ? 's' : ''}`}
+                            {group.lastMessageIsMine && group.lastMessage && (
+                                <Box component="span" sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                                    {(group.lastMessageStatus === 'sent' || group.lastMessageStatus === 'vaulted') ? (
+                                        <DoneIcon sx={{ fontSize: '16px', opacity: 0.7 }} />
+                                    ) : (
+                                        <DoneAllIcon sx={{
+                                            fontSize: '16px',
+                                            color: group.lastMessageStatus === 'read' ? '#53bdeb' : 'inherit',
+                                            opacity: group.lastMessageStatus === 'read' ? 1 : 0.7
+                                        }} />
+                                    )}
+                                </Box>
+                            )}
+                            <Typography
+                                level="body-sm"
+                                noWrap
+                                component="span"
+                                sx={{
+                                    color: 'inherit',
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {(() => {
+                                    if (!group.lastMessage) return `${group.members.length} miembro${group.members.length !== 1 ? 's' : ''}`;
+                                    if (group.lastMessage.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
+
+                                    if (group.lastMessage.startsWith('{') && group.lastMessage.endsWith('}')) {
+                                        try {
+                                            const parsed = JSON.parse(group.lastMessage);
+                                            if (parsed.type === 'file') {
+                                                if (parsed.isVoiceNote) {
+                                                    return (
+                                                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                            <MicIcon sx={{ fontSize: 16, opacity: 0.8 }} />
+                                                            <span>Nota de voz</span>
+                                                        </Box>
+                                                    );
+                                                }
+                                                return (
+                                                    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                        <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
+                                                            {getFileIcon(parsed.mimeType || '', parsed.fileName || '')}
+                                                        </Box>
+                                                        <span>{parsed.fileName}</span>
+                                                    </Box>
+                                                );
+                                            }
+                                            if (typeof parsed.text === 'string') return parsed.text || '';
+                                        } catch (e) { /* ignore */ }
+                                    }
+
+                                    if (group.lastMessage.startsWith('FILE_TRANSFER|')) {
+                                        const parts = group.lastMessage.split('|');
+                                        if (parts.length >= 6) {
+                                            return (
+                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                    <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
+                                                        {getFileIcon(parts[4] || '', parts[2] || '')}
+                                                    </Box>
+                                                    <span>{parts[2]}</span>
+                                                </Box>
+                                            );
+                                        }
+                                    }
+
+                                    return highlight ? highlightText(group.lastMessage, highlight) : group.lastMessage;
+                                })()}
+                            </Typography>
                         </Typography>
                     </Box>
 

@@ -1,3 +1,4 @@
+import { like, gte, lte } from 'drizzle-orm';
 import { getDb, getSchema, eq, desc, and, lt, runTransaction } from '../shared.js';
 import { updateMessageStatus, getMessageStatus } from './status.js';
 
@@ -140,6 +141,66 @@ export function getMessageById(id: string) {
     return db.select().from(schema.messages)
         .where(eq(schema.messages.id, id))
         .get();
+}
+
+export function getMessagesAround(chatUpeerId: string, targetMsgId: string, context = 60) {
+    const db = getDb();
+    const schema = getSchema();
+
+    const target = db.select({ timestamp: schema.messages.timestamp })
+        .from(schema.messages)
+        .where(eq(schema.messages.id, targetMsgId))
+        .get();
+
+    if (!target) return [];
+
+    const half = Math.floor(context / 2);
+
+    const before = db.select().from(schema.messages)
+        .where(and(
+            eq(schema.messages.chatUpeerId, chatUpeerId),
+            lte(schema.messages.timestamp, target.timestamp)
+        ))
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(half + 1)
+        .all();
+
+    const after = db.select().from(schema.messages)
+        .where(and(
+            eq(schema.messages.chatUpeerId, chatUpeerId),
+            gte(schema.messages.timestamp, target.timestamp + 1)
+        ))
+        .orderBy(schema.messages.timestamp)
+        .limit(half)
+        .all();
+
+    const merged = [...before, ...after];
+    const unique = Array.from(new Map(merged.map(m => [m.id, m])).values())
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    return unique.map(m => {
+        const msgReactions = db.select().from(schema.reactions)
+            .where(eq(schema.reactions.messageId, m.id))
+            .all();
+        return { ...m, reactions: msgReactions };
+    });
+}
+
+export function searchMessages(query: string, limit = 25) {
+    const db = getDb();
+    const schema = getSchema();
+    const q = `%${query}%`;
+    return db.select()
+        .from(schema.messages)
+        .where(
+            and(
+                like(schema.messages.message, q),
+                eq(schema.messages.isDeleted, false)
+            )
+        )
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(limit)
+        .all();
 }
 
 export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string, isVoiceNote?: boolean) {

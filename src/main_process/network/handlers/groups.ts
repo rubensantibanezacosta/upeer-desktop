@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, Notification as ElectronNotification, app } from 'electron';
+import { getMainWindow } from '../../core/windowManager.js';
 import {
     getGroupById,
     saveGroup,
@@ -13,7 +14,7 @@ import {
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { decrypt } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
-import { security, warn } from '../../security/secure-logger.js';
+import { security, warn, info } from '../../security/secure-logger.js';
 
 // Patrón UUID reutilizado en varios handlers para validar msgId/fileId de red.
 const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -90,6 +91,32 @@ export async function handleGroupMessage(
             replyTo,
             status: 'delivered'
         });
+
+        const notifWin = getMainWindow();
+        if (notifWin && !notifWin.isFocused() && ElectronNotification.isSupported()) {
+            const senderName = contact?.name || contact?.alias || upeerId.slice(0, 8);
+            const groupName = existingGroup?.name || groupId.slice(0, 8);
+            const body = displayContent.startsWith('\uD83D\uDD12')
+                ? 'Nuevo mensaje cifrado'
+                : displayContent.length > 80 ? displayContent.slice(0, 77) + '...' : displayContent;
+            const notif = new ElectronNotification({ title: `${senderName} → ${groupName}`, body });
+            notif.on('click', () => {
+                info('[Notif] Click en notificaci\u00f3n de grupo', { groupId }, 'notifications');
+                const currentWin = getMainWindow();
+                if (!currentWin) return;
+                app.focus({ steal: true });
+                if (currentWin.isMinimized()) currentWin.restore();
+                if (!currentWin.isVisible()) currentWin.show();
+                currentWin.setAlwaysOnTop(true, 'normal');
+                currentWin.moveTop();
+                currentWin.focus();
+                setTimeout(() => {
+                    currentWin.setAlwaysOnTop(false);
+                    currentWin.webContents.send('focus-conversation', { groupId });
+                }, 200);
+            });
+            notif.show();
+        }
     }
 }
 

@@ -207,6 +207,8 @@ export async function initializeApp(baseDir: string): Promise<void> {
     },
   });
 
+  mainWindow.maximize();
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {

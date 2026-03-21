@@ -63,6 +63,8 @@ export interface Group {
     // UI extras
     lastMessage?: string;
     lastMessageTime?: string;
+    lastMessageStatus?: string;
+    lastMessageIsMine?: boolean;
 }
 
 export interface MediaItem {

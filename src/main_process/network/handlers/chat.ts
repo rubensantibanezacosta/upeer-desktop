@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, Notification as ElectronNotification, app } from 'electron';
+import { getMainWindow } from '../../core/windowManager.js';
 import {
     saveMessage,
     updateMessageStatus,
@@ -19,7 +20,7 @@ import {
     getMyUPeerId,
 } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
-import { error, warn } from '../../security/secure-logger.js';
+import { error, warn, info } from '../../security/secure-logger.js';
 
 const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -133,6 +134,31 @@ export async function handleChatMessage(
             status: 'delivered',
             encrypted: !!data.nonce
         });
+
+        const notifWin = getMainWindow();
+        if (notifWin && !notifWin.isFocused() && ElectronNotification.isSupported()) {
+            const contactName = contact?.name || contact?.alias || upeerId.slice(0, 8);
+            const body = displayContent.startsWith('\uD83D\uDD12')
+                ? 'Nuevo mensaje cifrado'
+                : displayContent.length > 80 ? displayContent.slice(0, 77) + '...' : displayContent;
+            const notif = new ElectronNotification({ title: contactName, body });
+            notif.on('click', () => {
+                info('[Notif] Click en notificación de chat', { upeerId }, 'notifications');
+                const currentWin = getMainWindow();
+                if (!currentWin) return;
+                app.focus({ steal: true });
+                if (currentWin.isMinimized()) currentWin.restore();
+                if (!currentWin.isVisible()) currentWin.show();
+                currentWin.setAlwaysOnTop(true, 'normal');
+                currentWin.moveTop();
+                currentWin.focus();
+                setTimeout(() => {
+                    currentWin.setAlwaysOnTop(false);
+                    currentWin.webContents.send('focus-conversation', { upeerId });
+                }, 200);
+            });
+            notif.show();
+        }
     }
 
     sendResponse(fromAddress, {

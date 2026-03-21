@@ -100,7 +100,15 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
                     </Typography>
                 </Box>
             </Box>
-            <IconButton size="sm" variant="plain" color="neutral" onClick={onCancel}>
+            <IconButton
+                size="sm"
+                variant="plain"
+                color="neutral"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel();
+                }}
+            >
                 <CloseIcon sx={{ fontSize: '18px' }} />
             </IconButton>
         </Box>

@@ -1,13 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
     Box, List, Typography,
-    Avatar,
+    Avatar, ListItem, ListItemContent, ListItemDecorator,
 } from '@mui/joy';
 import { SidebarHeader, NewChatHeader } from './SidebarHeader.js';
 import { SidebarSearch } from './SidebarSearch.js';
 import { ContactItem } from './ContactItem.js';
 import { GroupItem } from './GroupItem.js';
-import { Group, Contact } from '../../types/chat.js';
+import { Group, Contact, ChatMessage } from '../../types/chat.js';
 import GroupsIcon from '@mui/icons-material/Groups';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
@@ -15,6 +15,8 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import { SidebarView, SidebarFilter, useNavigationStore } from '../../store/useNavigationStore.js';
+import { useChatStore } from '../../store/useChatStore.js';
+import { highlightText } from '../../utils/highlightText.js';
 
 // Import subcomponents
 import { EmptyState } from './sidebar/EmptyState.js';
@@ -57,35 +59,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
         sidebarView,
         sidebarFilter,
         newChatSearch,
+        sidebarSearch,
         setSidebarView,
         setSidebarFilter,
+        setSidebarSearch,
+        setPendingScrollMsgId,
         openNewChat,
         backToList,
     } = useNavigationStore();
 
-    const filteredGroups = useMemo(() => {
-        if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];
-        return groups;
-    }, [groups, sidebarFilter]);
+    const { handleSearchGlobal, searchResults } = useChatStore();
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (sidebarView === 'list') {
+                handleSearchGlobal(sidebarSearch);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [sidebarSearch, sidebarView, handleSearchGlobal]);
 
     const mergedList = useMemo(() => {
         type Entry =
             | { kind: 'group'; data: Group; time: number }
             | { kind: 'contact'; data: Contact; time: number };
+
+        const q = sidebarSearch.trim().toLowerCase();
+
         const entries: Entry[] = [
-            ...groups.map(g => ({
-                kind: 'group' as const,
-                data: g,
-                time: g.lastMessageTime ? new Date(g.lastMessageTime).getTime() : 0,
-            })),
-            ...contacts.filter(c => c.status !== 'blocked').map(c => ({
-                kind: 'contact' as const,
-                data: c,
-                time: c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0,
-            })),
+            ...groups
+                .filter(g => !q || g.name.toLowerCase().includes(q))
+                .map(g => ({
+                    kind: 'group' as const,
+                    data: g,
+                    time: g.lastMessageTime ? new Date(g.lastMessageTime).getTime() : 0,
+                })),
+            ...contacts
+                .filter(c => c.status !== 'blocked')
+                .filter(c => !q || c.name?.toLowerCase().includes(q) || c.upeerId?.toLowerCase().includes(q))
+                .map(c => ({
+                    kind: 'contact' as const,
+                    data: c,
+                    time: c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0,
+                })),
         ];
         return entries.sort((a, b) => b.time - a.time);
-    }, [groups, contacts]);
+    }, [groups, contacts, sidebarSearch]);
+
+    const filteredGroups = useMemo(() => {
+        if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];
+        const q = sidebarSearch.trim().toLowerCase();
+        return groups.filter(g => !q || g.name.toLowerCase().includes(q));
+    }, [groups, sidebarFilter, sidebarSearch]);
 
     const searchedContacts = useMemo(() => {
         const q = newChatSearch.trim().toLowerCase();
@@ -96,6 +121,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 c.upeerId?.toLowerCase().includes(q))
         );
     }, [contacts, newChatSearch]);
+
+    const handleSelectMessage = (msg: ChatMessage) => {
+        if (msg.id) setPendingScrollMsgId(msg.id);
+        if (msg.groupId) {
+            onSelectGroup?.(msg.groupId);
+        } else {
+            onSelectContact(msg.upeerId);
+        }
+    };
 
     const handleOpenNew = () => openNewChat();
     const handleBack = () => backToList();
@@ -146,7 +180,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onAddNew={handleOpenNew}
                     onCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                 />
-                <SidebarSearch activeFilter={sidebarFilter} onFilterChange={(f) => setSidebarFilter(f as SidebarFilter)} />
+                <SidebarSearch
+                    value={sidebarSearch}
+                    onChange={setSidebarSearch}
+                    activeFilter={sidebarFilter}
+                    onFilterChange={(f) => setSidebarFilter(f as SidebarFilter)}
+                />
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {sidebarFilter === 'all' && (
                         <>
@@ -159,10 +198,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 />
                             ) : (
                                 <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
+                                    {sidebarSearch && (
+                                        <Box sx={{ px: 2, pt: 2, pb: 0.5 }}>
+                                            <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.5 }}>
+                                                Chats
+                                            </Typography>
+                                        </Box>
+                                    )}
                                     {mergedList.map(entry =>
                                         entry.kind === 'group'
-                                            ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} />
-                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onDelete={onDeleteContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} />
+                                            ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
+                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onDelete={onDeleteContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />
+                                    )}
+
+                                    {sidebarSearch && searchResults.length > 0 && (
+                                        <>
+                                            <Box sx={{ px: 2, pt: 3, pb: 0.5 }}>
+                                                <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.5 }}>
+                                                    Mensajes
+                                                </Typography>
+                                            </Box>
+                                            {searchResults.map((msg) => (
+                                                <ListItem
+                                                    key={msg.id}
+                                                    onClick={() => handleSelectMessage(msg)}
+                                                    sx={{
+                                                        cursor: 'pointer',
+                                                        '&:hover': { backgroundColor: 'background.level1' },
+                                                        px: 2,
+                                                        py: 1.5,
+                                                    }}
+                                                >
+                                                    <ListItemDecorator sx={{ mr: 1.5 }}>
+                                                        <Avatar
+                                                            size="sm"
+                                                            src={msg.senderAvatar || undefined}
+                                                            sx={{ borderRadius: 'sm' }}
+                                                        >
+                                                            {!msg.senderAvatar && <ChatBubbleOutlineIcon />}
+                                                        </Avatar>
+                                                    </ListItemDecorator>
+                                                    <ListItemContent>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                                            <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                                                                {(msg as any).senderName || 'Mensaje'}
+                                                            </Typography>
+                                                            <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+                                                                {msg.timestamp}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Typography
+                                                            level="body-xs"
+                                                            sx={{
+                                                                color: 'text.secondary',
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical',
+                                                                whiteSpace: 'normal',
+                                                                overflow: 'hidden'
+                                                            }}
+                                                        >
+                                                            {(msg as any).senderDisplayName && (
+                                                                <Box component="span" sx={{ fontWeight: 600, mr: 0.5 }}>
+                                                                    {(msg as any).senderDisplayName}:
+                                                                </Box>
+                                                            )}
+                                                            {highlightText(msg.message, sidebarSearch)}
+                                                        </Typography>
+                                                    </ListItemContent>
+                                                </ListItem>
+                                            ))}
+                                        </>
+                                    )}
+
+                                    {sidebarSearch && mergedList.length === 0 && searchResults.length === 0 && (
+                                        <Box sx={{ px: 2, py: 4, textAlign: 'center' }}>
+                                            <Typography level="body-sm" color="neutral">Sin resultados para "{sidebarSearch}"</Typography>
+                                        </Box>
                                     )}
                                 </List>
                             )}
@@ -179,7 +291,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         ) : (
                             <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
                                 {filteredGroups.map((g) => (
-                                    <GroupItem key={g.groupId} group={g} isSelected={selectedGroupId === g.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} />
+                                    <GroupItem key={g.groupId} group={g} isSelected={selectedGroupId === g.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
                                 ))}
                             </List>
                         )

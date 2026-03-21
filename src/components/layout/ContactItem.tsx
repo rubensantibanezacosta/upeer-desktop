@@ -42,7 +42,9 @@ import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { getFileIcon } from '../../utils/fileIcons.js';
+import MicIcon from '@mui/icons-material/Mic';
 import { Contact } from '../../types/chat.js';
+import { highlightText } from '../../utils/highlightText.js';
 
 interface ContactItemProps {
     contact: Contact;
@@ -51,9 +53,10 @@ interface ContactItemProps {
     onDelete: (id: string) => void;
     onClear: (id: string) => void;
     isTyping: boolean;
+    highlight?: string;
 }
 
-export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onDelete, onClear, isTyping }) => {
+export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onDelete, onClear, isTyping, highlight = '' }) => {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
     const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
@@ -175,8 +178,8 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     }
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <Typography level="body-md" sx={{ fontWeight: isBold ? 700 : 500, display: 'flex', alignItems: 'center', gap: 0.5 }} noWrap>
-                            {c.name}
+                        <Typography level="body-md" sx={{ fontWeight: isBold ? 700 : 500 }} noWrap>
+                            {highlight ? highlightText(c.name, highlight) : c.name}
                         </Typography>
                         <Typography level="body-xs" color={isTyping ? "primary" : isBold ? "primary" : "neutral"} sx={{ ml: 1, minWidth: 'max-content', fontWeight: isBold ? 700 : 400 }}>
                             {timeStr}
@@ -245,6 +248,14 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                                     try {
                                                         const parsed = JSON.parse(c.lastMessage);
                                                         if (parsed.type === 'file') {
+                                                            if (parsed.isVoiceNote) {
+                                                                return (
+                                                                    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                                        <MicIcon sx={{ fontSize: 16, opacity: 0.8 }} />
+                                                                        <span>Nota de voz</span>
+                                                                    </Box>
+                                                                );
+                                                            }
                                                             return (
                                                                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                                                                     <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
@@ -272,7 +283,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                                     }
                                                 }
 
-                                                return c.lastMessage;
+                                                return highlight ? highlightText(c.lastMessage, highlight) : c.lastMessage;
                                             })()}
                                         </Typography>
                                     </Box>

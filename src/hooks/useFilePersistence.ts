@@ -17,16 +17,17 @@ interface FileTransferApi {
 
 export function useFilePersistence(fileTransfer: FileTransferApi) {
     const {
-        contacts, targetUpeerId, pendingFiles, setPendingFiles,
+        contacts, targetUpeerId, activeGroupId, pendingFiles, setPendingFiles,
         setIsDragging, addFileTransferMessage
     } = useChatStore();
     const { setFilePickerOpen } = useNavigationStore();
 
+    const effectiveId = activeGroupId || targetUpeerId;
     const activeContact = contacts.find(c => c.upeerId === targetUpeerId);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault(); e.stopPropagation();
-        if (!targetUpeerId || activeContact?.status !== 'connected') return;
+        if (!effectiveId || (!activeGroupId && activeContact?.status !== 'connected')) return;
         setIsDragging(true);
     };
 
@@ -38,7 +39,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault(); e.stopPropagation();
         setIsDragging(false);
-        if (!targetUpeerId || activeContact?.status !== 'connected') return;
+        if (!effectiveId || (!activeGroupId && activeContact?.status !== 'connected')) return;
 
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
         const mappedFiles = droppedFilesRaw.map((f: any) => {
@@ -61,7 +62,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
     };
 
     const handleAttachFile = async (type: AttachmentType) => {
-        if (!targetUpeerId) return;
+        if (!effectiveId) return;
         let filters: any[] = [];
         let title = 'Seleccionar archivo';
         switch (type) {
@@ -88,18 +89,18 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
     };
 
     const handleFileSubmit = async (files: any[], thumbnails?: (string | undefined)[], captions?: string[]) => {
-        if (!targetUpeerId) return;
+        if (!effectiveId) return;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const result = await fileTransfer.startTransfer({
-                upeerId: targetUpeerId,
+                upeerId: effectiveId,
                 filePath: file.path,
                 thumbnail: thumbnails?.[i],
                 caption: captions?.[i]
             });
             if (result.success && result.fileId) {
                 const tempHash = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                addFileTransferMessage(targetUpeerId, result.fileId, file.name, file.size, file.type, tempHash, thumbnails?.[i] || '', captions?.[i] || '', true);
+                addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, tempHash, thumbnails?.[i] || '', captions?.[i] || '', true);
             }
         }
         setFilePickerOpen(false);
@@ -107,7 +108,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
     };
 
     const handleSendVoiceNote = async (file: File): Promise<void> => {
-        if (!targetUpeerId) throw new Error('No hay un destinatario activo');
+        if (!effectiveId) throw new Error('No hay un destinatario activo');
 
         const base64full = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -133,14 +134,14 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         const finalPath = persistResult.success && persistResult.path ? persistResult.path : tempResult.path;
 
         const result = await fileTransfer.startTransfer({
-            upeerId: targetUpeerId,
+            upeerId: effectiveId,
             filePath: finalPath,
             isVoiceNote: true,
         });
 
         if (result.success && result.fileId) {
             const tempHash = `voicemail-${Date.now()}`;
-            addFileTransferMessage(targetUpeerId, result.fileId, file.name, file.size, file.type, tempHash, '', '', true, finalPath, true);
+            addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, tempHash, '', '', true, finalPath, true);
         }
     };
 
