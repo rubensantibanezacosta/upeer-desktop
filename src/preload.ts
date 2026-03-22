@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.removeAllListeners('contact-untrustworthy');
         ipcRenderer.on('contact-untrustworthy', (event, data) => callback(data));
     },
+    onReputationUpdated: (callback: () => void) => {
+        ipcRenderer.removeAllListeners('reputation-updated');
+        ipcRenderer.on('reputation-updated', () => callback());
+    },
     /** ⚠️ TOFU: la clave criptográfica estática de un contacto cambió.
      *  El UI debe mostrar una alerta prominente para que el usuario verifique
      *  la nueva huella digital por un canal alternativo (llamada, señal física, etc.).

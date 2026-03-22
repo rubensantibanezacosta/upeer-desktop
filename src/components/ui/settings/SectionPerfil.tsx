@@ -90,20 +90,24 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     }, [identity?.alias, identity?.avatar]);
 
     useEffect(() => {
-        if (window.upeer.getMyReputation) {
-            window.upeer.getMyReputation()
-                .then((r: any) => {
-                    if (r && typeof r.vouchScore === 'number') {
-                        setMyReputation({ vouchScore: r.vouchScore, connectionCount: r.connectionCount ?? 0 });
-                    } else {
-                        setMyReputation(DEFAULT_REPUTATION);
-                    }
-                })
-                .catch(() => setMyReputation(DEFAULT_REPUTATION));
-        } else {
-            setMyReputation(DEFAULT_REPUTATION);
-        }
+        const fetchReputation = () => {
+            if (window.upeer.getMyReputation) {
+                window.upeer.getMyReputation()
+                    .then((r: any) => {
+                        if (r && typeof r.vouchScore === 'number') {
+                            setMyReputation({ vouchScore: r.vouchScore, connectionCount: r.connectionCount ?? 0 });
+                        } else {
+                            setMyReputation(DEFAULT_REPUTATION);
+                        }
+                    })
+                    .catch(() => setMyReputation(DEFAULT_REPUTATION));
+            } else {
+                setMyReputation(DEFAULT_REPUTATION);
+            }
+        };
+        fetchReputation();
         window.upeer.getVaultStats?.().then(setVaultStats).catch(() => { });
+        window.upeer.onReputationUpdated?.(fetchReputation);
     }, []);
 
     const handleAvatarClick = () => fileInputRef.current?.click();

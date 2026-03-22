@@ -1,4 +1,5 @@
 import { getGossipIds, getVouchesForDelivery, saveIncomingVouch } from '../../security/reputation/vouches.js';
+import { getMainWindow } from '../../core/windowManager.js';
 
 export function handleReputationGossip(
     upeerId: string,
@@ -51,9 +52,11 @@ export function handleReputationDeliver(
     upeerId: string,
     data: any
 ) {
-    // Recibimos vouches: verificar firma y persistir
     const received: any[] = data.vouches ?? [];
-    for (const v of received) {
-        saveIncomingVouch(v).catch(() => { });
-    }
+    if (received.length === 0) return;
+    Promise.all(received.map(v => saveIncomingVouch(v))).then(() => {
+        getMainWindow()?.webContents.send('reputation-updated');
+    }).catch(() => {
+        getMainWindow()?.webContents.send('reputation-updated');
+    });
 }

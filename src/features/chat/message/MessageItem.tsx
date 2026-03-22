@@ -178,7 +178,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: isMe ? 'flex-end' : 'flex-start',
-                mb: msg.reactions && msg.reactions.length > 0 ? 1.2 : 0.2,
+                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : 0.2,
             }}
         >
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>

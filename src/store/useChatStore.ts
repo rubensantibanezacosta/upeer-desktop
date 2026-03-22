@@ -896,6 +896,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             }
         });
 
-        // Add other listeners as needed (deletions, etc.)
+        window.upeer.onReputationUpdated?.(() => {
+            get().refreshContacts();
+        });
     }
 }));
