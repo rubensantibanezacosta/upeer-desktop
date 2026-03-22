@@ -8,6 +8,10 @@ interface ValidationResult {
     error?: string;
 }
 
+const HEX_ID_RE = /^[0-9a-f]+$/i;
+const isValidHexId = (s: unknown) =>
+    typeof s === 'string' && s.length >= 32 && s.length <= 128 && HEX_ID_RE.test(s);
+
 export function validateHandshakeReq(data: any): ValidationResult {
     if (!data.publicKey || typeof data.publicKey !== 'string' || data.publicKey.length !== 64) {
         return { valid: false, error: 'Invalid publicKey' };
@@ -248,8 +252,8 @@ export function validateChatDelete(data: any): ValidationResult {
 }
 
 export function validateChatClear(data: any): ValidationResult {
-    if (!data.chatUpeerId || typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length !== 64) {
-        return { valid: false, error: 'Invalid chatUpeerId (expected 64 hex chars)' };
+    if (!isValidHexId(data.chatUpeerId)) {
+        return { valid: false, error: 'Invalid chatUpeerId' };
     }
     if (data.timestamp !== undefined && (typeof data.timestamp !== 'number' || data.timestamp < 0)) {
         return { valid: false, error: 'Invalid timestamp' };
@@ -262,14 +266,14 @@ export function validateChatClear(data: any): ValidationResult {
 }
 
 export function validateDhtQuery(data: any): ValidationResult {
-    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 64) {
+    if (!isValidHexId(data.targetId)) {
         return { valid: false, error: 'Invalid targetId' };
     }
     return { valid: true };
 }
 
 export function validateDhtResponse(data: any): ValidationResult {
-    if (!data.targetId || typeof data.targetId !== 'string' || data.targetId.length !== 64) {
+    if (!isValidHexId(data.targetId)) {
         return { valid: false, error: 'Invalid targetId' };
     }
     // locationBlock or neighbors are optional
@@ -326,7 +330,7 @@ export function validateDhtExchange(data: any): ValidationResult {
     }
     // Basic validation of each peer (more thorough validation done elsewhere)
     for (const peer of data.peers) {
-        if (!peer.upeerId || typeof peer.upeerId !== 'string' || peer.upeerId.length !== 64) {
+        if (!isValidHexId(peer.upeerId)) {
             return { valid: false, error: 'Invalid peer upeerId' };
         }
         if (!peer.publicKey || typeof peer.publicKey !== 'string' || peer.publicKey.length !== 64) {
@@ -690,7 +694,7 @@ export function validateChatContact(data: any): ValidationResult {
     if (!data.id || typeof data.id !== 'string' || data.id.length > 100) {
         return { valid: false, error: 'Invalid id' };
     }
-    if (!data.upeerId || typeof data.upeerId !== 'string' || data.upeerId.length !== 64) {
+    if (!isValidHexId(data.upeerId)) {
         return { valid: false, error: 'Invalid upeerId' };
     }
     if (data.contactName && (typeof data.contactName !== 'string' || data.contactName.length > 100)) {
@@ -722,7 +726,7 @@ export function validateReputationGossip(data: any): ValidationResult {
     if (!Array.isArray(data.ids)) return { valid: false, error: 'ids debe ser un array' };
     if (data.ids.length > 500) return { valid: false, error: 'Demasiados IDs' };
     for (const id of data.ids) {
-        if (typeof id !== 'string' || id.length !== 64) return { valid: false, error: 'ID de vouch inválido' };
+        if (!isValidHexId(id)) return { valid: false, error: 'ID de vouch inválido' };
     }
     return { valid: true };
 }
@@ -731,14 +735,10 @@ export function validateReputationRequest(data: any): ValidationResult {
     if (!Array.isArray(data.missing)) return { valid: false, error: 'missing debe ser un array' };
     if (data.missing.length > 100) return { valid: false, error: 'Demasiados IDs faltantes' };
     for (const id of data.missing) {
-        if (typeof id !== 'string' || id.length !== 64) return { valid: false, error: 'ID de vouch inválido' };
+        if (!isValidHexId(id)) return { valid: false, error: 'ID de vouch inválido' };
     }
     return { valid: true };
 }
-
-const HEX_ID_RE = /^[0-9a-f]+$/i;
-const isValidHexId = (s: unknown) =>
-    typeof s === 'string' && s.length >= 32 && s.length <= 128 && HEX_ID_RE.test(s);
 
 export function validateReputationDeliver(data: any): ValidationResult {
     if (!Array.isArray(data.vouches)) return { valid: false, error: 'vouches debe ser un array' };

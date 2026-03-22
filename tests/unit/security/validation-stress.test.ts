@@ -130,7 +130,7 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should validate DhtExchange peers array strictly', () => {
-            const peer = { upeerId: 'p'.repeat(64), publicKey: 'k'.repeat(64) };
+            const peer = { upeerId: 'a'.repeat(64), publicKey: 'k'.repeat(64) };
             expect(validateMessage('DHT_EXCHANGE', { peers: [peer] }).valid).toBe(true);
             expect(validateMessage('DHT_EXCHANGE', { peers: new Array(51).fill(peer) }).valid).toBe(false);
             expect(validateMessage('DHT_EXCHANGE', { peers: [{ ...peer, upeerId: 'short' }] }).valid).toBe(false);
