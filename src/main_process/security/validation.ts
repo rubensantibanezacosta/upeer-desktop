@@ -736,13 +736,17 @@ export function validateReputationRequest(data: any): ValidationResult {
     return { valid: true };
 }
 
+const HEX_ID_RE = /^[0-9a-f]+$/i;
+const isValidHexId = (s: unknown) =>
+    typeof s === 'string' && s.length >= 32 && s.length <= 128 && HEX_ID_RE.test(s);
+
 export function validateReputationDeliver(data: any): ValidationResult {
     if (!Array.isArray(data.vouches)) return { valid: false, error: 'vouches debe ser un array' };
     if (data.vouches.length > 50) return { valid: false, error: 'Demasiados vouches' };
     for (const v of data.vouches) {
-        if (!v.id || typeof v.id !== 'string' || v.id.length !== 64) return { valid: false, error: 'id inválido' };
-        if (!v.fromId || typeof v.fromId !== 'string' || v.fromId.length !== 64) return { valid: false, error: 'fromId inválido' };
-        if (!v.toId || typeof v.toId !== 'string' || v.toId.length !== 64) return { valid: false, error: 'toId inválido' };
+        if (!isValidHexId(v.id)) return { valid: false, error: 'id inválido' };
+        if (!isValidHexId(v.fromId)) return { valid: false, error: 'fromId inválido' };
+        if (!isValidHexId(v.toId)) return { valid: false, error: 'toId inválido' };
         if (!v.type || typeof v.type !== 'string') return { valid: false, error: 'type inválido' };
         if (typeof v.timestamp !== 'number') return { valid: false, error: 'timestamp inválido' };
         if (!v.signature || typeof v.signature !== 'string' || v.signature.length !== 128) return { valid: false, error: 'signature inválida' };
