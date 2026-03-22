@@ -260,6 +260,9 @@ export async function handleHandshakeAccept(
         if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
             updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
         }
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.queryOwnVaults();
+        }).catch(() => { });
         return;
     }
 
@@ -328,6 +331,10 @@ export async function handleHandshakeAccept(
                 warn('Failed to flush pending outbox', err, 'storage')
             );
         }
+
+        import('../vault/manager.js').then(({ VaultManager }) => {
+            VaultManager.queryOwnVaults();
+        }).catch(() => { });
 
         win?.webContents.send('contact-handshake-finished', { upeerId: senderUpeerId });
     }
