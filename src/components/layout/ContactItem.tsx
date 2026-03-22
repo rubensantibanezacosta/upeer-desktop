@@ -178,7 +178,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     }
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <Typography level="body-md" sx={{ fontWeight: isBold ? 700 : 500 }} noWrap>
+                        <Typography level="body-md" sx={{ fontWeight: 500 }} noWrap>
                             {highlight ? highlightText(c.name, highlight) : c.name}
                         </Typography>
                         <Typography level="body-xs" color={isTyping ? "primary" : isBold ? "primary" : "neutral"} sx={{ ml: 1, minWidth: 'max-content', fontWeight: isBold ? 700 : 400 }}>
@@ -193,6 +193,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                             sx={{
                                 flexGrow: 1,
                                 fontStyle: isPending ? 'italic' : 'normal',
+                                fontWeight: isBold ? 700 : 400,
                                 display: 'block',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
