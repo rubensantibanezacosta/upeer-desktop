@@ -83,8 +83,6 @@ export function parseMessage(message: string, isMe: boolean, activeTransfers: an
                     direction,
                     isVaulting: activeTransfer?.isVaulting,
                     isVoiceNote: parsed.isVoiceNote || activeTransfer?.isVoiceNote,
-                    // BUG EC fix: propagar la ruta del archivo para que el botón "Abrir" funcione tras reiniciar.
-                    // Priorizamos savedPath del mensaje guardado (persistence fix), luego el estado activo de la transferencia.
                     savedPath: parsed.savedPath || activeTransfer?.savedPath ||
                         (direction === 'sending' ? (parsed.filePath || activeTransfer?.filePath) : (parsed.tempPath || activeTransfer?.tempPath)),
                 };

@@ -125,11 +125,22 @@ export async function startSend(
 
             attempts++;
             if (attempts >= 3) {
-                clearInterval(proposalTimer);
-                this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: any) => {
-                    error('Vaulting failover failed', err, 'vault');
-                });
-                return;
+                if (contact?.status === 'connected') {
+                    debug('Contact still connected, extending FILE_PROPOSAL timeout', { fileId: transfer.fileId, attempt: attempts + 1 }, 'file-transfer');
+                    if (attempts >= 7) {
+                        clearInterval(proposalTimer);
+                        this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: any) => {
+                            error('Vaulting failover failed', err, 'vault');
+                        });
+                        return;
+                    }
+                } else {
+                    clearInterval(proposalTimer);
+                    this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: any) => {
+                        error('Vaulting failover failed', err, 'vault');
+                    });
+                    return;
+                }
             }
 
             debug('Retrying FILE_PROPOSAL', { fileId: transfer.fileId, attempt: attempts + 1 }, 'file-transfer');
