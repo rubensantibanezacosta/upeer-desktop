@@ -597,4 +597,128 @@ describe('TransferManager - Core Orchestration', () => {
 
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_HEARTBEAT_ACK', fileId }), undefined);
     });
+
+    it('should process all chunks regardless of arrival order (high-index first)', async () => {
+        const fileId = 'id-order-regression';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-order' });
+
+        manager['store'].createTransfer({
+            fileId, upeerId: 'p-order', peerAddress: 'addr-order',
+            fileName: 'f.bin', fileSize: 500, mimeType: 'application/octet-stream',
+            totalChunks: 5, chunkSize: 100, fileHash: 'h',
+            direction: 'receiving'
+        });
+        manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
+
+        // Llegan en orden inverso: 4, 3, 2, 1, 0
+        // Con el bug antiguo (chunkIndex < chunksProcessed), chunks 0,1,2 habrían sido descartados
+        for (const idx of [4, 3, 2, 1, 0]) {
+            await manager.handleMessage('p-order', 'addr-order', {
+                type: 'FILE_CHUNK', fileId, chunkIndex: idx, data: 'AAAA'
+            });
+        }
+
+        const transfer = manager['store'].getTransfer(fileId, 'receiving');
+        expect(transfer?.chunksProcessed).toBe(5);
+        expect(transfer?.state).toBe('completed');
+    });
+
+    it('should finalize receiver when FILE_DONE arrives after all chunks processed', async () => {
+        const fileId = 'id-filedone-finalize';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fd', publicKey: 'kfd' });
+
+        manager['store'].createTransfer({
+            fileId, upeerId: 'p-fd', peerAddress: 'addr-fd',
+            fileName: 'f.txt', fileSize: 100, mimeType: 'text/plain',
+            totalChunks: 2, chunkSize: 50, fileHash: 'h',
+            direction: 'receiving'
+        });
+        manager['store'].updateTransfer(fileId, 'receiving', {
+            state: 'active', phase: TransferPhase.TRANSFERRING, tempPath: '/tmp/fd.tmp'
+        });
+
+        // Procesamos ambos chunks
+        await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_CHUNK', fileId, chunkIndex: 0, data: 'AAAA' });
+        await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_CHUNK', fileId, chunkIndex: 1, data: 'BBBB' });
+
+        // Aunque finalizeTransfer ya se llamó desde handleFileChunk (totalChunks=2),
+        // FILE_DONE no debe explotar ni llamar dos veces (guard de reentrancia)
+        await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_DONE', fileId });
+
+        const transfer = manager['store'].getTransfer(fileId, 'receiving');
+        expect(transfer?.state).toBe('completed');
+        expect(mockSend).toHaveBeenCalledWith('addr-fd', { type: 'FILE_DONE_ACK', fileId }, 'kfd');
+    });
+
+    it('should finalize receiver via FILE_DONE when chunks were already written but finalizeTransfer had not been called', async () => {
+        const fileId = 'id-filedone-trigger';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fdt', publicKey: 'kfdt' });
+
+        manager['store'].createTransfer({
+            fileId, upeerId: 'p-fdt', peerAddress: 'addr-fdt',
+            fileName: 'f.txt', fileSize: 100, mimeType: 'text/plain',
+            totalChunks: 3, chunkSize: 34, fileHash: 'h',
+            direction: 'receiving'
+        });
+        // Simulamos que el receptor ya procesó los 3 chunks pero por algún motivo
+        // finalizeTransfer no fue llamado (el estado sigue 'active')
+        manager['store'].updateTransfer(fileId, 'receiving', {
+            state: 'active', phase: TransferPhase.TRANSFERRING,
+            chunksProcessed: 3, tempPath: '/tmp/fdt.tmp'
+        });
+
+        await manager.handleMessage('p-fdt', 'addr-fdt', { type: 'FILE_DONE', fileId });
+
+        const transfer = manager['store'].getTransfer(fileId, 'receiving');
+        expect(transfer?.state).toBe('completed');
+    });
+
+    it('should not double-finalize on concurrent finalizeTransfer calls', async () => {
+        const fileId = 'id-double-finalize';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-df' });
+
+        manager['store'].createTransfer({
+            fileId, upeerId: 'p-df', peerAddress: 'addr-df',
+            fileName: 'f.txt', fileSize: 100, mimeType: 'text/plain',
+            totalChunks: 1, chunkSize: 100, fileHash: 'h',
+            direction: 'receiving', tempPath: '/tmp/df.tmp'
+        });
+        manager['store'].updateTransfer(fileId, 'receiving', {
+            state: 'active', phase: TransferPhase.TRANSFERRING
+        });
+
+        // Dos llamadas concurrentes simultáneas
+        await Promise.all([
+            manager.finalizeTransfer(fileId, 'receiving'),
+            manager.finalizeTransfer(fileId, 'receiving'),
+        ]);
+
+        // notifyCompleted solo debe haberse emitido una vez
+        const completedEvents = mockWin.webContents.send.mock.calls
+            .filter((c: any[]) => c[0] === 'file-transfer-completed');
+        expect(completedEvents.length).toBe(1);
+    });
+
+    it('should not process FILE_DONE if chunksProcessed < totalChunks', async () => {
+        const fileId = 'id-filedone-partial';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fdp', publicKey: 'kfdp' });
+
+        manager['store'].createTransfer({
+            fileId, upeerId: 'p-fdp', peerAddress: 'addr-fdp',
+            fileName: 'f.txt', fileSize: 100, mimeType: 'text/plain',
+            totalChunks: 5, chunkSize: 20, fileHash: 'h',
+            direction: 'receiving'
+        });
+        manager['store'].updateTransfer(fileId, 'receiving', {
+            state: 'active', phase: TransferPhase.TRANSFERRING, chunksProcessed: 3
+        });
+
+        // FILE_DONE llega pero solo tenemos 3/5 chunks — no debe finalizar
+        await manager.handleMessage('p-fdp', 'addr-fdp', { type: 'FILE_DONE', fileId });
+
+        const transfer = manager['store'].getTransfer(fileId, 'receiving');
+        expect(transfer?.state).toBe('active');
+        // FILE_DONE_ACK sí debe enviarse
+        expect(mockSend).toHaveBeenCalledWith('addr-fdp', { type: 'FILE_DONE_ACK', fileId }, 'kfdp');
+    });
 });

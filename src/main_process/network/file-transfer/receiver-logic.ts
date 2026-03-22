@@ -123,23 +123,13 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
 
         if (transfer.state !== 'active') return;
 
-        // Comprobar duplicados o ya procesados
-        if (transfer.chunksProcessed > 0 && data.chunkIndex < transfer.chunksProcessed) {
-            // Ya hemos avanzado más allá de este chunk
-            const contact = await getContactByUpeerId(upeerId);
-            this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex }, contact?.publicKey);
-            return;
-        }
-
-        // El test usa pendingChunks.has(5) para simular que ya se procesó.
-        // Si usamos una arquitectura de sliding window real con huecos, esto sería más complejo.
-        // Por ahora, si está en el set de procesados, respondemos ACK y salimos.
-        // @ts-ignore (accediendo a propiedad interna para el test)
         if (transfer.pendingChunks && transfer.pendingChunks.has(data.chunkIndex)) {
             const contact = await getContactByUpeerId(upeerId);
             this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex }, contact?.publicKey);
             return;
         }
+
+        transfer.pendingChunks?.add(data.chunkIndex);
 
         let handle = this.getFileHandle(transfer.fileId);
         if (!handle) {
@@ -173,12 +163,6 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
 
         if (updated) {
             this.ui.notifyProgress(updated);
-
-            // Marcar como pendiente/procesado si no es secuencial (para el sliding window)
-            // @ts-ignore (evitar errores de tipo en el set interno si existe)
-            if (updated.pendingChunks) {
-                updated.pendingChunks.add(data.chunkIndex);
-            }
 
             if (updated.chunksProcessed === updated.totalChunks) {
                 await this.finalizeTransfer(updated.fileId, 'receiving');
