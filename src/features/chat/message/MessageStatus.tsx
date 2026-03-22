@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box } from '@mui/joy';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 
@@ -8,17 +7,18 @@ interface MessageStatusProps {
 }
 
 export const MessageStatus: React.FC<MessageStatusProps> = ({ status }) => {
+    const isRead = status === 'read';
+    const isSingleCheck = status === 'sent' || status === 'vaulted';
+    const Icon = isSingleCheck ? DoneIcon : DoneAllIcon;
     return (
-        <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            color: status === 'read' ? '#53bdeb' : 'text.tertiary',
-        }}>
-            {(status === 'sent' || status === 'vaulted') ?
-                <DoneIcon sx={{ fontSize: '15px' }} /> :
-                <DoneAllIcon sx={{ fontSize: '15px' }} />
-            }
-        </Box>
+        <Icon sx={{
+            fontSize: '16px',
+            lineHeight: 1,
+            flexShrink: 0,
+            color: isRead ? '#53bdeb' : 'text.tertiary',
+            opacity: isRead ? 1 : 0.7,
+            verticalAlign: 'middle',
+        }} />
     );
 };
 

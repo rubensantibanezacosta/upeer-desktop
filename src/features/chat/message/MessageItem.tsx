@@ -292,7 +292,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                                 <LinkPreviewCard data={linkPreviewData} />
                                             </Box>
                                         )}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', mb: 0.5 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
                                             {msg.isEdited && !msg.isDeleted && (
                                                 <Typography level="body-xs" sx={{ fontSize: '9px', opacity: 0.7 }}>(Editado)</Typography>
                                             )}
