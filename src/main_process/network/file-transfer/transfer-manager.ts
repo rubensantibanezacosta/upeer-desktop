@@ -22,6 +22,7 @@ export class TransferManager implements ITransferManager {
     private fileHandles = new Map<string, any>(); // fileId -> fs.FileHandle
     public transferKeys = new Map<string, Buffer>(); // fileId -> AES key
     private retryTimers = new Map<string, any>(); // fileId -> timer (single timer per transfer)
+    private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -166,69 +167,78 @@ export class TransferManager implements ITransferManager {
     }
 
     public async finalizeTransfer(fileId: string, direction: 'sending' | 'receiving') {
+        const guardKey = `${fileId}_${direction}`;
+        if (this.finalizingTransfers.has(guardKey)) return;
+
         const transfer = this.store.getTransfer(fileId, direction);
         if (!transfer || transfer.state === 'completed') return;
 
-        this.store.updateTransfer(fileId, direction, {
-            state: 'completed',
-            phase: TransferPhase.DONE
-        });
+        this.finalizingTransfers.add(guardKey);
 
-        this.clearRetryTimer(fileId);
+        try {
+            this.store.updateTransfer(fileId, direction, {
+                state: 'completed',
+                phase: TransferPhase.DONE
+            });
 
-        const handle = this.fileHandles.get(fileId);
-        if (handle) {
-            await handle.close();
-            this.fileHandles.delete(fileId);
-        }
+            this.clearRetryTimer(fileId);
 
-        const updated_initial = this.store.getTransfer(fileId, direction);
-        if (!updated_initial) return;
-        let updated = updated_initial;
-
-        if (updated.direction === 'receiving') {
-            try {
-                const { validator } = this;
-                await validator.verifyFileHash(updated, updated.fileHash!);
-            } catch (err) {
-                error('Error validating file hash', err, 'file-transfer');
-                this.cancelTransfer(updated.fileId, 'receiving', 'hash_mismatch');
-                const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
-                const contact = await getContactByUpeerId(updated.upeerId);
-                this.send(updated.peerAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
-                return;
+            const handle = this.fileHandles.get(fileId);
+            if (handle) {
+                await handle.close();
+                this.fileHandles.delete(fileId);
             }
 
-            if (updated.tempPath) {
+            const updated_initial = this.store.getTransfer(fileId, direction);
+            if (!updated_initial) return;
+            let updated = updated_initial;
+
+            if (updated.direction === 'receiving') {
                 try {
-                    const fs = await import('node:fs/promises');
-                    const path = await import('node:path');
-                    const { app } = await import('electron');
-                    const assetsDir = path.join(app.getPath('userData'), 'assets', 'received');
-                    await fs.mkdir(assetsDir, { recursive: true });
-                    const ext = path.extname(updated.fileName) || '';
-                    const permanentPath = path.join(assetsDir, `${updated.fileId}${ext}`);
-                    await fs.rename(updated.tempPath, permanentPath).catch(() =>
-                        fs.copyFile(updated.tempPath!, permanentPath)
-                    );
-                    this.store.updateTransfer(fileId, 'receiving', { tempPath: permanentPath });
-                    updated = this.store.getTransfer(fileId, 'receiving')!;
+                    const { validator } = this;
+                    await validator.verifyFileHash(updated, updated.fileHash!);
                 } catch (err) {
-                    error('Failed to move received file to assets', err, 'file-transfer');
+                    error('Error validating file hash', err, 'file-transfer');
+                    this.cancelTransfer(updated.fileId, 'receiving', 'hash_mismatch');
+                    const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
+                    const contact = await getContactByUpeerId(updated.upeerId);
+                    this.send(updated.peerAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
+                    return;
+                }
+
+                if (updated.tempPath) {
+                    try {
+                        const fs = await import('node:fs/promises');
+                        const path = await import('node:path');
+                        const { app } = await import('electron');
+                        const assetsDir = path.join(app.getPath('userData'), 'assets', 'received');
+                        await fs.mkdir(assetsDir, { recursive: true });
+                        const ext = path.extname(updated.fileName) || '';
+                        const permanentPath = path.join(assetsDir, `${updated.fileId}${ext}`);
+                        await fs.rename(updated.tempPath, permanentPath).catch(() =>
+                            fs.copyFile(updated.tempPath!, permanentPath)
+                        );
+                        this.store.updateTransfer(fileId, 'receiving', { tempPath: permanentPath });
+                        updated = this.store.getTransfer(fileId, 'receiving')!;
+                    } catch (err) {
+                        error('Failed to move received file to assets', err, 'file-transfer');
+                    }
                 }
             }
-        }
 
-        this.ui.notifyCompleted(updated);
-        const { saveTransferToDB } = await import('./db-helper.js');
-        await saveTransferToDB(updated);
+            this.ui.notifyCompleted(updated);
+            const { saveTransferToDB } = await import('./db-helper.js');
+            await saveTransferToDB(updated);
 
-        if (updated.direction === 'sending') {
-            const { updateTransferMessageStatus } = await import('./db-helper.js');
-            if (await updateTransferMessageStatus(fileId, 'delivered')) {
-                this.ui.safeSend('message-delivered', { id: fileId, upeerId: updated.upeerId });
-                this.ui.notifyStatusUpdated(fileId, 'delivered');
+            if (updated.direction === 'sending') {
+                const { updateTransferMessageStatus } = await import('./db-helper.js');
+                if (await updateTransferMessageStatus(fileId, 'delivered')) {
+                    this.ui.safeSend('message-delivered', { id: fileId, upeerId: updated.upeerId });
+                    this.ui.notifyStatusUpdated(fileId, 'delivered');
+                }
             }
+        } finally {
+            this.finalizingTransfers.delete(guardKey);
         }
     }
 

@@ -11,6 +11,7 @@ import { getNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, is
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
+import { sendContactRequest } from './contacts.js';
 
 /**
  * Helper to get all verified addresses for a contact (primary + known)
@@ -35,6 +36,11 @@ function getFanOutAddresses(contact: any): string[] {
 
 export function checkHeartbeat(contacts: any[]) {
     for (const contact of contacts) {
+        if (contact.status === 'pending' && contact.address && isYggdrasilAddress(contact.address) && !isIPBlocked(contact.address)) {
+            sendContactRequest(contact.address).catch(err => {
+                warn('Failed to retry pending contact request', err, 'heartbeat');
+            });
+        }
         if (contact.status === 'connected') {
             // Si la IP está en backoff (falla repetida), omitir este ciclo
             const addresses = getFanOutAddresses(contact);

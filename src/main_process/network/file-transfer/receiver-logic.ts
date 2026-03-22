@@ -193,6 +193,11 @@ export async function handleFileDone(this: TransferManager, upeerId: string, add
     try {
         const contact = await getContactByUpeerId(upeerId);
         this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
+
+        const transfer = this.store.getTransfer(data.fileId, 'receiving');
+        if (transfer && transfer.state !== 'completed' && transfer.chunksProcessed >= transfer.totalChunks) {
+            await this.finalizeTransfer(data.fileId, 'receiving');
+        }
     } catch (err) {
         error('Error handling FILE_DONE', err, 'file-transfer');
     }
