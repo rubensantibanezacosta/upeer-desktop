@@ -49,6 +49,7 @@ vi.mock('../../../src/main_process/network/handlers/chat.js', () => ({
     handleIncomingClear: vi.fn(),
     handleChatDelete: vi.fn(),
     handleChatAck: vi.fn(),
+    handleChatReaction: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/handlers/groups.js', () => ({
@@ -156,6 +157,17 @@ describe('Vault Delivery Handler', () => {
 
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatDelete).toHaveBeenCalledWith('origin-id', expect.anything(), mockWin);
+    });
+
+    it('should process CHAT_REACTION entries', async () => {
+        const innerPacket = { type: 'CHAT_REACTION', msgId: '12345678-1234-1234-1234-123456789012', emoji: '👍', remove: false, signature: 'sig' };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatReaction).toHaveBeenCalledWith('origin-id', expect.anything(), mockWin);
     });
 
     it('should process ACK and READ entries', async () => {

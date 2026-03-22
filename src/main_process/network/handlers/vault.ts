@@ -73,7 +73,7 @@ export async function handleVaultDelivery(
                     // Un contacto comprometido puede firmar un packet malformado que crashe handlers.
                     // Se valida aquí para los tipos que tienen validador; FILE_* y FILE_DATA_SMALL
                     // gestionan su propia validación en sus respectivos handlers.
-                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'ACK', 'READ'];
+                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'ACK', 'READ', 'CHAT_REACTION'];
                     if (_vaultTypes.includes(innerPacket.type)) {
                         const _innerValidation = validateMessage(innerPacket.type, innerPacket);
                         if (!_innerValidation.valid) {
@@ -125,6 +125,9 @@ export async function handleVaultDelivery(
                     } else if (innerPacket.type === 'GROUP_UPDATE') {
                         const { handleGroupUpdate } = await import('./groups.js');
                         await handleGroupUpdate(entry.senderSid, innerPacket, win);
+                    } else if (innerPacket.type === 'CHAT_REACTION') {
+                        const { handleChatReaction } = await import('./chat.js');
+                        await handleChatReaction(entry.senderSid, innerPacket, win);
                     }
                 } else {
                     // Raw Data / Shards
