@@ -178,8 +178,9 @@ export class TransferManager implements ITransferManager {
             this.fileHandles.delete(fileId);
         }
 
-        const updated = this.store.getTransfer(fileId, direction);
-        if (!updated) return;
+        const updated_initial = this.store.getTransfer(fileId, direction);
+        if (!updated_initial) return;
+        let updated = updated_initial;
 
         if (updated.direction === 'receiving') {
             try {
@@ -192,6 +193,25 @@ export class TransferManager implements ITransferManager {
                 const contact = await getContactByUpeerId(updated.upeerId);
                 this.send(updated.peerAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
                 return;
+            }
+
+            if (updated.tempPath) {
+                try {
+                    const fs = await import('node:fs/promises');
+                    const path = await import('node:path');
+                    const { app } = await import('electron');
+                    const assetsDir = path.join(app.getPath('userData'), 'assets', 'received');
+                    await fs.mkdir(assetsDir, { recursive: true });
+                    const ext = path.extname(updated.fileName) || '';
+                    const permanentPath = path.join(assetsDir, `${updated.fileId}${ext}`);
+                    await fs.rename(updated.tempPath, permanentPath).catch(() =>
+                        fs.copyFile(updated.tempPath!, permanentPath)
+                    );
+                    this.store.updateTransfer(fileId, 'receiving', { tempPath: permanentPath });
+                    updated = this.store.getTransfer(fileId, 'receiving')!;
+                } catch (err) {
+                    error('Failed to move received file to assets', err, 'file-transfer');
+                }
             }
         }
 

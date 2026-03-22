@@ -12,6 +12,10 @@ export async function saveTransferToDB(transfer: FileTransfer) {
         if (isSelf && transfer.direction === 'receiving') return;
 
         // Correct arguments for saveFileMessage in storage/messages/operations.ts
+        const persistedPath = transfer.direction === 'sending'
+            ? transfer.filePath
+            : transfer.tempPath;
+
         await saveFileMessage(
             transfer.fileId,
             transfer.upeerId,
@@ -20,7 +24,7 @@ export async function saveTransferToDB(transfer: FileTransfer) {
             transfer.fileId,
             transfer.fileSize,
             transfer.mimeType,
-            transfer.filePath,
+            persistedPath,
             undefined, // signature
             isSelf ? 'read' : (transfer.state === 'completed' ? 'delivered' : 'sent'),
             myId, // senderUpeerId
