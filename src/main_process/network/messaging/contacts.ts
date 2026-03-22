@@ -2,7 +2,9 @@ import { getMyPublicKeyHex, getMyUPeerId, getMyAlias, getMyAvatar, getMyEphemera
 import { AdaptivePow } from '../../security/pow.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactPublicKey } from '../../storage/contacts/keys.js';
+import { updateContactStatus } from '../../storage/contacts/status.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
+import { getMainWindow } from '../../core/windowManager.js';
 
 export async function sendContactRequest(targetIp: string) {
     // Generate PoW proof for Sybil resistance (light proof for mobile compatibility)
@@ -26,6 +28,10 @@ export async function acceptContactRequest(upeerId: string, publicKey: string) {
     if (!contact) return;
 
     updateContactPublicKey(upeerId, publicKey);
+    updateContactStatus(upeerId, 'connected');
+
+    const win = getMainWindow();
+    win?.webContents.send('contact-handshake-finished', { upeerId });
 
     const data = {
         type: 'HANDSHAKE_ACCEPT',
