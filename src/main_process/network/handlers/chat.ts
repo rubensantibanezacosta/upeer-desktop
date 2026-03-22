@@ -280,20 +280,25 @@ export async function handleChatReaction(
     data: any,
     win: BrowserWindow | null
 ) {
-    if (!data.id || !_UUID_RE.test(String(data.id))) return;
-    if (data.reaction) {
-        saveReaction(data.id, upeerId, data.reaction);
-        win?.webContents.send('reaction-added', {
-            messageId: data.id,
-            upeerId: upeerId,
-            reaction: data.reaction
-        });
-    } else if (data.emojiToDelete) {
-        deleteReaction(data.id, upeerId, data.emojiToDelete);
+    const id = data.msgId || data.id;
+    if (!id || !_UUID_RE.test(String(id))) return;
+    const emoji = data.emoji || data.reaction;
+    if (!emoji || typeof emoji !== 'string') return;
+
+    if (data.remove || data.emojiToDelete) {
+        const emojiToRemove = data.emojiToDelete || emoji;
+        deleteReaction(id, upeerId, emojiToRemove);
         win?.webContents.send('reaction-removed', {
-            messageId: data.id,
+            messageId: id,
             upeerId: upeerId,
-            reaction: data.emojiToDelete
+            reaction: emojiToRemove
+        });
+    } else {
+        saveReaction(id, upeerId, emoji);
+        win?.webContents.send('reaction-added', {
+            messageId: id,
+            upeerId: upeerId,
+            reaction: emoji
         });
     }
 }
