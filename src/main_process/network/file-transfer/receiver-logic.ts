@@ -9,7 +9,18 @@ import type { TransferManager } from './transfer-manager.js';
 
 export async function handleFileProposal(this: TransferManager, upeerId: string, address: string, data: any) {
     try {
-        if (this.store.getTransfer(data.fileId, 'receiving')) return;
+        const existing = this.store.getTransfer(data.fileId, 'receiving');
+        if (existing) {
+            if (existing.state === 'active' &&
+                (existing.phase === TransferPhase.PROPOSED || existing.phase === TransferPhase.TRANSFERRING)) {
+                const contact = await getContactByUpeerId(upeerId);
+                const acceptMsg: any = { type: 'FILE_ACCEPT', fileId: data.fileId };
+                const sig = sign(Buffer.from(canonicalStringify(acceptMsg)));
+                acceptMsg.signature = sig.toString('hex');
+                this.send(address, acceptMsg, contact?.publicKey);
+            }
+            return;
+        }
 
         try {
             this.validator.validateIncomingFile(data);
@@ -73,7 +84,8 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
 
 export async function acceptTransfer(this: TransferManager, fileId: string) {
     const transfer = this.store.getTransfer(fileId, 'receiving');
-    if (!transfer || transfer.state !== 'active' || transfer.phase !== TransferPhase.PROPOSED) return;
+    if (!transfer || transfer.state !== 'active') return;
+    if (transfer.phase !== TransferPhase.PROPOSED && transfer.phase !== TransferPhase.TRANSFERRING) return;
 
     try {
         const acceptMsg: any = { type: 'FILE_ACCEPT', fileId };
@@ -83,8 +95,10 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
         const contact = await getContactByUpeerId(transfer.upeerId);
         this.send(transfer.peerAddress, acceptMsg, contact?.publicKey);
 
-        this.store.updateTransfer(fileId, 'receiving', { phase: TransferPhase.TRANSFERRING });
-        this.ui.notifyStarted(transfer);
+        if (transfer.phase === TransferPhase.PROPOSED) {
+            this.store.updateTransfer(fileId, 'receiving', { phase: TransferPhase.TRANSFERRING });
+            this.ui.notifyStarted(transfer);
+        }
     } catch (err) {
         error('Error accepting transfer', err, 'file-transfer');
     }
