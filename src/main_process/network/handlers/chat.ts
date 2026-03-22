@@ -288,19 +288,23 @@ export async function handleChatReaction(
         const emojiToRemove = data.emojiToDelete || data.emoji;
         if (!emojiToRemove || typeof emojiToRemove !== 'string') return;
         deleteReaction(id, upeerId, emojiToRemove);
-        win?.webContents.send('reaction-removed', {
-            messageId: id,
-            upeerId: upeerId,
-            reaction: emojiToRemove
+        win?.webContents.send('message-reaction-updated', {
+            msgId: id,
+            upeerId,
+            chatUpeerId: data.chatUpeerId || upeerId,
+            emoji: emojiToRemove,
+            remove: true
         });
     } else {
         const emoji = data.emoji || data.reaction;
         if (!emoji || typeof emoji !== 'string') return;
         saveReaction(id, upeerId, emoji);
-        win?.webContents.send('reaction-added', {
-            messageId: id,
-            upeerId: upeerId,
-            reaction: emoji
+        win?.webContents.send('message-reaction-updated', {
+            msgId: id,
+            upeerId,
+            chatUpeerId: data.chatUpeerId || upeerId,
+            emoji,
+            remove: false
         });
     }
 }

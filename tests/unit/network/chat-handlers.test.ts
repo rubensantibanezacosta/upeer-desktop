@@ -340,10 +340,12 @@ describe('Chat Handlers', () => {
             await handleChatReaction(senderId, data, mockWin);
 
             expect(reactionsOps.saveReaction).toHaveBeenCalledWith(data.id, senderId, '👍');
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('reaction-added', {
-                messageId: data.id,
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-reaction-updated', {
+                msgId: data.id,
                 upeerId: senderId,
-                reaction: '👍'
+                chatUpeerId: senderId,
+                emoji: '👍',
+                remove: false
             });
         });
 
@@ -353,10 +355,12 @@ describe('Chat Handlers', () => {
             await handleChatReaction(senderId, data, mockWin);
 
             expect(reactionsOps.deleteReaction).toHaveBeenCalledWith(data.id, senderId, '👍');
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('reaction-removed', {
-                messageId: data.id,
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-reaction-updated', {
+                msgId: data.id,
                 upeerId: senderId,
-                reaction: '👍'
+                chatUpeerId: senderId,
+                emoji: '👍',
+                remove: true
             });
         });
     });
