@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { toMediaUrl } from '../../../utils/fileUtils.js';
 import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, Avatar, Tooltip, Stack, Button } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
@@ -274,14 +275,10 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
 
         const fileUrl = currentItem.url;
         let url = '';
-        if (fileUrl.startsWith('data:') || fileUrl.startsWith('media://')) {
+        if (fileUrl.startsWith('data:')) {
             url = fileUrl;
         } else if (fileUrl) {
-            // BUG FIX: Asegurar que el path sea absoluto y esté normalizado para el protocolo media://
-            // En Windows, los paths pueden venir con \ o /. El handler en appInitializer espera url.hostname + url.pathname.
-            // En Linux, necesitamos que empiece por / tras el media:// para que appInitializer lo reciba correctamente.
-            const normalizedPath = fileUrl.replace(/\\/g, '/');
-            url = `media://${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
+            url = toMediaUrl(fileUrl);
         }
 
         setContentUrl(url || null);

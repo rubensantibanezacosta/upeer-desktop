@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MediaFileMessage } from './MediaFileMessage.js';
 import { DocumentFileMessage } from './DocumentFileMessage.js';
 import { AudioPlayer } from './AudioPlayer.js';
+import { toMediaUrl } from '../../../utils/fileUtils.js';
 
 export interface FileMessageData {
     fileId: string;
@@ -95,7 +96,7 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     }
 
     if (data.isVoiceNote) {
-        return <AudioPlayer url={isTransferComplete && (fullPath || savedPath) ? `media://${fullPath || savedPath}` : ''} isMe={isMe} timestamp={timestamp} status={status} />;
+        return <AudioPlayer url={isTransferComplete && (fullPath || savedPath) ? toMediaUrl(fullPath || savedPath!) : ''} isMe={isMe} timestamp={timestamp} status={status} />;
     }
 
     return <DocumentFileMessage {...sharedProps} />;

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import { getFileIcon } from '../../../utils/fileIcons.js';
+import { toMediaUrl } from '../../../utils/fileUtils.js';
 
 interface ReplyBarProps {
     replyToMessage: { id?: string; message: string; isMine: boolean; senderName?: string };
@@ -85,7 +86,7 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
                         backgroundColor: 'background.level2', display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}>
                         <img
-                            src={thumbnail.startsWith('data:') ? thumbnail : `media://${thumbnail}`}
+                            src={thumbnail.startsWith('data:') ? thumbnail : toMediaUrl(thumbnail)}
                             alt="preview"
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />

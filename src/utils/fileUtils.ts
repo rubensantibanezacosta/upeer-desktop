@@ -44,3 +44,13 @@ export const getMimeType = (fileName: string): string => {
     
     return mimeMap[ext || ''] || 'application/octet-stream';
 };
+
+export const toMediaUrl = (filePath: string): string => {
+    const raw = filePath.startsWith('media://') ? filePath.slice(8) : filePath;
+    const normalized = raw.replace(/\\/g, '/');
+    const driveMatch = normalized.match(/^([A-Za-z]):?\/(.+)$/);
+    if (driveMatch) {
+        return `media://${driveMatch[1]}/${driveMatch[2]}`;
+    }
+    return `media://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+};

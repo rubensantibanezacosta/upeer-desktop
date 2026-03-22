@@ -25,7 +25,7 @@ import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
-import { formatFileSize, getMimeType } from '../../../utils/fileUtils.js';
+import { formatFileSize, getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
 
 interface FileInfo {
     path: string;
@@ -122,7 +122,7 @@ const useFilesPreview = (files: FileInfo[]) => {
                 if (!effectiveType.startsWith("image/") && !effectiveType.startsWith("video/")) continue;
                 if (previews[file.path]) continue;
                 try {
-                    const mediaUrl = `media://${file.path}`;
+                    const mediaUrl = toMediaUrl(file.path);
                     let thumbnail = "";
                     if (effectiveType.startsWith("image/")) {
                         thumbnail = await generateThumbnail(mediaUrl);
