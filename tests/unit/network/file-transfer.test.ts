@@ -116,22 +116,17 @@ describe('TransferManager - Integration', () => {
         // Mock validators to return true/void
         (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
 
-        // 1. Receive proposal
+        // 1. Receive proposal — now auto-accepts immediately
         await manager.handleFileProposal('peer1', 'addr1', proposal);
         let transfer = manager.getTransfer(fileId, 'receiving');
         expect(transfer).toBeDefined();
-        expect(transfer?.phase).toBe(TransferPhase.PROPOSED);
-
-        // 2. Accept proposal
-        await manager.acceptTransfer(fileId);
-        // Force tempPath for testing
-        manager.store.updateTransfer(fileId, 'receiving', { tempPath: '/tmp/test-file' });
-
-        transfer = manager.getTransfer(fileId, 'receiving');
         expect(transfer?.phase).toBe(TransferPhase.TRANSFERRING);
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_ACCEPT' }), 'pubkey');
 
-        // 3. Handle chunk
+        // Force tempPath for testing (acceptTransfer doesn't set it, chunks do)
+        manager.store.updateTransfer(fileId, 'receiving', { tempPath: '/tmp/test-file' });
+
+        // 2. Handle chunk
         // Mock file handle operations
         const mockHandle = {
             write: vi.fn().mockResolvedValue({ bytesWritten: 50 }),

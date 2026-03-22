@@ -9,6 +9,8 @@ import type { TransferManager } from './transfer-manager.js';
 
 export async function handleFileProposal(this: TransferManager, upeerId: string, address: string, data: any) {
     try {
+        if (this.store.getTransfer(data.fileId, 'receiving')) return;
+
         try {
             this.validator.validateIncomingFile(data);
         } catch (e: any) {
@@ -63,6 +65,7 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         this.store.updateTransfer(transfer.fileId, 'receiving', { state: 'active', phase: TransferPhase.PROPOSED });
         this.ui.notifyReceiveMessage(transfer, upeerId);
         await saveTransferToDB(transfer);
+        await this.acceptTransfer(transfer.fileId);
     } catch (err) {
         error('Error handling FILE_PROPOSAL', err, 'file-transfer');
     }
