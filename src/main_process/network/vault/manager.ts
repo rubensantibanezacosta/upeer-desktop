@@ -90,7 +90,21 @@ export class VaultManager {
         }
 
         if (candidates.length === 0) {
-            warn('No candidates found (friends or mesh) to act as vault', { recipientSid }, 'vault');
+            const mySelf = allContacts.find(c => c.upeerId === myId);
+            if (mySelf?.status === 'connected' && mySelf?.address) {
+                candidates.push(mySelf);
+            }
+        }
+
+        if (candidates.length === 0) {
+            const recipient = allContacts.find(c => c.upeerId === recipientSid);
+            if (recipient?.status === 'connected' && recipient?.address) {
+                candidates.push(recipient);
+            }
+        }
+
+        if (candidates.length === 0) {
+            warn('No candidates found (friends, mesh, self, or recipient) to act as vault', { recipientSid }, 'vault');
             return 0;
         }
 
