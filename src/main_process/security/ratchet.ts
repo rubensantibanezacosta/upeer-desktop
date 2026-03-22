@@ -172,7 +172,7 @@ export function ratchetInitAlice(sharedSecret: Buffer, bobSpkPk: Buffer): Ratche
 
 export function ratchetInitBob(sharedSecret: Buffer, bobSpkPk: Buffer, bobSpkSk: Buffer): RatchetState {
     return {
-        rk: sharedSecret, cks: null, ckr: null,
+        rk: Buffer.from(sharedSecret), cks: null, ckr: null,
         ns: 0, nr: 0, pn: 0,
         dhsPk: bobSpkPk, dhsSk: bobSpkSk,
         dhr: null,

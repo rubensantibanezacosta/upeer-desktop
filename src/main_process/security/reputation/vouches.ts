@@ -1,4 +1,4 @@
-import { info, warn, error } from '../secure-logger.js';
+import { info, warn, error, debug } from '../secure-logger.js';
 import {
     insertVouch,
     vouchExists,
@@ -35,7 +35,7 @@ export {
 
 // ── Constantes locales ────────────────────────────────────────────────────────
 /** Límite de vouches almacenados por emisor por día (anti-flood en DB) */
-const MAX_VOUCHES_PER_SENDER_PER_DAY = 20;
+const MAX_VOUCHES_PER_SENDER_PER_DAY = 200;
 
 // ── Emisión ───────────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
         const dayAgo = now - ONE_DAY_MS;
         const todayCount = countRecentVouchesByFrom(vouch.fromId, dayAgo);
         if (todayCount >= MAX_VOUCHES_PER_SENDER_PER_DAY) {
-            warn('Rate limit de vouch excedido', { fromId: vouch.fromId }, 'reputation');
+            debug('Rate limit de vouch excedido', { fromId: vouch.fromId }, 'reputation');
             return false;
         }
 
