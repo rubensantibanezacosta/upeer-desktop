@@ -43,4 +43,8 @@ export async function acceptContactRequest(upeerId: string, publicKey: string) {
         addresses: (await import('../utils.js')).getNetworkAddresses()
     };
     sendSecureUDPMessage(contact.address, data);
+
+    import('../vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.queryOwnVaults();
+    }).catch(() => { });
 }
