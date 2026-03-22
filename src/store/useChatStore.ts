@@ -811,6 +811,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     msg.id === data.id ? { ...msg, status: data.status } : msg
                 )
             }));
+            get().refreshContacts();
         });
 
         window.upeer.onGroupMessageDelivered((data: any) => {
