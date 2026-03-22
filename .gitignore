@@ -26,3 +26,4 @@ frontend-coverage.json
 coverage-output.txt
 coverage-summary.txt
 .vite/build/main.js
+
