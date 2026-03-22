@@ -133,7 +133,6 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 spkId: usedSpkId,
                 ikPub: myIkPk.toString('hex'),
             };
-            saveRatchetSession(upeerId, session, usedSpkId);
         }
 
         if (session) {
