@@ -155,20 +155,16 @@ export async function startSend(
 }
 
 export async function handleAccept(this: TransferManager, upeerId: string, address: string, data: any) {
-    if (!data.signature) {
-        warn('File accept missing signature', { fileId: data.fileId, upeerId }, 'security');
-        return;
-    }
-
     const contact = await getContactByUpeerId(upeerId);
     if (!contact?.publicKey) return;
 
-    const dataToVerify = { ...data };
-    delete dataToVerify.signature;
-
-    if (!verify(Buffer.from(canonicalStringify(dataToVerify)), Buffer.from(data.signature, 'hex'), Buffer.from(contact.publicKey, 'hex'))) {
-        warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
-        return;
+    if (data.signature) {
+        const dataToVerify = { ...data };
+        delete dataToVerify.signature;
+        if (!verify(Buffer.from(canonicalStringify(dataToVerify)), Buffer.from(data.signature, 'hex'), Buffer.from(contact.publicKey, 'hex'))) {
+            warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
+            return;
+        }
     }
 
     const transfer = this.store.getTransfer(data.fileId, 'sending');
@@ -241,7 +237,8 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
 
 export async function startVaultingFailover(this: TransferManager, fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: any) {
     const currentTransfer = this.store.getTransfer(fileId, 'sending');
-    if (!currentTransfer || (currentTransfer.state !== 'active' && currentTransfer.phase !== TransferPhase.VAULTED)) return;
+    if (!currentTransfer || currentTransfer.state !== 'active') return;
+    if (currentTransfer.phase === TransferPhase.TRANSFERRING || currentTransfer.state === 'completed') return;
 
     if (aesKey) {
         if (currentTransfer.fileSize > 10 * 1024 * 1024) {

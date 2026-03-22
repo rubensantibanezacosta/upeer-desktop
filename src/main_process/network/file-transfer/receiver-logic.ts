@@ -93,7 +93,8 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
         acceptMsg.signature = sig.toString('hex');
 
         const contact = await getContactByUpeerId(transfer.upeerId);
-        this.send(transfer.peerAddress, acceptMsg, contact?.publicKey);
+        const targetAddress = contact?.address || transfer.peerAddress;
+        this.send(targetAddress, acceptMsg, contact?.publicKey);
 
         if (transfer.phase === TransferPhase.PROPOSED) {
             this.store.updateTransfer(fileId, 'receiving', { phase: TransferPhase.TRANSFERRING });
