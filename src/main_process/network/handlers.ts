@@ -133,7 +133,7 @@ export async function handlePacket(
 
         const contact = await getContactByUpeerId(upeerId);
         if (!contact || contact.status !== 'connected' || !contact.publicKey) {
-            security('Origin not connected or missing key', { upeerId, ip: rinfo.address }, 'network');
+            security('Origin not connected or missing key', { upeerId, ip: rinfo.address, type: data.type }, 'network');
             return;
         }
 
