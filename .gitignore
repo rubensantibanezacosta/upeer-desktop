@@ -25,5 +25,4 @@ resources/bin/win32-x64/yggstack.exe
 frontend-coverage.json
 coverage-output.txt
 coverage-summary.txt
-.vite/build/main.js
 
