@@ -318,8 +318,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 height: '100%', position: 'relative', px: 3, textAlign: 'center',
                                 backgroundColor: 'background.body',
-                                backgroundImage: 'radial-gradient(var(--joy-palette-neutral-300, #d1d1d1) 0.5px, transparent 0.5px)',
-                                backgroundSize: '20px 20px',
+                                backgroundImage: 'linear-gradient(160deg, var(--joy-palette-primary-900, #0a1929) 0%, var(--joy-palette-background-body, #0b0d12) 40%, var(--joy-palette-neutral-900, #0d1117) 100%)',
                             }}>
                                 <Box sx={{ opacity: 0.8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                     <Box sx={{
