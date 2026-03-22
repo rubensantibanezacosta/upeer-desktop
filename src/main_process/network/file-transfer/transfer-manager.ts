@@ -47,6 +47,7 @@ export class TransferManager implements ITransferManager {
     public handleFileProposal = receiver.handleFileProposal;
     public acceptTransfer = receiver.acceptTransfer;
     public handleFileChunk = receiver.handleFileChunk;
+    public handleFileDone = receiver.handleFileDone;
     public handleFileCancel = receiver.handleFileCancel;
     public handleHeartbeat = receiver.handleHeartbeat;
 
@@ -91,6 +92,9 @@ export class TransferManager implements ITransferManager {
             case 'FILE_CHUNK_ACK':
             case 'FILE_ACK':
                 await this.handleAck(upeerId, address, data);
+                break;
+            case 'FILE_DONE':
+                await this.handleFileDone(upeerId, address, data);
                 break;
             case 'FILE_DONE_ACK':
                 await this.handleDoneAck(data.fileId);

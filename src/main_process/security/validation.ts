@@ -822,6 +822,7 @@ export function validateMessage(type: string, data: any): ValidationResult {
         case 'FILE_CHUNK_ACK':
         case 'FILE_ACK':
             return validateFileChunkAck(data);
+        case 'FILE_DONE':
         case 'FILE_DONE_ACK':
         case 'FILE_END':
             return validateFileDoneAck(data);

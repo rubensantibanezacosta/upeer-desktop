@@ -91,6 +91,7 @@ export class RateLimiter {
             'FILE_ACK': { windowMs: 1000, maxTokens: 5000, refillRate: 5000 },
             'FILE_CHUNK_ACK': { windowMs: 1000, maxTokens: 5000, refillRate: 5000 },
             'FILE_END': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
+            'FILE_DONE': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_DONE_ACK': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_CANCEL': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             // BUG DJ fix: SEALED no tenía regla → operaciones DH X25519 ilimitadas por IP.

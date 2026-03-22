@@ -322,6 +322,7 @@ export async function handlePacket(
             case 'FILE_CHUNK':
             case 'FILE_CHUNK_ACK':
             case 'FILE_ACK':
+            case 'FILE_DONE':
             case 'FILE_DONE_ACK':
             case 'FILE_END':
             case 'FILE_CANCEL':

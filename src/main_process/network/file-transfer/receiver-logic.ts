@@ -41,7 +41,7 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         }
 
         if (data.encryptedKey && data.encryptedKeyNonce) {
-            const senderKey = contact?.publicKey;
+            const senderKey = contact?.ephemeralPublicKey || contact?.publicKey;
             if (senderKey) {
                 const aesKey = unsealTransferKey(data.encryptedKey, data.encryptedKeyNonce, senderKey);
                 if (aesKey) this.transferKeys.set(data.fileId, aesKey);
@@ -55,7 +55,11 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
                 const raw = decryptChunk(thumbnail.data, thumbnail.iv, thumbnail.tag, aesKey);
                 const mime = data.mimeType?.startsWith('video') ? 'image/jpeg' : (data.mimeType || 'image/jpeg');
                 thumbnail = `data:${mime};base64,${raw.toString('base64')}`;
-            } catch { thumbnail = undefined; }
+            } catch {
+                thumbnail = undefined;
+            }
+        } else if (thumbnail && typeof thumbnail === 'object') {
+            thumbnail = undefined;
         }
 
         const transfer = this.store.createTransfer({
@@ -182,6 +186,15 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
         }
     } catch (err) {
         error('Error handling FILE_CHUNK', err, 'file-transfer');
+    }
+}
+
+export async function handleFileDone(this: TransferManager, upeerId: string, address: string, data: any) {
+    try {
+        const contact = await getContactByUpeerId(upeerId);
+        this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
+    } catch (err) {
+        error('Error handling FILE_DONE', err, 'file-transfer');
     }
 }
 
