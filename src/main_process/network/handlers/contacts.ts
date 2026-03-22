@@ -252,6 +252,17 @@ export async function handleHandshakeAccept(
     }
 
     const existing = await getContactByUpeerId(senderUpeerId);
+
+    if (existing && existing.status === 'connected') {
+        const currentAddress = rinfo.address;
+        const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
+        addOrUpdateContact(senderUpeerId, currentAddress, existing.name, data.publicKey, 'connected', data.ephemeralPublicKey, undefined, undefined, undefined, incomingAddresses);
+        if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
+            updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
+        }
+        return;
+    }
+
     if (existing && existing.status === 'pending') {
         let keyResult: { changed: boolean; oldKey?: string; newKey: string };
         try {
