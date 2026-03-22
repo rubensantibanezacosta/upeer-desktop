@@ -19,18 +19,18 @@ export function handleReputationGossip(
         sendResponse(rinfo.address, { type: 'REPUTATION_REQUEST', missing: ourMissing });
     }
 
-    // 2. Identificar qué le falta al peer de nuestra base de datos e informarle
-    // Limitamos a 50 para no saturar el canal UDP. 
-    // Al enviarle un REPUTATION_GOSSIP con nuestros IDs, el peer podrá 
-    // iniciar su propio REPUTATION_REQUEST en el siguiente ciclo.
+    // 2. Si el peer no tiene algunos de nuestros IDs, notificarlo.
+    // Solo lo hacemos si hay diferencia (evitar bucles donde el peer rechaza
+    // sistemáticamente vouches de terceros que no conoce).
     const theirMissing = ourIds.filter(id => !theirIds.has(id)).slice(0, 50);
-    if (theirMissing.length > 0) {
-        // BUG REP-GOSP-PUSH: Empujar activamente nuestros IDs faltantes para
-        // acelerar la convergencia del CRDT sin esperar a su heartbeat.
-        sendResponse(rinfo.address, {
-            type: 'REPUTATION_GOSSIP',
-            ids: ourIds.slice(0, 100) // Enviamos nuestra lista para que él pida
-        });
+    if (theirMissing.length > 0 && ourIds.length > 0) {
+        const shareRatio = theirIds.size / ourIds.length;
+        if (shareRatio < 0.9) {
+            sendResponse(rinfo.address, {
+                type: 'REPUTATION_GOSSIP',
+                ids: ourIds.slice(0, 100)
+            });
+        }
     }
 }
 
@@ -54,8 +54,11 @@ export function handleReputationDeliver(
 ) {
     const received: any[] = data.vouches ?? [];
     if (received.length === 0) return;
-    Promise.all(received.map(v => saveIncomingVouch(v))).then(() => {
-        getMainWindow()?.webContents.send('reputation-updated');
+    Promise.all(received.map(v => saveIncomingVouch(v))).then((results) => {
+        const saved = results.filter(Boolean).length;
+        if (saved > 0) {
+            getMainWindow()?.webContents.send('reputation-updated');
+        }
     }).catch(() => {
         getMainWindow()?.webContents.send('reputation-updated');
     });

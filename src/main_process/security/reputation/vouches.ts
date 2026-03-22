@@ -132,7 +132,7 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
         const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
         const contact = await getContactByUpeerId(vouch.fromId);
         if (!contact?.publicKey) {
-            warn('Vouch de contacto desconocido ignorado', { fromId: vouch.fromId }, 'reputation');
+            debug('Vouch de contacto desconocido ignorado', { fromId: vouch.fromId }, 'reputation');
             return false;
         }
 
