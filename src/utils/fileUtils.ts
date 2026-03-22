@@ -11,7 +11,7 @@ export const getMimeType = (fileName: string): string => {
     const parts = fileName.split('.');
     if (parts.length <= 1) return 'application/octet-stream';
     const ext = parts.pop()?.toLowerCase();
-    
+
     const mimeMap: Record<string, string> = {
         'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
@@ -41,7 +41,7 @@ export const getMimeType = (fileName: string): string => {
         'rar': 'application/x-rar-compressed',
         '7z': 'application/x-7z-compressed',
     };
-    
+
     return mimeMap[ext || ''] || 'application/octet-stream';
 };
 

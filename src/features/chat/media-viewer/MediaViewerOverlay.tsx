@@ -220,7 +220,7 @@ const useVideoThumbnails = (items: MediaItem[], currentIndex: number) => {
         const generateVisible = async () => {
             const start = Math.max(0, currentIndex - VISIBLE_BUFFER);
             const end = Math.min(items.length - 1, currentIndex + VISIBLE_BUFFER);
-            
+
             for (let i = start; i <= end; i++) {
                 if (!isMounted) break;
                 const item = items[i];
@@ -632,7 +632,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                         let startIdx = currentIndex - VISIBLE_BUFFER;
                         if (startIdx < 0) startIdx = 0;
                         if (startIdx + visibleCount > items.length) startIdx = items.length - visibleCount;
-                        
+
                         return Array.from({ length: visibleCount }, (_, i) => {
                             const idx = startIdx + i;
                             const item = items[idx];
@@ -640,7 +640,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                             const isImg = !isVideo(item.mimeType, item.fileName);
                             const showImg = (thumb && thumb.length > 10) || (isImg && item.url);
                             const isCurrent = idx === currentIndex;
-                            
+
                             return (
                                 <Box
                                     key={item.fileId}

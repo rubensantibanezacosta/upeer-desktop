@@ -127,6 +127,20 @@ export async function handlePacket(
             return;
         }
 
+        // 1b. DHT — infraestructura de red abierta, no requiere contacto conectado.
+        // El handler DHT tiene su propia validación de firmas y secuencias internamente.
+        if (data.type.startsWith('DHT_') && senderUpeerId) {
+            const kademliaHandled = await handleDhtPacket(
+                data.type,
+                data,
+                senderUpeerId,
+                rinfo.address,
+                win,
+                sendResponse
+            );
+            if (kademliaHandled) return;
+        }
+
         // 2. SECURITY CHECK
         const upeerId = senderUpeerId;
         if (!upeerId) return;
@@ -209,23 +223,7 @@ export async function handlePacket(
             avatar: data.avatar ?? undefined,
         });
 
-        // 4. CHAT & DHT LOGIC
-        // First, try to handle DHT messages with the new Kademlia handler
-        if (data.type.startsWith('DHT_')) {
-            const handled = await handleDhtPacket(
-                data.type,
-                data,
-                upeerId,
-                rinfo.address,
-                win,
-                sendResponse
-            );
-            if (handled) {
-                return;
-            }
-            // If not handled, fall through to legacy handlers
-        }
-
+        // 4. CHAT LOGIC
         switch (data.type) {
 
             case 'PING':
