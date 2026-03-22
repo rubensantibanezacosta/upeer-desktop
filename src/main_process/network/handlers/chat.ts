@@ -282,11 +282,11 @@ export async function handleChatReaction(
 ) {
     const id = data.msgId || data.id;
     if (!id || !_UUID_RE.test(String(id))) return;
-    const emoji = data.emoji || data.reaction;
-    if (!emoji || typeof emoji !== 'string') return;
 
-    if (data.remove || data.emojiToDelete) {
-        const emojiToRemove = data.emojiToDelete || emoji;
+    const isDelete = data.remove === true || !!data.emojiToDelete;
+    if (isDelete) {
+        const emojiToRemove = data.emojiToDelete || data.emoji;
+        if (!emojiToRemove || typeof emojiToRemove !== 'string') return;
         deleteReaction(id, upeerId, emojiToRemove);
         win?.webContents.send('reaction-removed', {
             messageId: id,
@@ -294,6 +294,8 @@ export async function handleChatReaction(
             reaction: emojiToRemove
         });
     } else {
+        const emoji = data.emoji || data.reaction;
+        if (!emoji || typeof emoji !== 'string') return;
         saveReaction(id, upeerId, emoji);
         win?.webContents.send('reaction-added', {
             messageId: id,

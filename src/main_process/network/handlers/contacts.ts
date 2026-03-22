@@ -123,7 +123,8 @@ export async function handleHandshakeReq(
     }
 
     const isAlreadyConnected = existingContact?.status === 'connected';
-    const newStatus = isAlreadyConnected ? 'connected' : 'incoming';
+    const isPendingByUs = existingContact?.status === 'pending';
+    const newStatus = (isAlreadyConnected || isPendingByUs) ? 'connected' : 'incoming';
     const rawAlias = typeof data.alias === 'string' ? data.alias.slice(0, 100) : null;
     const alias = rawAlias || existingContact?.name || `Peer ${senderUpeerId.slice(0, 4)}`;
 
@@ -171,8 +172,12 @@ export async function handleHandshakeReq(
         return;
     }
 
-    if (isAlreadyConnected) {
+    if (isAlreadyConnected || isPendingByUs) {
         win?.webContents.send('contact-presence', { upeerId: senderUpeerId, lastSeen: new Date().toISOString() });
+
+        if (isPendingByUs) {
+            win?.webContents.send('contact-handshake-finished', { upeerId: senderUpeerId });
+        }
 
         import('../messaging/contacts.js').then(({ acceptContactRequest }) => {
             acceptContactRequest(senderUpeerId, data.publicKey);

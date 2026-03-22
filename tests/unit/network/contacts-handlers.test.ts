@@ -406,7 +406,7 @@ describe('Contact Handlers', () => {
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.addOrUpdateContact).toHaveBeenCalledWith(
-                senderUpeerId, rinfo.address, 'A'.repeat(100), expect.anything(), 'incoming', undefined, undefined, undefined, undefined, undefined
+                senderUpeerId, rinfo.address, 'A'.repeat(100), expect.anything(), 'connected', undefined, undefined, undefined, undefined, undefined
             );
             expect(contactsOps.updateContactAvatar).toHaveBeenCalled();
         });
