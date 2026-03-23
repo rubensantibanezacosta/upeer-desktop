@@ -507,13 +507,12 @@ export function validateFileProposal(data: any): ValidationResult {
     if (Math.ceil(data.fileSize / data.chunkSize) !== data.totalChunks) {
         return { valid: false, error: 'Inconsistent totalChunks' };
     }
-    // BUG DH fix: encryptedKey (NaCl box de 32-byte AES key → 48 bytes ciphertext = 96 hex)
-    // y encryptedKeyNonce (NaCl nonce de 24 bytes = 48 hex) no tenían límite de longitud.
-    // Buffer.from(data.encryptedKey, 'hex') en handleProposal asignaba hasta 5MB
-    // por cualquier peer antes de que crypto_box_open_easy rechazara el MAC inválido.
+    // Compatibilidad de formatos para la transfer key:
+    // - Legacy: crypto_box_easy sobre 32B AES key => 48B ciphertext => 96 hex
+    // - Actual: crypto_box_seal sobre 32B AES key => 80B ciphertext => 160 hex
     if (data.encryptedKey !== undefined &&
-        (typeof data.encryptedKey !== 'string' || data.encryptedKey.length !== 96)) {
-        return { valid: false, error: 'Invalid encryptedKey (expected 96 hex chars)' };
+        (typeof data.encryptedKey !== 'string' || ![96, 160].includes(data.encryptedKey.length))) {
+        return { valid: false, error: 'Invalid encryptedKey (expected 96 or 160 hex chars)' };
     }
     if (data.encryptedKeyNonce !== undefined &&
         (typeof data.encryptedKeyNonce !== 'string' || data.encryptedKeyNonce.length !== 48)) {
