@@ -252,6 +252,14 @@ export async function initializeApp(baseDir: string): Promise<void> {
     setTimeout(() => {
       if (!isSessionLocked()) broadcastDhtUpdate();
     }, 2000);
+
+    setTimeout(() => {
+      if (isSessionLocked()) return;
+      checkHeartbeat(getContacts());
+      import('../network/vault/manager.js')
+        .then(({ VaultManager }) => VaultManager.queryOwnVaults())
+        .catch(() => {});
+    }, 4000);
   });
 
   setInterval(() => {
