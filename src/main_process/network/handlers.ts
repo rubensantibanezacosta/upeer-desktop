@@ -39,7 +39,7 @@ function maybeQueryVaultsForPeer(upeerId: string) {
     const last = vaultQueryThrottle.get(upeerId) ?? 0;
     if (Date.now() - last < 30_000) return;
     vaultQueryThrottle.set(upeerId, Date.now());
-    import('./vault/manager.js').then(({ VaultManager }) => VaultManager.queryOwnVaults()).catch(() => {});
+    import('./vault/manager.js').then(({ VaultManager }) => VaultManager.queryOwnVaults()).catch(() => { });
 }
 
 /** BUG AP fix: exponer cleanup para que server.ts lo llame cada hora. */

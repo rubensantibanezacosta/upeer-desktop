@@ -258,7 +258,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
       checkHeartbeat(getContacts());
       import('../network/vault/manager.js')
         .then(({ VaultManager }) => VaultManager.queryOwnVaults())
-        .catch(() => {});
+        .catch(() => { });
     }, 4000);
   });
 
