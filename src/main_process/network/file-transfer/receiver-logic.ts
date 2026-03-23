@@ -1,4 +1,4 @@
-import { warn, error } from '../../security/secure-logger.js';
+import { warn, error, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { verify, sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
@@ -92,6 +92,14 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             direction: 'receiving' as const
         });
 
+        debug('FILE_PROPOSAL accepted', {
+            fileId: transfer.fileId,
+            fileSize: transfer.fileSize,
+            totalChunks: transfer.totalChunks,
+            chunkSize: transfer.chunkSize,
+            hasThumbnail: !!transfer.thumbnail
+        }, 'file-transfer');
+
         this.store.updateTransfer(transfer.fileId, 'receiving', { state: 'active', phase: TransferPhase.PROPOSED });
         this.ui.notifyReceiveMessage(transfer, upeerId);
         await saveTransferToDB(transfer);
@@ -182,6 +190,14 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
 
             const updated = this.store.updateTransfer(data.fileId, 'receiving', { chunksProcessed: received });
 
+            debug('FILE_CHUNK written', {
+                fileId: data.fileId,
+                chunkIndex: data.chunkIndex,
+                chunkLength: chunkData.length,
+                received,
+                totalChunks: transfer.totalChunks
+            }, 'file-transfer');
+
             this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex });
 
             if (updated) this.ui.notifyProgress(updated);
@@ -199,6 +215,14 @@ export async function handleFileDone(this: TransferManager, upeerId: string, add
     try {
         const contact = await getContactByUpeerId(upeerId);
         this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
+
+        const transfer = this.store.getTransfer(data.fileId, 'receiving');
+        debug('FILE_DONE acknowledged', {
+            fileId: data.fileId,
+            chunksProcessed: transfer?.chunksProcessed,
+            totalChunks: transfer?.totalChunks,
+            state: transfer?.state
+        }, 'file-transfer');
     } catch (err) {
         error('Error handling FILE_DONE', err, 'file-transfer');
     }

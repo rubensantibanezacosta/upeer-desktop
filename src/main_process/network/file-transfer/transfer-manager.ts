@@ -257,6 +257,15 @@ export class TransferManager implements ITransferManager {
         this.finalizingTransfers.add(guardKey);
 
         try {
+            debug('Finalizing transfer', {
+                fileId,
+                direction,
+                chunksProcessed: transfer.chunksProcessed,
+                totalChunks: transfer.totalChunks,
+                fileSize: transfer.fileSize,
+                tempPath: transfer.tempPath
+            }, 'file-transfer');
+
             this.store.updateTransfer(fileId, direction, {
                 state: 'completed',
                 phase: TransferPhase.DONE
