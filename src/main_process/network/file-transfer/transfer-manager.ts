@@ -25,6 +25,7 @@ export class TransferManager implements ITransferManager {
     private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
     private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
     private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
+    public writeCounters = new Map<string, number>(); // fileId -> completed writes
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -232,6 +233,7 @@ export class TransferManager implements ITransferManager {
 
             this.clearRetryTimer(fileId);
             this.clearDoneRetry(fileId);
+            this.writeCounters.delete(fileId);
             this.dhtSearchTimestamps.delete(transfer.upeerId);
 
             const handle = this.fileHandles.get(fileId);
@@ -386,6 +388,7 @@ export class TransferManager implements ITransferManager {
         this.clearRetryTimer(fileId);
         this.clearDoneRetry(fileId);
         this.transferKeys.delete(fileId);
+        this.writeCounters.delete(fileId);
         this.dhtSearchTimestamps.delete(transfer.upeerId);
 
         const handle = this.fileHandles.get(fileId);

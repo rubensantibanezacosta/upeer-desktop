@@ -159,6 +159,9 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
         const fileOffset = data.chunkIndex * transfer.chunkSize;
         await handle.write(chunkData, 0, chunkData.length, fileOffset);
 
+        const completedWrites = (this.writeCounters.get(transfer.fileId) || 0) + 1;
+        this.writeCounters.set(transfer.fileId, completedWrites);
+
         const updated = this.store.updateTransfer(transfer.fileId, 'receiving', {
             chunksProcessed: transfer.pendingChunks?.size ?? (transfer.chunksProcessed + 1)
         });
@@ -169,7 +172,7 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
         if (updated) {
             this.ui.notifyProgress(updated);
 
-            if (updated.chunksProcessed === updated.totalChunks) {
+            if (completedWrites === updated.totalChunks) {
                 await this.finalizeTransfer(updated.fileId, 'receiving');
             }
         }
