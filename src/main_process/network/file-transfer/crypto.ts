@@ -31,8 +31,8 @@ export function sealTransferKey(aesKey: Buffer, peerPublicKey: string): { nonce:
  */
 export function unsealTransferKey(encryptedKey: string, nonce: string, peerPublicKey: string): Buffer | null {
     return identityDecrypt(
-        Buffer.from(encryptedKey, 'hex'),
         Buffer.from(nonce, 'hex'),
+        Buffer.from(encryptedKey, 'hex'),
         Buffer.from(peerPublicKey, 'hex')
     );
 }

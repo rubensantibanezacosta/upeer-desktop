@@ -54,7 +54,7 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             try {
                 const raw = decryptChunk(thumbnail.data, thumbnail.iv, thumbnail.tag, aesKey);
                 const mime = data.mimeType?.startsWith('image/') ? data.mimeType : 'image/jpeg';
-                thumbnail = `data:${mime};base64,${raw.toString('base64')}`;  
+                thumbnail = `data:${mime};base64,${raw.toString('base64')}`;
             } catch {
                 thumbnail = undefined;
             }
