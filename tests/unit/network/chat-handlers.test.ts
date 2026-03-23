@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleChatMessage, handleChatAck, handleChatEdit, handleChatDelete, handleChatReaction, handleChatClear, handleReadReceipt } from '../../../src/main_process/network/handlers/chat.js';
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as reactionsOps from '../../../src/main_process/storage/messages/reactions.js';
+import * as contactKeysOps from '../../../src/main_process/storage/contacts/keys.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 import * as ratchet from '../../../src/main_process/security/ratchet.js';
@@ -359,6 +360,7 @@ describe('Chat Handlers', () => {
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig');
 
+            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, data.ephemeralPublicKey);
             expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado', 'edit-sig', 2);
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-updated', {
                 id: data.msgId,
@@ -367,6 +369,31 @@ describe('Chat Handlers', () => {
                 content: 'editado',
                 signature: 'edit-sig'
             });
+        });
+
+        it('should fallback to stored ephemeral key when packet key is missing', async () => {
+            const data = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                version: 3,
+            };
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+                publicKey: 'b'.repeat(64),
+                ephemeralPublicKey: 'c'.repeat(64)
+            });
+            (identity.decrypt as any).mockReturnValue(Buffer.from('editado 2'));
+
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig-2');
+
+            expect(identity.decrypt).toHaveBeenCalledWith(
+                Buffer.from(data.nonce, 'hex'),
+                Buffer.from(data.content, 'hex'),
+                Buffer.from('c'.repeat(64), 'hex')
+            );
+            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado 2', 'edit-sig-2', 3);
         });
     });
 

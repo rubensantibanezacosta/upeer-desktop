@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { ErasureCoder } from './redundancy/erasure.js';
 import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
+import { saveVaultEntry } from '../../storage/vault/operations.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
@@ -19,6 +20,11 @@ export class ChunkVault {
 
     // Systematic Reed-Solomon: 4 data blocks, 8 parity blocks (Total 12)
     private static coder = new ErasureCoder(4, 8);
+
+    private static async persistLocally(payloadHash: string, recipientSid: string, priority: number, dataHex: string): Promise<void> {
+        const myId = getMyUPeerId();
+        await saveVaultEntry(payloadHash, recipientSid, myId, priority, dataHex, Date.now() + SHARD_TTL_MS);
+    }
 
     /**
      * Calcula el tamaño del segmento basado en la reputación del receptor.
@@ -86,30 +92,11 @@ export class ChunkVault {
         const signature = sign(Buffer.from(canonicalStringify(fileDataPacket)));
         const signedPacket = { ...fileDataPacket, senderUpeerId: myId, signature: signature.toString('hex') };
 
-        if (candidates.length === 0) {
-            warn('No candidates for small buffer vault replication', { fileHash, fileId }, 'vault');
-            if (fileId) {
-                const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
-                fileTransferManager.store.updateTransfer(fileId, 'sending', { state: 'failed', isVaulting: true });
-                const updated = fileTransferManager.getTransfer(fileId, 'sending');
-                if (updated) fileTransferManager.ui.notifyProgress(updated, true);
-            }
-            return 0;
-        }
-
         const packetJson = JSON.stringify(signedPacket);
         const payloadHash = crypto.createHash('sha256').update(packetJson).digest('hex');
-        const expiresAt = Date.now() + SHARD_TTL_MS;
+        const packetHex = Buffer.from(packetJson).toString('hex');
 
-        const vaultPacket = {
-            type: 'VAULT_STORE',
-            payloadHash,
-            recipientSid,
-            senderSid: myId,
-            priority: 2,
-            data: Buffer.from(packetJson).toString('hex'),
-            expiresAt,
-        };
+        await this.persistLocally(payloadHash, recipientSid, 2, packetHex);
 
         const { VaultManager } = await import('./manager.js');
         const nodes = await VaultManager.replicateToVaults(recipientSid, signedPacket);
@@ -200,45 +187,51 @@ export class ChunkVault {
             .filter(c => c.status === 'connected' && c.upeerId !== myId)
             .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
 
-        if (candidates.length === 0) return 0;
+        let remoteCopies = 0;
 
         for (let i = 0; i < shards.length; i++) {
             const shard = shards[i];
-            const custodian = candidates[i % candidates.length];
 
             // Format: shard:fileHash:segIdx:shardIdx
             const cid = `shard:${fileHash}:${segIdx}:${i}`;
-            const expiresAt = Date.now() + SHARD_TTL_MS;
+            const shardHex = shard.toString('hex');
 
-            const vaultPacket = {
-                type: 'VAULT_STORE',
-                payloadHash: cid,
-                recipientSid,
-                senderSid: myId,
-                priority: 3,
-                data: shard.toString('hex'),
-                expiresAt
-            };
+            await this.persistLocally(cid, recipientSid, 3, shardHex);
+            await trackDistributedAsset(fileHash, cid, i, shards.length, myId, segIdx);
 
-            sendSecureUDPMessage(custodian.address, vaultPacket);
+            const custodians = candidates.length > 0 ? [candidates[i % candidates.length]] : [];
+            for (const custodian of custodians) {
+                const vaultPacket = {
+                    type: 'VAULT_STORE',
+                    payloadHash: cid,
+                    recipientSid,
+                    senderSid: myId,
+                    priority: 3,
+                    data: shardHex,
+                    expiresAt: Date.now() + SHARD_TTL_MS
+                };
 
-            if (custodian.upeerId) {
-                await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
+                sendSecureUDPMessage(custodian.address, vaultPacket);
+                remoteCopies += 1;
 
-                if (fileId) {
-                    const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
-                    const progress = Math.floor(((segIdx * shards.length + i + 1) / (totalSegments * shards.length)) * 100);
-                    fileTransferManager.notifyVaultProgress(fileId, progress, 100);
-                }
+                if (custodian.upeerId) {
+                    await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
 
-                const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
-                if (kademlia) {
-                    const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
-                    const ptrKey = createVaultPointerKey(fileHash);
-                    kademlia.storeValue(ptrKey, { fileHash, custodians: [custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
+                    const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
+                    if (kademlia) {
+                        const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
+                        const ptrKey = createVaultPointerKey(fileHash);
+                        kademlia.storeValue(ptrKey, { fileHash, custodians: [myId, custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
+                    }
                 }
             }
+
+            if (fileId) {
+                const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
+                const progress = Math.floor(((segIdx * shards.length + i + 1) / (totalSegments * shards.length)) * 100);
+                fileTransferManager.notifyVaultProgress(fileId, progress, 100);
+            }
         }
-        return candidates.length;
+        return remoteCopies + shards.length;
     }
 }

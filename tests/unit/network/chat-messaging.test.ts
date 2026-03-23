@@ -14,6 +14,7 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     updateMessageStatus: vi.fn(),
     updateMessageContent: vi.fn(),
     deleteMessageLocally: vi.fn(),
+    getMessageById: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/reactions.js', () => ({
@@ -113,5 +114,54 @@ describe('network/messaging/chat.ts', () => {
         );
         expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(expect.any(String), 'vaulted');
         expect(startDhtSearch).toHaveBeenCalledWith('peer-offline', expect.any(Function));
+    });
+
+    it('uses recipient ephemeral key for chat updates when available', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            ephemeralPublicKey: 'bb'.repeat(32),
+            address: '200::9',
+        } as any);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null as any);
+
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+
+        await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
+
+        expect(identity.encrypt).toHaveBeenCalledWith(
+            Buffer.from('mensaje editado', 'utf-8'),
+            Buffer.from('bb'.repeat(32), 'hex')
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::9',
+            expect.objectContaining({
+                type: 'CHAT_UPDATE',
+                useRecipientEphemeral: true,
+                ephemeralPublicKey: '22'.repeat(32),
+            }),
+            'aa'.repeat(32)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-online',
+            expect.objectContaining({
+                type: 'CHAT_UPDATE',
+                useRecipientEphemeral: true,
+            })
+        );
+        expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(
+            '12345678-1234-1234-1234-123456789012',
+            'mensaje editado',
+            Buffer.from('sig').toString('hex'),
+            1
+        );
     });
 });

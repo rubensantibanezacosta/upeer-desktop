@@ -8,6 +8,7 @@ import {
 } from '../../../src/main_process/network/handlers/groups.js';
 import * as groupsOps from '../../../src/main_process/storage/groups/operations.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
+import * as contactKeysOps from '../../../src/main_process/storage/contacts/keys.js';
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 
@@ -21,6 +22,10 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
+    updateContactEphemeralPublicKey: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
@@ -74,6 +79,42 @@ describe('Group Handlers Final Coverage', () => {
             }));
         });
 
+        it('should decrypt using packet ephemeral key', async () => {
+            const group = { id: groupId, members: [senderId, 'my-id'], adminUpeerId: 'admin' };
+            const data = {
+                id: '550e8400-e29b-41d4-a716-446655440000',
+                groupId,
+                content: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: true,
+                timestamp: 1710000000000
+            };
+            (groupsOps.getGroupById as any).mockReturnValue(group);
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            (identity.decrypt as any).mockReturnValue(Buffer.from('hola grupo'));
+
+            await handleGroupMessage(senderId, { upeerId: senderId, publicKey: 'b'.repeat(64) } as any, data, mockWin);
+
+            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, data.ephemeralPublicKey);
+            expect(identity.decrypt).toHaveBeenCalledWith(
+                Buffer.from(data.nonce, 'hex'),
+                Buffer.from(data.content, 'hex'),
+                Buffer.from(data.ephemeralPublicKey, 'hex')
+            );
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                data.id,
+                groupId,
+                false,
+                'hola grupo',
+                undefined,
+                undefined,
+                'delivered',
+                senderId,
+                data.timestamp
+            );
+        });
+
         it('should fail if groupId or content is missing', async () => {
             const group = { id: groupId, members: [senderId] };
             (groupsOps.getGroupById as any).mockReturnValue(group);
@@ -87,10 +128,21 @@ describe('Group Handlers Final Coverage', () => {
             const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'] });
             (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
             (groupsOps.getGroupById as any).mockReturnValue(null);
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
 
-            await handleGroupInvite(senderId, { groupId, payload: 'hex', nonce: 'hex' }, mockWin);
+            await handleGroupInvite(senderId, {
+                groupId,
+                payload: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64)
+            }, mockWin);
 
+            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
+            expect(identity.decrypt).toHaveBeenCalledWith(
+                Buffer.from('bb', 'hex'),
+                Buffer.from('aa', 'hex'),
+                Buffer.from('a'.repeat(64), 'hex')
+            );
             expect(groupsOps.saveGroup).toHaveBeenCalled();
         });
 
@@ -107,10 +159,21 @@ describe('Group Handlers Final Coverage', () => {
         it('should update group info', async () => {
             const inner = JSON.stringify({ groupName: 'New Name' });
             (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, adminUpeerId: senderId });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
             (identity.decrypt as any).mockReturnValue(Buffer.from(inner));
 
-            await handleGroupUpdate(senderId, { groupId, payload: 'hex', nonce: 'hex' }, mockWin);
+            await handleGroupUpdate(senderId, {
+                groupId,
+                payload: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64)
+            }, mockWin);
+            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
+            expect(identity.decrypt).toHaveBeenCalledWith(
+                Buffer.from('bb', 'hex'),
+                Buffer.from('aa', 'hex'),
+                Buffer.from('a'.repeat(64), 'hex')
+            );
             expect(groupsOps.updateGroupInfo).toHaveBeenCalled();
         });
     });

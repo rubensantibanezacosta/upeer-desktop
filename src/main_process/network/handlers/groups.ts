@@ -14,6 +14,7 @@ import {
     updateMessageStatus,
 } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
 import { decrypt } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { security, warn, info } from '../../security/secure-logger.js';
@@ -30,6 +31,10 @@ export async function handleGroupMessage(
 ) {
     const { id, groupId, content, nonce, ephemeralPublicKey, useRecipientEphemeral, replyTo, timestamp } = data;
     if (!groupId || !content) return;
+
+    if (typeof ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(ephemeralPublicKey)) {
+        updateContactEphemeralPublicKey(upeerId, ephemeralPublicKey);
+    }
 
     // BUG CA fix: si el grupo no existe localmente, rechazar el mensaje en lugar
     // de crear un grupo fantasma. Un peer arbitrario podía enviar GROUP_MSG con
@@ -56,11 +61,13 @@ export async function handleGroupMessage(
     let displayContent = content;
     if (nonce) {
         try {
-            const senderKeyHex = useRecipientEphemeral ? ephemeralPublicKey : contact.publicKey;
+            const senderKeyHex = typeof ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(ephemeralPublicKey)
+                ? ephemeralPublicKey
+                : contact.publicKey;
             if (senderKeyHex) {
                 const decrypted = decrypt(
-                    Buffer.from(content, 'hex'),
                     Buffer.from(nonce, 'hex'),
+                    Buffer.from(content, 'hex'),
                     Buffer.from(senderKeyHex, 'hex')
                 );
                 if (decrypted) displayContent = decrypted.toString('utf-8');
@@ -135,20 +142,27 @@ export async function handleGroupInvite(
     const { groupId, adminUpeerId } = data;
     if (!groupId || !data.payload || !data.nonce) return;
 
+    if (typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
+        updateContactEphemeralPublicKey(upeerId, data.ephemeralPublicKey);
+    }
+
     // --- Decrypt E2E payload ---
     let groupName: string;
     let members: string[];
     let avatar: string | undefined;
 
     try {
-        const senderKey = (await getContactByUpeerId(upeerId))?.publicKey;
+        const contact = await getContactByUpeerId(upeerId);
+        const senderKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
+            ? data.ephemeralPublicKey
+            : contact?.publicKey;
         if (!senderKey) {
             security('GROUP_INVITE: no sender key to decrypt', { upeerId }, 'security');
             return;
         }
         const decrypted = decrypt(
-            Buffer.from(data.payload, 'hex'),
             Buffer.from(data.nonce, 'hex'),
+            Buffer.from(data.payload, 'hex'),
             Buffer.from(senderKey, 'hex')
         );
         if (!decrypted) {
@@ -222,6 +236,10 @@ export async function handleGroupUpdate(
     const { groupId, adminUpeerId } = data;
     if (!groupId) return;
 
+    if (typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
+        updateContactEphemeralPublicKey(senderUpeerId, data.ephemeralPublicKey);
+    }
+
     const group = getGroupById(groupId);
     if (!group) return;
 
@@ -237,11 +255,14 @@ export async function handleGroupUpdate(
     const fields: { name?: string; avatar?: string | null } = {};
 
     try {
-        const senderKey = (await getContactByUpeerId(senderUpeerId))?.publicKey;
+        const contact = await getContactByUpeerId(senderUpeerId);
+        const senderKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
+            ? data.ephemeralPublicKey
+            : contact?.publicKey;
         if (!senderKey) return;
         const decrypted = decrypt(
-            Buffer.from(data.payload, 'hex'),
             Buffer.from(data.nonce, 'hex'),
+            Buffer.from(data.payload, 'hex'),
             Buffer.from(senderKey, 'hex')
         );
         if (!decrypted) {

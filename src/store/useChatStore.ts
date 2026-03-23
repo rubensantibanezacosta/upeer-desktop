@@ -379,7 +379,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     handleLeaveGroup: async (groupId) => {
         await window.upeer.leaveGroup(groupId);
         get().refreshGroups();
-        if (get().activeGroupId === groupId) set({ activeGroupId: '' });
+        if (get().activeGroupId === groupId) set({ activeGroupId: '', groupChatHistory: [], isWindowedHistory: false });
     },
 
     handleSend: async () => {
@@ -419,10 +419,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     handleSendGroupMessage: async (msg: string) => {
-        const { activeGroupId, myIdentity } = get();
+        const { activeGroupId, myIdentity, replyByConversation } = get();
         if (!activeGroupId || !msg) return;
 
-        const sendResult = await window.upeer.sendGroupMessage(activeGroupId, msg);
+        const replyTo = replyByConversation[activeGroupId];
+        const sendResult = await window.upeer.sendGroupMessage(activeGroupId, msg, replyTo?.id);
         if (sendResult) {
             set(state => ({
                 groupChatHistory: [...state.groupChatHistory, {
@@ -433,6 +434,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     message: msg,
                     status: 'sent',
                     timestamp: formatMessageTimestamp(sendResult.timestamp),
+                    replyTo: replyTo?.id,
                     senderUpeerId: myIdentity?.upeerId,
                     senderName: myIdentity?.alias || myIdentity?.name || 'Yo',
                     senderAvatar: myIdentity?.avatar ?? undefined,
@@ -556,8 +558,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     handleClearChat: (id) => {
-        const { targetUpeerId } = get();
-        const targetId = id || targetUpeerId;
+        const { targetUpeerId, activeGroupId } = get();
+        const targetId = id || activeGroupId || targetUpeerId;
         if (!targetId) return;
 
         window.upeer.clearChat(targetId).then(() => {

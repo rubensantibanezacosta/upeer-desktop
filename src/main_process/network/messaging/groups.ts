@@ -277,7 +277,7 @@ export async function updateGroup(
         // siempre era true si la clave existía, sin importar si tenía semanas de
         // antigüedad. shouldUseEphemeral comprueba también ephemeralPublicKeyUpdatedAt < 2h,
         // usando la clave estática para peers offline (que es correcta para vault).
-        const useEphemeral = shouldUseEphemeral(contact);
+        const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
         const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
         const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
         const { ciphertext, nonce } = encrypt(

@@ -253,10 +253,13 @@ export async function handleChatEdit(
     if (typeof newContent !== 'string') {
         if (data.nonce && typeof data.content === 'string') {
             try {
+                if (data.ephemeralPublicKey && typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)) {
+                    updateContactEphemeralPublicKey(upeerId, data.ephemeralPublicKey);
+                }
                 const contact = await getContactByUpeerId(upeerId);
                 const decryptKeyHex = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
                     ? data.ephemeralPublicKey
-                    : contact?.publicKey;
+                    : contact?.ephemeralPublicKey || contact?.publicKey;
                 if (!decryptKeyHex) return;
                 const decrypted = decrypt(
                     Buffer.from(data.nonce, 'hex'),

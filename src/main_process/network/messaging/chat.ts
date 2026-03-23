@@ -594,8 +594,9 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const contact = await getContactByUpeerId(targetId);
         if (!contact || !contact.publicKey) return;
 
-        const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
+        const useEphemeral = typeof contact.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(contact.ephemeralPublicKey);
         const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
+        if (!targetKeyHex) return;
 
         const ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
