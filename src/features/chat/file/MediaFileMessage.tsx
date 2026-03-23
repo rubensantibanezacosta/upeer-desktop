@@ -12,7 +12,7 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 import ImageIcon from '@mui/icons-material/Image';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { MessageStatus } from '../message/MessageStatus.js';
-import { formatFileSize } from '../../../utils/fileUtils.js';
+import { formatFileSize, toMediaUrl } from '../../../utils/fileUtils.js';
 import { RichText } from '../../../components/ui/RichText.js';
 
 interface MediaFileMessageProps {
@@ -111,10 +111,10 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 borderBottomLeftRadius: caption ? 0 : '12px',
                 borderBottomRightRadius: caption ? 0 : '12px',
             }}>
-                {thumbnail ? (
+                {thumbnail || (isTransferComplete && savedPath) ? (
                     <Box
                         component="img"
-                        src={thumbnail}
+                        src={thumbnail || toMediaUrl(savedPath!)}
                         alt={fileName}
                         sx={{
                             width: '100%',

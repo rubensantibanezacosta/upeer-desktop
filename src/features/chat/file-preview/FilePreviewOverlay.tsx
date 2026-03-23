@@ -53,23 +53,58 @@ interface FilePreviewOverlayProps {
 const useFilesPreview = (files: FileInfo[]) => {
     const [previews, setPreviews] = useState<Record<string, { previewUrl: string; thumbnail: string }>>({});
     const [isGenerating, setIsGenerating] = useState(false);
+    const [assetPaths, setAssetPaths] = useState<Record<string, string>>({});
+
+    const copyFilesToAssets = async (filesToCopy: FileInfo[]): Promise<Record<string, string>> => {
+        const paths: Record<string, string> = {};
+        for (const file of filesToCopy) {
+            if (assetPaths[file.path]) {
+                paths[file.path] = assetPaths[file.path];
+                continue;
+            }
+            try {
+                const result = await (window as any).upeer?.persistInternalAsset({
+                    filePath: file.path,
+                    fileName: file.name
+                });
+                if (result?.success && result.path) {
+                    paths[file.path] = result.path;
+                } else {
+                    paths[file.path] = file.path;
+                }
+            } catch {
+                paths[file.path] = file.path;
+            }
+        }
+        setAssetPaths(prev => ({ ...prev, ...paths }));
+        return paths;
+    };
 
     const generateThumbnail = (imageUrl: string): Promise<string> =>
         new Promise((resolve) => {
+            let settled = false;
+            const resolveOnce = (v: string) => { if (!settled) { settled = true; resolve(v); } };
+            const timeout = setTimeout(() => resolveOnce(''), 5000);
+
             const img = new Image();
             img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                if (!ctx) { resolve(''); return; }
-                const maxSize = 240;
-                let { width, height } = img;
-                if (width > height) { if (width > maxSize) { height = (height * maxSize) / width; width = maxSize; } }
-                else { if (height > maxSize) { width = (width * maxSize) / height; height = maxSize; } }
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
+                clearTimeout(timeout);
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) { resolveOnce(''); return; }
+                    const maxSize = 240;
+                    let { width, height } = img;
+                    if (width > height) { if (width > maxSize) { height = (height * maxSize) / width; width = maxSize; } }
+                    else { if (height > maxSize) { width = (width * maxSize) / height; height = maxSize; } }
+                    canvas.width = width; canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolveOnce(canvas.toDataURL('image/jpeg', 0.7));
+                } catch {
+                    resolveOnce('');
+                }
             };
-            img.onerror = () => resolve('');
+            img.onerror = () => { clearTimeout(timeout); resolveOnce(''); };
             img.src = imageUrl;
         });
 
@@ -115,20 +150,26 @@ const useFilesPreview = (files: FileInfo[]) => {
         let isMounted = true;
         const load = async () => {
             if (isMounted) setIsGenerating(true);
-            for (const file of files) {
+            const filesToProcess = files.filter(f => !previews[f.path]);
+            if (filesToProcess.length === 0) {
+                if (isMounted) setIsGenerating(false);
+                return;
+            }
+            const assetPathMap = await copyFilesToAssets(filesToProcess);
+            for (const file of filesToProcess) {
                 if (!isMounted) break;
                 let effectiveType = file.type;
                 if (!effectiveType || effectiveType === 'application/octet-stream') effectiveType = getMimeType(file.name);
                 if (!effectiveType.startsWith("image/") && !effectiveType.startsWith("video/")) continue;
-                if (previews[file.path]) continue;
+                const assetPath = assetPathMap[file.path] || file.path;
                 try {
-                    const mediaUrl = toMediaUrl(file.path);
+                    const mediaUrl = toMediaUrl(assetPath);
                     let thumbnail = "";
                     if (effectiveType.startsWith("image/")) {
                         thumbnail = await generateThumbnail(mediaUrl);
                     } else if (effectiveType.startsWith("video/")) {
                         try {
-                            const result = await (window as any).upeer.generateVideoThumbnail(file.path);
+                            const result = await (window as any).upeer.generateVideoThumbnail(assetPath);
                             thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(mediaUrl);
                         } catch { thumbnail = await generateVideoThumbnail(mediaUrl); }
                     }
@@ -141,9 +182,9 @@ const useFilesPreview = (files: FileInfo[]) => {
         };
         load();
         return () => { isMounted = false; };
-    }, [files, previews]);
+    }, [files, previews, assetPaths]);
 
-    return { previews, isGenerating };
+    return { previews, isGenerating, assetPaths };
 };
 
 // ── File icon helper ──────────────────────────────────────────────────────────
@@ -345,7 +386,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [captions, setCaptions] = useState<Record<number, string>>({});
-    const { previews, isGenerating } = useFilesPreview(files);
+    const { previews, isGenerating, assetPaths } = useFilesPreview(files);
 
     useEffect(() => {
         if (selectedIndex >= files.length) setSelectedIndex(Math.max(0, files.length - 1));
@@ -355,9 +396,10 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
     const currentPreview = currentFile ? previews[currentFile.path] : null;
 
     const handleSendAll = () => {
-        const thumbnails = files.map(f => previews[f.path]?.thumbnail);
+        const filesToSend = files.map(f => ({ ...f, path: assetPaths[f.path] || f.path }));
+        const thumbnails = files.map(f => previews[f.path]?.thumbnail || undefined);
         const caps = files.map((_, i) => captions[i] || '');
-        onSend(files, thumbnails, caps);
+        onSend(filesToSend, thumbnails, caps);
     };
 
     const sheetSx = {
