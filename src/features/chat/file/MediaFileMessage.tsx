@@ -12,7 +12,7 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 import ImageIcon from '@mui/icons-material/Image';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { MessageStatus } from '../message/MessageStatus.js';
-import { formatFileSize, toMediaUrl } from '../../../utils/fileUtils.js';
+import { toMediaUrl } from '../../../utils/fileUtils.js';
 import { RichText } from '../../../components/ui/RichText.js';
 
 interface MediaFileMessageProps {
@@ -47,7 +47,7 @@ interface MediaFileMessageProps {
 export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     fileId,
     fileName,
-    fileSize,
+    fileSize: _fileSize,
     mimeType,
     thumbnail,
     caption,
@@ -204,35 +204,6 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 </Box>
             )}
 
-            {/* File size badge */}
-            <Box sx={{
-                position: 'absolute', top: 12, left: 12,
-                display: 'flex', alignItems: 'center', gap: 0.5,
-                p: 0.6, px: 1.5, borderRadius: '8px',
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(8px)', color: 'white',
-                zIndex: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-            }}>
-                {isVideo && <VideoFileIcon sx={{ fontSize: 14 }} />}
-                <Typography level="body-xs" sx={{ color: 'white', fontWeight: 700, fontSize: '11px' }}>
-                    {formatFileSize(fileSize)}
-                </Typography>
-                {isVaulting && (
-                    <Typography level="body-xs" sx={{
-                        ml: 0.5,
-                        bgcolor: isTransferFailed ? 'danger.500' : 'primary.500',
-                        px: 0.6,
-                        borderRadius: '4px',
-                        fontSize: '9px',
-                        fontWeight: 900,
-                        color: 'white'
-                    }}>
-                        {isTransferFailed ? 'VAULT FAILED' : 'VAULT'}
-                    </Typography>
-                )}
-            </Box>
-
             {/* Caption & Timestamp Container */}
             {caption && (
                 <Box sx={{
@@ -276,16 +247,16 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
             {/* Timestamp (no caption, over the image) */}
             {!caption && timestamp && (
                 <Box sx={{
-                    position: 'absolute', bottom: 10, right: 10,
+                    position: 'absolute', bottom: 6, right: 6,
                     display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                    p: 0.5, px: 1, borderRadius: '6px',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    backdropFilter: 'blur(10px)',
+                    p: 0.35, px: 0.75, borderRadius: '4px',
+                    backgroundColor: 'rgba(0,0,0,0.42)',
+                    backdropFilter: 'blur(8px)',
                     zIndex: 2,
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Typography level="body-xs" sx={{ color: 'white', fontSize: '10px', fontWeight: 600 }}>
+                        <Typography level="body-xs" sx={{ color: 'white', fontSize: '10px', opacity: 0.8 }}>
                             {timestamp}
                         </Typography>
                         {isMe && <MessageStatus status={status} />}

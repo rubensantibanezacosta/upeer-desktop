@@ -10,7 +10,6 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import AddIcon from '@mui/icons-material/Add';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
@@ -25,7 +24,7 @@ import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
-import { formatFileSize, getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
+import { getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
 
 interface FileInfo {
     path: string;
@@ -356,7 +355,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
 
 export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
     files, onClose, onSend, onAddMore, onRemove,
-    isDragging, vouchScore, onDragOver, onDragLeave, onDrop,
+    isDragging, onDragOver, onDragLeave, onDrop,
 }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [captions, setCaptions] = useState<Record<number, string>>({});
@@ -485,7 +484,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                         {getFileTypeIcon(currentFile.type, currentFile.name, 100)}
                         <Typography level="body-md" sx={{ mt: 2, color: 'text.secondary' }}>No hay vista previa disponible</Typography>
                         <Typography level="body-xs" sx={{ mt: 1, color: 'text.tertiary' }}>
-                            {formatFileSize(currentFile.size)} - {(currentFile.type === 'application/octet-stream' ? getMimeType(currentFile.name) : currentFile.type).split('/')[1]?.toUpperCase() || 'FILE'}
+                            {(currentFile.type === 'application/octet-stream' ? getMimeType(currentFile.name) : currentFile.type).split('/')[1]?.toUpperCase() || 'FILE'}
                         </Typography>
                     </Box>
                 )}
@@ -493,22 +492,6 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 
             {/* Footer */}
             <Box sx={{ p: 2, backgroundColor: 'background.surface', borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* Reputation Warning for Large Files */}
-                {currentFile && currentFile.size > 10 * 1024 * 1024 && (vouchScore || 0) < 30 && (
-                    <Box sx={{
-                        display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1,
-                        backgroundColor: 'danger.softBg', borderRadius: 'md', mx: 'auto',
-                        border: '1px solid', borderColor: 'danger.softBorder', maxWidth: 600, width: '100%'
-                    }}>
-                        <WarningAmberIcon sx={{ color: 'danger.main', fontSize: 20 }} />
-                        <Typography level="body-xs" sx={{ color: 'danger.plainColor', fontWeight: 600 }}>
-                            Este archivo es grande ({formatFileSize(currentFile.size)}).
-                            El contacto tiene baja reputación ({vouchScore ?? 0}) y el autivismo offline (vault) está deshabilitado.
-                            Ambos deben estar online para transferirlo.
-                        </Typography>
-                    </Box>
-                )}
-
                 {/* Caption + Send */}
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                     <Box sx={{ width: '100%', maxWidth: 600, display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
