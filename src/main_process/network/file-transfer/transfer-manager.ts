@@ -25,7 +25,7 @@ export class TransferManager implements ITransferManager {
     private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
     private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
     private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
-    public writeCounters = new Map<string, number>(); // fileId -> completed writes
+    public transferLocks = new Map<string, Promise<void>>(); // fileId -> active lock promise
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -216,6 +216,22 @@ export class TransferManager implements ITransferManager {
         }
     }
 
+    public async withTransferLock<T>(fileId: string, fn: () => Promise<T>): Promise<T> {
+        const prev = this.transferLocks.get(fileId) ?? Promise.resolve();
+        let release!: () => void;
+        const next = new Promise<void>(resolve => { release = resolve; });
+        this.transferLocks.set(fileId, next);
+        try {
+            await prev;
+            return await fn();
+        } finally {
+            release();
+            if (this.transferLocks.get(fileId) === next) {
+                this.transferLocks.delete(fileId);
+            }
+        }
+    }
+
     public async finalizeTransfer(fileId: string, direction: 'sending' | 'receiving') {
         const guardKey = `${fileId}_${direction}`;
         if (this.finalizingTransfers.has(guardKey)) return;
@@ -233,7 +249,7 @@ export class TransferManager implements ITransferManager {
 
             this.clearRetryTimer(fileId);
             this.clearDoneRetry(fileId);
-            this.writeCounters.delete(fileId);
+            this.transferLocks.delete(fileId);
             this.dhtSearchTimestamps.delete(transfer.upeerId);
 
             const handle = this.fileHandles.get(fileId);
@@ -388,7 +404,7 @@ export class TransferManager implements ITransferManager {
         this.clearRetryTimer(fileId);
         this.clearDoneRetry(fileId);
         this.transferKeys.delete(fileId);
-        this.writeCounters.delete(fileId);
+        this.transferLocks.delete(fileId);
         this.dhtSearchTimestamps.delete(transfer.upeerId);
 
         const handle = this.fileHandles.get(fileId);

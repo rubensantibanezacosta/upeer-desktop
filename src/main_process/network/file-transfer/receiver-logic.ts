@@ -33,7 +33,11 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         if (data.signature) {
             const proposalCopy = { ...data };
             delete proposalCopy.signature;
-            const isValid = verify(Buffer.from(canonicalStringify(proposalCopy)), Buffer.from(data.signature, 'hex'), Buffer.from(contact?.publicKey || '', 'hex'));
+            const isValid = verify(
+                Buffer.from(canonicalStringify(proposalCopy)),
+                Buffer.from(data.signature, 'hex'),
+                Buffer.from(contact?.publicKey || '', 'hex')
+            );
             if (!isValid) {
                 warn('Invalid signature on file proposal', { upeerId, fileId: data.fileId }, 'file-transfer');
                 return;
@@ -110,75 +114,62 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
 }
 
 export async function handleFileChunk(this: TransferManager, upeerId: string, address: string, data: any) {
-    try {
-        const transfer = this.store.getTransfer(data.fileId, 'receiving');
-        if (!transfer) return;
+    await this.withTransferLock(data.fileId, async () => {
+        try {
+            const transfer = this.store.getTransfer(data.fileId, 'receiving');
+            if (!transfer) return;
 
-        if (transfer.state === 'completed') {
-            // Use any for simplicity in this case to avoid deep type issues with the contact object
-            const contact = await getContactByUpeerId(upeerId);
-            this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
-            return;
-        }
-
-        if (transfer.state !== 'active') return;
-
-        if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0 || data.chunkIndex >= transfer.totalChunks) {
-            warn('Received chunk with invalid index, ignoring', { fileId: data.fileId, chunkIndex: data.chunkIndex, totalChunks: transfer.totalChunks }, 'file-transfer');
-            return;
-        }
-
-        if (transfer.pendingChunks && transfer.pendingChunks.has(data.chunkIndex)) {
-            const contact = await getContactByUpeerId(upeerId);
-            this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex }, contact?.publicKey);
-            return;
-        }
-
-        transfer.pendingChunks?.add(data.chunkIndex);
-
-        let handle = this.getFileHandle(transfer.fileId);
-        if (!handle) {
-            const fs = await import('node:fs/promises');
-            const path = await import('node:path');
-            const os = await import('node:os');
-            const tempFile = path.join(os.tmpdir(), `chat-p2p-${transfer.fileId}.tmp`);
-            handle = await fs.open(tempFile, 'w+');
-            this.setFileHandle(transfer.fileId, handle);
-            this.store.updateTransfer(transfer.fileId, 'receiving', { tempPath: tempFile });
-        }
-
-        const aesKey = this.transferKeys.get(data.fileId);
-        let chunkData: Buffer;
-
-        if (aesKey && data.iv && data.tag) {
-            chunkData = decryptChunk(data.data, data.iv, data.tag, aesKey);
-        } else {
-            chunkData = Buffer.from(data.data, 'base64');
-        }
-
-        const fileOffset = data.chunkIndex * transfer.chunkSize;
-        await handle.write(chunkData, 0, chunkData.length, fileOffset);
-
-        const completedWrites = (this.writeCounters.get(transfer.fileId) || 0) + 1;
-        this.writeCounters.set(transfer.fileId, completedWrites);
-
-        const updated = this.store.updateTransfer(transfer.fileId, 'receiving', {
-            chunksProcessed: transfer.pendingChunks?.size ?? (transfer.chunksProcessed + 1)
-        });
-
-        const ack = { type: 'FILE_ACK', fileId: transfer.fileId, chunkIndex: data.chunkIndex };
-        this.send(address, ack);
-
-        if (updated) {
-            this.ui.notifyProgress(updated);
-
-            if (completedWrites === updated.totalChunks) {
-                await this.finalizeTransfer(updated.fileId, 'receiving');
+            if (transfer.state === 'completed') {
+                this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId });
+                return;
             }
+
+            if (transfer.state !== 'active') return;
+
+            if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0 || data.chunkIndex >= transfer.totalChunks) {
+                warn('Received chunk with invalid index, ignoring', { fileId: data.fileId, chunkIndex: data.chunkIndex, totalChunks: transfer.totalChunks }, 'file-transfer');
+                return;
+            }
+
+            if (transfer.pendingChunks.has(data.chunkIndex)) {
+                this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex });
+                return;
+            }
+
+            let handle = this.getFileHandle(transfer.fileId);
+            if (!handle) {
+                const fs = await import('node:fs/promises');
+                const path = await import('node:path');
+                const os = await import('node:os');
+                const tempFile = path.join(os.tmpdir(), `chat-p2p-${transfer.fileId}.tmp`);
+                handle = await fs.open(tempFile, 'w+');
+                this.setFileHandle(transfer.fileId, handle);
+                this.store.updateTransfer(transfer.fileId, 'receiving', { tempPath: tempFile });
+            }
+
+            const aesKey = this.transferKeys.get(data.fileId);
+            const chunkData = (aesKey && data.iv && data.tag)
+                ? decryptChunk(data.data, data.iv, data.tag, aesKey)
+                : Buffer.from(data.data, 'base64');
+
+            await handle.write(chunkData, 0, chunkData.length, data.chunkIndex * transfer.chunkSize);
+
+            transfer.pendingChunks.add(data.chunkIndex);
+            const received = transfer.pendingChunks.size;
+
+            const updated = this.store.updateTransfer(data.fileId, 'receiving', { chunksProcessed: received });
+
+            this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex });
+
+            if (updated) this.ui.notifyProgress(updated);
+
+            if (received === transfer.totalChunks) {
+                await this.finalizeTransfer(data.fileId, 'receiving');
+            }
+        } catch (err) {
+            error('Error handling FILE_CHUNK', err, 'file-transfer');
         }
-    } catch (err) {
-        error('Error handling FILE_CHUNK', err, 'file-transfer');
-    }
+    });
 }
 
 export async function handleFileDone(this: TransferManager, upeerId: string, address: string, data: any) {
@@ -186,10 +177,12 @@ export async function handleFileDone(this: TransferManager, upeerId: string, add
         const contact = await getContactByUpeerId(upeerId);
         this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
 
-        const transfer = this.store.getTransfer(data.fileId, 'receiving');
-        if (transfer && transfer.state !== 'completed' && transfer.chunksProcessed >= transfer.totalChunks) {
-            await this.finalizeTransfer(data.fileId, 'receiving');
-        }
+        await this.withTransferLock(data.fileId, async () => {
+            const transfer = this.store.getTransfer(data.fileId, 'receiving');
+            if (transfer && transfer.state !== 'completed' && transfer.chunksProcessed >= transfer.totalChunks) {
+                await this.finalizeTransfer(data.fileId, 'receiving');
+            }
+        });
     } catch (err) {
         error('Error handling FILE_DONE', err, 'file-transfer');
     }
@@ -204,7 +197,6 @@ export async function handleFileCancel(this: TransferManager, upeerId: string, a
 export function handleHeartbeat(this: TransferManager, upeerId: string, address: string, data: any) {
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (transfer && transfer.state === 'active') {
-        const ack = { type: 'FILE_HEARTBEAT_ACK', fileId: data.fileId, t: data.t };
-        this.send(address, ack);
+        this.send(address, { type: 'FILE_HEARTBEAT_ACK', fileId: data.fileId, t: data.t });
     }
 }
