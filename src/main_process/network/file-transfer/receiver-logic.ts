@@ -155,7 +155,7 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
         await (handle as any).write(chunkData, 0, chunkData.length, offset);
 
         const updated = this.store.updateTransfer(transfer.fileId, 'receiving', {
-            chunksProcessed: transfer.chunksProcessed + 1
+            chunksProcessed: transfer.pendingChunks?.size ?? (transfer.chunksProcessed + 1)
         });
 
         const ack = { type: 'FILE_ACK', fileId: transfer.fileId, chunkIndex: data.chunkIndex };

@@ -70,7 +70,7 @@ export class TransferManager implements ITransferManager {
         if (transfer.state === 'failed' || transfer.state === 'cancelled') {
             this.store.updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
             debug('Retrying transfer', { fileId, peer: transfer.peerAddress }, 'file-transfer');
-            this.sendNextChunks(transfer, transfer.peerAddress);
+            this.sendNextChunks(transfer);
         }
     }
 
@@ -128,7 +128,7 @@ export class TransferManager implements ITransferManager {
         this.fileHandles.set(fileId, handle);
     }
 
-    public setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer, address: string) {
+    public setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer) {
         const key = `${fileId}_${chunkIndex}`;
         if (this.retryTimers.has(key)) return;
 
@@ -136,10 +136,9 @@ export class TransferManager implements ITransferManager {
             this.retryTimers.delete(key);
             const current = this.store.getTransfer(fileId, 'sending');
             if (current && current.state === 'active') {
-                // Si el chunk aún no ha sido procesado (confirmado por ACK)
                 if (current.chunksProcessed <= chunkIndex) {
                     debug('Retrying chunk due to timeout', { fileId, chunkIndex }, 'file-transfer');
-                    this.sendNextChunks(current, address);
+                    this.sendNextChunks(current);
                 }
             }
         }, 5000);
@@ -202,7 +201,8 @@ export class TransferManager implements ITransferManager {
                     this.cancelTransfer(updated.fileId, 'receiving', 'hash_mismatch');
                     const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
                     const contact = await getContactByUpeerId(updated.upeerId);
-                    this.send(updated.peerAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
+                    const freshAddress = contact?.address || updated.peerAddress;
+                    this.send(freshAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
                     return;
                 }
 
@@ -244,6 +244,26 @@ export class TransferManager implements ITransferManager {
 
     public async handleDoneAck(fileId: string) {
         await this.finalizeTransfer(fileId, 'sending');
+    }
+
+    public checkStaleTransfers(timeoutMs = 90_000) {
+        const now = Date.now();
+        for (const transfer of this.store.getAllTransfers()) {
+            if (transfer.state !== 'active') continue;
+            if (now - transfer.lastActivity < timeoutMs) continue;
+
+            this.store.updateTransfer(transfer.fileId, transfer.direction, { state: 'failed' });
+            this.clearRetryTimer(transfer.fileId);
+            this.transferKeys.delete(transfer.fileId);
+
+            const handle = this.fileHandles.get(transfer.fileId);
+            if (handle) {
+                handle.close().catch(() => { });
+                this.fileHandles.delete(transfer.fileId);
+            }
+
+            this.ui.notifyCancelled(transfer, 'peer_disconnected');
+        }
     }
 
     public notifyVaultProgress(fileId: string, processed: number, total: number) {

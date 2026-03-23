@@ -11,6 +11,7 @@ import { broadcastDhtUpdate, checkHeartbeat } from '../network/messaging/heartbe
 import { startRenewalService } from '../network/dht/renewal.js';
 import { info, error as logError } from '../security/secure-logger.js';
 import { setMainWindow, getAllWindows } from './windowManager.js';
+import { fileTransferManager } from '../network/file-transfer/transfer-manager.js';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -250,8 +251,9 @@ export async function initializeApp(baseDir: string): Promise<void> {
   // Heartbeat every 30s
   heartbeatInterval = setInterval(() => {
     if (isSessionLocked()) return;
-    broadcastDhtUpdate(); // Detect IP changes and broadcast
+    broadcastDhtUpdate();
     const contacts = getContacts();
     checkHeartbeat(contacts);
+    fileTransferManager.checkStaleTransfers();
   }, 30000);
 }

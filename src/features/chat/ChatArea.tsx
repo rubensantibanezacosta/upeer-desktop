@@ -127,7 +127,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
             <Box sx={{
                 flexGrow: 1,
                 backgroundColor: 'background.body',
-                backgroundImage: 'linear-gradient(160deg, var(--joy-palette-primary-900, #0a1929) 0%, var(--joy-palette-background-body, #0b0d12) 40%, var(--joy-palette-neutral-900, #0d1117) 100%)',
                 display: 'flex',
                 flexDirection: 'column'
             }}>
@@ -166,7 +165,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 display: 'flex',
                 flexDirection: 'column-reverse',
                 backgroundColor: 'background.body',
-                backgroundImage: 'linear-gradient(160deg, var(--joy-palette-primary-900, #0a1929) 0%, var(--joy-palette-background-body, #0b0d12) 40%, var(--joy-palette-neutral-900, #0d1117) 100%)',
                 px: 4,
                 pt: 2,
                 pb: 4,

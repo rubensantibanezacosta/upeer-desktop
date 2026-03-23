@@ -224,6 +224,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                     opacity: msg.isDeleted ? 0.6 : 1,
                                     outline: '0px solid transparent',
                                     transition: 'outline 0.2s, outline-offset 0.2s',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.2)',
                                 }}
                             >
                                 {!!msg.replyTo && !msg.isDeleted && (

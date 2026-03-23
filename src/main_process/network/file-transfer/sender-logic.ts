@@ -181,7 +181,7 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
             this.ui.safeSend('message-delivered', { id: data.fileId, upeerId });
             this.ui.notifyStatusUpdated(data.fileId, 'delivered');
         }
-        this.sendNextChunks(updated, address);
+        this.sendNextChunks(updated);
     }
 }
 
@@ -191,10 +191,13 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
 
     this.clearRetryTimer(data.fileId, data.chunkIndex);
 
-    // Update RTT/RTO
+    if (!(transfer as any)._ackedChunks) (transfer as any)._ackedChunks = new Set<number>();
+    const ackedChunks = (transfer as any)._ackedChunks as Set<number>;
+    ackedChunks.add(data.chunkIndex);
+
     const sentTime = (transfer as any)._chunksSentTimes?.get(data.chunkIndex);
     const updates: any = {
-        chunksProcessed: Math.max(transfer.chunksProcessed || 0, data.chunkIndex + 1)
+        chunksProcessed: ackedChunks.size
     };
 
     if (sentTime) {
@@ -205,16 +208,13 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
         updates.srtt = newSrtt;
         updates.rto = newRto;
 
-        // Sliding window logic (AIMD-like)
         let windowSize = transfer.windowSize || 64;
         const ssthresh = transfer.ssthresh || 1024;
         const growthFactor = newSrtt < 150 ? 2.0 : 1.0;
 
         if (windowSize < ssthresh) {
-            // Slow start (crecimiento exponencial)
             windowSize = Math.min(ssthresh, windowSize + Math.floor(growthFactor));
         } else {
-            // Congestion avoidance (crecimiento lineal)
             windowSize += (1.0 / windowSize) * growthFactor;
         }
 
@@ -226,11 +226,12 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
 
     if (updated) {
         this.ui.notifyProgress(updated);
-        if (updated.chunksProcessed === updated.totalChunks) {
+        if (ackedChunks.size === updated.totalChunks) {
             const contact = await getContactByUpeerId(upeerId);
-            this.send(address, { type: 'FILE_DONE', fileId: data.fileId }, contact?.publicKey);
+            const freshAddress = contact?.address || address;
+            this.send(freshAddress, { type: 'FILE_DONE', fileId: data.fileId }, contact?.publicKey);
         } else {
-            this.sendNextChunks(updated, address);
+            this.sendNextChunks(updated);
         }
     }
 }
@@ -244,7 +245,6 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
         if (currentTransfer.fileSize > 10 * 1024 * 1024) {
             const { computeScore } = await import('../../security/reputation/vouches.js');
             const contactsForScore = await _getContacts();
-            // Correctly handle null upeerId and potential type issues
             const directIds = new Set<string>(contactsForScore
                 .filter((c: any) => c.status === 'connected' && c.upeerId)
                 .map((c: any) => c.upeerId as string));
@@ -335,14 +335,11 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
     }
 }
 
-export async function sendNextChunks(this: TransferManager, transfer: FileTransfer, address: string) {
+export async function sendNextChunks(this: TransferManager, transfer: FileTransfer) {
     if (transfer.state !== 'active' || transfer.phase !== TransferPhase.TRANSFERRING) return;
 
-    // Obtener el índice del primer chunk no procesado si queremos reintentar
     const processed = transfer.chunksProcessed || 0;
     const nextIdx = transfer.nextChunkIndex || 0;
-
-    // Si estamos reintentando por timeout, empezamos desde el primer chunk que no ha recibido ACK
     const startIdx = Math.min(nextIdx, processed);
 
     const windowSize = transfer.windowSize || 64;
@@ -369,15 +366,14 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
         const aesKey = this.transferKeys.get(transfer.fileId);
         const contact = await getContactByUpeerId(transfer.upeerId);
         const peerPublicKey = contact?.publicKey;
+        const freshAddress = contact?.address || transfer.peerAddress;
 
         for (let i = 0; i < toSend; i++) {
             const chunkIndex = (transfer.nextChunkIndex || 0) + i;
             if (chunkIndex >= transfer.totalChunks) break;
 
             const offset = BigInt(chunkIndex) * BigInt(transfer.chunkSize || 16384);
-
             const buffer = Buffer.alloc(transfer.chunkSize || 16384);
-
             const { bytesRead } = await (handle as any).read(buffer, 0, buffer.length, offset);
             const finalBuffer = bytesRead < (transfer.chunkSize || 16384) ? buffer.slice(0, bytesRead) : buffer;
 
@@ -396,12 +392,11 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
                 chunkMsg.data = finalBuffer.toString('base64');
             }
 
-            // Save sent time for RTT calculation
             if (!(transfer as any)._chunksSentTimes) (transfer as any)._chunksSentTimes = new Map<number, number>();
             (transfer as any)._chunksSentTimes.set(chunkIndex, Date.now());
 
-            this.send(address, chunkMsg, peerPublicKey);
-            this.setRetryTimer(transfer.fileId, chunkIndex, transfer, address);
+            this.send(freshAddress, chunkMsg, peerPublicKey);
+            this.setRetryTimer(transfer.fileId, chunkIndex, transfer);
         }
 
         this.store.updateTransfer(transfer.fileId, 'sending', {
