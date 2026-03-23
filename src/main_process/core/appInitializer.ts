@@ -248,10 +248,18 @@ export async function initializeApp(baseDir: string): Promise<void> {
     }
   }
 
-  // Heartbeat every 30s
+  onYggstackAddress(() => {
+    setTimeout(() => {
+      if (!isSessionLocked()) broadcastDhtUpdate();
+    }, 2000);
+  });
+
+  setInterval(() => {
+    if (!isSessionLocked()) broadcastDhtUpdate();
+  }, 5000);
+
   heartbeatInterval = setInterval(() => {
     if (isSessionLocked()) return;
-    broadcastDhtUpdate();
     const contacts = getContacts();
     checkHeartbeat(contacts);
     fileTransferManager.checkStaleTransfers();

@@ -12,7 +12,8 @@ vi.mock('../../../src/main_process/network/utils', () => ({
     generateSignedLocationBlock: vi.fn(),
     getDeviceMetadata: vi.fn(),
     validateDhtSequence: vi.fn(),
-    canonicalStringify: (obj: any) => JSON.stringify(obj)
+    canonicalStringify: (obj: any) => JSON.stringify(obj),
+    isYggdrasilAddress: (addr: string) => /^[23][0-9a-f]{2}:/i.test(addr)
 }));
 vi.mock('../../../src/main_process/network/dht/handlers');
 vi.mock('../../../src/main_process/security/secure-logger');
@@ -34,17 +35,17 @@ describe('DHT Core', () => {
         });
 
         it('should broadcast update when addresses change', () => {
-            vi.mocked(utils.getNetworkAddresses).mockReturnValue(['2001:db8::1']);
+            vi.mocked(utils.getNetworkAddresses).mockReturnValue(['200:db8::1']);
             vi.mocked(identity.incrementMyDhtSeq).mockReturnValue(100);
             vi.mocked(utils.generateSignedLocationBlock).mockReturnValue({
-                address: '2001:db8::1',
-                addresses: ['2001:db8::1'],
+                address: '200:db8::1',
+                addresses: ['200:db8::1'],
                 dhtSeq: 100,
                 signature: 'sig',
                 expiresAt: 12345
             } as any);
             vi.mocked(contactsOps.getContacts).mockReturnValue([
-                { upeerId: 'contact1', address: '2001:db8::2', status: 'connected' }
+                { upeerId: 'contact1', address: '200:db8::2', status: 'connected' }
             ] as any);
             vi.mocked(handlers.publishLocationBlock).mockResolvedValue(undefined as any);
 
@@ -52,7 +53,7 @@ describe('DHT Core', () => {
 
             expect(identity.incrementMyDhtSeq).toHaveBeenCalled();
             expect(handlers.publishLocationBlock).toHaveBeenCalled();
-            expect(sendSecureUDPMessage).toHaveBeenCalledWith('2001:db8::2', expect.objectContaining({
+            expect(sendSecureUDPMessage).toHaveBeenCalledWith('200:db8::2', expect.objectContaining({
                 type: 'DHT_UPDATE'
             }));
         });

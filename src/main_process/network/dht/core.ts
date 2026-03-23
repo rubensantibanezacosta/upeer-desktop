@@ -9,7 +9,8 @@ import {
 import {
     generateSignedLocationBlock,
     getNetworkAddresses,
-    getDeviceMetadata
+    getDeviceMetadata,
+    isYggdrasilAddress
 } from '../utils.js';
 import { getKademliaInstance, publishLocationBlock, findNodeLocation, iterativeFindNode } from './handlers.js';
 import { network, warn, error } from '../../security/secure-logger.js';
@@ -41,20 +42,25 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any)
             warn('Failed to publish location block', err, 'kademlia');
         });
 
-        // 2. Limited broadcast to intimate contacts with the FULL multi-channel block
+        // 2. Broadcast to all connected contacts with fan-out across all known addresses
         const contacts = getContacts();
-        const intimateContacts = contacts
-            .filter(c => c.status === 'connected')
-            .slice(0, 10);
+        const connectedContacts = contacts.filter(c => c.status === 'connected');
 
-        for (const contact of intimateContacts) {
-            sendSecureUDPMessage(contact.address, {
-                type: 'DHT_UPDATE',
-                locationBlock: locBlock
-            });
+        for (const contact of connectedContacts) {
+            const addrs = new Set<string>();
+            if (contact.address && isYggdrasilAddress(contact.address)) addrs.add(contact.address);
+            if (contact.knownAddresses) {
+                try {
+                    const known: string[] = JSON.parse(contact.knownAddresses);
+                    known.filter(isYggdrasilAddress).forEach((a: string) => addrs.add(a));
+                } catch { addrs.add(contact.address); }
+            }
+            for (const addr of addrs) {
+                sendSecureUDPMessage(addr, { type: 'DHT_UPDATE', locationBlock: locBlock });
+            }
         }
 
-        network('Multi-channel update propagated', undefined, { intimateContacts: intimateContacts.length }, 'dht');
+        network('Multi-channel update propagated', undefined, { intimateContacts: connectedContacts.length }, 'dht');
     }
 }
 
