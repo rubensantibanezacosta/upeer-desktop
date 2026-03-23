@@ -49,7 +49,7 @@ export async function startSend(
         }
 
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
-        const totalChunks = this.chunker.calculateChunks(fileInfo.size);
+        const totalChunks = this.chunker.calculateChunks(fileInfo.size, this.config.maxChunkSize);
 
         const originalFileName = fileName || path.basename(filePath) || fileInfo.name;
 
@@ -374,10 +374,11 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
             const chunkIndex = (transfer.nextChunkIndex || 0) + i;
             if (chunkIndex >= transfer.totalChunks) break;
 
-            const offset = BigInt(chunkIndex) * BigInt(transfer.chunkSize || 16384);
-            const buffer = Buffer.alloc(transfer.chunkSize || 16384);
-            const { bytesRead } = await (handle as any).read(buffer, 0, buffer.length, offset);
-            const finalBuffer = bytesRead < (transfer.chunkSize || 16384) ? buffer.slice(0, bytesRead) : buffer;
+            const chunkSize = transfer.chunkSize || 16384;
+            const offset = chunkIndex * chunkSize;
+            const buffer = Buffer.alloc(chunkSize);
+            const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset);
+            const finalBuffer = bytesRead < chunkSize ? buffer.slice(0, bytesRead) : buffer;
 
             const chunkMsg: any = {
                 type: 'FILE_CHUNK',
