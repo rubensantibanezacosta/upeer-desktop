@@ -14,14 +14,14 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
         mb: 0.5,
         p: 1,
         borderRadius: '8px',
-        backgroundColor: isMe ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
         backdropFilter: 'blur(10px)',
         borderLeft: '3px solid',
-        borderColor: isMe ? 'rgba(255,255,255,0.25)' : 'primary.400',
+        borderColor: isMe ? 'neutral.500' : 'primary.500',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         '&:hover': {
-            backgroundColor: isMe ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
         },
         minWidth: '100px',
         maxWidth: '100%',
@@ -35,7 +35,7 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
                 sx={{
                     fontWeight: 700,
                     fontSize: '11px',
-                    color: isMe ? 'rgba(255,255,255,0.85)' : 'primary.600',
+                    color: isMe ? 'neutral.100' : 'primary.700',
                     lineHeight: 1.2,
                     mb: 0.25
                 }}
@@ -49,7 +49,7 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
             sx={{
                 opacity: 0.85,
                 fontSize: '12.5px',
-                color: isMe ? 'rgba(255,255,255,0.9)' : 'text.secondary',
+                color: isMe ? 'text.primary' : 'text.secondary',
                 lineHeight: 1.4,
                 fontWeight: 500,
                 display: 'flex',

@@ -247,7 +247,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                 chatHistory={activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory}
                                                 isGroup={!!activeGroupId}
                                                 myIp={appStore.networkAddress || ''}
-                                                contacts={chatStore.contacts.map((c: any) => ({ address: c.address, name: c.name }))}
+                                                contacts={chatStore.contacts.map((c: any) => ({ address: c.address, name: c.name, upeerId: c.upeerId }))}
                                                 onReply={(msg: any) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
                                                 onReact={handleReaction}
                                                 onEdit={(msg: any) => {

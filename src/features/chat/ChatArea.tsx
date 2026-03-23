@@ -27,7 +27,7 @@ interface ChatMessage {
 interface ChatAreaProps {
     chatHistory: ChatMessage[];
     myIp: string;
-    contacts: { address: string, name: string }[];
+    contacts: { address: string, name: string, upeerId?: string }[];
     onReply: (msg: ChatMessage) => void;
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
     onEdit: (msg: ChatMessage) => void;
@@ -106,6 +106,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
     }, [chatHistory]);
 
     const getMessageById = (id: string) => chatHistory.find(m => m.id === id);
+
+    const getReplySenderName = (replyTo?: string) => {
+        if (!replyTo) return undefined;
+        const original = getMessageById(replyTo);
+        if (!original) return undefined;
+        if (original.isMine) return 'Tú';
+        return original.senderName
+            || _contacts.find((contact) => contact.upeerId === original.senderUpeerId || contact.upeerId === original.upeerId)?.name
+            || _contacts[0]?.name
+            || 'Contacto';
+    };
 
     const handleScrollToMessage = (id: string) => {
         const element = document.getElementById(`msg-${id}`);
@@ -193,7 +204,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 onDelete={onDelete}
                                 onForward={onForward}
                                 originalMessage={msg.replyTo ? getMessageById(msg.replyTo)?.message : undefined}
-                                originalSenderName={msg.replyTo ? (getMessageById(msg.replyTo)?.isMine ? 'Tú' : getMessageById(msg.replyTo)?.senderName) : undefined}
+                                originalSenderName={getReplySenderName(msg.replyTo)}
                                 activeTransfers={activeTransfers}
                                 onScrollToMessage={handleScrollToMessage}
                                 onRetryTransfer={onRetryTransfer}
