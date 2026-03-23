@@ -53,8 +53,8 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         if (thumbnail && typeof thumbnail === 'object' && thumbnail.iv && aesKey) {
             try {
                 const raw = decryptChunk(thumbnail.data, thumbnail.iv, thumbnail.tag, aesKey);
-                const mime = data.mimeType?.startsWith('video') ? 'image/jpeg' : (data.mimeType || 'image/jpeg');
-                thumbnail = `data:${mime};base64,${raw.toString('base64')}`;
+                const mime = data.mimeType?.startsWith('image/') ? data.mimeType : 'image/jpeg';
+                thumbnail = `data:${mime};base64,${raw.toString('base64')}`;  
             } catch {
                 thumbnail = undefined;
             }

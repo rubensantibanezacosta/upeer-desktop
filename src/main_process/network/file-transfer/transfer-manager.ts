@@ -147,12 +147,53 @@ export class TransferManager implements ITransferManager {
                             startDhtSearch(current.upeerId, (ip: string, data: any) => this.send(ip, data));
                         });
                     }
-                    this.sendNextChunks(current);
+                    this.resendSingleChunk(current, chunkIndex);
                 }
             }
         }, 5000);
 
         this.retryTimers.set(key, timer);
+    }
+
+    public async resendSingleChunk(transfer: FileTransfer, chunkIndex: number): Promise<void> {
+        if (transfer.state !== 'active') return;
+        try {
+            let handle = this.getFileHandle(transfer.fileId);
+            if (!handle && transfer.filePath) {
+                const fs = await import('node:fs/promises');
+                const h = await fs.open(transfer.filePath, 'r');
+                this.setFileHandle(transfer.fileId, h);
+                handle = h;
+            }
+            if (!handle) return;
+
+            const { encryptChunk } = await import('./crypto.js');
+            const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
+            const aesKey = this.transferKeys.get(transfer.fileId);
+            const contact = await getContactByUpeerId(transfer.upeerId);
+            const freshAddress = contact?.address || transfer.peerAddress;
+
+            const chunkSize = transfer.chunkSize || 16384;
+            const offset = BigInt(chunkIndex) * BigInt(chunkSize);
+            const buffer = Buffer.alloc(chunkSize);
+            const { bytesRead } = await (handle as any).read(buffer, 0, buffer.length, offset);
+            const finalBuffer = bytesRead < chunkSize ? buffer.slice(0, bytesRead) : buffer;
+
+            const chunkMsg: any = { type: 'FILE_CHUNK', fileId: transfer.fileId, chunkIndex };
+            if (aesKey) {
+                const enc = encryptChunk(finalBuffer, aesKey);
+                chunkMsg.data = enc.data;
+                chunkMsg.iv = enc.iv;
+                chunkMsg.tag = enc.tag;
+            } else {
+                chunkMsg.data = finalBuffer.toString('base64');
+            }
+
+            this.send(freshAddress, chunkMsg, contact?.publicKey);
+            this.setRetryTimer(transfer.fileId, chunkIndex, transfer);
+        } catch (err) {
+            error('Error resending single chunk', err, 'file-transfer');
+        }
     }
 
     public clearRetryTimer(fileId: string, chunkIndex?: number) {
