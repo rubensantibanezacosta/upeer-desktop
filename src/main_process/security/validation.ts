@@ -500,6 +500,13 @@ export function validateFileProposal(data: any): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (!data.fileName || typeof data.fileName !== 'string') return { valid: false, error: 'Invalid fileName' };
     if (typeof data.fileSize !== 'number' || data.fileSize < 0) return { valid: false, error: 'Invalid fileSize' };
+    if (typeof data.totalChunks !== 'number' || data.totalChunks <= 0) return { valid: false, error: 'Invalid totalChunks' };
+    if (typeof data.chunkSize !== 'number' || data.chunkSize <= 0 || data.chunkSize > 32 * 1024) {
+        return { valid: false, error: 'Invalid chunkSize' };
+    }
+    if (Math.ceil(data.fileSize / data.chunkSize) !== data.totalChunks) {
+        return { valid: false, error: 'Inconsistent totalChunks' };
+    }
     // BUG DH fix: encryptedKey (NaCl box de 32-byte AES key → 48 bytes ciphertext = 96 hex)
     // y encryptedKeyNonce (NaCl nonce de 24 bytes = 48 hex) no tenían límite de longitud.
     // Buffer.from(data.encryptedKey, 'hex') en handleProposal asignaba hasta 5MB
@@ -524,10 +531,7 @@ export function validateFileChunk(data: any): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0) return { valid: false, error: 'Invalid chunkIndex' };
     if (!data.data || typeof data.data !== 'string') return { valid: false, error: 'Invalid chunk data' };
-    // BUG CN fix: limitar tamaño del payload del chunk para evitar OOM.
-    // Máx chunk 64 KB + AES-GCM overhead (28 bytes) = 65564 bytes → base64 ≈ 87420 chars.
-    // 200 000 chars es un margen amplio para cubrir cualquier variante de cifrado.
-    if (data.data.length > 200_000) return { valid: false, error: 'Chunk data too large' };
+    if (data.data.length > 50_000) return { valid: false, error: 'Chunk data too large' };
     // BUG DI fix: iv (AES-GCM nonce 12 bytes → 24 hex chars) y tag (auth tag 16 bytes → 32 hex
     // chars) sin validar longitud → decryptChunk() llama Buffer.from(iv, 'hex') que asigna
     // memoria arbitraria antes de que Node.js rechace el IV de tamaño incorrecto en createDecipheriv.
@@ -568,10 +572,7 @@ export function validateVaultStore(data: any): ValidationResult {
     // BUG DN fix: recipientSid sin límite → DB bloat. ID legítimo = 32 chars; '*' = 1 char.
     if (!data.recipientSid || typeof data.recipientSid !== 'string' || data.recipientSid.length > 64) return { valid: false, error: 'Invalid recipientSid' };
     if (!data.data || typeof data.data !== 'string') return { valid: false, error: 'Invalid data' };
-    // BUG U fix: sin límite de tamaño, un peer puede enviar un blob de varios GB
-    // que se parsea en memoria antes de que llegue la comprobación de quota.
-    // 2,000,000 chars hex = 1MB binario — cubre chunks de archivo (64KB típico) con margen.
-    if (data.data.length > 2_000_000) return { valid: false, error: 'Vault data too large' };
+    if (data.data.length > 150_000) return { valid: false, error: 'Vault data too large' };
     return { valid: true };
 }
 

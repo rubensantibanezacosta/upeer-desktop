@@ -11,6 +11,23 @@ import { ITransferManager } from './interfaces.js';
 import * as sender from './sender-logic.js';
 import * as receiver from './receiver-logic.js';
 
+async function readChunkFully(handle: any, length: number, position: number): Promise<Buffer> {
+    const buffer = Buffer.alloc(length);
+    let offset = 0;
+
+    while (offset < length) {
+        const { bytesRead } = await handle.read(buffer, offset, length - offset, position + offset);
+        if (bytesRead <= 0) break;
+        offset += bytesRead;
+    }
+
+    if (offset <= 0) {
+        throw new Error('Invalid chunk range or end of file reached');
+    }
+
+    return offset < length ? buffer.slice(0, offset) : buffer;
+}
+
 export class TransferManager implements ITransferManager {
     public store: FileTransferStore;
     public chunker: FileChunker;
@@ -176,9 +193,7 @@ export class TransferManager implements ITransferManager {
 
             const chunkSize = transfer.chunkSize || 16384;
             const fileOffset = chunkIndex * chunkSize;
-            const buffer = Buffer.alloc(chunkSize);
-            const { bytesRead } = await handle.read(buffer, 0, buffer.length, fileOffset);
-            const finalBuffer = bytesRead < chunkSize ? buffer.slice(0, bytesRead) : buffer;
+            const finalBuffer = await readChunkFully(handle, chunkSize, fileOffset);
 
             const chunkMsg: any = { type: 'FILE_CHUNK', fileId: transfer.fileId, chunkIndex };
             if (aesKey) {

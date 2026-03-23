@@ -655,7 +655,7 @@ describe('TransferManager - Core Orchestration', () => {
         expect(mockSend).toHaveBeenCalledWith('addr-fd', { type: 'FILE_DONE_ACK', fileId }, 'kfd');
     });
 
-    it('should finalize receiver via FILE_DONE when chunks were already written but finalizeTransfer had not been called', async () => {
+    it('should acknowledge FILE_DONE without finalizing receiver state', async () => {
         const fileId = 'id-filedone-trigger';
         (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fdt', publicKey: 'kfdt' });
 
@@ -675,7 +675,8 @@ describe('TransferManager - Core Orchestration', () => {
         await manager.handleMessage('p-fdt', 'addr-fdt', { type: 'FILE_DONE', fileId });
 
         const transfer = manager['store'].getTransfer(fileId, 'receiving');
-        expect(transfer?.state).toBe('completed');
+        expect(transfer?.state).toBe('active');
+        expect(mockSend).toHaveBeenCalledWith('addr-fdt', { type: 'FILE_DONE_ACK', fileId }, 'kfdt');
     });
 
     it('should not double-finalize on concurrent finalizeTransfer calls', async () => {

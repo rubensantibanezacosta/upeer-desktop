@@ -7,6 +7,17 @@ import { decryptChunk, unsealTransferKey } from './crypto.js';
 import { saveTransferToDB } from './db-helper.js';
 import type { TransferManager } from './transfer-manager.js';
 
+async function writeAll(handle: any, buffer: Buffer, position: number): Promise<void> {
+    let offset = 0;
+    while (offset < buffer.length) {
+        const { bytesWritten } = await handle.write(buffer, offset, buffer.length - offset, position + offset);
+        if (!bytesWritten || bytesWritten <= 0) {
+            throw new Error('Failed to write complete chunk to disk');
+        }
+        offset += bytesWritten;
+    }
+}
+
 export async function handleFileProposal(this: TransferManager, upeerId: string, address: string, data: any) {
     try {
         const existing = this.store.getTransfer(data.fileId, 'receiving');
@@ -152,7 +163,19 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
                 ? decryptChunk(data.data, data.iv, data.tag, aesKey)
                 : Buffer.from(data.data, 'base64');
 
-            await handle.write(chunkData, 0, chunkData.length, data.chunkIndex * transfer.chunkSize);
+            const chunkStart = data.chunkIndex * transfer.chunkSize;
+            const maxChunkLength = Math.min(transfer.chunkSize, transfer.fileSize - chunkStart);
+            if (chunkData.length <= 0 || chunkData.length > maxChunkLength) {
+                warn('Received chunk with invalid byte length, ignoring', {
+                    fileId: data.fileId,
+                    chunkIndex: data.chunkIndex,
+                    chunkLength: chunkData.length,
+                    maxChunkLength
+                }, 'file-transfer');
+                return;
+            }
+
+            await writeAll(handle, chunkData, chunkStart);
 
             transfer.pendingChunks.add(data.chunkIndex);
             const received = transfer.pendingChunks.size;
@@ -176,13 +199,6 @@ export async function handleFileDone(this: TransferManager, upeerId: string, add
     try {
         const contact = await getContactByUpeerId(upeerId);
         this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
-
-        await this.withTransferLock(data.fileId, async () => {
-            const transfer = this.store.getTransfer(data.fileId, 'receiving');
-            if (transfer && transfer.state !== 'completed' && transfer.chunksProcessed >= transfer.totalChunks) {
-                await this.finalizeTransfer(data.fileId, 'receiving');
-            }
-        });
     } catch (err) {
         error('Error handling FILE_DONE', err, 'file-transfer');
     }

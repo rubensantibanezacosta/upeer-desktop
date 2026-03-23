@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { FileTransfer } from './types.js';
+import { DEFAULT_CONFIG, FileTransfer } from './types.js';
 import { FileChunkData } from '../types.js';
 import { warn } from '../../security/secure-logger.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
@@ -9,7 +9,7 @@ import { metadataSanitizer } from './metadata-sanitizer.js';
 export class FileChunker {
     private chunkSize: number;
 
-    constructor(chunkSize: number = 1024 * 64) {
+    constructor(chunkSize: number = DEFAULT_CONFIG.maxChunkSize) {
         this.chunkSize = chunkSize;
     }
 
@@ -134,8 +134,8 @@ export class FileChunker {
         if (size <= 0) {
             throw new Error('Chunk size must be positive');
         }
-        if (size > 1024 * 1024) { // 1MB max
-            throw new Error('Chunk size cannot exceed 1MB');
+        if (size > DEFAULT_CONFIG.maxChunkSize) {
+            throw new Error(`Chunk size cannot exceed ${DEFAULT_CONFIG.maxChunkSize} bytes`);
         }
         this.chunkSize = size;
     }

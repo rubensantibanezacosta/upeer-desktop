@@ -12,10 +12,10 @@ import { getVouchScore } from '../../security/reputation/vouches.js';
  * ChunkVault handles the 200% resilience distribution for file attachments.
  */
 export class ChunkVault {
-    // Límites de segmentación dinámicos basados en reputación.
-    private static DEFAULT_SEGMENT_SIZE = 25 * 1024 * 1024; // 25MB (Base para desconocidos)
-    private static MAX_SEGMENT_SIZE = 100 * 1024 * 1024;    // 100MB (Máxima confianza)
-    private static MIN_SEGMENT_SIZE = 5 * 1024 * 1024;      // 5MB (Mínimo absoluto para nodos tóxicos)
+    private static MAX_BINARY_CHUNK_SIZE = 32 * 1024;
+    private static DEFAULT_SEGMENT_SIZE = 128 * 1024;
+    private static MAX_SEGMENT_SIZE = 128 * 1024;
+    private static MIN_SEGMENT_SIZE = 128 * 1024;
 
     // Systematic Reed-Solomon: 4 data blocks, 8 parity blocks (Total 12)
     private static coder = new ErasureCoder(4, 8);
@@ -46,7 +46,7 @@ export class ChunkVault {
      * Supports both direct buffers (small files) and file paths (large files with streaming).
      */
     static async replicateFile(fileHash: string, dataOrPath: Buffer | string, aesKey: Buffer, recipientSid = '*', fileId?: string) {
-        const threshold = 1024 * 1024; // 1MB for switching from mirroring to RS
+        const threshold = this.MAX_BINARY_CHUNK_SIZE;
 
         // If it's a buffer and small, use mirroring
         if (Buffer.isBuffer(dataOrPath) && dataOrPath.length < threshold) {

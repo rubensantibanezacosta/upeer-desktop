@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { FileTransfer } from './types.js';
+import { DEFAULT_CONFIG, FileTransfer } from './types.js';
 
 export interface FileValidationResult {
     name: string;
@@ -90,6 +90,15 @@ export class TransferValidator {
 
         if (typeof data.chunkSize !== 'number' || data.chunkSize <= 0) {
             throw new Error('Invalid chunkSize');
+        }
+
+        if (data.chunkSize > DEFAULT_CONFIG.maxChunkSize) {
+            throw new Error(`chunkSize exceeds limit: ${data.chunkSize} > ${DEFAULT_CONFIG.maxChunkSize}`);
+        }
+
+        const minExpectedChunks = Math.ceil(data.fileSize / data.chunkSize);
+        if (data.totalChunks !== minExpectedChunks) {
+            throw new Error(`Inconsistent totalChunks for fileSize/chunkSize: expected ${minExpectedChunks}, got ${data.totalChunks}`);
         }
 
         if (typeof data.fileHash !== 'string' || !/^[a-f0-9]{64}$/i.test(data.fileHash)) {

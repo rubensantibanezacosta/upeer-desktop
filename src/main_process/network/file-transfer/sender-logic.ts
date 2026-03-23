@@ -9,6 +9,23 @@ import { saveTransferToDB, updateTransferMessageStatus } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
 import type { TransferManager } from './transfer-manager.js';
 
+async function readChunkFully(handle: any, length: number, position: number): Promise<Buffer> {
+    const buffer = Buffer.alloc(length);
+    let offset = 0;
+
+    while (offset < length) {
+        const { bytesRead } = await handle.read(buffer, offset, length - offset, position + offset);
+        if (bytesRead <= 0) break;
+        offset += bytesRead;
+    }
+
+    if (offset <= 0) {
+        throw new Error('Invalid chunk range or end of file reached');
+    }
+
+    return offset < length ? buffer.slice(0, offset) : buffer;
+}
+
 export async function startSend(
     this: TransferManager,
     upeerId: string,
@@ -234,6 +251,8 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
             const doneMsg = { type: 'FILE_DONE', fileId: data.fileId };
             this.send(freshAddress, doneMsg, contact?.publicKey);
             this.startDoneRetry(data.fileId, upeerId, doneMsg);
+        } else if ((updated.nextChunkIndex || 0) < updated.totalChunks) {
+            await this.sendNextChunks(updated);
         }
     }
 }
@@ -376,9 +395,7 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
 
             const chunkSize = transfer.chunkSize || 16384;
             const offset = chunkIndex * chunkSize;
-            const buffer = Buffer.alloc(chunkSize);
-            const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset);
-            const finalBuffer = bytesRead < chunkSize ? buffer.slice(0, bytesRead) : buffer;
+            const finalBuffer = await readChunkFully(handle, chunkSize, offset);
 
             const chunkMsg: any = {
                 type: 'FILE_CHUNK',
