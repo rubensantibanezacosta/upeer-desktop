@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toMediaUrl, fromMediaUrl } from '../../../src/utils/fileUtils.js';
+import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../src/utils/videoPlayback.js';
 
 describe('toMediaUrl', () => {
     it('convierte ruta Linux absoluta', () => {
@@ -52,5 +53,21 @@ describe('fromMediaUrl', () => {
     it('es la inversa exacta de toMediaUrl en Windows (forward slashes)', () => {
         const original = 'C:/Users/user/AppData/Roaming/chat-p2p/assets/received/photo.jpg';
         expect(fromMediaUrl(toMediaUrl(original))).toBe(original);
+    });
+});
+
+describe('videoPlayback', () => {
+    it('detecta AVI como vídeo', () => {
+        expect(isVideoFile('video/x-msvideo', 'clip.avi')).toBe(true);
+    });
+
+    it('marca AVI como no reproducible inline', () => {
+        expect(supportsInlineVideoPlayback('video/x-msvideo', 'clip.avi')).toBe(false);
+        expect(getInlineVideoUnsupportedReason('video/x-msvideo', 'clip.avi')).toContain('no es compatible');
+    });
+
+    it('mantiene MP4 como reproducible inline', () => {
+        expect(supportsInlineVideoPlayback('video/mp4', 'clip.mp4')).toBe(true);
+        expect(getInlineVideoUnsupportedReason('video/mp4', 'clip.mp4')).toBeNull();
     });
 });

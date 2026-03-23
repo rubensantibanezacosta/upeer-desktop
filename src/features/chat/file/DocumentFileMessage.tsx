@@ -61,9 +61,6 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
     const getFileExtension = () => {
         const parts = fileName.split('.');
         const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
-        if (isVaulting) {
-            return isTransferFailed ? `VAULT FAILED • ${ext}` : `VAULT • ${ext}`;
-        }
         return ext;
     };
 

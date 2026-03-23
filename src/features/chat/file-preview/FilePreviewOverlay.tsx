@@ -24,7 +24,9 @@ import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
+import { UnsupportedVideoFallback } from '../../../components/ui/UnsupportedVideoFallback.js';
 import { getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
+import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../utils/videoPlayback.js';
 
 interface FileInfo {
     path: string;
@@ -368,6 +370,9 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 
     const currentFile = files[selectedIndex];
     const currentPreview = currentFile ? previews[currentFile.path] : null;
+    const isCurrentVideo = currentFile ? isVideoFile(currentFile.type, currentFile.name) : false;
+    const canPlayCurrentVideoInline = currentFile ? supportsInlineVideoPlayback(currentFile.type, currentFile.name) : false;
+    const currentVideoUnsupportedReason = currentFile ? getInlineVideoUnsupportedReason(currentFile.type, currentFile.name) : null;
 
     const handleSendAll = () => {
         const filesToSend = files.map(f => ({ ...f, path: assetPaths[f.path] || f.path }));
@@ -499,8 +504,18 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             {/* Preview area */}
             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4, overflow: 'hidden' }}>
                 {currentPreview?.previewUrl ? (
-                    (currentFile.type.startsWith('video/') || getMimeType(currentFile.name).startsWith('video/')) ? (
-                        <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
+                    isCurrentVideo ? (
+                        canPlayCurrentVideoInline ? (
+                            <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
+                        ) : (
+                            <UnsupportedVideoFallback
+                                compact
+                                fileName={currentFile.name}
+                                reason={currentVideoUnsupportedReason || 'Este vídeo no se puede reproducir aquí.'}
+                                thumbnailSrc={currentPreview.thumbnail || undefined}
+                                onAction={() => window.upeer.openFile(assetPaths[currentFile.path] || currentFile.path)}
+                            />
+                        )
                     ) : (
                         <Box component="img" src={currentPreview.previewUrl} sx={{ maxWidth: '90%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 'md', boxShadow: 'lg', transition: 'all 0.3s ease' }} />
                     )

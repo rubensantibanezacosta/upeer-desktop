@@ -61,6 +61,38 @@ function getFanOutAddresses(contact: any): string[] {
     return Array.from(addresses);
 }
 
+async function vaultChatForOfflineDelivery(
+    recipientUpeerId: string,
+    recipientPublicKey: string,
+    msgId: string,
+    content: string,
+    replyTo: string | undefined,
+    senderUpeerId: string,
+): Promise<number> {
+    const vaultEncrypted = encrypt(
+        Buffer.from(content, 'utf-8'),
+        Buffer.from(recipientPublicKey, 'hex')
+    );
+
+    const vaultData = {
+        type: 'CHAT',
+        id: msgId,
+        content: vaultEncrypted.ciphertext,
+        nonce: vaultEncrypted.nonce,
+        replyTo,
+    };
+
+    const vaultSig = sign(Buffer.from(canonicalStringify(vaultData)));
+    const innerPacket = {
+        ...vaultData,
+        senderUpeerId,
+        signature: vaultSig.toString('hex')
+    };
+
+    const { VaultManager } = await import('../vault/manager.js');
+    return VaultManager.replicateToVaults(recipientUpeerId, innerPacket);
+}
+
 export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<{ id: string; savedMessage: string } | undefined> {
     const selfId = getMyUPeerId();
     const msgId = crypto.randomUUID();
@@ -73,13 +105,8 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     }
 
     const contact = await getContactByUpeerId(upeerId);
-    if (!contact || contact.status !== 'connected' || !contact.publicKey) {
-        // Fix 3 — Resiliencia para contactos sin clave pública aún (nunca han conectado):
-        // En vez de descartar el mensaje, lo guardamos cifrado por SQLCipher en la outbox local.
-        // Se vaultea automáticamente cuando Bob conecte y enviemos su primer HANDSHAKE.
+    if (!contact || !contact.publicKey) {
         if (contact && !contact.publicKey) {
-            // Persistir localmente para que el usuario vea el mensaje en el historial.
-            // No hay firma aún (se firmará al vaultear durante el flush del outbox).
             await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
             const { savePendingOutboxMessage } = await import('../../storage/pending-outbox.js');
             await savePendingOutboxMessage(upeerId, msgId, content, replyTo);
@@ -87,6 +114,34 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
             return { id: msgId, savedMessage: content };
         }
         return undefined;
+    }
+
+    if (contact.status !== 'connected') {
+        const timestamp = Date.now();
+        await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent', selfId, timestamp);
+
+        try {
+            const nodes = await vaultChatForOfflineDelivery(
+                upeerId,
+                contact.publicKey,
+                msgId,
+                content,
+                replyTo,
+                selfId
+            );
+
+            if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted' as any)) {
+                const { BrowserWindow } = await import('electron');
+                setTimeout(() => {
+                    BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
+                }, 0);
+            }
+        } catch (err) {
+            error('Immediate vault replication failed for offline contact', err, 'vault');
+        }
+
+        startDhtSearch(upeerId, sendSecureUDPMessage);
+        return { id: msgId, savedMessage: content };
     }
 
     const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
@@ -289,36 +344,14 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 const freshContact = await getContactByUpeerId(upeerId);
                 if (!freshContact?.publicKey) return;
 
-                const { encrypt: encStatic } = await import('../../security/identity.js');
-                const vaultEncrypted = encStatic(
-                    Buffer.from(content, 'utf-8'),
-                    Buffer.from(freshContact.publicKey, 'hex')
+                const nodes = await vaultChatForOfflineDelivery(
+                    upeerId,
+                    freshContact.publicKey,
+                    msgId,
+                    content,
+                    replyTo,
+                    selfId
                 );
-
-                const vaultData = {
-                    type: 'CHAT',
-                    id: msgId,
-                    content: vaultEncrypted.ciphertext,
-                    nonce: vaultEncrypted.nonce,
-                    // No ratchetHeader: el receptor descifra con crypto_box al recibir del vault
-                    replyTo: replyTo
-                };
-
-                // Prepare a fully signed packet for the vault (inner packet).
-                // IMPORTANTE: la firma debe ser sobre vaultData (cifrado estático),
-                // NO sobre `data` que contiene el ciphertext DR/ephemeral diferente.
-                // La verificación en handleVaultDelivery hace:
-                //   verify(canonicalStringify(innerData), innerSig)  donde innerData == vaultData
-                const vaultSig = sign(Buffer.from(canonicalStringify(vaultData)));
-                const innerPacket = {
-                    ...vaultData,
-                    senderUpeerId: selfId,
-                    signature: vaultSig.toString('hex')
-                };
-
-                // Try to backup the message in friends' vaults
-                const { VaultManager } = await import('../vault/manager.js');
-                const nodes = await VaultManager.replicateToVaults(upeerId, innerPacket);
 
                 if (nodes > 0) {
                     const { updateMessageStatus } = await import('../../storage/messages/operations.js');

@@ -13,6 +13,8 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ShortcutOutlinedIcon from '@mui/icons-material/ShortcutOutlined';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { UnsupportedVideoFallback } from '../../../components/ui/UnsupportedVideoFallback.js';
+import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../utils/videoPlayback.js';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👎'];
 
@@ -40,9 +42,7 @@ interface MediaViewerOverlayProps {
 }
 
 const isVideo = (mime: string, fileName?: string) => {
-    const m = mime.toLowerCase();
-    const ext = fileName ? fileName.split('.').pop()?.toLowerCase() : '';
-    return m.startsWith('video/') || m === 'video/x-matroska' || ext === 'mkv';
+    return isVideoFile(mime, fileName);
 };
 
 // ── Video Player Component ───────────────────────────────────────────────────
@@ -265,6 +265,8 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
 
     const currentItem = items[currentIndex];
     const isMediaVideo = currentItem ? isVideo(currentItem.mimeType, currentItem.fileName) : false;
+    const canPlayInlineCurrentVideo = currentItem ? supportsInlineVideoPlayback(currentItem.mimeType, currentItem.fileName) : false;
+    const unsupportedCurrentVideoReason = currentItem ? getInlineVideoUnsupportedReason(currentItem.mimeType, currentItem.fileName) : null;
 
     // Handle index change
     useEffect(() => {
@@ -426,11 +428,24 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
 
                 {!loading && !error && contentUrl && (
                     isMediaVideo ? (
-                        <VideoPlayerWithControls
-                            src={contentUrl}
-                            fileName={currentItem.fileName}
-                            onVideoError={() => setError('El formato de video o sus codecs no son compatibles con el reproductor interno.')}
-                        />
+                        canPlayInlineCurrentVideo ? (
+                            <VideoPlayerWithControls
+                                src={contentUrl}
+                                fileName={currentItem.fileName}
+                                onVideoError={() => setError('El formato de video o sus codecs no son compatibles con el reproductor interno.')}
+                            />
+                        ) : (
+                            <UnsupportedVideoFallback
+                                fileName={currentItem.fileName}
+                                reason={unsupportedCurrentVideoReason || 'Este vídeo no se puede reproducir en el visor integrado.'}
+                                thumbnailSrc={currentItem.thumbnail || generatedThumbnails[currentItem.fileId]}
+                                onAction={async () => {
+                                    const cleanPath = fromMediaUrl(contentUrl);
+                                    await window.upeer.openFile(cleanPath);
+                                    onClose();
+                                }}
+                            />
+                        )
                     ) : (
                         <img
                             key={currentIndex}

@@ -92,8 +92,9 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
     const getStatusText = () => {
         // Support for new social mesh phases (numeric values from TransferPhase enum)
         const phase = (transfer as any).phase;
-        if (phase === 3) return 'Replicando en red social...'; // REPLICATING
-        if (phase === 4) return 'Guardado (Vaulted)'; // VAULTED
+        if (phase === 3 || phase === 4) {
+            return direction === 'sending' ? 'Enviando...' : 'Recibiendo...';
+        }
 
         switch (state) {
             case 'completed': return 'Completado';
