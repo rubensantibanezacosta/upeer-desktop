@@ -110,12 +110,12 @@ export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?:
 
     socks5Connect(ip, YGG_PORT)
         .then((sock) => {
-            recordIPSuccess(ip);
+            if (!isFileTransfer) recordIPSuccess(ip);
             sock.write(framedBuf);
             sock.end(() => sock.destroy());
         })
         .catch((_err: Error) => {
             error(`TCP send error to ${ip}: ${_err.message}`, undefined, 'network');
-            recordIPFailure(ip);
+            if (!isFileTransfer) recordIPFailure(ip);
         });
 }
