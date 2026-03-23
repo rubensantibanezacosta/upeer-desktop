@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { encrypt as identityEncrypt, decrypt as identityDecrypt } from '../../security/identity.js';
+import sodium from 'sodium-native';
+import { decryptSealed } from '../../security/identity.js';
 
 export function generateTransferKey(): Buffer {
     return crypto.randomBytes(32); // AES-256 key
@@ -20,19 +21,24 @@ export function decryptChunk(data: string, iv: string, tag: string, key: Buffer)
 }
 
 /**
- * Seals the AES key for a peer using NaCl box (static for now as per current architecture)
+ * Seals the AES key for a peer using sealed box over the peer static identity key.
  */
-export function sealTransferKey(aesKey: Buffer, peerPublicKey: string): { nonce: string; ciphertext: string } {
-    return identityEncrypt(aesKey, Buffer.from(peerPublicKey, 'hex'));
+export function sealTransferKey(aesKey: Buffer, peerPublicKey: string): { nonce?: string; ciphertext: string } {
+    const recipientEdPk = Buffer.from(peerPublicKey, 'hex');
+    const recipientCurvePk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
+    sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePk, recipientEdPk);
+
+    const ciphertext = Buffer.alloc(aesKey.length + sodium.crypto_box_SEALBYTES);
+    sodium.crypto_box_seal(ciphertext, aesKey, recipientCurvePk);
+
+    return { ciphertext: ciphertext.toString('hex') };
 }
 
 /**
  * Unseals the AES key from a peer
  */
-export function unsealTransferKey(encryptedKey: string, nonce: string, peerPublicKey: string): Buffer | null {
-    return identityDecrypt(
-        Buffer.from(nonce, 'hex'),
-        Buffer.from(encryptedKey, 'hex'),
-        Buffer.from(peerPublicKey, 'hex')
-    );
+export function unsealTransferKey(encryptedKey: string, nonce?: string, peerPublicKey?: string): Buffer | null {
+    void nonce;
+    void peerPublicKey;
+    return decryptSealed(Buffer.from(encryptedKey, 'hex'));
 }

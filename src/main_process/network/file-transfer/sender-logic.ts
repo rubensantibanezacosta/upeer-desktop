@@ -133,7 +133,7 @@ export async function startSend(
         this.store.updateTransfer(transfer.fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });
 
         const contact = await getContactByUpeerId(upeerId);
-        const peerKey = contact?.ephemeralPublicKey || contact?.publicKey;
+        const peerKey = contact?.publicKey;
         let encryptedKey: string | undefined;
         let encryptedKeyNonce: string | undefined;
 
@@ -165,7 +165,7 @@ export async function startSend(
             totalChunks: transfer.totalChunks,
             chunkSize: transfer.chunkSize,
             fileHash: transfer.fileHash,
-            ...(encryptedKey ? { encryptedKey, encryptedKeyNonce, useRecipientEphemeral: !!contact?.ephemeralPublicKey } : {}),
+            ...(encryptedKey ? { encryptedKey, ...(encryptedKeyNonce ? { encryptedKeyNonce } : {}), useRecipientEphemeral: false } : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: transfer.caption,
         };
@@ -357,7 +357,7 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
             totalChunks: currentTransfer.totalChunks,
             chunkSize: currentTransfer.chunkSize,
             fileHash: currentTransfer.fileHash,
-            ...(vaultEncKey ? { encryptedKey: vaultEncKey, encryptedKeyNonce: vaultEncKeyNonce, useRecipientEphemeral: false } : {}),
+            ...(vaultEncKey ? { encryptedKey: vaultEncKey, ...(vaultEncKeyNonce ? { encryptedKeyNonce: vaultEncKeyNonce } : {}), useRecipientEphemeral: false } : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: currentTransfer.caption,
         };

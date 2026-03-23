@@ -55,11 +55,13 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             }
         }
 
-        if (data.encryptedKey && data.encryptedKeyNonce) {
-            const senderKey = contact?.ephemeralPublicKey || contact?.publicKey;
-            if (senderKey) {
-                const aesKey = unsealTransferKey(data.encryptedKey, data.encryptedKeyNonce, senderKey);
-                if (aesKey) this.transferKeys.set(data.fileId, aesKey);
+        if (data.encryptedKey) {
+            const aesKey = unsealTransferKey(data.encryptedKey, data.encryptedKeyNonce, contact?.publicKey);
+            if (aesKey) {
+                this.transferKeys.set(data.fileId, aesKey);
+                debug('Transfer AES key unsealed', { fileId: data.fileId }, 'file-transfer');
+            } else {
+                warn('Failed to unseal transfer AES key', { fileId: data.fileId }, 'file-transfer');
             }
         }
 
