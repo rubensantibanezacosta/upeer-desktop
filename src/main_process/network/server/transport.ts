@@ -105,7 +105,8 @@ export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?:
         return;
     }
 
-    if (isIPBlocked(ip)) return;
+    const isFileTransfer = typeof data.type === 'string' && data.type.startsWith('FILE_');
+    if (!isFileTransfer && isIPBlocked(ip)) return;
 
     socks5Connect(ip, YGG_PORT)
         .then((sock) => {
