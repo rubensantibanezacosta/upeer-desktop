@@ -96,7 +96,8 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
                 upeerId: effectiveId,
                 filePath: file.path,
                 thumbnail: thumbnails?.[i],
-                caption: captions?.[i]
+                caption: captions?.[i],
+                fileName: file.name
             });
             if (result.success && result.fileId) {
                 const tempHash = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

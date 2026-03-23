@@ -167,7 +167,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
             </Box>
 
             {/* Transfer state overlay */}
-            {!isTransferComplete && (
+            {!isTransferComplete && (isTransferInProgress || isTransferFailed) && (
                 <Box sx={{
                     position: 'absolute', top: '50%', left: '50%',
                     transform: 'translate(-50%, -50%)',

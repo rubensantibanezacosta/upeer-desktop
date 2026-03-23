@@ -9,7 +9,7 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
  */
 export function registerFileTransferHandlers(): void {
   // File transfer handlers (Phase 16)
-  ipcMain.handle('start-file-transfer', async (event, { upeerId, filePath, thumbnail, caption, isVoiceNote }) => {
+  ipcMain.handle('start-file-transfer', async (event, { upeerId, filePath, thumbnail, caption, isVoiceNote, fileName }) => {
     try {
       // BUG CW fix: un renderer comprometido (XSS en contenido del chat) podría llamar a
       // start-file-transfer con filePath='~/.ssh/id_rsa' y el proceso principal leería y
@@ -41,7 +41,7 @@ export function registerFileTransferHandlers(): void {
           if (memberId === myId) continue;
           const contact = await getContactByUpeerId(memberId);
           if (contact && contact.status === 'connected') {
-            const fid = await fileTransferManager.startSend(memberId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote);
+            const fid = await fileTransferManager.startSend(memberId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
             if (!firstFileId) firstFileId = fid;
           }
         }
@@ -55,7 +55,7 @@ export function registerFileTransferHandlers(): void {
         return { success: false, error: 'Contact not connected' };
       }
 
-      const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote);
+      const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
       return { success: true, fileId };
     } catch (err: any) {
       logError('Error starting file transfer', { err: String(err) }, 'file-transfer');

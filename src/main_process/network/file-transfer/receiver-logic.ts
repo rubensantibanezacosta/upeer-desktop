@@ -123,6 +123,11 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
 
         if (transfer.state !== 'active') return;
 
+        if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0 || data.chunkIndex >= transfer.totalChunks) {
+            warn('Received chunk with invalid index, ignoring', { fileId: data.fileId, chunkIndex: data.chunkIndex, totalChunks: transfer.totalChunks }, 'file-transfer');
+            return;
+        }
+
         if (transfer.pendingChunks && transfer.pendingChunks.has(data.chunkIndex)) {
             const contact = await getContactByUpeerId(upeerId);
             this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex }, contact?.publicKey);

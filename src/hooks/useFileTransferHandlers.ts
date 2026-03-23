@@ -89,7 +89,9 @@ export const useFileTransferHandlers = ({
                 const result = await fileTransfer.startTransfer({
                     upeerId: targetUpeerId,
                     filePath: file.path,
-                    thumbnail // Pass thumbnail if available
+                    thumbnail,
+                    caption,
+                    fileName: file.name
                 });
 
                 if (result.success && result.fileId) {

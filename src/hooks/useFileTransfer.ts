@@ -56,6 +56,7 @@ export interface StartTransferParams {
   thumbnail?: string;
   caption?: string;
   isVoiceNote?: boolean;
+  fileName?: string;
 }
 
 export interface SaveFileParams {
@@ -183,7 +184,8 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
         params.filePath,
         params.thumbnail,
         params.caption,
-        params.isVoiceNote
+        params.isVoiceNote,
+        params.fileName
       );
 
       if (result.success) {

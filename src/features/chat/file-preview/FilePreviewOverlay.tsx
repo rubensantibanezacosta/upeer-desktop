@@ -78,6 +78,7 @@ const useFilesPreview = (files: FileInfo[]) => {
                 } catch { resolveOnce(''); }
             };
             img.onerror = () => { clearTimeout(timeout); resolveOnce(''); };
+            img.crossOrigin = 'anonymous';
             img.src = imageUrl;
         });
 

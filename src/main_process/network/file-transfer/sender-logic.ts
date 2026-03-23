@@ -16,7 +16,8 @@ export async function startSend(
     filePath: string,
     thumbnail?: string,
     caption?: string,
-    isVoiceNote?: boolean
+    isVoiceNote?: boolean,
+    fileName?: string
 ): Promise<string> {
     try {
         const preliminaryMime = this.validator.detectMimeType(filePath);
@@ -50,7 +51,7 @@ export async function startSend(
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
         const totalChunks = this.chunker.calculateChunks(fileInfo.size);
 
-        const originalFileName = path.basename(filePath) || fileInfo.name;
+        const originalFileName = fileName || path.basename(filePath) || fileInfo.name;
 
         const transfer = this.store.createTransfer({
             upeerId,

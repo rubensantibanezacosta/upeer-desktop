@@ -5,7 +5,7 @@ import started from 'electron-squirrel-startup';
 
 // Registrar el esquema como privilegiado para permitir streaming (range requests)
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'media', privileges: { stream: true, bypassCSP: true, secure: true, supportFetchAPI: true } }
+  { scheme: 'media', privileges: { stream: true, bypassCSP: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
 ]);
 
 // BUG FIX: Deshabilitar aceleración de hardware en Linux para corregir

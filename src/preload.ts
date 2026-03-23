@@ -134,7 +134,7 @@ contextBridge.exposeInMainWorld('upeer', {
         ipcRenderer.on('focus-conversation', (event, data) => callback(data));
     },
     // File transfer API (Phase 16)
-    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption, isVoiceNote }),
+    startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean, fileName?: string) => ipcRenderer.invoke('start-file-transfer', { upeerId, filePath, thumbnail, caption, isVoiceNote, fileName }),
     cancelFileTransfer: (fileId: string, reason?: string) => ipcRenderer.invoke('cancel-file-transfer', { fileId, reason: reason || 'User cancelled' }),
     retryFileTransfer: (fileId: string) => ipcRenderer.invoke('retry-file-transfer', { fileId }),
     getFileTransfers: () => ipcRenderer.invoke('get-file-transfers'),
