@@ -7,6 +7,10 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
+    saveVaultEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
 }));
@@ -141,5 +145,133 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const callArgs = mockKademlia.storeValue.mock.calls[0];
         expect(callArgs[1].custodians).toContain('friend-success');
         expect(callArgs[1].custodians).not.toContain('friend-fail');
+    });
+});
+
+describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer network)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('stores message locally when only 2 peers and recipient is offline', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+
+        // Escenario real: getContacts() no incluye al propio nodo — solo el contacto offline.
+        // Sin terceros disponibles ni kademlia → ningún candidato → saveVaultEntry como self-custodian.
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'recipient-offline', address: '200::2', status: 'disconnected', lastSeen: new Date().toISOString() }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+
+        const packet = { type: 'CHAT', content: 'hola que pasa' };
+        const result = await VaultManager.replicateToVaults('recipient-offline', packet);
+
+        expect(result).toBe(1);
+        expect(sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(saveVaultEntry).toHaveBeenCalledOnce();
+
+        const [hash, recipientSid, senderSid, priority, data, expiresAt] = vi.mocked(saveVaultEntry).mock.calls[0];
+        expect(typeof hash).toBe('string');
+        expect(hash).toHaveLength(64);
+        expect(recipientSid).toBe('recipient-offline');
+        expect(senderSid).toBe('my-peer-id');
+        expect(priority).toBe(1);
+        expect(JSON.parse(Buffer.from(data, 'hex').toString())).toEqual(packet);
+        expect(expiresAt).toBeGreaterThan(Date.now());
+    });
+
+    it('stores message locally when kademlia returns no extra nodes and all candidates are filtered', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        const mockKademlia = { findClosestContacts: vi.fn().mockReturnValue([]) };
+        vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as any);
+
+        // Solo el recipient offline — kademlia devuelve array vacío → ningún candidato
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'target-peer', address: '200::2', status: 'disconnected' }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(6);
+
+        const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT', content: 'msg' });
+
+        expect(result).toBe(1);
+        expect(saveVaultEntry).toHaveBeenCalledOnce();
+    });
+
+    it('does NOT use self-custodian when third-party custodians are available', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+        vi.mocked(sendSecureUDPMessage).mockResolvedValue(undefined);
+
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'my-peer-id', address: '200::1', status: 'connected' },
+            { upeerId: 'target-peer', address: '200::2', status: 'disconnected' },
+            { upeerId: 'third-party-1', address: '200::3', status: 'connected', lastSeen: new Date().toISOString() },
+            { upeerId: 'third-party-2', address: '200::4', status: 'connected', lastSeen: new Date().toISOString() }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
+
+        const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT' });
+
+        expect(result).toBe(2);
+        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(saveVaultEntry).not.toHaveBeenCalled();
+    });
+
+    it('self-custodian stores data with TTL that does not exceed VAULT_TTL_MS', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+        // Sin self en la lista → ningún candidato → saveVaultEntry
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'offline-peer', address: '200::2', status: 'disconnected' }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+
+        const beforeCall = Date.now();
+        await VaultManager.replicateToVaults('offline-peer', { type: 'CHAT' });
+        const afterCall = Date.now();
+
+        const { VAULT_TTL_MS } = await import('../../../src/main_process/network/vault/manager.js');
+        const [, , , , , expiresAt] = vi.mocked(saveVaultEntry).mock.calls[0];
+
+        expect(expiresAt).toBeGreaterThanOrEqual(beforeCall + VAULT_TTL_MS - 100);
+        expect(expiresAt).toBeLessThanOrEqual(afterCall + VAULT_TTL_MS + 100);
+    });
+
+    it('uses payloadHashOverride when provided in self-custodian path', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'offline', status: 'disconnected' }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+
+        const fixedHash = 'a'.repeat(64);
+        await VaultManager.replicateToVaults('offline', { type: 'CHAT' }, undefined, fixedHash);
+
+        const [storedHash] = vi.mocked(saveVaultEntry).mock.calls[0];
+        expect(storedHash).toBe(fixedHash);
     });
 });

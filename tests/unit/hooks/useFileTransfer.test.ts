@@ -113,6 +113,78 @@ describe('useFileTransfer hook', () => {
         }));
     });
 
+    it('passes savedPath to callback when receiving side completes with tempPath', async () => {
+        const onStateChange = vi.fn();
+        const initialTransfer = { fileId: 'recv-1', direction: 'receiving', state: 'active', progress: 99 };
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: [initialTransfer] });
+
+        renderHook(() => useFileTransfer(onStateChange));
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+        const completionHandler = mockUpeer.onFileTransferCompleted.mock.calls[0][0];
+
+        await act(async () => {
+            completionHandler({
+                fileId: 'recv-1',
+                fileHash: 'abc123hash',
+                direction: 'receiving',
+                tempPath: '/home/user/.config/chat-p2p/assets/received/recv-1.jpg'
+            });
+        });
+
+        expect(onStateChange).toHaveBeenCalledWith('recv-1', {
+            fileHash: 'abc123hash',
+            transferState: 'completed',
+            savedPath: '/home/user/.config/chat-p2p/assets/received/recv-1.jpg'
+        });
+    });
+
+    it('does NOT pass savedPath to callback when sending side completes', async () => {
+        const onStateChange = vi.fn();
+        const initialTransfer = { fileId: 'send-1', direction: 'sending', state: 'active', progress: 99 };
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: [initialTransfer] });
+
+        renderHook(() => useFileTransfer(onStateChange));
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+        const completionHandler = mockUpeer.onFileTransferCompleted.mock.calls[0][0];
+
+        await act(async () => {
+            completionHandler({
+                fileId: 'send-1',
+                fileHash: 'deadbeef',
+                direction: 'sending',
+                tempPath: '/tmp/some-original-path.jpg'
+            });
+        });
+
+        const callArgs = onStateChange.mock.calls[0][1];
+        expect(callArgs.savedPath).toBeUndefined();
+        expect(callArgs.transferState).toBe('completed');
+        expect(callArgs.fileHash).toBe('deadbeef');
+    });
+
+    it('passes savedPath as undefined when receiving completes without tempPath', async () => {
+        const onStateChange = vi.fn();
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: [] });
+
+        renderHook(() => useFileTransfer(onStateChange));
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+        const completionHandler = mockUpeer.onFileTransferCompleted.mock.calls[0][0];
+
+        await act(async () => {
+            completionHandler({
+                fileId: 'recv-2',
+                fileHash: 'somehash',
+                direction: 'receiving'
+            });
+        });
+
+        const callArgs = onStateChange.mock.calls[0][1];
+        expect(callArgs.savedPath).toBeUndefined();
+    });
+
     it('should call startFileTransfer IPC when startTransfer is called', async () => {
         mockUpeer.startFileTransfer.mockResolvedValue({ success: true, fileId: 'new-file' });
         const { result } = renderHook(() => useFileTransfer());
