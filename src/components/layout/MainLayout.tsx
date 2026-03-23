@@ -118,7 +118,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     }
 
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
-    const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || chatStore.incomingRequests[targetUpeerId]?.untrustworthy;
+    const incomingRequest = chatStore.incomingRequests[targetUpeerId];
+    const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
+    const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
 
     const handleForward = async (targets: { id: string; isGroup: boolean }[]) => {
         if (!forwardingMsg) return;
@@ -221,7 +223,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                         isTyping={!!chatStore.typingStatus[targetUpeerId]}
                                         status={activeContact?.status}
                                         lastSeen={activeContact?.lastSeen}
-                                        vouchScore={activeContact?.vouchScore}
+                                        vouchScore={effectiveVouchScore}
                                         onDelete={() => handleDeleteContact(targetUpeerId)}
                                         onShare={() => navigation.setShareModalOpen(true)}
                                         onAccept={isIncomingRequest ? undefined : () => handleAcceptContact(targetUpeerId)}
@@ -233,11 +235,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                     <IncomingRequestChat
                                         contactName={activeContact?.name}
                                         avatar={activeContactAvatar}
-                                        receivedAt={chatStore.incomingRequests[targetUpeerId]?.receivedAt}
+                                        receivedAt={incomingRequest?.receivedAt}
                                         onAccept={() => handleAcceptContact(targetUpeerId)}
                                         onReject={handleBlockContact}
                                         untrustworthyInfo={untrustworthyInfo}
-                                        vouchScore={activeContact?.vouchScore}
+                                        vouchScore={effectiveVouchScore}
                                     />
                                 ) : (
                                     <Box onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', overflow: 'hidden' }}>

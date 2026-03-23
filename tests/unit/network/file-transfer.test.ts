@@ -155,6 +155,35 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.state).toBe('completed');
     });
 
+    it('should accept vault-delivered FILE_PROPOSAL signed without sender metadata', async () => {
+        const { verify } = await import('../../../src/main_process/security/identity.js');
+        (verify as any).mockImplementation((message: Buffer) => !message.toString().includes('"senderUpeerId"'));
+
+        const fileId = '550e8400-e29b-41d4-a716-446655440005';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'vaulted.txt',
+            fileSize: 50,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'b'.repeat(64),
+            senderUpeerId: 'peer1',
+            signature: 'sig'
+        };
+
+        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        const transfer = manager.getTransfer(fileId, 'receiving');
+        expect(transfer).toBeDefined();
+        expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_ACCEPT' }), 'pubkey');
+
+        (verify as any).mockImplementation(() => true);
+    });
+
     it('should handle selective ACKs and retransmissions correctly', async () => {
         (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
             name: 'retry.txt',

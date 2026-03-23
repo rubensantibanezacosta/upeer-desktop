@@ -179,18 +179,26 @@ export function computeScore(
     }
 }
 
+export async function getDirectContactIds(): Promise<Set<string>> {
+    try {
+        const { getContacts } = await import('../../storage/contacts/operations.js');
+        const contacts = await getContacts();
+        return new Set<string>(
+            contacts
+                .filter((c: any) => (c.status === 'connected' || c.status === 'offline') && c.upeerId)
+                .map((c: any) => c.upeerId as string),
+        );
+    } catch {
+        return new Set<string>();
+    }
+}
+
 /**
  * Versión conveniente que obtiene los contactos directos desde la DB.
  */
 export async function getVouchScore(toId: string): Promise<number> {
     try {
-        const { getContacts } = await import('../../storage/contacts/operations.js');
-        const contacts = getContacts() as any[];
-        const directContactIds = new Set<string>(
-            contacts
-                .filter((c: any) => c.status === 'connected' && c.upeerId)
-                .map((c: any) => c.upeerId as string),
-        );
+        const directContactIds = await getDirectContactIds();
         return computeScore(toId, directContactIds);
     } catch {
         return 50;

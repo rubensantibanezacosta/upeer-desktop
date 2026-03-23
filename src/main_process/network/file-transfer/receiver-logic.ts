@@ -1,10 +1,11 @@
 import { warn, error, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
-import { verify, sign } from '../../security/identity.js';
+import { sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { TransferPhase } from './types.js';
 import { decryptChunk, unsealTransferKey } from './crypto.js';
 import { saveTransferToDB } from './db-helper.js';
+import { verifyFileTransferPacketSignature } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
 async function writeAll(handle: any, buffer: Buffer, position: number): Promise<void> {
@@ -41,18 +42,9 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         }
 
         const contact = await getContactByUpeerId(upeerId);
-        if (data.signature) {
-            const proposalCopy = { ...data };
-            delete proposalCopy.signature;
-            const isValid = verify(
-                Buffer.from(canonicalStringify(proposalCopy)),
-                Buffer.from(data.signature, 'hex'),
-                Buffer.from(contact?.publicKey || '', 'hex')
-            );
-            if (!isValid) {
-                warn('Invalid signature on file proposal', { upeerId, fileId: data.fileId }, 'file-transfer');
-                return;
-            }
+        if (data.signature && !verifyFileTransferPacketSignature(data, contact?.publicKey)) {
+            warn('Invalid signature on file proposal', { upeerId, fileId: data.fileId }, 'file-transfer');
+            return;
         }
 
         if (data.encryptedKey) {

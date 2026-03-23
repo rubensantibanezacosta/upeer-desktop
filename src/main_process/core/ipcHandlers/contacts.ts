@@ -12,7 +12,7 @@ import {
 import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
 import { sendChatClear } from '../../network/messaging/chat.js';
-import { computeScore } from '../../security/reputation/vouches.js';
+import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
 
 /**
  * Registra los manejadores IPC relacionados con contactos
@@ -20,12 +20,7 @@ import { computeScore } from '../../security/reputation/vouches.js';
 export function registerContactHandlers(): void {
   ipcMain.handle('get-contacts', async () => {
     const contacts = await getContacts();
-
-    const directContactIds = new Set<string>(
-      contacts
-        .filter((c: any) => c.status === 'connected' && c.upeerId)
-        .map((c: any) => c.upeerId as string)
-    );
+    const directContactIds = await getDirectContactIds();
 
     return contacts.map(contact => {
       let known: string[] = [];

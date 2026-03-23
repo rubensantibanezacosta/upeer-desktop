@@ -105,7 +105,7 @@ export async function handleHandshakeReq(
 
     const { getContacts: _gc } = await import('../../storage/contacts/operations.js').catch(() => ({ getContacts: () => [] })) as any;
     const _contacts = _gc() as any[];
-    const _directIds = new Set<string>(_contacts.filter((c: any) => c.status === 'connected' && c.upeerId).map((c: any) => c.upeerId as string));
+    const _directIds = new Set<string>(_contacts.filter((c: any) => (c.status === 'connected' || c.status === 'offline') && c.upeerId).map((c: any) => c.upeerId as string));
     const vouchScore = computeScore(senderUpeerId, _directIds);
     if (vouchScore < 40) {
         security('Low vouch score contact detected', { upeerId: senderUpeerId, score: vouchScore, ip: rinfo.address }, 'reputation');

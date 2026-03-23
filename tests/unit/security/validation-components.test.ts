@@ -172,8 +172,24 @@ describe('Validation - Advanced Components', () => {
             expect(validateMessage('DHT_STORE_ACK', { key: 'a'.repeat(40) }).valid).toBe(true);
 
             // File types
-            expect(validateMessage('FILE_PROPOSAL', { fileId: 'f', fileName: 'n', fileSize: 1 }).valid).toBe(true);
-            expect(validateMessage('FILE_START', { fileId: 'f', fileName: 'n', fileSize: 1 }).valid).toBe(true);
+            expect(validateMessage('FILE_PROPOSAL', {
+                fileId: '550e8400-e29b-41d4-a716-446655440001',
+                fileName: 'n',
+                fileSize: 1,
+                mimeType: 'application/octet-stream',
+                totalChunks: 1,
+                chunkSize: 1,
+                fileHash: 'a'.repeat(64)
+            }).valid).toBe(true);
+            expect(validateMessage('FILE_START', {
+                fileId: '550e8400-e29b-41d4-a716-446655440002',
+                fileName: 'n',
+                fileSize: 1,
+                mimeType: 'application/octet-stream',
+                totalChunks: 1,
+                chunkSize: 1,
+                fileHash: 'b'.repeat(64)
+            }).valid).toBe(true);
             expect(validateMessage('FILE_ACCEPT', { fileId: 'f' }).valid).toBe(true);
             expect(validateMessage('FILE_CHUNK', { fileId: 'f', chunkIndex: 0, data: 'd' }).valid).toBe(true);
             expect(validateMessage('FILE_CHUNK_ACK', { fileId: 'f', chunkIndex: 0 }).valid).toBe(true);
@@ -181,6 +197,15 @@ describe('Validation - Advanced Components', () => {
             expect(validateMessage('FILE_DONE_ACK', { fileId: 'f' }).valid).toBe(true);
             expect(validateMessage('FILE_END', { fileId: 'f' }).valid).toBe(true);
             expect(validateMessage('FILE_CANCEL', { fileId: 'f' }).valid).toBe(true);
+            expect(validateMessage('FILE_PROPOSAL', {
+                fileId: '550e8400-e29b-41d4-a716-446655440099',
+                fileName: 'archivo.bin',
+                fileSize: 65536,
+                mimeType: 'application/octet-stream',
+                totalChunks: 1,
+                chunkSize: 64 * 1024,
+                fileHash: 'a'.repeat(64)
+            }).valid).toBe(true);
 
             // Vault types
             expect(validateMessage('VAULT_STORE', { payloadHash: 'a', recipientSid: 'b', data: 'd' }).valid).toBe(true);

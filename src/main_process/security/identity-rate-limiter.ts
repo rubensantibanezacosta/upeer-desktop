@@ -1,5 +1,5 @@
 import { RateLimiter, RateLimitRule, RateLimitConfig } from './rate-limiter.js';
-import { computeScore } from './reputation/vouches.js';
+import { computeScore, getDirectContactIds } from './reputation/vouches.js';
 import { warn } from './secure-logger.js';
 
 interface IdentityTokenBucket {
@@ -15,13 +15,7 @@ async function _getDirectContactIds(): Promise<Set<string>> {
     const now = Date.now();
     if (now - _cacheTs < _CACHE_TTL) return _cachedDirectIds;
     try {
-        const { getContacts } = await import('../storage/contacts/operations.js');
-        const contacts = (getContacts() as any[]);
-        _cachedDirectIds = new Set<string>(
-            contacts
-                .filter((c: any) => c.status === 'connected' && c.upeerId)
-                .map((c: any) => c.upeerId as string)
-        );
+        _cachedDirectIds = await getDirectContactIds();
         _cacheTs = now;
     } catch (err) {
         const { error } = await import('./secure-logger.js');
@@ -95,7 +89,8 @@ export class IdentityRateLimiter extends RateLimiter {
     }
 
     private getAdjustedRule(upeerId: string, _messageType: string, baseRule: RateLimitConfig): RateLimitConfig {
-        const vouchScore = computeScore(upeerId, _cachedDirectIds);
+        const directIds = _cachedDirectIds;
+        const vouchScore = directIds.size > 0 ? computeScore(upeerId, directIds) : 50;
         const reputationMultiplier = this.calculateReputationMultiplier(vouchScore);
 
         const adjustedMaxTokens = Math.max(1, Math.floor(baseRule.maxTokens * reputationMultiplier));

@@ -1,7 +1,7 @@
 import { VaultStoreData, VaultQueryData } from '../../types.js';
 import { saveVaultEntry, getVaultEntriesForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
 import { security, network, warn, debug } from '../../../security/secure-logger.js';
-import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
+import { computeScore, getDirectContactIds, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
 
 /** Número máximo de entradas por respuesta VAULT_DELIVERY (anti-OOM) */
@@ -27,13 +27,7 @@ export async function handleVaultStore(senderSid: string, data: VaultStoreData, 
     // computeScorePure filtra todos los vouches que no provengan de directContactIds.
     // Si el conjunto está vacío, delta=0 → score=50 siempre → protección Sybil nunca dispara
     // y los tiers de cuota (score>=65, >=80) nunca aplican. Hay que pasar los contactos reales.
-    const { getContacts: _getContactsForScore } = await import('../../../storage/contacts/operations.js');
-    const _allContacts = _getContactsForScore() as any[];
-    const _directIds = new Set<string>(
-        _allContacts
-            .filter((c: any) => c.status === 'connected' && c.upeerId)
-            .map((c: any) => c.upeerId as string)
-    );
+    const _directIds = await getDirectContactIds();
     const vouchScore = computeScore(senderSid, _directIds);
     if (vouchScore < 30) {
         security('Refusing vault storage for untrusted node', { senderSid, vouchScore }, 'vault');
@@ -221,13 +215,7 @@ export async function handleVaultRenew(
     // Autorización:
     // 1. El remitente es el dueño original de la entry (senderSid === entry.senderSid).
     // 2. O el remitente es un custodio de confianza (score >= 65) que está ayudando a la red (RepairWorker).
-    const { getContacts: _getContactsForScore } = await import('../../../storage/contacts/operations.js');
-    const _allContacts = _getContactsForScore() as any[];
-    const _directIds = new Set<string>(
-        _allContacts
-            .filter((c: any) => c.status === 'connected' && c.upeerId)
-            .map((c: any) => c.upeerId as string)
-    );
+    const _directIds = await getDirectContactIds();
     const vouchScore = computeScore(senderSid, _directIds);
 
     const isOwner = entry.senderSid === senderSid;

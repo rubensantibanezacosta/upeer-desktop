@@ -3,6 +3,8 @@
  * Provides strict validation to prevent malformed packets and injection attacks
  */
 
+import { DEFAULT_CONFIG } from '../network/file-transfer/types.js';
+
 interface ValidationResult {
     valid: boolean;
     error?: string;
@@ -501,7 +503,7 @@ export function validateFileProposal(data: any): ValidationResult {
     if (!data.fileName || typeof data.fileName !== 'string') return { valid: false, error: 'Invalid fileName' };
     if (typeof data.fileSize !== 'number' || data.fileSize < 0) return { valid: false, error: 'Invalid fileSize' };
     if (typeof data.totalChunks !== 'number' || data.totalChunks <= 0) return { valid: false, error: 'Invalid totalChunks' };
-    if (typeof data.chunkSize !== 'number' || data.chunkSize <= 0 || data.chunkSize > 32 * 1024) {
+    if (typeof data.chunkSize !== 'number' || data.chunkSize <= 0 || data.chunkSize > DEFAULT_CONFIG.maxChunkSize) {
         return { valid: false, error: 'Invalid chunkSize' };
     }
     if (Math.ceil(data.fileSize / data.chunkSize) !== data.totalChunks) {

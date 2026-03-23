@@ -2,12 +2,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { warn, debug, error } from '../../security/secure-logger.js';
 import { getContactByUpeerId, getContacts as _getContacts } from '../../storage/contacts/operations.js';
-import { getMyUPeerId, sign, verify } from '../../security/identity.js';
+import { getMyUPeerId, sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { TransferPhase, FileTransfer } from './types.js';
 import { generateTransferKey, sealTransferKey, encryptChunk } from './crypto.js';
 import { saveTransferToDB, updateTransferMessageStatus } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
+import { verifyFileTransferPacketSignature } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
 const CHUNK_PREPARE_CONCURRENCY = 4;
@@ -260,13 +261,9 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
     const contact = await getContactByUpeerId(upeerId);
     if (!contact?.publicKey) return;
 
-    if (data.signature) {
-        const dataToVerify = { ...data };
-        delete dataToVerify.signature;
-        if (!verify(Buffer.from(canonicalStringify(dataToVerify)), Buffer.from(data.signature, 'hex'), Buffer.from(contact.publicKey, 'hex'))) {
-            warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
-            return;
-        }
+    if (data.signature && !verifyFileTransferPacketSignature(data, contact.publicKey)) {
+        warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
+        return;
     }
 
     const transfer = this.store.getTransfer(data.fileId, 'sending');
