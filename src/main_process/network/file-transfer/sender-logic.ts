@@ -10,6 +10,8 @@ import { saveTransferToDB, updateTransferMessageStatus } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
 import type { TransferManager } from './transfer-manager.js';
 
+const CHUNK_PREPARE_CONCURRENCY = 4;
+
 async function calculateHashFromChunks(handle: any, fileSize: number, chunkSize: number): Promise<string> {
     const { createHash } = await import('node:crypto');
     const hash = createHash('sha256');
@@ -40,6 +42,34 @@ async function readChunkFully(handle: any, length: number, position: number): Pr
     }
 
     return offset < length ? buffer.slice(0, offset) : buffer;
+}
+
+async function prepareChunkPayload(handle: any, transfer: FileTransfer, chunkIndex: number, aesKey?: Buffer) {
+    const chunkSize = transfer.chunkSize || 16384;
+    const offset = chunkIndex * chunkSize;
+    const finalBuffer = await readChunkFully(handle, chunkSize, offset);
+
+    const chunkMsg: any = {
+        type: 'FILE_CHUNK',
+        fileId: transfer.fileId,
+        chunkIndex,
+        chunkHash: crypto.createHash('sha256').update(finalBuffer).digest('hex')
+    };
+
+    if (aesKey) {
+        const enc = encryptChunk(finalBuffer, aesKey);
+        chunkMsg.data = enc.data;
+        chunkMsg.iv = enc.iv;
+        chunkMsg.tag = enc.tag;
+    } else {
+        chunkMsg.data = finalBuffer.toString('base64');
+    }
+
+    return {
+        chunkIndex,
+        chunkLength: finalBuffer.length,
+        chunkMsg
+    };
 }
 
 export async function startSend(
@@ -287,7 +317,7 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
         updates.srtt = newSrtt;
         updates.rto = newRto;
 
-        let windowSize = transfer.windowSize || 64;
+        let windowSize = transfer.windowSize || this.config.initialWindowSize || 64;
         const ssthresh = transfer.ssthresh || 1024;
         const growthFactor = newSrtt < 150 ? 2.0 : 1.0;
 
@@ -297,7 +327,7 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
             windowSize += (1.0 / windowSize) * growthFactor;
         }
 
-        updates.windowSize = Math.floor(windowSize);
+        updates.windowSize = Math.min(this.config.maxWindowSize, Math.floor(windowSize));
         (transfer as any)._chunksSentTimes.delete(data.chunkIndex);
     }
 
@@ -417,25 +447,29 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
 }
 
 export async function sendNextChunks(this: TransferManager, transfer: FileTransfer) {
-    if (transfer.state !== 'active' || transfer.phase !== TransferPhase.TRANSFERRING) return;
-
-    const processed = transfer.chunksProcessed || 0;
-    const nextIdx = transfer.nextChunkIndex || 0;
-    const startIdx = Math.min(nextIdx, processed);
-
-    const windowSize = transfer.windowSize || 64;
-    const inflight = nextIdx - processed;
-    const toSend = Math.max(1, Math.min(windowSize - inflight, transfer.totalChunks - startIdx));
-
-    if (toSend <= 0) return;
+    if (!this.tryStartSendBatch(transfer.fileId)) return;
+    let didSendChunks = false;
 
     try {
+        const current = this.store.getTransfer(transfer.fileId, 'sending');
+        if (!current || current.state !== 'active' || current.phase !== TransferPhase.TRANSFERRING) return;
+
+        const processed = current.chunksProcessed || 0;
+        const nextIdx = current.nextChunkIndex || 0;
+        const startIdx = Math.min(nextIdx, processed);
+        const windowSize = current.windowSize || this.config.initialWindowSize || 64;
+        const inflight = Math.max(0, nextIdx - processed);
+        const remaining = current.totalChunks - startIdx;
+        const availableWindow = Math.min(windowSize - inflight, remaining);
+
+        if (availableWindow <= 0) return;
+
         let handle = this.getFileHandle(transfer.fileId);
-        if (!handle && transfer.filePath) {
+        if (!handle && current.filePath) {
             const fs = await import('node:fs/promises');
             try {
-                const h = await fs.open(transfer.filePath, 'r');
-                this.setFileHandle(transfer.fileId, h);
+                const h = await fs.open(current.filePath, 'r');
+                this.setFileHandle(current.fileId, h);
                 handle = h;
             } catch (err) {
                 error('Failed to open file for sending', err, 'file-transfer');
@@ -444,54 +478,60 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
         }
 
         if (!handle) return;
-        const aesKey = this.transferKeys.get(transfer.fileId);
-        const contact = await getContactByUpeerId(transfer.upeerId);
+        const aesKey = this.transferKeys.get(current.fileId);
+        const contact = await getContactByUpeerId(current.upeerId);
         const peerPublicKey = contact?.publicKey;
-        const freshAddress = contact?.address || transfer.peerAddress;
+        const freshAddress = contact?.address || current.peerAddress;
+        const chunkIndexes = Array.from({ length: availableWindow }, (_, index) => startIdx + index)
+            .filter(chunkIndex => chunkIndex < current.totalChunks);
 
-        for (let i = 0; i < toSend; i++) {
-            const chunkIndex = (transfer.nextChunkIndex || 0) + i;
-            if (chunkIndex >= transfer.totalChunks) break;
+        if (chunkIndexes.length === 0) return;
 
-            const chunkSize = transfer.chunkSize || 16384;
-            const offset = chunkIndex * chunkSize;
-            const finalBuffer = await readChunkFully(handle, chunkSize, offset);
+        const reserved = this.store.updateTransfer(current.fileId, 'sending', {
+            nextChunkIndex: startIdx + chunkIndexes.length
+        }) || current;
 
-            const chunkMsg: any = {
-                type: 'FILE_CHUNK',
-                fileId: transfer.fileId,
-                chunkIndex,
-                chunkHash: crypto.createHash('sha256').update(finalBuffer).digest('hex')
-            };
+        const preparedChunks: Array<{ chunkIndex: number; chunkLength: number; chunkMsg: any }> = [];
+        for (let batchStart = 0; batchStart < chunkIndexes.length; batchStart += CHUNK_PREPARE_CONCURRENCY) {
+            const batchIndexes = chunkIndexes.slice(batchStart, batchStart + CHUNK_PREPARE_CONCURRENCY);
+            const preparedBatch = await Promise.all(
+                batchIndexes.map(chunkIndex => prepareChunkPayload(handle, reserved, chunkIndex, aesKey))
+            );
+            preparedChunks.push(...preparedBatch);
+        }
 
-            if (aesKey) {
-                const enc = encryptChunk(finalBuffer, aesKey);
-                chunkMsg.data = enc.data;
-                chunkMsg.iv = enc.iv;
-                chunkMsg.tag = enc.tag;
-            } else {
-                chunkMsg.data = finalBuffer.toString('base64');
-            }
+        if (!(reserved as any)._chunksSentTimes) (reserved as any)._chunksSentTimes = new Map<number, number>();
+        const chunksSentTimes = (reserved as any)._chunksSentTimes as Map<number, number>;
 
-            if (!(transfer as any)._chunksSentTimes) (transfer as any)._chunksSentTimes = new Map<number, number>();
-            (transfer as any)._chunksSentTimes.set(chunkIndex, Date.now());
+        for (const prepared of preparedChunks) {
+            chunksSentTimes.set(prepared.chunkIndex, Date.now());
+            didSendChunks = true;
 
             debug('FILE_CHUNK sent', {
-                fileId: transfer.fileId,
-                chunkIndex,
-                chunkLength: finalBuffer.length,
-                chunkHash: chunkMsg.chunkHash,
+                fileId: current.fileId,
+                chunkIndex: prepared.chunkIndex,
+                chunkLength: prepared.chunkLength,
+                chunkHash: prepared.chunkMsg.chunkHash,
                 encrypted: !!aesKey
             }, 'file-transfer');
 
-            this.send(freshAddress, chunkMsg, peerPublicKey);
-            this.setRetryTimer(transfer.fileId, chunkIndex, transfer);
+            this.send(freshAddress, prepared.chunkMsg, peerPublicKey);
+            this.setRetryTimer(current.fileId, prepared.chunkIndex, reserved);
         }
-
-        this.store.updateTransfer(transfer.fileId, 'sending', {
-            nextChunkIndex: (transfer.nextChunkIndex || 0) + toSend
-        });
     } catch (err) {
         error('Error in sendNextChunks', err, 'file-transfer');
+    } finally {
+        this.finishSendBatch(transfer.fileId);
+        if (!didSendChunks) return;
+        const latest = this.store.getTransfer(transfer.fileId, 'sending');
+        if (!latest || latest.state !== 'active' || latest.phase !== TransferPhase.TRANSFERRING) return;
+
+        const windowSize = latest.windowSize || this.config.initialWindowSize || 64;
+        const inflight = Math.max(0, (latest.nextChunkIndex || 0) - (latest.chunksProcessed || 0));
+        if (inflight < windowSize && (latest.nextChunkIndex || 0) < latest.totalChunks) {
+            queueMicrotask(() => {
+                void this.sendNextChunks(latest);
+            });
+        }
     }
 }

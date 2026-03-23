@@ -44,6 +44,7 @@ export class TransferManager implements ITransferManager {
     private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
     private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
     public transferLocks = new Map<string, Promise<void>>(); // fileId -> active lock promise
+    private activeSendBatches = new Set<string>();
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -149,15 +150,38 @@ export class TransferManager implements ITransferManager {
         this.fileHandles.set(fileId, handle);
     }
 
+    public tryStartSendBatch(fileId: string): boolean {
+        if (this.activeSendBatches.has(fileId)) return false;
+        this.activeSendBatches.add(fileId);
+        return true;
+    }
+
+    public finishSendBatch(fileId: string): void {
+        this.activeSendBatches.delete(fileId);
+    }
+
     public setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer) {
         const key = `${fileId}_${chunkIndex}`;
         if (this.retryTimers.has(key)) return;
+
+        const timeoutMs = Math.min(5000, Math.max(1200, transfer.rto || 1200));
 
         const timer = setTimeout(() => {
             this.retryTimers.delete(key);
             const current = this.store.getTransfer(fileId, 'sending');
             if (current && current.state === 'active') {
-                if (current.chunksProcessed <= chunkIndex) {
+                const ackedChunks = (current as any)._ackedChunks as Set<number> | undefined;
+                if (!ackedChunks?.has(chunkIndex)) {
+                    const currentWindow = Math.max(1, Math.floor(current.windowSize || this.config.initialWindowSize || 40));
+                    const reducedSsthresh = Math.max(4, Math.floor(currentWindow / 2));
+                    const reducedWindow = Math.max(4, Math.min(reducedSsthresh, currentWindow));
+                    const backedOffRto = Math.min(5000, Math.max(1200, (current.rto || timeoutMs) * 2));
+                    const throttled = this.store.updateTransfer(fileId, 'sending', {
+                        ssthresh: reducedSsthresh,
+                        windowSize: reducedWindow,
+                        rto: backedOffRto
+                    }) || current;
+
                     debug('Retrying chunk due to timeout', { fileId, chunkIndex }, 'file-transfer');
                     const lastSearch = this.dhtSearchTimestamps.get(current.upeerId) ?? 0;
                     if (Date.now() - lastSearch > 10000) {
@@ -166,10 +190,10 @@ export class TransferManager implements ITransferManager {
                             startDhtSearch(current.upeerId, (ip: string, data: any) => this.send(ip, data));
                         });
                     }
-                    this.resendSingleChunk(current, chunkIndex);
+                    this.resendSingleChunk(throttled, chunkIndex);
                 }
             }
-        }, 5000);
+        }, timeoutMs);
 
         this.retryTimers.set(key, timer);
     }
@@ -280,6 +304,7 @@ export class TransferManager implements ITransferManager {
             this.clearRetryTimer(fileId);
             this.clearDoneRetry(fileId);
             this.transferLocks.delete(fileId);
+            this.activeSendBatches.delete(fileId);
             this.dhtSearchTimestamps.delete(transfer.upeerId);
 
             const handle = this.fileHandles.get(fileId);
@@ -435,6 +460,7 @@ export class TransferManager implements ITransferManager {
         this.clearDoneRetry(fileId);
         this.transferKeys.delete(fileId);
         this.transferLocks.delete(fileId);
+        this.activeSendBatches.delete(fileId);
         this.dhtSearchTimestamps.delete(transfer.upeerId);
 
         const handle = this.fileHandles.get(fileId);

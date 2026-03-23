@@ -446,6 +446,50 @@ describe('TransferManager - Core Orchestration', () => {
         expect(Math.abs((updated?.srtt || 0) - 190)).toBeLessThanOrEqual(2);
     });
 
+    it('should back off window and RTO after a chunk timeout', async () => {
+        vi.useFakeTimers();
+        const fileId = 'id-timeout-backoff';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-timeout', publicKey: 'kp-timeout' });
+
+        manager['transferKeys'].set(fileId, Buffer.alloc(32));
+        manager['store'].createTransfer({
+            fileId,
+            upeerId: 'p-timeout',
+            peerAddress: 'addr-timeout',
+            fileName: 'f',
+            fileSize: 1000,
+            mimeType: 't',
+            totalChunks: 10,
+            chunkSize: 100,
+            fileHash: 'h',
+            direction: 'sending',
+            filePath: '/path'
+        });
+        manager['store'].updateTransfer(fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+            chunksProcessed: 0,
+            nextChunkIndex: 1,
+            windowSize: 12,
+            ssthresh: 20,
+            rto: 1500
+        });
+
+        const tx = manager['store'].getTransfer(fileId, 'sending');
+        if (tx) {
+            manager.setRetryTimer(fileId, 0, tx, 'addr-timeout');
+        }
+
+        await vi.advanceTimersByTimeAsync(1600);
+
+        const updated = manager['store'].getTransfer(fileId, 'sending');
+        expect(updated?.windowSize).toBe(6);
+        expect(updated?.ssthresh).toBe(6);
+        expect(updated?.rto).toBe(3000);
+
+        vi.useRealTimers();
+    });
+
     it('should ignore late chunk ACKs for completed transfers', async () => {
         const fileId = 'id-late';
         (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p13' });
@@ -576,6 +620,46 @@ describe('TransferManager - Core Orchestration', () => {
         }
 
         expect(manager['fileHandles'].has(fileId)).toBe(false);
+    });
+
+    it('should not oversend when the inflight window is full', async () => {
+        const fileId = 'id-window-full';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-window', publicKey: 'kp-window' });
+
+        manager['transferKeys'].set(fileId, Buffer.alloc(32));
+        manager['store'].createTransfer({
+            fileId,
+            upeerId: 'p-window',
+            peerAddress: 'addr-window',
+            fileName: 'f.bin',
+            fileSize: 1000,
+            mimeType: 'application/octet-stream',
+            totalChunks: 10,
+            chunkSize: 100,
+            fileHash: 'h',
+            direction: 'sending',
+            filePath: '/path'
+        });
+        manager['store'].updateTransfer(fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+            chunksProcessed: 0,
+            nextChunkIndex: 1,
+            windowSize: 1
+        });
+
+        mockSend.mockClear();
+
+        const transfer = manager['store'].getTransfer(fileId, 'sending');
+        if (transfer) {
+            await manager.sendNextChunks(transfer, 'addr-window');
+        }
+
+        expect(mockSend).not.toHaveBeenCalledWith(
+            'addr-window',
+            expect.objectContaining({ type: 'FILE_CHUNK' }),
+            'kp-window'
+        );
     });
 
     it('should handle cancelation by peer (handleFileCancel)', async () => {
