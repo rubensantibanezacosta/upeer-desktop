@@ -54,3 +54,15 @@ export const toMediaUrl = (filePath: string): string => {
     }
     return `media://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
 };
+
+export const fromMediaUrl = (mediaUrl: string): string => {
+    if (!mediaUrl.startsWith('media://')) return mediaUrl;
+    const url = new URL(mediaUrl);
+    const hostname = url.hostname;
+    const pathname = decodeURIComponent(url.pathname);
+    if (/^[a-zA-Z]$/.test(hostname)) {
+        return hostname + ':' + pathname;
+    }
+    const combined = hostname + pathname;
+    return combined.startsWith('/') ? combined : '/' + combined;
+};

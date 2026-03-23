@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { toMediaUrl } from '../../../utils/fileUtils.js';
+import { toMediaUrl, fromMediaUrl } from '../../../utils/fileUtils.js';
 import { Box, IconButton, Sheet, Typography, CircularProgress, Slider, Avatar, Tooltip, Stack, Button } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
@@ -412,8 +412,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                                     startDecorator={<OpenInNewIcon />}
                                     onClick={async (e) => {
                                         e.stopPropagation();
-                                        // Extraer el path del protocolo media:// o usar el original
-                                        const cleanPath = contentUrl.replace('media://', '');
+                                        const cleanPath = fromMediaUrl(contentUrl);
                                         await window.upeer.openFile(cleanPath);
                                         onClose();
                                     }}
@@ -664,7 +663,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                                 >
                                     {showImg ? (
                                         <img
-                                            src={thumb || item.url}
+                                            src={thumb || (item.url && !item.url.startsWith('data:') ? toMediaUrl(item.url) : item.url)}
                                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                         />

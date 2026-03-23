@@ -294,6 +294,12 @@ export function registerFileHandlers(): void {
       }
 
       const resolvedSource = path.resolve(filePath);
+      const homeDir = app.getPath('home');
+      const homeDirNormalized = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+      if (!resolvedSource.startsWith(homeDirNormalized) && resolvedSource !== homeDir) {
+        return { success: false, error: 'El archivo debe estar dentro del directorio home' };
+      }
+
       const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
 
       if (!fsSync.existsSync(internalAssetsDir)) {

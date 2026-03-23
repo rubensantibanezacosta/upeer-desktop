@@ -59,10 +59,10 @@ describe('File Persistence & Access Policies', () => {
     describe('persist-internal-asset handler', () => {
         it('should copy file to the assets directory with a unique name', async () => {
             const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-internal-asset')[1];
-            
+
             const sourcePath = '/home/user/external-file.jpg';
             const fileName = 'test.jpg';
-            
+
             (fsSync.existsSync as any).mockReturnValue(true);
             (fs.copyFile as any).mockResolvedValue(undefined);
 
@@ -76,12 +76,12 @@ describe('File Persistence & Access Policies', () => {
 
         it('should create assets directory if it does not exist', async () => {
             const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-internal-asset')[1];
-            
+
             (fsSync.existsSync as any).mockReturnValue(false);
             (fs.mkdir as any).mockResolvedValue(undefined);
             (fs.copyFile as any).mockResolvedValue(undefined);
 
-            await handler({}, { filePath: '/some/path', fileName: 'file.txt' });
+            await handler({}, { filePath: '/home/user/Downloads/file.txt', fileName: 'file.txt' });
 
             expect(fs.mkdir).toHaveBeenCalledWith('/data/user/assets', { recursive: true });
         });
@@ -90,7 +90,7 @@ describe('File Persistence & Access Policies', () => {
     describe('open-file security policy', () => {
         it('should allow opening files from assets directory', async () => {
             const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
-            
+
             const assetPath = '/data/user/assets/123-file.jpg';
             (fs.access as any).mockResolvedValue(undefined); // exists
             const { shell } = await import('electron');
@@ -103,7 +103,7 @@ describe('File Persistence & Access Policies', () => {
 
         it('should deny opening sensitive system files', async () => {
             const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
-            
+
             const sensitivePath = '/etc/shadow';
             const result = await handler({}, { filePath: sensitivePath });
 
@@ -115,7 +115,7 @@ describe('File Persistence & Access Policies', () => {
 
         it('should allow opening files from downloads directory', async () => {
             const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
-            
+
             const downloadPath = '/home/user/Downloads/received.pdf';
             (fs.access as any).mockResolvedValue(undefined);
 

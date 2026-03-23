@@ -13,9 +13,14 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 vi.mock('node:path', () => ({
-    default: { join: (...args: string[]) => args.join('/'), extname: (p: string) => p.slice(p.lastIndexOf('.')) },
+    default: {
+        join: (...args: string[]) => args.join('/'),
+        extname: (p: string) => p.slice(p.lastIndexOf('.')),
+        basename: (p: string) => p.split('/').pop()?.split('\\').pop() ?? '',
+    },
     join: (...args: string[]) => args.join('/'),
     extname: (p: string) => p.slice(p.lastIndexOf('.')),
+    basename: (p: string) => p.split('/').pop()?.split('\\').pop() ?? '',
 }));
 
 vi.mock('node:os', () => ({

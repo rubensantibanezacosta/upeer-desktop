@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { warn, debug, error } from '../../security/secure-logger.js';
 import { getContactByUpeerId, getContacts as _getContacts } from '../../storage/contacts/operations.js';
 import { getMyUPeerId, sign, verify } from '../../security/identity.js';
@@ -49,7 +50,7 @@ export async function startSend(
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
         const totalChunks = this.chunker.calculateChunks(fileInfo.size);
 
-        const originalFileName = filePath.split('/').pop() || fileInfo.name;
+        const originalFileName = path.basename(filePath) || fileInfo.name;
 
         const transfer = this.store.createTransfer({
             upeerId,
