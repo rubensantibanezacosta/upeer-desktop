@@ -80,6 +80,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
     it('should correctly select candidates for replication and send messages', async () => {
         const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
 
         const mockContacts = [
             { upeerId: 'friend-1', address: '127.0.0.1:1', status: 'connected', lastSeen: new Date().toISOString() },
@@ -92,15 +93,13 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         vi.mocked(sendSecureUDPMessage).mockResolvedValue(undefined);
 
         const packet = { type: 'CHAT', content: 'test msg' };
-
-        // Espiamos el factor de replicación
         vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
         const nodesCount = await VaultManager.replicateToVaults('recipient-id', packet);
 
-        expect(nodesCount).toBe(2);
-        // Debe de haber llamado a sendSecureUDPMessage 2 veces
+        expect(nodesCount).toBe(3);
         expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('should handle retries when sending fails initially', async () => {
@@ -141,8 +140,8 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
 
         await VaultManager.replicateToVaults('recipient-id', { type: 'CHAT' });
 
-        // Verificar que solo el exitante se envió a la DHT
         const callArgs = mockKademlia.storeValue.mock.calls[0];
+        expect(callArgs[1].custodians).toContain('my-peer-id');
         expect(callArgs[1].custodians).toContain('friend-success');
         expect(callArgs[1].custodians).not.toContain('friend-fail');
     });
@@ -207,7 +206,27 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         expect(saveVaultEntry).toHaveBeenCalledOnce();
     });
 
-    it('does NOT use self-custodian when third-party custodians are available', async () => {
+    it('stores message locally when the only other peer is the recipient still marked connected', async () => {
+        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+        vi.mocked(getContacts).mockResolvedValue([
+            { upeerId: 'recipient-stale', address: '200::2', status: 'connected', lastSeen: new Date().toISOString() }
+        ] as any);
+
+        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+
+        const result = await VaultManager.replicateToVaults('recipient-stale', { type: 'CHAT', content: 'msg' });
+
+        expect(result).toBe(1);
+        expect(sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(saveVaultEntry).toHaveBeenCalledOnce();
+    });
+
+    it('uses self-custodian and third-party custodians when available', async () => {
         const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
@@ -227,9 +246,9 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
 
         const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT' });
 
-        expect(result).toBe(2);
+        expect(result).toBe(3);
         expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(saveVaultEntry).not.toHaveBeenCalled();
+        expect(saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('self-custodian stores data with TTL that does not exceed VAULT_TTL_MS', async () => {

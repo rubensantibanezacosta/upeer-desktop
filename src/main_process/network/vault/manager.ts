@@ -66,8 +66,21 @@ export class VaultManager {
         const allContacts = await getContacts();
         const myId = getMyUPeerId();
         const kademlia = getKademliaInstance();
-
         const replicationFactor = await this.getDynamicReplicationFactor(recipientSid);
+        const packetJson = JSON.stringify(packet);
+        const payloadHash = payloadHashOverride ?? crypto.createHash('sha256').update(packetJson).digest('hex');
+        const expiresAt = Date.now() + (ttlMs ?? VAULT_TTL_MS);
+        const isControlPacket = ['CHAT_CLEAR_ALL', 'CHAT_DELETE'].includes(packet.type);
+        const priority = isControlPacket ? 3 : (packet.type === 'CHAT' ? 1 : 2);
+        const packetHex = Buffer.from(packetJson).toString('hex');
+
+        const { saveVaultEntry: saveLocal } = await import('../../storage/vault/operations.js');
+        await saveLocal(payloadHash, recipientSid, myId, priority, packetHex, expiresAt);
+
+        info('Self-custodian: message stored locally for delivery on reconnect', {
+            recipient: recipientSid,
+            hash: payloadHash.slice(0, 8)
+        }, 'vault');
 
         let candidates = allContacts
             .filter(c => c.status === 'connected' && c.upeerId !== myId && c.upeerId !== recipientSid)
@@ -89,47 +102,15 @@ export class VaultManager {
                 })) as any[];
         }
 
-        if (candidates.length === 0) {
-            const mySelf = allContacts.find(c => c.upeerId === myId);
-            if (mySelf?.status === 'connected' && mySelf?.address) {
-                candidates.push(mySelf);
-            }
-        }
-
-        if (candidates.length === 0) {
-            const recipient = allContacts.find(c => c.upeerId === recipientSid);
-            if (recipient?.status === 'connected' && recipient?.address) {
-                candidates.push(recipient);
-            }
-        }
-
-        if (candidates.length === 0) {
-            const selfPacketJson = JSON.stringify(packet);
-            const selfHash = payloadHashOverride ?? crypto.createHash('sha256').update(selfPacketJson).digest('hex');
-            const selfExpiresAt = Date.now() + (ttlMs ?? VAULT_TTL_MS);
-            const { saveVaultEntry: saveLocal } = await import('../../storage/vault/operations.js');
-            await saveLocal(selfHash, recipientSid, myId, 1, Buffer.from(selfPacketJson).toString('hex'), selfExpiresAt);
-            info('Self-custodian: message stored locally for delivery on reconnect', { recipient: recipientSid, hash: selfHash.slice(0, 8) }, 'vault');
-            return 1;
-        }
-
-        const packetJson = JSON.stringify(packet);
-        const payloadHash = payloadHashOverride ?? crypto.createHash('sha256').update(packetJson).digest('hex');
-        const expiresAt = Date.now() + (ttlMs ?? VAULT_TTL_MS);
-
-        const isControlPacket = ['CHAT_CLEAR_ALL', 'CHAT_DELETE'].includes(packet.type);
-
         const vaultPacket = {
             type: 'VAULT_STORE',
             payloadHash,
             recipientSid,
             senderSid: myId,
-            priority: isControlPacket ? 3 : (packet.type === 'CHAT' ? 1 : 2),
-            data: Buffer.from(packetJson).toString('hex'),
+            priority,
+            data: packetHex,
             expiresAt,
         };
-
-        const custodianIds: string[] = [];
         const sendPromises = candidates.map(async (friend) => {
             try {
                 await this.sendWithRetry(friend.address, vaultPacket);
@@ -142,10 +123,11 @@ export class VaultManager {
 
         const results = await Promise.all(sendPromises);
         const successfulIds = results.filter((id): id is string => !!id);
+        const custodianIds = Array.from(new Set([myId, ...successfulIds]));
 
-        if (kademlia && successfulIds.length > 0) {
+        if (kademlia && typeof kademlia.storeValue === 'function' && custodianIds.length > 0) {
             const ptrKey = createVaultPointerKey(recipientSid);
-            const ptrValue = { custodians: successfulIds, updatedAt: Date.now() };
+            const ptrValue = { custodians: custodianIds, updatedAt: Date.now() };
             kademlia.storeValue(ptrKey, ptrValue, myId).catch(err => {
                 warn('Failed to publish vault pointer to DHT', err, 'vault');
             });
@@ -153,12 +135,14 @@ export class VaultManager {
 
         info('Message replicated to vaults', {
             recipient: recipientSid,
+            localCustody: true,
             nodes: successfulIds.length,
+            totalCustodians: custodianIds.length,
             hash: payloadHash.slice(0, 8),
             dht: !!kademlia
         }, 'vault');
 
-        return successfulIds.length;
+        return custodianIds.length;
     }
 
     static async queryOwnVaults() {

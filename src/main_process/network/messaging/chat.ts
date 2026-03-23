@@ -31,6 +31,8 @@ import { sendSecureUDPMessage } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
 import { EPH_FRESHNESS_MS, MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 
+const CHAT_ACK_TIMEOUT_MS = 2500;
+
 function shouldUseEphemeral(contact: any): boolean {
     if (!contact?.ephemeralPublicKey) return false;
     // Usar ephemeralPublicKeyUpdatedAt (timestamp preciso de cuándo se recibió la
@@ -367,7 +369,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         } catch (err) {
             error('Vault fallback setTimeout failed', err, 'vault');
         }
-    }, 5000);
+    }, CHAT_ACK_TIMEOUT_MS);
 
     return { id: msgId, savedMessage: payload };
 }
