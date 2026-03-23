@@ -67,6 +67,19 @@ import { sendSecureUDPMessage } from '../../../src/main_process/network/server/t
 
 describe('Transport - sendSecureUDPMessage', () => {
 
+    const createMockSocket = () => ({
+        destroyed: false,
+        write: vi.fn((_buf?: Buffer, cb?: (err?: Error | null) => void) => {
+            if (cb) cb(null);
+            return true;
+        }),
+        end: vi.fn((cb?: () => void) => { if (cb) cb(); }),
+        destroy: vi.fn(),
+        on: vi.fn(),
+        once: vi.fn(),
+        off: vi.fn(),
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         (state.setNetworkReady as any)(true);
@@ -74,11 +87,7 @@ describe('Transport - sendSecureUDPMessage', () => {
     });
 
     it('should sign and send message when network is ready', async () => {
-        const mockSocket = {
-            write: vi.fn(),
-            end: vi.fn((cb) => { if (cb) cb(); }),
-            destroy: vi.fn(),
-        };
+        const mockSocket = createMockSocket();
         (socks5.socks5Connect as any).mockResolvedValue(mockSocket);
 
         sendSecureUDPMessage('1.2.3.4', { type: 'PING', content: 'hello' });
@@ -109,7 +118,7 @@ describe('Transport - sendSecureUDPMessage', () => {
     });
 
     it('should seal packet if type is in SEALED_TYPES', async () => {
-        const mockSocket = { write: vi.fn(), end: vi.fn((cb) => { if (cb) cb(); }), destroy: vi.fn() };
+        const mockSocket = createMockSocket();
         (socks5.socks5Connect as any).mockResolvedValue(mockSocket);
 
         // CHAT está en SEALED_TYPES según nuestro mock
@@ -120,6 +129,19 @@ describe('Transport - sendSecureUDPMessage', () => {
         const lastWrite = mockSocket.write.mock.calls[0][0];
         const sentData = JSON.parse(lastWrite.toString());
         expect(sentData.sealed).toBe(true);
+    });
+
+    it('should reuse the same connection for consecutive sends to the same IP', async () => {
+        const mockSocket = createMockSocket();
+        (socks5.socks5Connect as any).mockResolvedValue(mockSocket);
+
+        sendSecureUDPMessage('1.2.3.4', { type: 'PING', a: 1 });
+        sendSecureUDPMessage('1.2.3.4', { type: 'PING', a: 2 });
+
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        expect(socks5.socks5Connect).toHaveBeenCalledTimes(1);
+        expect(mockSocket.write).toHaveBeenCalledTimes(2);
     });
 
     it('should block sending if IP is in circuit breaker blocklist', () => {

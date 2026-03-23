@@ -32,19 +32,134 @@ import {
 
 export { isIPUnreachable };
 
+const SOCKET_IDLE_MS = 1500;
+
+type PendingFrame = {
+    framedBuf: Buffer;
+    isFileTransfer: boolean;
+    isProbeTraffic: boolean;
+};
+
+type PooledConnection = {
+    socket?: any;
+    connectPromise?: Promise<any>;
+    queue: PendingFrame[];
+    flushing: boolean;
+    idleTimer?: ReturnType<typeof setTimeout>;
+};
+
+const connectionPool = new Map<string, PooledConnection>();
+
+function clearIdleTimer(entry: PooledConnection): void {
+    if (entry.idleTimer) {
+        clearTimeout(entry.idleTimer);
+        entry.idleTimer = undefined;
+    }
+}
+
+function destroyConnection(ip: string): void {
+    const entry = connectionPool.get(ip);
+    if (!entry) return;
+    clearIdleTimer(entry);
+    try {
+        entry.socket?.destroy?.();
+    } catch {
+        error(`TCP pooled socket destroy error for ${ip}`, undefined, 'network');
+    }
+    connectionPool.delete(ip);
+}
+
+function scheduleIdleClose(ip: string, entry: PooledConnection): void {
+    clearIdleTimer(entry);
+    entry.idleTimer = setTimeout(() => {
+        const current = connectionPool.get(ip);
+        if (!current || current.queue.length > 0 || current.flushing) return;
+        destroyConnection(ip);
+    }, SOCKET_IDLE_MS);
+}
+
+async function getOrCreateSocket(ip: string, entry: PooledConnection): Promise<any> {
+    if (entry.socket && !entry.socket.destroyed) return entry.socket;
+    if (!entry.connectPromise) {
+        entry.connectPromise = socks5Connect(ip, YGG_PORT)
+            .then((sock) => {
+                entry.socket = sock;
+                entry.connectPromise = undefined;
+                if (typeof sock.on === 'function') {
+                    sock.on('error', () => destroyConnection(ip));
+                    sock.on('close', () => destroyConnection(ip));
+                }
+                return sock;
+            })
+            .catch((err: Error) => {
+                entry.connectPromise = undefined;
+                destroyConnection(ip);
+                throw err;
+            });
+    }
+    return entry.connectPromise;
+}
+
+async function flushConnection(ip: string): Promise<void> {
+    const entry = connectionPool.get(ip);
+    if (!entry || entry.flushing) return;
+    entry.flushing = true;
+    clearIdleTimer(entry);
+
+    try {
+        while (entry.queue.length > 0) {
+            const item = entry.queue[0];
+            const sock = await getOrCreateSocket(ip, entry);
+            await new Promise<void>((resolve, reject) => {
+                const onError = (err: Error) => reject(err);
+                if (typeof sock.once === 'function') sock.once('error', onError);
+                const done = (err?: Error | null) => {
+                    if (typeof sock.off === 'function') sock.off('error', onError);
+                    if (err) reject(err);
+                    else resolve();
+                };
+                const writeResult = sock.write(item.framedBuf, done);
+                if (writeResult === false && typeof sock.once === 'function') {
+                    sock.once('drain', () => resolve());
+                }
+            });
+
+            entry.queue.shift();
+            if (!item.isFileTransfer) recordIPSuccess(ip);
+        }
+    } catch (_err: any) {
+        const failed = entry.queue.shift();
+        destroyConnection(ip);
+        error(`TCP send error to ${ip}: ${_err.message}`, undefined, 'network');
+        if (failed && !failed.isFileTransfer) recordIPFailure(ip);
+    } finally {
+        const current = connectionPool.get(ip);
+        if (current) {
+            current.flushing = false;
+            if (current.queue.length > 0) {
+                queueMicrotask(() => {
+                    void flushConnection(ip);
+                });
+            } else {
+                scheduleIdleClose(ip, current);
+            }
+        }
+    }
+}
+
+function enqueueForSend(ip: string, framedBuf: Buffer, isFileTransfer: boolean, isProbeTraffic: boolean): void {
+    const entry = connectionPool.get(ip) || { queue: [], flushing: false };
+    entry.queue.push({ framedBuf, isFileTransfer, isProbeTraffic });
+    connectionPool.set(ip, entry);
+    void flushConnection(ip);
+}
+
 export function drainSendQueue(): void {
     const queue = getSendQueue();
     if (queue.length === 0) return;
     const toSend = queue.splice(0);
     for (const { ip, framedBuf } of toSend) {
-        socks5Connect(ip, YGG_PORT)
-            .then((sock) => {
-                sock.write(framedBuf);
-                sock.end(() => sock.destroy());
-            })
-            .catch((_err: Error) => {
-                error(`TCP send error (drain) to ${ip}`, _err, 'network');
-            });
+        enqueueForSend(ip, framedBuf, false, false);
     }
 }
 
@@ -52,6 +167,7 @@ onYggstackStatus((status) => {
     if (status === 'down' || status === 'reconnecting') {
         setNetworkReady(false);
         clearSendQueue();
+        Array.from(connectionPool.keys()).forEach(destroyConnection);
     }
 });
 
@@ -111,14 +227,5 @@ export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?:
 
     if (isProbeTraffic && isIPBlocked(ip)) return;
 
-    socks5Connect(ip, YGG_PORT)
-        .then((sock) => {
-            if (!isFileTransfer) recordIPSuccess(ip);
-            sock.write(framedBuf);
-            sock.end(() => sock.destroy());
-        })
-        .catch((_err: Error) => {
-            error(`TCP send error to ${ip}: ${_err.message}`, undefined, 'network');
-            if (!isFileTransfer) recordIPFailure(ip);
-        });
+    enqueueForSend(ip, framedBuf, isFileTransfer, isProbeTraffic);
 }
