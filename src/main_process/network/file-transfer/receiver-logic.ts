@@ -171,6 +171,19 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
                 ? decryptChunk(data.data, data.iv, data.tag, aesKey)
                 : Buffer.from(data.data, 'base64');
 
+            if (typeof data.chunkHash === 'string') {
+                const actualChunkHash = (await import('node:crypto')).createHash('sha256').update(chunkData).digest('hex');
+                if (actualChunkHash !== data.chunkHash) {
+                    warn('Received chunk with hash mismatch, ignoring', {
+                        fileId: data.fileId,
+                        chunkIndex: data.chunkIndex,
+                        expectedChunkHash: data.chunkHash,
+                        actualChunkHash
+                    }, 'file-transfer');
+                    return;
+                }
+            }
+
             const chunkStart = data.chunkIndex * transfer.chunkSize;
             const maxChunkLength = Math.min(transfer.chunkSize, transfer.fileSize - chunkStart);
             if (chunkData.length <= 0 || chunkData.length > maxChunkLength) {
@@ -194,6 +207,7 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
                 fileId: data.fileId,
                 chunkIndex: data.chunkIndex,
                 chunkLength: chunkData.length,
+                chunkHash: data.chunkHash,
                 received,
                 totalChunks: transfer.totalChunks
             }, 'file-transfer');

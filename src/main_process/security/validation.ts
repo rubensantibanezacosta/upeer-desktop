@@ -532,6 +532,9 @@ export function validateFileChunk(data: any): ValidationResult {
     if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0) return { valid: false, error: 'Invalid chunkIndex' };
     if (!data.data || typeof data.data !== 'string') return { valid: false, error: 'Invalid chunk data' };
     if (data.data.length > 50_000) return { valid: false, error: 'Chunk data too large' };
+    if (data.chunkHash !== undefined && (typeof data.chunkHash !== 'string' || !/^[a-f0-9]{64}$/i.test(data.chunkHash))) {
+        return { valid: false, error: 'Invalid chunkHash' };
+    }
     // BUG DI fix: iv (AES-GCM nonce 12 bytes → 24 hex chars) y tag (auth tag 16 bytes → 32 hex
     // chars) sin validar longitud → decryptChunk() llama Buffer.from(iv, 'hex') que asigna
     // memoria arbitraria antes de que Node.js rechace el IV de tamaño incorrecto en createDecipheriv.

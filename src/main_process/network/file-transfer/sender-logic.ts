@@ -1,4 +1,5 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { warn, debug, error } from '../../security/secure-logger.js';
 import { getContactByUpeerId, getContacts as _getContacts } from '../../storage/contacts/operations.js';
 import { getMyUPeerId, sign, verify } from '../../security/identity.js';
@@ -452,7 +453,8 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
             const chunkMsg: any = {
                 type: 'FILE_CHUNK',
                 fileId: transfer.fileId,
-                chunkIndex
+                chunkIndex,
+                chunkHash: crypto.createHash('sha256').update(finalBuffer).digest('hex')
             };
 
             if (aesKey) {

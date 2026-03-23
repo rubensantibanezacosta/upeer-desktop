@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import crypto from 'node:crypto';
 import { debug, error } from '../../security/secure-logger.js';
 import { FileTransfer, TransferPhase, DEFAULT_CONFIG, TransferConfig } from './types.js';
 import { FileTransferStore } from './transfer-store.js';
@@ -195,7 +196,12 @@ export class TransferManager implements ITransferManager {
             const fileOffset = chunkIndex * chunkSize;
             const finalBuffer = await readChunkFully(handle, chunkSize, fileOffset);
 
-            const chunkMsg: any = { type: 'FILE_CHUNK', fileId: transfer.fileId, chunkIndex };
+            const chunkMsg: any = {
+                type: 'FILE_CHUNK',
+                fileId: transfer.fileId,
+                chunkIndex,
+                chunkHash: crypto.createHash('sha256').update(finalBuffer).digest('hex')
+            };
             if (aesKey) {
                 const enc = encryptChunk(finalBuffer, aesKey);
                 chunkMsg.data = enc.data;
