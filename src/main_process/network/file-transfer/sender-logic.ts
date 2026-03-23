@@ -9,6 +9,21 @@ import { saveTransferToDB, updateTransferMessageStatus } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
 import type { TransferManager } from './transfer-manager.js';
 
+async function calculateHashFromChunks(handle: any, fileSize: number, chunkSize: number): Promise<string> {
+    const { createHash } = await import('node:crypto');
+    const hash = createHash('sha256');
+    let position = 0;
+
+    while (position < fileSize) {
+        const length = Math.min(chunkSize, fileSize - position);
+        const buffer = await readChunkFully(handle, length, position);
+        hash.update(buffer);
+        position += buffer.length;
+    }
+
+    return hash.digest('hex');
+}
+
 async function readChunkFully(handle: any, length: number, position: number): Promise<Buffer> {
     const buffer = Buffer.alloc(length);
     let offset = 0;
@@ -67,6 +82,29 @@ export async function startSend(
 
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
         const totalChunks = this.chunker.calculateChunks(fileInfo.size, this.config.maxChunkSize);
+        let sendHandle: any;
+        let snapshotHash = fileInfo.hash;
+
+        try {
+            const fs = await import('node:fs/promises');
+            sendHandle = await fs.open(effectivePath, 'r');
+            snapshotHash = await calculateHashFromChunks(sendHandle, fileInfo.size, this.config.maxChunkSize);
+
+            if (snapshotHash !== fileInfo.hash) {
+                warn('Hash mismatch between validator stream and chunk reader', {
+                    filePath: effectivePath,
+                    validatorHash: fileInfo.hash,
+                    chunkReaderHash: snapshotHash,
+                    fileSize: fileInfo.size,
+                    chunkSize: this.config.maxChunkSize
+                }, 'file-transfer');
+            }
+        } catch (err) {
+            warn('Failed to prepare sender snapshot handle, falling back to validator hash', {
+                filePath: effectivePath,
+                err: String(err)
+            }, 'file-transfer');
+        }
 
         const originalFileName = fileName || path.basename(filePath) || fileInfo.name;
 
@@ -78,7 +116,7 @@ export async function startSend(
             mimeType: fileInfo.mimeType,
             totalChunks,
             chunkSize: this.config.maxChunkSize,
-            fileHash: fileInfo.hash,
+            fileHash: snapshotHash,
             thumbnail,
             caption,
             isVoiceNote,
@@ -86,6 +124,10 @@ export async function startSend(
             filePath: effectivePath,
             sanitizedPath: sanitizationResult?.wasProcessed ? effectivePath : undefined
         });
+
+        if (sendHandle) {
+            this.setFileHandle(transfer.fileId, sendHandle);
+        }
 
         this.store.updateTransfer(transfer.fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });
 
@@ -129,6 +171,16 @@ export async function startSend(
 
         const sig = sign(Buffer.from(canonicalStringify(proposal)));
         proposal.signature = sig.toString('hex');
+
+        debug('FILE_PROPOSAL prepared', {
+            fileId: transfer.fileId,
+            filePath: effectivePath,
+            fileSize: transfer.fileSize,
+            totalChunks: transfer.totalChunks,
+            chunkSize: transfer.chunkSize,
+            fileHash: transfer.fileHash,
+            hasThumbnail: !!encThumb
+        }, 'file-transfer');
 
         this.send(address, proposal, contact?.publicKey);
         this.ui.notifyStarted(transfer);
