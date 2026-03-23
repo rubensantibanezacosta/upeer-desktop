@@ -261,6 +261,13 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (!transfer || (transfer.state !== 'active' && transfer.state !== 'completed')) return;
 
+    debug('FILE_ACK received', {
+        fileId: data.fileId,
+        chunkIndex: data.chunkIndex,
+        upeerId,
+        address
+    }, 'file-transfer');
+
     this.clearRetryTimer(data.fileId, data.chunkIndex);
 
     if (!(transfer as any)._ackedChunks) (transfer as any)._ackedChunks = new Set<number>();
@@ -468,6 +475,14 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
 
             if (!(transfer as any)._chunksSentTimes) (transfer as any)._chunksSentTimes = new Map<number, number>();
             (transfer as any)._chunksSentTimes.set(chunkIndex, Date.now());
+
+            debug('FILE_CHUNK sent', {
+                fileId: transfer.fileId,
+                chunkIndex,
+                chunkLength: finalBuffer.length,
+                chunkHash: chunkMsg.chunkHash,
+                encrypted: !!aesKey
+            }, 'file-transfer');
 
             this.send(freshAddress, chunkMsg, peerPublicKey);
             this.setRetryTimer(transfer.fileId, chunkIndex, transfer);

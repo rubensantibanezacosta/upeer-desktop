@@ -119,6 +119,14 @@ export async function handlePacket(
         // Input validation
         const validation = validateMessage(data.type, data);
         if (!validation.valid) {
+            if (data.type === 'FILE_CHUNK' || data.type === 'FILE_ACK' || data.type === 'FILE_PROPOSAL') {
+                debug('FILE_* validation rejected', {
+                    type: data.type,
+                    fileId: data.fileId,
+                    chunkIndex: data.chunkIndex,
+                    error: validation.error
+                }, 'file-transfer');
+            }
             security('Invalid message', { ip: rinfo.address, type: data.type, error: validation.error }, 'network');
             return;
         }

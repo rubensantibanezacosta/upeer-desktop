@@ -135,6 +135,12 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
 export async function handleFileChunk(this: TransferManager, upeerId: string, address: string, data: any) {
     await this.withTransferLock(data.fileId, async () => {
         try {
+            debug('handleFileChunk entered', {
+                fileId: data.fileId,
+                chunkIndex: data.chunkIndex,
+                hasChunkHash: typeof data.chunkHash === 'string'
+            }, 'file-transfer');
+
             const transfer = this.store.getTransfer(data.fileId, 'receiving');
             if (!transfer) return;
 
