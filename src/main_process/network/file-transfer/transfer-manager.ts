@@ -21,8 +21,9 @@ export class TransferManager implements ITransferManager {
     private sendFunction?: (address: string, data: any, publicKey?: string) => void;
     private fileHandles = new Map<string, any>(); // fileId -> fs.FileHandle
     public transferKeys = new Map<string, Buffer>(); // fileId -> AES key
-    private retryTimers = new Map<string, any>(); // fileId -> timer (single timer per transfer)
+    private retryTimers = new Map<string, any>(); // fileId_chunkIndex -> timer
     private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
+    private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -181,6 +182,7 @@ export class TransferManager implements ITransferManager {
             });
 
             this.clearRetryTimer(fileId);
+            this.clearDoneRetry(fileId);
 
             const handle = this.fileHandles.get(fileId);
             if (handle) {
@@ -243,7 +245,32 @@ export class TransferManager implements ITransferManager {
     }
 
     public async handleDoneAck(fileId: string) {
+        this.clearDoneRetry(fileId);
         await this.finalizeTransfer(fileId, 'sending');
+    }
+
+    public startDoneRetry(fileId: string, upeerId: string, msg: any) {
+        this.clearDoneRetry(fileId);
+        const timer = setInterval(async () => {
+            const transfer = this.store.getTransfer(fileId, 'sending');
+            if (!transfer || transfer.state !== 'active') {
+                this.clearDoneRetry(fileId);
+                return;
+            }
+            const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
+            const contact = await getContactByUpeerId(upeerId);
+            const freshAddress = contact?.address || transfer.peerAddress;
+            this.send(freshAddress, msg, contact?.publicKey);
+        }, 3000);
+        this.donePendingTimers.set(fileId, timer);
+    }
+
+    public clearDoneRetry(fileId: string) {
+        const timer = this.donePendingTimers.get(fileId);
+        if (timer) {
+            clearInterval(timer);
+            this.donePendingTimers.delete(fileId);
+        }
     }
 
     public checkStaleTransfers(timeoutMs = 90_000) {
@@ -307,6 +334,7 @@ export class TransferManager implements ITransferManager {
         this.store.updateTransfer(fileId, direction, { state: 'cancelled' });
 
         this.clearRetryTimer(fileId);
+        this.clearDoneRetry(fileId);
         this.transferKeys.delete(fileId);
 
         const handle = this.fileHandles.get(fileId);

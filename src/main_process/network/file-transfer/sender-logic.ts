@@ -229,9 +229,9 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
         if (ackedChunks.size === updated.totalChunks) {
             const contact = await getContactByUpeerId(upeerId);
             const freshAddress = contact?.address || address;
-            this.send(freshAddress, { type: 'FILE_DONE', fileId: data.fileId }, contact?.publicKey);
-        } else {
-            this.sendNextChunks(updated);
+            const doneMsg = { type: 'FILE_DONE', fileId: data.fileId };
+            this.send(freshAddress, doneMsg, contact?.publicKey);
+            this.startDoneRetry(data.fileId, upeerId, doneMsg);
         }
     }
 }
