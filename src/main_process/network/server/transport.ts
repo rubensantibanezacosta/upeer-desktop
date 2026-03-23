@@ -50,6 +50,10 @@ type PooledConnection = {
 
 const connectionPool = new Map<string, PooledConnection>();
 
+export function resetTransportConnectionsForTests(): void {
+    Array.from(connectionPool.keys()).forEach(destroyConnection);
+}
+
 function clearIdleTimer(entry: PooledConnection): void {
     if (entry.idleTimer) {
         clearTimeout(entry.idleTimer);

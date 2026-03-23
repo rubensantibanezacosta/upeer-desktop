@@ -63,7 +63,7 @@ vi.mock('../../../src/main_process/network/server/constants.js', () => ({
 import * as state from '../../../src/main_process/network/server/state.js';
 import * as socks5 from '../../../src/main_process/network/server/socks5.js';
 import * as circuitBreaker from '../../../src/main_process/network/server/circuitBreaker.js';
-import { sendSecureUDPMessage } from '../../../src/main_process/network/server/transport.js';
+import { resetTransportConnectionsForTests, sendSecureUDPMessage } from '../../../src/main_process/network/server/transport.js';
 
 describe('Transport - sendSecureUDPMessage', () => {
 
@@ -82,6 +82,7 @@ describe('Transport - sendSecureUDPMessage', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        resetTransportConnectionsForTests();
         (state.setNetworkReady as any)(true);
         (state.clearSendQueue as any)();
     });
@@ -124,7 +125,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         // CHAT está en SEALED_TYPES según nuestro mock
         sendSecureUDPMessage('1.2.3.4', { type: 'CHAT' }, 'recipient-pubkey');
 
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 20));
 
         const lastWrite = mockSocket.write.mock.calls[0][0];
         const sentData = JSON.parse(lastWrite.toString());
@@ -144,10 +145,12 @@ describe('Transport - sendSecureUDPMessage', () => {
         expect(mockSocket.write).toHaveBeenCalledTimes(2);
     });
 
-    it('should block sending if IP is in circuit breaker blocklist', () => {
+    it('should block sending if IP is in circuit breaker blocklist', async () => {
         (circuitBreaker.isIPBlocked as any).mockReturnValue(true);
 
         sendSecureUDPMessage('1.2.3.4', { type: 'PING' });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
 
         expect(socks5.socks5Connect).not.toHaveBeenCalled();
     });

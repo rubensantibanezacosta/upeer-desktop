@@ -662,6 +662,51 @@ describe('TransferManager - Core Orchestration', () => {
         );
     });
 
+    it('should send only new chunks after a partial ACK', async () => {
+        const fileId = 'id-no-duplicate-inflight';
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-new', publicKey: 'kp-new' });
+
+        manager['transferKeys'].set(fileId, Buffer.alloc(32));
+        manager['store'].createTransfer({
+            fileId,
+            upeerId: 'p-new',
+            peerAddress: 'addr-new',
+            fileName: 'f.bin',
+            fileSize: 400,
+            mimeType: 'application/octet-stream',
+            totalChunks: 4,
+            chunkSize: 100,
+            fileHash: 'h',
+            direction: 'sending',
+            filePath: '/path'
+        });
+        manager['store'].updateTransfer(fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+            chunksProcessed: 1,
+            nextChunkIndex: 2,
+            windowSize: 2
+        });
+
+        mockSend.mockClear();
+
+        const transfer = manager['store'].getTransfer(fileId, 'sending');
+        if (transfer) {
+            await manager.sendNextChunks(transfer, 'addr-new');
+        }
+
+        expect(mockSend).toHaveBeenCalledWith(
+            'addr-new',
+            expect.objectContaining({ type: 'FILE_CHUNK', chunkIndex: 2 }),
+            'kp-new'
+        );
+        expect(mockSend).not.toHaveBeenCalledWith(
+            'addr-new',
+            expect.objectContaining({ type: 'FILE_CHUNK', chunkIndex: 1 }),
+            'kp-new'
+        );
+    });
+
     it('should handle cancelation by peer (handleFileCancel)', async () => {
         const fileId = 'id-peer-cancel';
         manager['store'].createTransfer({

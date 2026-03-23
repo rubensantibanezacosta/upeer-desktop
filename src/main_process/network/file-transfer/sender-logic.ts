@@ -456,10 +456,9 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
 
         const processed = current.chunksProcessed || 0;
         const nextIdx = current.nextChunkIndex || 0;
-        const startIdx = Math.min(nextIdx, processed);
         const windowSize = current.windowSize || this.config.initialWindowSize || 64;
         const inflight = Math.max(0, nextIdx - processed);
-        const remaining = current.totalChunks - startIdx;
+        const remaining = current.totalChunks - nextIdx;
         const availableWindow = Math.min(windowSize - inflight, remaining);
 
         if (availableWindow <= 0) return;
@@ -482,13 +481,13 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
         const contact = await getContactByUpeerId(current.upeerId);
         const peerPublicKey = contact?.publicKey;
         const freshAddress = contact?.address || current.peerAddress;
-        const chunkIndexes = Array.from({ length: availableWindow }, (_, index) => startIdx + index)
+        const chunkIndexes = Array.from({ length: availableWindow }, (_, index) => nextIdx + index)
             .filter(chunkIndex => chunkIndex < current.totalChunks);
 
         if (chunkIndexes.length === 0) return;
 
         const reserved = this.store.updateTransfer(current.fileId, 'sending', {
-            nextChunkIndex: startIdx + chunkIndexes.length
+            nextChunkIndex: nextIdx + chunkIndexes.length
         }) || current;
 
         const preparedChunks: Array<{ chunkIndex: number; chunkLength: number; chunkMsg: any }> = [];
