@@ -160,7 +160,8 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       // Notifica a useChatState para actualizar el mensaje del chat
       onTransferStateChangeRef.current?.(data.fileId, {
         fileHash: data.fileHash,
-        transferState: 'completed'
+        transferState: 'completed',
+        savedPath: data.direction === 'receiving' ? data.tempPath : undefined
       });
     });
 

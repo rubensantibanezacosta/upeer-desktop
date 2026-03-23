@@ -89,6 +89,7 @@ export class UINotifier {
             totalChunks: transfer.totalChunks,
             thumbnail: transfer.thumbnail,
             fileHash: transfer.fileHash,
+            tempPath: transfer.tempPath,
             isVaulting: !!transfer.isVaulting,
             progress,
             bytesTransferred,

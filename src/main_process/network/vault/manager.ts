@@ -104,8 +104,13 @@ export class VaultManager {
         }
 
         if (candidates.length === 0) {
-            warn('No candidates found (friends, mesh, self, or recipient) to act as vault', { recipientSid }, 'vault');
-            return 0;
+            const selfPacketJson = JSON.stringify(packet);
+            const selfHash = payloadHashOverride ?? crypto.createHash('sha256').update(selfPacketJson).digest('hex');
+            const selfExpiresAt = Date.now() + (ttlMs ?? VAULT_TTL_MS);
+            const { saveVaultEntry: saveLocal } = await import('../../storage/vault/operations.js');
+            await saveLocal(selfHash, recipientSid, myId, 1, Buffer.from(selfPacketJson).toString('hex'), selfExpiresAt);
+            info('Self-custodian: message stored locally for delivery on reconnect', { recipient: recipientSid, hash: selfHash.slice(0, 8) }, 'vault');
+            return 1;
         }
 
         const packetJson = JSON.stringify(packet);
