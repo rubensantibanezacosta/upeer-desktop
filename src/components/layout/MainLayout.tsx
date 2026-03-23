@@ -67,6 +67,7 @@ interface MainLayoutProps {
 
     // Files
     isFilePickerOpen: boolean;
+    isPreparingAttachments: boolean;
     setFilePickerOpen: (open: boolean) => void;
     pendingFiles: any[];
     setPendingFiles: (files: any[]) => void;
@@ -89,7 +90,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     handleAcceptContact, handleDeleteContact, handleBlockContact,
     handleReaction, handleUpdateMessage, handleDeleteMessage, handleMediaClick,
     navigation, appStore, chatStore,
-    isFilePickerOpen, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
+    isFilePickerOpen, isPreparingAttachments, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
     const [forwardingMsg, setForwardingMsg] = useState<any>(null);
@@ -291,15 +292,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                             onScrollToMessage={handleScrollToMessage}
                                         />
 
-                                        {(isFilePickerOpen || isDragging) && (
+                                        {(isFilePickerOpen || isPreparingAttachments || isDragging) && (
                                             <FilePreviewOverlay
                                                 files={pendingFiles}
+                                                isPreparingAttachments={isPreparingAttachments}
                                                 isDragging={isDragging}
                                                 vouchScore={activeContact?.vouchScore}
                                                 onDragOver={handleDragOver}
                                                 onDragLeave={handleDragLeave}
                                                 onDrop={handleDrop}
-                                                onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setIsDragging(false); }}
+                                                onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setPreparingAttachments(false); navigation.setIsDragging(false); }}
                                                 onSend={handleFileSubmit}
                                                 onAddMore={() => handleAttachFile('any')}
                                                 onRemove={(index: number) => {

@@ -30,6 +30,7 @@ interface NavigationState {
 
     // Overlays
     isFilePickerOpen: boolean;
+    isPreparingAttachments: boolean;
     isTransfersExpanded: boolean;
 
     // Media Viewer
@@ -67,6 +68,7 @@ interface NavigationActions {
 
     // Overlays
     setFilePickerOpen: (open: boolean) => void;
+    setPreparingAttachments: (preparing: boolean) => void;
     setTransfersExpanded: (expanded: boolean) => void;
 
     // Media Viewer
@@ -94,6 +96,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
     isCreateGroupModalOpen: false,
 
     isFilePickerOpen: false,
+    isPreparingAttachments: false,
     isTransfersExpanded: false,
 
     viewerMediaList: [],
@@ -140,6 +143,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
 
     // ── Acciones Overlays
     setFilePickerOpen: (open) => set({ isFilePickerOpen: open }),
+    setPreparingAttachments: (preparing) => set({ isPreparingAttachments: preparing }),
     setTransfersExpanded: (expanded) => set({ isTransfersExpanded: expanded }),
 
     // ── Acciones Media Viewer

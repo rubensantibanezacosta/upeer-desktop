@@ -85,7 +85,7 @@ export interface TransferConfig {
 }
 
 export const DEFAULT_CONFIG: TransferConfig = {
-    maxChunkSize: 1024 * 32,
+    maxChunkSize: 1024 * 64,
     maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB
     transferTimeout: 300000,
     maxRetries: 5,

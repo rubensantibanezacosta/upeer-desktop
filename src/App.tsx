@@ -141,6 +141,7 @@ export default function App() {
                 handleFileSubmit={handleFileSubmit}
                 handleSendVoiceNote={handleSendVoiceNote}
                 fileTransfer={fileTransfer}
+                isPreparingAttachments={navigation.isPreparingAttachments}
                 editingMessage={editingMessage}
                 setEditingMessage={setEditingMessage}
             />

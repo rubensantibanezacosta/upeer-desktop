@@ -20,7 +20,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         contacts, targetUpeerId, activeGroupId, pendingFiles, setPendingFiles,
         setIsDragging, addFileTransferMessage
     } = useChatStore();
-    const { setFilePickerOpen } = useNavigationStore();
+    const { setFilePickerOpen, setPreparingAttachments } = useNavigationStore();
 
     const effectiveId = activeGroupId || targetUpeerId;
     const activeContact = contacts.find(c => c.upeerId === targetUpeerId);
@@ -49,15 +49,20 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         }).filter(f => !!f.path);
 
         if (mappedFiles.length > 0) {
-            const persistedFiles = await Promise.all(mappedFiles.map(async f => {
-                const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
-                if (persistResult.success && persistResult.path) {
-                    return { ...f, path: persistResult.path };
-                }
-                return f;
-            }));
-            setPendingFiles([...pendingFiles, ...persistedFiles]);
-            setFilePickerOpen(true);
+            setPreparingAttachments(true);
+            try {
+                const persistedFiles = await Promise.all(mappedFiles.map(async f => {
+                    const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
+                    if (persistResult.success && persistResult.path) {
+                        return { ...f, path: persistResult.path };
+                    }
+                    return f;
+                }));
+                setPendingFiles([...pendingFiles, ...persistedFiles]);
+                setFilePickerOpen(true);
+            } finally {
+                setPreparingAttachments(false);
+            }
         }
     };
 
@@ -75,15 +80,20 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         try {
             const result = await window.upeer.openFileDialog({ title, filters, multiSelect: true });
             if (result.success && !result.canceled && result.files && result.files.length > 0) {
-                const persistedFiles = await Promise.all(result.files.map(async (f: any) => {
-                    const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
-                    if (persistResult.success && persistResult.path) {
-                        return { ...f, path: persistResult.path };
-                    }
-                    return f;
-                }));
-                setPendingFiles([...pendingFiles, ...persistedFiles]);
-                setFilePickerOpen(true);
+                setPreparingAttachments(true);
+                try {
+                    const persistedFiles = await Promise.all(result.files.map(async (f: any) => {
+                        const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
+                        if (persistResult.success && persistResult.path) {
+                            return { ...f, path: persistResult.path };
+                        }
+                        return f;
+                    }));
+                    setPendingFiles([...pendingFiles, ...persistedFiles]);
+                    setFilePickerOpen(true);
+                } finally {
+                    setPreparingAttachments(false);
+                }
             }
         } catch (error) { console.error('Error opening native file dialog:', error); }
     };
@@ -105,6 +115,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
             }
         }
         setFilePickerOpen(false);
+        setPreparingAttachments(false);
         setPendingFiles([]);
     };
 
