@@ -6,6 +6,16 @@ import { playNotificationSound } from '../utils/notificationSound.js';
 
 let navGeneration = 0;
 
+const formatMessageTimestamp = (timestamp?: number) => {
+    const safeTimestamp = typeof timestamp === 'number' && Number.isFinite(timestamp)
+        ? timestamp
+        : Date.now();
+    return new Intl.DateTimeFormat(undefined, {
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(new Date(safeTimestamp));
+};
+
 interface ChatState {
     // Identity
     myIdentity: { address: string | null, upeerId: string, publicKey: string, alias?: string | null, name?: string | null, avatar?: string | null } | null;
@@ -130,7 +140,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             return {
                 id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
                 message: m.message, status: m.status,
-                timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: formatMessageTimestamp(m.timestamp),
                 replyTo: m.replyTo, reactions: m.reactions,
                 isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
             };
@@ -166,7 +176,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
                     isSystem: m.message?.startsWith('__SYS__|') || undefined,
                     status: m.status,
-                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: formatMessageTimestamp(m.timestamp),
                     replyTo: m.replyTo, reactions: m.reactions,
                     isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
                     senderUpeerId: m.senderUpeerId,
@@ -203,7 +213,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             return;
         }
 
-        const { contacts, groups, myIdentity } = get();
+        const { contacts, groups } = get();
         const raw = await window.upeer.searchMessages(query);
 
         set({
@@ -225,9 +235,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         isMine: !!m.isMine,
                         message: m.message,
                         status: m.status,
-                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: formatMessageTimestamp(m.timestamp),
                         senderName: conversationName,
-                        senderAvatar: isGroup ? group?.avatar : contact?.avatar,
+                        senderAvatar: (isGroup ? group?.avatar : contact?.avatar) ?? undefined,
                         senderDisplayName: senderName,
                         date: m.timestamp
                     };
@@ -236,7 +246,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     loadHistoryAround: async (targetMsgId: string) => {
-        const { targetUpeerId, activeGroupId, contacts, groups, myIdentity } = get();
+        const { targetUpeerId, activeGroupId, contacts, myIdentity } = get();
         const chatId = activeGroupId || targetUpeerId;
         if (!chatId) return;
 
@@ -252,11 +262,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
                         isSystem: m.message?.startsWith('__SYS__|') || undefined,
                         status: m.status,
-                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: formatMessageTimestamp(m.timestamp),
                         replyTo: m.replyTo, reactions: m.reactions, isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
                         senderUpeerId: m.senderUpeerId,
                         senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
-                        senderAvatar: (sender as any)?.avatar, date: m.timestamp
+                        senderAvatar: (sender as any)?.avatar ?? undefined, date: m.timestamp
                     };
                 }),
                 isWindowedHistory: true
@@ -266,7 +276,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                 chatHistory: raw.map((m: any) => ({
                     id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
                     message: m.message, status: m.status,
-                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: formatMessageTimestamp(m.timestamp),
                     replyTo: m.replyTo, reactions: m.reactions,
                     isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
                 })),
@@ -292,11 +302,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         message: m.message?.startsWith('__SYS__|') ? m.message.slice(8) : m.message,
                         isSystem: m.message?.startsWith('__SYS__|') || undefined,
                         status: m.status,
-                        timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: formatMessageTimestamp(m.timestamp),
                         replyTo: m.replyTo, reactions: m.reactions, isEdited: !!m.isEdited, isDeleted: !!m.isDeleted,
                         senderUpeerId: m.senderUpeerId,
                         senderName: (sender as any)?.name || (sender as any)?.alias || m.senderName || 'Usuario desconocido',
-                        senderAvatar: (sender as any)?.avatar, date: m.timestamp
+                        senderAvatar: (sender as any)?.avatar ?? undefined, date: m.timestamp
                     };
                 }),
                 isWindowedHistory: false
@@ -306,7 +316,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                 chatHistory: raw.reverse().map((m: any) => ({
                     id: m.id, upeerId: m.chatUpeerId, isMine: !!m.isMine,
                     message: m.message, status: m.status,
-                    timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: formatMessageTimestamp(m.timestamp),
                     replyTo: m.replyTo, reactions: m.reactions,
                     isEdited: !!m.isEdited, isDeleted: !!m.isDeleted, date: m.timestamp
                 })),
@@ -397,9 +407,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     isMine: true,
                     message: sendResult.savedMessage,
                     status: targetUpeerId === myIdentity?.upeerId ? 'read' : 'sent',
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: formatMessageTimestamp(sendResult.timestamp),
                     replyTo: replyTo?.id,
-                    date: Date.now()
+                    date: sendResult.timestamp
                 }],
                 messagesByConversation: { ...state.messagesByConversation, [targetUpeerId]: '' },
                 replyByConversation: { ...state.replyByConversation, [targetUpeerId]: null }
@@ -412,21 +422,21 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         const { activeGroupId, myIdentity } = get();
         if (!activeGroupId || !msg) return;
 
-        const sentId = await window.upeer.sendGroupMessage(activeGroupId, msg);
-        if (sentId) {
+        const sendResult = await window.upeer.sendGroupMessage(activeGroupId, msg);
+        if (sendResult) {
             set(state => ({
                 groupChatHistory: [...state.groupChatHistory, {
-                    id: sentId,
+                    id: sendResult.id,
                     upeerId: activeGroupId,
                     groupId: activeGroupId,
                     isMine: true,
                     message: msg,
                     status: 'sent',
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: formatMessageTimestamp(sendResult.timestamp),
                     senderUpeerId: myIdentity?.upeerId,
                     senderName: myIdentity?.alias || myIdentity?.name || 'Yo',
-                    senderAvatar: myIdentity?.avatar,
-                    date: Date.now()
+                    senderAvatar: myIdentity?.avatar ?? undefined,
+                    date: sendResult.timestamp
                 }],
                 messagesByConversation: { ...state.messagesByConversation, [activeGroupId]: '' },
                 replyByConversation: { ...state.replyByConversation, [activeGroupId]: null }
@@ -625,11 +635,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         isMine,
                         message: messageContent,
                         status: 'sent',
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: formatMessageTimestamp(Date.now()),
                         replyTo: replyTo?.id,
                         senderUpeerId: isMine ? myIdentity?.upeerId : undefined,
                         senderName: isMine ? ((myIdentity as any)?.alias || (myIdentity as any)?.name || 'Yo') : undefined,
-                        senderAvatar: isMine ? myIdentity?.avatar : undefined,
+                        senderAvatar: isMine ? (myIdentity?.avatar ?? undefined) : undefined,
                         date: Date.now()
                     }],
                     replyByConversation: { ...state.replyByConversation, [upeerId]: null }
@@ -642,7 +652,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         isMine,
                         message: messageContent,
                         status: (isMine && upeerId === get().myIdentity?.upeerId) ? 'read' : 'sent',
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: formatMessageTimestamp(Date.now()),
                         replyTo: replyTo?.id,
                         date: Date.now()
                     }],
@@ -693,7 +703,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                         chatHistory: [...state.chatHistory, {
                             ...data,
                             status: 'read',
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: formatMessageTimestamp(data.timestamp),
                             date: data.timestamp || Date.now()
                         }]
                     };
@@ -769,11 +779,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                             message: data.message,
                             isSystem: data.isSystem || undefined,
                             status: data.status || 'delivered',
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: formatMessageTimestamp(data.timestamp),
                             replyTo: data.replyTo,
                             senderUpeerId: data.senderUpeerId,
                             senderName: (sender as any)?.name || (sender as any)?.alias || data.senderName || 'Usuario desconocido',
-                            senderAvatar: sender?.avatar,
+                            senderAvatar: sender?.avatar ?? undefined,
                             date: data.timestamp || Date.now()
                         }]
                     };

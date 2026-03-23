@@ -185,6 +185,7 @@ export interface SendMessageRequest {
 export interface SendMessageResponse {
     id: string;
     savedMessage: string;
+    timestamp: number;
 }
 
 export interface SendTypingIndicatorRequest {
@@ -316,9 +317,8 @@ export interface SendGroupMessageRequest {
 }
 
 export interface SendGroupMessageResponse {
-    success: boolean;
-    msgId?: string;
-    error?: string;
+    id: string;
+    timestamp: number;
 }
 
 export interface InviteToGroupRequest {
@@ -509,7 +509,7 @@ export interface ReceiveP2PMessageEvent {
     content: string;
     replyTo?: string;
     signature: string;
-    timestamp: string;
+    timestamp: number;
 }
 
 export interface MessageDeliveredEvent {
@@ -565,7 +565,7 @@ export interface ReceiveGroupMessageEvent {
     content: string;
     replyTo?: string;
     signature: string;
-    timestamp: string;
+    timestamp: number;
 }
 
 export interface GroupInviteReceivedEvent {

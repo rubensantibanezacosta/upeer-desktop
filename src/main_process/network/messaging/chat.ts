@@ -70,7 +70,9 @@ async function vaultChatForOfflineDelivery(
     content: string,
     replyTo: string | undefined,
     senderUpeerId: string,
+    timestamp: number,
 ): Promise<number> {
+    const senderEphemeralPublicKey = getMyEphemeralPublicKeyHex();
     const vaultEncrypted = encrypt(
         Buffer.from(content, 'utf-8'),
         Buffer.from(recipientPublicKey, 'hex')
@@ -81,6 +83,9 @@ async function vaultChatForOfflineDelivery(
         id: msgId,
         content: vaultEncrypted.ciphertext,
         nonce: vaultEncrypted.nonce,
+        timestamp,
+        ephemeralPublicKey: senderEphemeralPublicKey,
+        useRecipientEphemeral: false,
         replyTo,
     };
 
@@ -95,7 +100,7 @@ async function vaultChatForOfflineDelivery(
     return VaultManager.replicateToVaults(recipientUpeerId, innerPacket);
 }
 
-export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<{ id: string; savedMessage: string } | undefined> {
+export async function sendUDPMessage(upeerId: string, message: string | { [key: string]: any }, replyTo?: string): Promise<{ id: string; savedMessage: string; timestamp: number } | undefined> {
     const selfId = getMyUPeerId();
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
@@ -129,7 +134,8 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 msgId,
                 content,
                 replyTo,
-                selfId
+                selfId,
+                timestamp
             );
 
             if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted' as any)) {
@@ -143,7 +149,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         }
 
         startDhtSearch(upeerId, sendSecureUDPMessage);
-        return { id: msgId, savedMessage: content };
+        return { id: msgId, savedMessage: content, timestamp };
     }
 
     const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
@@ -308,6 +314,9 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                     id: msgId,
                     content: selfVaultEncrypted.ciphertext,
                     nonce: selfVaultEncrypted.nonce,
+                    timestamp,
+                    ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
+                    useRecipientEphemeral: false,
                     replyTo,
                     senderUpeerId: selfId
                 };
@@ -352,7 +361,8 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                     msgId,
                     content,
                     replyTo,
-                    selfId
+                    selfId,
+                    timestamp
                 );
 
                 if (nodes > 0) {
@@ -371,7 +381,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         }
     }, CHAT_ACK_TIMEOUT_MS);
 
-    return { id: msgId, savedMessage: payload };
+    return { id: msgId, savedMessage: payload, timestamp };
 }
 
 export async function sendTypingIndicator(upeerId: string) {

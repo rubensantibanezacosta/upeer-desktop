@@ -28,7 +28,7 @@ export async function handleGroupMessage(
     win: BrowserWindow | null,
     senderAddress?: string
 ) {
-    const { id, groupId, content, nonce, ephemeralPublicKey, useRecipientEphemeral, replyTo } = data;
+    const { id, groupId, content, nonce, ephemeralPublicKey, useRecipientEphemeral, replyTo, timestamp } = data;
     if (!groupId || !content) return;
 
     // BUG CA fix: si el grupo no existe localmente, rechazar el mensaje en lugar
@@ -72,7 +72,7 @@ export async function handleGroupMessage(
     }
 
     // BUG AB fix: igual que BUG P (ya corregido para CHAT), los mensajes de grupo\n    // entregados por múltiples custodios simultáneamente llegaban aquí dos veces\n    // con el mismo msgId. saveMessage usa onConflictDoNothing → changes=0 en la segunda\n    // llamada, pero la emit 'receive-group-message' se hacía igualmente → duplicados en UI.
-    const savedGroup = await saveMessage(msgId, groupId, false, displayContent, replyTo, undefined, 'delivered', upeerId);
+    const savedGroup = await saveMessage(msgId, groupId, false, displayContent, replyTo, undefined, 'delivered', upeerId, timestamp);
     const isNewGroupMsg = (savedGroup as any)?.changes > 0;
 
     // Notify sender that we received the message
@@ -91,7 +91,8 @@ export async function handleGroupMessage(
             isMine: false,
             message: displayContent,
             replyTo,
-            status: 'delivered'
+            status: 'delivered',
+            timestamp: typeof timestamp === 'number' ? timestamp : Date.now()
         });
 
         const notifWin = getMainWindow();

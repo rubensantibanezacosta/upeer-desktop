@@ -73,7 +73,7 @@ export async function handleVaultDelivery(
                     // Un contacto comprometido puede firmar un packet malformado que crashe handlers.
                     // Se valida aquí para los tipos que tienen validador; FILE_* y FILE_DATA_SMALL
                     // gestionan su propia validación en sus respectivos handlers.
-                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'ACK', 'READ', 'CHAT_REACTION'];
+                    const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_UPDATE', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'ACK', 'READ', 'CHAT_REACTION'];
                     if (_vaultTypes.includes(innerPacket.type)) {
                         const _innerValidation = validateMessage(innerPacket.type, innerPacket);
                         if (!_innerValidation.valid) {
@@ -89,6 +89,9 @@ export async function handleVaultDelivery(
                     } else if (innerPacket.type === 'CHAT_CLEAR_ALL') {
                         const { handleChatClear } = await import('./chat.js');
                         await handleChatClear(entry.senderSid, innerPacket, win);
+                    } else if (innerPacket.type === 'CHAT_UPDATE') {
+                        const { handleChatEdit } = await import('./chat.js');
+                        await handleChatEdit(entry.senderSid, innerPacket, win, innerSig);
                     } else if (innerPacket.type === 'FILE_DATA_SMALL') {
                         if (typeof innerPacket.fileHash !== 'string' || !/^[0-9a-f]{64}$/i.test(innerPacket.fileHash)) {
                             security('Vault FILE_DATA_SMALL: fileHash inválido', { sender: entry.senderSid }, 'vault');

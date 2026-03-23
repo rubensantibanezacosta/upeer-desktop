@@ -277,7 +277,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                         <RichText
                                             isMe={isMe}
                                             level="body-md"
-                                            sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', fontStyle: msg.isDeleted ? 'italic' : 'normal', pb: 0.5 }}
+                                            sx={{
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'pre-wrap',
+                                                fontStyle: msg.isDeleted ? 'italic' : 'normal',
+                                                pb: 0.5,
+                                                transform: msg.isDeleted ? 'translateY(2px)' : 'none'
+                                            }}
                                         >
                                             {(() => {
                                                 if (isFile && fileData && fileData.caption) return fileData.caption;

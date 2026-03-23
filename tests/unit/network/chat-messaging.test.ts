@@ -103,6 +103,9 @@ describe('network/messaging/chat.ts', () => {
                 type: 'CHAT',
                 content: 'ciphertext',
                 nonce: 'nonce',
+                timestamp: expect.any(Number),
+                ephemeralPublicKey: '22'.repeat(32),
+                useRecipientEphemeral: false,
                 replyTo: 'reply-1',
                 senderUpeerId: 'self-id',
                 signature: Buffer.from('sig').toString('hex')

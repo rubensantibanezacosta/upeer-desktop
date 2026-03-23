@@ -25,6 +25,10 @@ vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
     updateContactEphemeralPublicKey: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
+    getContactByUpeerId: vi.fn(),
+}));
+
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     decrypt: vi.fn(),
     getMyUPeerId: vi.fn(() => 'my-peer-id'),
@@ -105,7 +109,8 @@ describe('Chat Handlers', () => {
 
             expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
                 message: 'hola p2p',
-                id: data.id
+                id: data.id,
+                timestamp: data.timestamp
             }));
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
@@ -135,6 +140,38 @@ describe('Chat Handlers', () => {
                 senderId,
                 false,
                 'mensaje descifrado',
+                undefined,
+                'sig',
+                'delivered',
+                senderId,
+                undefined
+            );
+        });
+
+        it('should prefer sender ephemeral public key when decrypting crypto_box messages', async () => {
+            const data = {
+                id: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: false,
+            };
+
+            (identity.decrypt as any).mockReturnValue(Buffer.from('mensaje vault'));
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+
+            await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
+
+            expect(identity.decrypt).toHaveBeenCalledWith(
+                Buffer.from(data.nonce, 'hex'),
+                Buffer.from(data.content, 'hex'),
+                Buffer.from(data.ephemeralPublicKey, 'hex')
+            );
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                expect.any(String),
+                senderId,
+                false,
+                'mensaje vault',
                 undefined,
                 'sig',
                 'delivered',
@@ -307,29 +344,41 @@ describe('Chat Handlers', () => {
     });
 
     describe('handleChatEdit', () => {
-        it('should update content if message is from the peer', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012', newContent: 'editado' };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 });
+        it('should decrypt and update content if message is from the peer', async () => {
+            const data = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                version: 2,
+            };
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
+            (identity.decrypt as any).mockReturnValue(Buffer.from('editado'));
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig');
 
-            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.id, 'editado', 'edit-sig');
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-edited', {
-                id: data.id,
-                newContent: 'editado'
+            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado', 'edit-sig', 2);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-updated', {
+                id: data.msgId,
+                upeerId: senderId,
+                chatUpeerId: senderId,
+                content: 'editado',
+                signature: 'edit-sig'
             });
         });
     });
 
     describe('handleChatDelete', () => {
         it('should delete locally if message is from the peer', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012' };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 });
+            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
 
             await handleChatDelete(senderId, data, mockWin);
 
-            expect(messagesOps.deleteMessageLocally).toHaveBeenCalledWith(data.id);
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-deleted', { id: data.id });
+            expect(messagesOps.deleteMessageLocally).toHaveBeenCalledWith(data.msgId, data.timestamp);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-deleted', { id: data.msgId, upeerId: senderId, chatUpeerId: senderId });
         });
     });
 

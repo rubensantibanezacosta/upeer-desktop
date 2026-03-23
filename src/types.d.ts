@@ -13,7 +13,7 @@ declare global {
             unblockContact: (upeerId: string) => Promise<any>;
             clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
-            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<{ id: string; savedMessage: string } | undefined>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
@@ -35,7 +35,7 @@ declare global {
             getGroups: () => Promise<any[]>;
             createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
             updateGroupAvatar: (groupId: string, avatar: string) => Promise<void>;
-            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<string | undefined>;
+            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<{ id: string; timestamp: number } | undefined>;
             inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
@@ -57,6 +57,8 @@ declare global {
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
             onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => void;
+            onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => void;
+            onReputationUpdated: (callback: () => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;

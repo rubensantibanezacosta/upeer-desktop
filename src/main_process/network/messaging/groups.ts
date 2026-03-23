@@ -33,13 +33,13 @@ function shouldUseEphemeral(contact: any): boolean {
 
 /**
  * Send a text message to a group (fan-out to each member).
- * Returns the generated message ID.
+ * Returns the generated message ID and timestamp.
  */
 export async function sendGroupMessage(
     groupId: string,
     message: string,
     replyTo?: string
-): Promise<string | undefined> {
+): Promise<{ id: string; timestamp: number } | undefined> {
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (message.length > MAX_MESSAGE_SIZE_BYTES) {
         error(`Group message size exceeds limit (${message.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { groupId }, 'security');
@@ -51,10 +51,11 @@ export async function sendGroupMessage(
 
     const msgId = crypto.randomUUID();
     const myId = getMyUPeerId();
+    const timestamp = Date.now();
 
     // Save locally first
     const signature = sign(Buffer.from(message));
-    await saveMessage(msgId, groupId, true, message, replyTo, signature.toString('hex'), 'sent', myId);
+    await saveMessage(msgId, groupId, true, message, replyTo, signature.toString('hex'), 'sent', myId, timestamp);
 
     // Fan-out: send to every member including other devices of ours for "Self-Sync"
     const membersWithSelf = [...group.members];
@@ -86,6 +87,7 @@ export async function sendGroupMessage(
             groupId,
             groupName: group.name,
             senderUpeerId: myId,
+            timestamp,
             content: ciphertext,
             nonce: nonce,
             ephemeralPublicKey: ephPubKey,
@@ -168,6 +170,7 @@ export async function sendGroupMessage(
             Buffer.from(message, 'utf-8'),
             Buffer.from(targetKeyHex, 'hex')
         );
+        const ephPubKey = getMyEphemeralPublicKeyHex();
         const offlinePacket = {
             type: 'GROUP_MSG',
             id: msgId,
@@ -175,6 +178,8 @@ export async function sendGroupMessage(
             // groupName omitido por privacidad
             content: ciphertext,
             nonce: nonce,
+            timestamp,
+            ephemeralPublicKey: ephPubKey,
             useRecipientEphemeral: useEphemeral,
             replyTo
         };
@@ -202,7 +207,7 @@ export async function sendGroupMessage(
         }
     }
 
-    return msgId;
+    return { id: msgId, timestamp };
 }
 
 /**

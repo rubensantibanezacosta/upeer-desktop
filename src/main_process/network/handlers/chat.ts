@@ -17,6 +17,7 @@ import {
 import {
     updateContactEphemeralPublicKey,
 } from '../../storage/contacts/keys.js';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import {
     decrypt,
     getMyUPeerId,
@@ -142,7 +143,9 @@ export async function handleChatMessage(
         }
     } else if (data.nonce) {
         try {
-            const senderKeyHex = data.useRecipientEphemeral ? data.ephemeralPublicKey : contact.publicKey;
+            const senderKeyHex = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
+                ? data.ephemeralPublicKey
+                : contact.publicKey;
             if (!senderKeyHex) throw new Error("La llave pública del remitente no está disponible");
 
             const decrypted = decrypt(
@@ -172,7 +175,8 @@ export async function handleChatMessage(
             message: displayContent,
             replyTo: data.replyTo,
             status: 'delivered',
-            encrypted: !!data.nonce
+            encrypted: !!data.nonce,
+            timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now()
         });
 
         const notifWin = getMainWindow();
@@ -238,15 +242,47 @@ export async function handleChatEdit(
     win: BrowserWindow | null,
     signature: string
 ) {
-    if (!data.id || !_UUID_RE.test(String(data.id))) return;
-    const msg = (await getMessageById(data.id)) as any;
-    if (msg && msg.chatUpeerId === upeerId && !msg.isMine) {
-        updateMessageContent(data.id, data.newContent, signature);
-        win?.webContents.send('message-edited', {
-            id: data.id,
-            newContent: data.newContent
-        });
+    const msgId = data.msgId || data.id;
+    if (!msgId || !_UUID_RE.test(String(msgId))) return;
+
+    const chatUpeerId = data.chatUpeerId || upeerId;
+    const msg = (await getMessageById(msgId)) as any;
+    if (!msg || msg.chatUpeerId !== chatUpeerId || msg.isMine) return;
+
+    let newContent = data.newContent;
+    if (typeof newContent !== 'string') {
+        if (data.nonce && typeof data.content === 'string') {
+            try {
+                const contact = await getContactByUpeerId(upeerId);
+                const decryptKeyHex = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
+                    ? data.ephemeralPublicKey
+                    : contact?.publicKey;
+                if (!decryptKeyHex) return;
+                const decrypted = decrypt(
+                    Buffer.from(data.nonce, 'hex'),
+                    Buffer.from(data.content, 'hex'),
+                    Buffer.from(decryptKeyHex, 'hex')
+                );
+                if (!decrypted) return;
+                newContent = decrypted.toString('utf-8');
+            } catch {
+                return;
+            }
+        } else if (typeof data.content === 'string') {
+            newContent = data.content;
+        }
     }
+
+    if (typeof newContent !== 'string') return;
+
+    updateMessageContent(msgId, newContent, signature, data.version);
+    win?.webContents.send('message-updated', {
+        id: msgId,
+        upeerId,
+        chatUpeerId,
+        content: newContent,
+        signature
+    });
 }
 
 export async function handleReadReceipt(
@@ -267,11 +303,13 @@ export async function handleChatDelete(
     data: any,
     win: BrowserWindow | null
 ) {
-    if (!data.id || !_UUID_RE.test(String(data.id))) return;
-    const msg = (await getMessageById(data.id)) as any;
-    if (msg && msg.chatUpeerId === upeerId && !msg.isMine) {
-        deleteMessageLocally(data.id);
-        win?.webContents.send('message-deleted', { id: data.id });
+    const msgId = data.msgId || data.id;
+    if (!msgId || !_UUID_RE.test(String(msgId))) return;
+    const chatUpeerId = data.chatUpeerId || upeerId;
+    const msg = (await getMessageById(msgId)) as any;
+    if (msg && msg.chatUpeerId === chatUpeerId && !msg.isMine) {
+        deleteMessageLocally(msgId, data.timestamp);
+        win?.webContents.send('message-deleted', { id: msgId, upeerId, chatUpeerId });
     }
 }
 

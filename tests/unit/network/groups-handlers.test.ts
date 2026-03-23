@@ -51,13 +51,27 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupMessage', () => {
         it('should process valid group message', async () => {
             const group = { id: groupId, members: [senderId, 'my-id'], adminUpeerId: 'admin' };
-            const data = { id: '550e8400-e29b-41d4-a716-446655440000', groupId, content: 'hi' };
+            const data = { id: '550e8400-e29b-41d4-a716-446655440000', groupId, content: 'hi', timestamp: 1710000000000 };
             (groupsOps.getGroupById as any).mockReturnValue(group);
             (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
 
             await handleGroupMessage(senderId, { upeerId: senderId } as any, data, mockWin);
 
-            expect(messagesOps.saveMessage).toHaveBeenCalled();
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                data.id,
+                groupId,
+                false,
+                'hi',
+                undefined,
+                undefined,
+                'delivered',
+                senderId,
+                data.timestamp
+            );
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-group-message', expect.objectContaining({
+                id: data.id,
+                timestamp: data.timestamp
+            }));
         });
 
         it('should fail if groupId or content is missing', async () => {
