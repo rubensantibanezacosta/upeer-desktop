@@ -174,9 +174,9 @@ export class TransferManager implements ITransferManager {
             const freshAddress = contact?.address || transfer.peerAddress;
 
             const chunkSize = transfer.chunkSize || 16384;
-            const offset = BigInt(chunkIndex) * BigInt(chunkSize);
+            const fileOffset = chunkIndex * chunkSize;
             const buffer = Buffer.alloc(chunkSize);
-            const { bytesRead } = await (handle as any).read(buffer, 0, buffer.length, offset);
+            const { bytesRead } = await handle.read(buffer, 0, buffer.length, fileOffset);
             const finalBuffer = bytesRead < chunkSize ? buffer.slice(0, bytesRead) : buffer;
 
             const chunkMsg: any = { type: 'FILE_CHUNK', fileId: transfer.fileId, chunkIndex };

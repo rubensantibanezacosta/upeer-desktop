@@ -137,7 +137,7 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
             const path = await import('node:path');
             const os = await import('node:os');
             const tempFile = path.join(os.tmpdir(), `chat-p2p-${transfer.fileId}.tmp`);
-            handle = await fs.open(tempFile, 'a+');
+            handle = await fs.open(tempFile, 'w+');
             this.setFileHandle(transfer.fileId, handle);
             this.store.updateTransfer(transfer.fileId, 'receiving', { tempPath: tempFile });
         }
@@ -151,8 +151,8 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
             chunkData = Buffer.from(data.data, 'base64');
         }
 
-        const offset = BigInt(data.chunkIndex) * BigInt(transfer.chunkSize);
-        await (handle as any).write(chunkData, 0, chunkData.length, offset);
+        const fileOffset = data.chunkIndex * transfer.chunkSize;
+        await handle.write(chunkData, 0, chunkData.length, fileOffset);
 
         const updated = this.store.updateTransfer(transfer.fileId, 'receiving', {
             chunksProcessed: transfer.pendingChunks?.size ?? (transfer.chunksProcessed + 1)

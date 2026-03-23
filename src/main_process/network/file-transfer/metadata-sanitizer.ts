@@ -209,7 +209,9 @@ export class MetadataSanitizer {
             warn('Sanitization failed, sending original file', { err: String(err), filePath }, 'metadata-sanitizer');
             try {
                 await fs.unlink(sanitizedPath);
-            } catch (_e) { /* ignore */ }
+            } catch (unlinkErr) {
+                warn('Failed to delete failed sanitized file', { err: String(unlinkErr) }, 'metadata-sanitizer');
+            }
 
             return {
                 sanitizedPath: filePath,
@@ -225,7 +227,8 @@ export class MetadataSanitizer {
         try {
             const stats = await fs.stat(outputPath);
             return stats.size > 0;
-        } catch {
+        } catch (err) {
+            warn('Sanitized file not accessible for verification', { err: String(err) }, 'metadata-sanitizer');
             return false;
         }
     }
@@ -329,10 +332,14 @@ export class MetadataSanitizer {
             for (const file of files) {
                 try {
                     await fs.unlink(path.join(this.tempDir, file));
-                } catch (_e) { /* ignore */ }
+                } catch (unlinkErr) {
+                    warn('Failed to delete sanitized file during cleanupAll', { file, err: String(unlinkErr) }, 'metadata-sanitizer');
+                }
             }
             debug('Cleaned up all sanitized files', { count: files.length }, 'metadata-sanitizer');
-        } catch (_err) { /* ignore */ }
+        } catch (err) {
+            warn('Failed to read sanitized temp dir during cleanupAll', { err: String(err) }, 'metadata-sanitizer');
+        }
     }
 }
 

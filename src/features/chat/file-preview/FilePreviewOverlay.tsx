@@ -52,40 +52,15 @@ interface FilePreviewOverlayProps {
 
 const useFilesPreview = (files: FileInfo[]) => {
     const [previews, setPreviews] = useState<Record<string, { previewUrl: string; thumbnail: string }>>({});
-    const [isGenerating, setIsGenerating] = useState(false);
     const [assetPaths, setAssetPaths] = useState<Record<string, string>>({});
-
-    const copyFilesToAssets = async (filesToCopy: FileInfo[]): Promise<Record<string, string>> => {
-        const paths: Record<string, string> = {};
-        for (const file of filesToCopy) {
-            if (assetPaths[file.path]) {
-                paths[file.path] = assetPaths[file.path];
-                continue;
-            }
-            try {
-                const result = await (window as any).upeer?.persistInternalAsset({
-                    filePath: file.path,
-                    fileName: file.name
-                });
-                if (result?.success && result.path) {
-                    paths[file.path] = result.path;
-                } else {
-                    paths[file.path] = file.path;
-                }
-            } catch {
-                paths[file.path] = file.path;
-            }
-        }
-        setAssetPaths(prev => ({ ...prev, ...paths }));
-        return paths;
-    };
+    const [isGenerating, setIsGenerating] = useState(false);
+    const processingRef = useRef(new Set<string>());
 
     const generateThumbnail = (imageUrl: string): Promise<string> =>
         new Promise((resolve) => {
             let settled = false;
             const resolveOnce = (v: string) => { if (!settled) { settled = true; resolve(v); } };
             const timeout = setTimeout(() => resolveOnce(''), 5000);
-
             const img = new Image();
             img.onload = () => {
                 clearTimeout(timeout);
@@ -100,9 +75,7 @@ const useFilesPreview = (files: FileInfo[]) => {
                     canvas.width = width; canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
                     resolveOnce(canvas.toDataURL('image/jpeg', 0.7));
-                } catch {
-                    resolveOnce('');
-                }
+                } catch { resolveOnce(''); }
             };
             img.onerror = () => { clearTimeout(timeout); resolveOnce(''); };
             img.src = imageUrl;
@@ -115,17 +88,8 @@ const useFilesPreview = (files: FileInfo[]) => {
             video.src = videoUrl;
             video.muted = true;
             video.playsInline = true;
-
-            const timeout = setTimeout(() => {
-                video.onseeked = null;
-                video.onerror = null;
-                resolve('');
-            }, 5000);
-
-            video.onloadedmetadata = () => {
-                video.currentTime = Math.min(1, video.duration * 0.1);
-            };
-
+            const timeout = setTimeout(() => { video.onseeked = null; video.onerror = null; resolve(''); }, 5000);
+            video.onloadedmetadata = () => { video.currentTime = Math.min(1, video.duration * 0.1); };
             video.onseeked = () => {
                 clearTimeout(timeout);
                 const canvas = document.createElement('canvas');
@@ -139,50 +103,59 @@ const useFilesPreview = (files: FileInfo[]) => {
                 ctx.drawImage(video, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', 0.7));
             };
-
-            video.onerror = () => {
-                clearTimeout(timeout);
-                resolve('');
-            };
+            video.onerror = () => { clearTimeout(timeout); resolve(''); };
         });
 
     useEffect(() => {
-        let isMounted = true;
-        const load = async () => {
-            if (isMounted) setIsGenerating(true);
-            const filesToProcess = files.filter(f => !previews[f.path]);
-            if (filesToProcess.length === 0) {
-                if (isMounted) setIsGenerating(false);
-                return;
-            }
-            const assetPathMap = await copyFilesToAssets(filesToProcess);
-            for (const file of filesToProcess) {
-                if (!isMounted) break;
+        const currentPaths = new Set(files.map(f => f.path));
+        for (const p of processingRef.current) {
+            if (!currentPaths.has(p)) processingRef.current.delete(p);
+        }
+
+        const unprocessed = files.filter(f => !processingRef.current.has(f.path));
+        if (unprocessed.length === 0) return;
+
+        for (const f of unprocessed) processingRef.current.add(f.path);
+
+        setIsGenerating(true);
+
+        const process = async () => {
+            for (const file of unprocessed) {
+                let assetPath = file.path;
+                try {
+                    const result = await (window as any).upeer?.persistInternalAsset({ filePath: file.path, fileName: file.name });
+                    if (result?.success && result.path) assetPath = result.path;
+                } catch (err) { console.warn('persistInternalAsset failed, using original path', err); }
+
+                setAssetPaths(prev => ({ ...prev, [file.path]: assetPath }));
+
                 let effectiveType = file.type;
                 if (!effectiveType || effectiveType === 'application/octet-stream') effectiveType = getMimeType(file.name);
-                if (!effectiveType.startsWith("image/") && !effectiveType.startsWith("video/")) continue;
-                const assetPath = assetPathMap[file.path] || file.path;
-                try {
-                    const mediaUrl = toMediaUrl(assetPath);
-                    let thumbnail = "";
-                    if (effectiveType.startsWith("image/")) {
-                        thumbnail = await generateThumbnail(mediaUrl);
-                    } else if (effectiveType.startsWith("video/")) {
-                        try {
-                            const result = await (window as any).upeer.generateVideoThumbnail(assetPath);
-                            thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(mediaUrl);
-                        } catch { thumbnail = await generateVideoThumbnail(mediaUrl); }
+
+                let thumbnail = '';
+                let previewUrl = '';
+
+                if (effectiveType.startsWith('image/')) {
+                    previewUrl = toMediaUrl(assetPath);
+                    thumbnail = await generateThumbnail(previewUrl);
+                } else if (effectiveType.startsWith('video/')) {
+                    previewUrl = toMediaUrl(assetPath);
+                    try {
+                        const result = await (window as any).upeer.generateVideoThumbnail(assetPath);
+                        thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(previewUrl);
+                    } catch (err) {
+                        console.warn('generateVideoThumbnail IPC failed, using canvas fallback', err);
+                        thumbnail = await generateVideoThumbnail(previewUrl);
                     }
-                    if (isMounted) {
-                        setPreviews(prev => ({ ...prev, [file.path]: { previewUrl: mediaUrl, thumbnail } }));
-                    }
-                } catch { /* ignore */ }
+                }
+
+                setPreviews(prev => ({ ...prev, [file.path]: { previewUrl, thumbnail } }));
             }
-            if (isMounted) setIsGenerating(false);
+            setIsGenerating(false);
         };
-        load();
-        return () => { isMounted = false; };
-    }, [files, previews, assetPaths]);
+
+        process();
+    }, [files]);
 
     return { previews, isGenerating, assetPaths };
 };
