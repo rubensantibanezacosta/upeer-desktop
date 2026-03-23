@@ -24,6 +24,7 @@ export class TransferManager implements ITransferManager {
     private retryTimers = new Map<string, any>(); // fileId_chunkIndex -> timer
     private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
     private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
+    private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -139,6 +140,13 @@ export class TransferManager implements ITransferManager {
             if (current && current.state === 'active') {
                 if (current.chunksProcessed <= chunkIndex) {
                     debug('Retrying chunk due to timeout', { fileId, chunkIndex }, 'file-transfer');
+                    const lastSearch = this.dhtSearchTimestamps.get(current.upeerId) ?? 0;
+                    if (Date.now() - lastSearch > 10000) {
+                        this.dhtSearchTimestamps.set(current.upeerId, Date.now());
+                        import('../dht/core.js').then(({ startDhtSearch }) => {
+                            startDhtSearch(current.upeerId, (ip: string, data: any) => this.send(ip, data));
+                        });
+                    }
                     this.sendNextChunks(current);
                 }
             }
@@ -183,6 +191,7 @@ export class TransferManager implements ITransferManager {
 
             this.clearRetryTimer(fileId);
             this.clearDoneRetry(fileId);
+            this.dhtSearchTimestamps.delete(transfer.upeerId);
 
             const handle = this.fileHandles.get(fileId);
             if (handle) {
@@ -336,6 +345,7 @@ export class TransferManager implements ITransferManager {
         this.clearRetryTimer(fileId);
         this.clearDoneRetry(fileId);
         this.transferKeys.delete(fileId);
+        this.dhtSearchTimestamps.delete(transfer.upeerId);
 
         const handle = this.fileHandles.get(fileId);
         if (handle) {

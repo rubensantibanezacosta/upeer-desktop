@@ -3,7 +3,7 @@ export const SOCKS5_HOST = '127.0.0.1';
 export const SOCKS5_PORT = 9050;
 
 export const BACKOFF_STEPS_MS = [
-    30_000,      // 30 s  (1º fallo)
+    3_000,       // 3 s  (1º fallo — recuperación rápida)
     2 * 60_000,  // 2 min
     10 * 60_000, // 10 min
     30 * 60_000, // 30 min (tope)
