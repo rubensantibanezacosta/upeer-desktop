@@ -32,8 +32,15 @@ import { handleVaultDelivery } from './handlers/vault.js';
 import { unsealPacket } from './sealed.js';
 import { canonicalStringify } from './utils.js';
 
-// Global rate limiter instance
 const rateLimiter = new IdentityRateLimiter();
+const vaultQueryThrottle = new Map<string, number>();
+
+function maybeQueryVaultsForPeer(upeerId: string) {
+    const last = vaultQueryThrottle.get(upeerId) ?? 0;
+    if (Date.now() - last < 30_000) return;
+    vaultQueryThrottle.set(upeerId, Date.now());
+    import('./vault/manager.js').then(({ VaultManager }) => VaultManager.queryOwnVaults()).catch(() => {});
+}
 
 /** BUG AP fix: exponer cleanup para que server.ts lo llame cada hora. */
 export function cleanupRateLimiter(): void {
@@ -228,6 +235,7 @@ export async function handlePacket(
 
             case 'PING':
                 sendResponse(rinfo.address, { type: 'PONG' });
+                maybeQueryVaultsForPeer(upeerId);
                 // Update contact alias/avatar if the peer included them
                 if (data.alias && typeof data.alias === 'string') {
                     import('../storage/contacts/operations.js').then(({ updateContactName }) => {
@@ -258,7 +266,7 @@ export async function handlePacket(
                 }
                 break;
             case 'PONG':
-                // Presence is already updated by updateLastSeen(upeerId) above
+                maybeQueryVaultsForPeer(upeerId);
                 break;
             case 'VAULT_STORE':
                 await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, data, rinfo.address, sendResponse);

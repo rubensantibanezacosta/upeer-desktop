@@ -271,5 +271,5 @@ export async function initializeApp(baseDir: string): Promise<void> {
     const contacts = getContacts();
     checkHeartbeat(contacts);
     fileTransferManager.checkStaleTransfers();
-  }, 30000);
+  }, 10000);
 }
