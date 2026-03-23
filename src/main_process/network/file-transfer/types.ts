@@ -90,6 +90,6 @@ export const DEFAULT_CONFIG: TransferConfig = {
     transferTimeout: 300000,
     maxRetries: 5,
     cleanupInterval: 60000,
-    initialWindowSize: 200,  // 40 chunks concurrentes en vuelo (was 64, but we want to match our store initial)
-    maxWindowSize: 10000
+    initialWindowSize: 16,
+    maxWindowSize: 128
 };
