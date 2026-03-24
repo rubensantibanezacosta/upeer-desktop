@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('upeer', {
     deleteContact: (upeerId: string) => ipcRenderer.invoke('delete-contact', { upeerId }),
     blockContact: (upeerId: string) => ipcRenderer.invoke('block-contact', { upeerId }),
     unblockContact: (upeerId: string) => ipcRenderer.invoke('unblock-contact', { upeerId }),
+    toggleFavoriteContact: (upeerId: string, isFavorite: boolean) => ipcRenderer.invoke('toggle-favorite-contact', { upeerId, isFavorite }),
     clearChat: (upeerId: string) => ipcRenderer.invoke('clear-chat', { upeerId }),
     getBlockedContacts: () => ipcRenderer.invoke('get-blocked-contacts'),
     sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: any) => ipcRenderer.invoke('send-p2p-message', { upeerId, message, replyTo, linkPreview }),
@@ -43,6 +44,7 @@ contextBridge.exposeInMainWorld('upeer', {
     sendGroupMessage: (groupId: string, message: string, replyTo?: string, linkPreview?: any) => ipcRenderer.invoke('send-group-message', { groupId, message, replyTo, linkPreview }),
     inviteToGroup: (groupId: string, upeerId: string) => ipcRenderer.invoke('invite-to-group', { groupId, upeerId }),
     updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => ipcRenderer.invoke('update-group', { groupId, ...fields }),
+    toggleFavoriteGroup: (groupId: string, isFavorite: boolean) => ipcRenderer.invoke('toggle-favorite-group', { groupId, isFavorite }),
     leaveGroup: (groupId: string) => ipcRenderer.invoke('leave-group', { groupId }),
     onGroupUpdated: (callback: (data: any) => void) => {
         ipcRenderer.removeAllListeners('group-updated');

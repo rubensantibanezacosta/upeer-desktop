@@ -5,6 +5,7 @@ export interface GroupRecord {
     name: string;
     adminUpeerId: string;
     members: string[]; // parsed from JSON
+    isFavorite?: boolean;
     status: 'active' | 'invited';
     epoch: number;
     senderKey?: string | null;
@@ -157,6 +158,15 @@ export function updateGroupStatus(groupId: string, status: 'active' | 'invited')
     const schema = getSchema();
     db.update(schema.groups)
         .set({ status })
+        .where(eq(schema.groups.groupId, groupId))
+        .run();
+}
+
+export function setGroupFavorite(groupId: string, isFavorite: boolean): void {
+    const db = getDb();
+    const schema = getSchema();
+    db.update(schema.groups)
+        .set({ isFavorite })
         .where(eq(schema.groups.groupId, groupId))
         .run();
 }

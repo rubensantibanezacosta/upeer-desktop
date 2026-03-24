@@ -121,6 +121,16 @@ export interface DeleteContactResponse {
     error?: string;
 }
 
+export interface ToggleFavoriteContactRequest {
+    upeerId: string;
+    isFavorite: boolean;
+}
+
+export interface ToggleFavoriteContactResponse {
+    success: boolean;
+    error?: string;
+}
+
 export interface ClearChatRequest {
     upeerId: string;
 }
@@ -342,6 +352,16 @@ export interface UpdateGroupRequest {
 }
 
 export interface UpdateGroupResponse {
+    success: boolean;
+    error?: string;
+}
+
+export interface ToggleFavoriteGroupRequest {
+    groupId: string;
+    isFavorite: boolean;
+}
+
+export interface ToggleFavoriteGroupResponse {
     success: boolean;
     error?: string;
 }
@@ -714,6 +734,7 @@ export interface IPCMap {
     'add-contact': { request: AddContactRequest; response: AddContactResponse };
     'accept-contact-request': { request: AcceptContactRequestRequest; response: AcceptContactRequestResponse };
     'delete-contact': { request: DeleteContactRequest; response: DeleteContactResponse };
+    'toggle-favorite-contact': { request: ToggleFavoriteContactRequest; response: ToggleFavoriteContactResponse };
     'clear-chat': { request: ClearChatRequest; response: ClearChatResponse };
     'block-contact': { request: BlockContactRequest; response: BlockContactResponse };
     'unblock-contact': { request: UnblockContactRequest; response: UnblockContactResponse };
@@ -737,6 +758,7 @@ export interface IPCMap {
     'send-group-message': { request: SendGroupMessageRequest; response: SendGroupMessageResponse };
     'invite-to-group': { request: InviteToGroupRequest; response: InviteToGroupResponse };
     'update-group': { request: UpdateGroupRequest; response: UpdateGroupResponse };
+    'toggle-favorite-group': { request: ToggleFavoriteGroupRequest; response: ToggleFavoriteGroupResponse };
     'leave-group': { request: LeaveGroupRequest; response: LeaveGroupResponse };
 
     // Files

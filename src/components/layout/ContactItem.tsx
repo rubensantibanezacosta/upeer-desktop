@@ -31,6 +31,7 @@ import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -47,12 +48,13 @@ interface ContactItemProps {
     contact: Contact;
     isSelected: boolean;
     onSelect: (id: string) => void;
+    onToggleFavorite: (id: string) => void;
     onClear: (id: string) => void;
     isTyping: boolean;
     highlight?: string;
 }
 
-export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onClear, isTyping, highlight = '' }) => {
+export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '' }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
     const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
     const isPending = c.status === 'pending' || c.status === 'incoming';
@@ -326,12 +328,12 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                         zIndex: 1000
                                     }}
                                 >
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator> Archivar chat</MenuItem>
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator> Silenciar notificaciones</MenuItem>
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator> Fijar chat</MenuItem>
+                                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator> Archivar chat</MenuItem>
+                                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator> Silenciar notificaciones</MenuItem>
+                                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator> Fijar chat</MenuItem>
                                     <ListDivider />
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><FavoriteBorderIcon /></ListItemDecorator> Añadir a Favoritos</MenuItem>
+                                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
+                                    <MenuItem onClick={(e) => { e.stopPropagation(); onToggleFavorite(c.upeerId); }}><ListItemDecorator sx={{ color: 'inherit' }}>{c.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}</ListItemDecorator>{c.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}</MenuItem>
                                     <ListDivider />
                                     <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmClearOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
                                 </Menu>

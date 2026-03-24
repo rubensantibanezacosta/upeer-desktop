@@ -57,6 +57,8 @@ interface MainLayoutProps {
     setReplyToMessage: (id: string, msg: any) => void;
     handleAcceptContact: (id: string) => void;
     handleDeleteContact: (id: string) => void;
+    handleToggleFavorite: (id: string) => Promise<void>;
+    handleToggleFavoriteGroup: (id: string) => Promise<void>;
     handleClearChat: (id: string) => void;
     handleBlockContact: () => void;
     handleReaction: (id: string, emoji: string, isGroup: boolean) => void;
@@ -91,7 +93,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     targetUpeerId, activeGroupId, message, setMessage,
     handleSend, handleSendGroupMessage, handleAttachFile, handleTyping, handleScrollToMessage,
     currentReplyToMessage, setReplyToMessage,
-    handleAcceptContact, handleDeleteContact, handleClearChat, handleBlockContact,
+    handleAcceptContact, handleDeleteContact, handleToggleFavorite, handleToggleFavoriteGroup, handleClearChat, handleBlockContact,
     handleReaction, handleUpdateMessage, handleDeleteMessage, handleMediaClick,
     navigation, appStore, chatStore,
     isFilePickerOpen, isPreparingAttachments, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
@@ -210,6 +212,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         groups={chatStore.groups}
                         onSelectContact={chatStore.setTargetUpeerId}
                         onSelectGroup={chatStore.setActiveGroupId}
+                        onToggleFavorite={chatStore.handleToggleFavorite}
+                        onToggleFavoriteGroup={chatStore.handleToggleFavoriteGroup}
                         onClearChat={chatStore.handleClearChat}
                         selectedId={chatStore.targetUpeerId}
                         selectedGroupId={chatStore.activeGroupId}
@@ -347,6 +351,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                         activeTransfers={fileTransfer.allTransfers.filter((t: any) => t.upeerId === targetUpeerId)}
                                         onClose={() => setIsContactInfoOpen(false)}
                                         onShare={() => navigation.setShareModalOpen(true)}
+                                        onFavorite={() => handleToggleFavorite(targetUpeerId)}
                                         onClearChat={() => handleClearChat(targetUpeerId)}
                                         onBlockContact={handleBlockContact}
                                         onDeleteContact={() => handleDeleteContact(targetUpeerId)}

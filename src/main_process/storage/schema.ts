@@ -16,6 +16,7 @@ export const groups = sqliteTable('groups', {
     name: text('name').notNull(),
     adminUpeerId: text('admin_upeer_id').notNull(),
     members: text('members').notNull().default('[]'), // JSON array of upeerIds
+    isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     status: text('status').notNull().default('active'), // 'active' | 'invited'
     avatar: text('avatar'), // base64 data URL, local only
     epoch: integer('epoch').notNull().default(1),
@@ -54,6 +55,7 @@ export const contacts = sqliteTable('contacts', {
     upeerId: text('upeer_id').unique(),
     address: text('address').notNull(),
     name: text('name').notNull(),
+    isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
     publicKey: text('public_key'),
     ephemeralPublicKey: text('ephemeral_public_key'),
     ephemeralPublicKeyUpdatedAt: text('ephemeral_public_key_updated_at'), // ISO timestamp of last eph key update

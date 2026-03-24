@@ -81,12 +81,14 @@ interface ChatActions {
     handleCreateGroup: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
     handleUpdateGroup: (groupId: string, fields: { name?: string, avatar?: string | null }) => Promise<void>;
     handleInviteGroupMembers: (groupId: string, memberIds: string[]) => Promise<void>;
+    handleToggleFavoriteGroup: (groupId: string) => Promise<void>;
     handleLeaveGroup: (groupId: string) => Promise<void>;
 
     // Contact Mgmt
     handleAddContact: (idAtAddress: string, name: string) => void;
     handleAcceptContact: () => void;
     handleDeleteContact: (id?: string) => void;
+    handleToggleFavorite: (id?: string) => Promise<void>;
     handleClearChat: (id?: string) => Promise<void>;
     handleBlockContact: (id?: string) => void;
     handleUnblockContact: (id: string) => void;
@@ -385,6 +387,13 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         await get().refreshGroups();
     },
 
+    handleToggleFavoriteGroup: async (groupId) => {
+        const group = get().groups.find(g => g.groupId === groupId);
+        if (!group) return;
+        await window.upeer.toggleFavoriteGroup(groupId, !group.isFavorite);
+        await get().refreshGroups();
+    },
+
     handleLeaveGroup: async (groupId) => {
         await window.upeer.leaveGroup(groupId);
         get().refreshGroups();
@@ -575,6 +584,18 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             get().refreshContacts();
             if (targetId === targetUpeerId) set({ targetUpeerId: '' });
         });
+    },
+
+    handleToggleFavorite: async (id) => {
+        const { targetUpeerId, contacts } = get();
+        const targetId = id || targetUpeerId;
+        if (!targetId) return;
+
+        const contact = contacts.find(c => c.upeerId === targetId);
+        if (!contact || contact.isConversationOnly) return;
+
+        await window.upeer.toggleFavoriteContact(targetId, !contact.isFavorite);
+        await get().refreshContacts();
     },
 
     handleClearChat: async (id) => {

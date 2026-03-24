@@ -127,6 +127,8 @@ export default function App() {
                 setReplyToMessage={chatStore.setReplyToMessage}
                 handleAcceptContact={chatStore.handleAcceptContact}
                 handleDeleteContact={chatStore.handleDeleteContact}
+                handleToggleFavorite={chatStore.handleToggleFavorite}
+                handleToggleFavoriteGroup={chatStore.handleToggleFavoriteGroup}
                 handleClearChat={chatStore.handleClearChat}
                 handleBlockContact={chatStore.handleBlockContact}
                 handleReaction={chatStore.handleReaction}

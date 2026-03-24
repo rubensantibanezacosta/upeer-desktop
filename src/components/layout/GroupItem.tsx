@@ -26,6 +26,7 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import DoneIcon from '@mui/icons-material/Done';
@@ -41,11 +42,12 @@ interface GroupItemProps {
     group: Group;
     isSelected: boolean;
     onSelect: (groupId: string) => void;
+    onToggleFavorite: (groupId: string) => void;
     onLeaveGroup?: (groupId: string) => void;
     highlight?: string;
 }
 
-export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onLeaveGroup, highlight = '' }) => {
+export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onToggleFavorite, onLeaveGroup, highlight = '' }) => {
     const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
 
     const formatTime = (iso?: string) => {
@@ -235,12 +237,12 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                                     zIndex: 1000
                                 }}
                             >
-                                <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator> Archivar chat</MenuItem>
-                                <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator> Silenciar notificaciones</MenuItem>
-                                <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator> Fijar chat</MenuItem>
+                                <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator> Archivar chat</MenuItem>
+                                <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator> Silenciar notificaciones</MenuItem>
+                                <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator> Fijar chat</MenuItem>
                                 <ListDivider />
-                                <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
-                                <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><FavoriteBorderIcon /></ListItemDecorator> Añadir a Favoritos</MenuItem>
+                                <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
+                                <MenuItem onClick={(e) => { e.stopPropagation(); onToggleFavorite(group.groupId); }}><ListItemDecorator sx={{ color: 'inherit' }}>{group.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}</ListItemDecorator>{group.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}</MenuItem>
                                 <ListDivider />
                                 <MenuItem onClick={(e) => e.stopPropagation()}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
                                 <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmLeaveOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><ExitToAppIcon /></ListItemDecorator> Eliminar grupo</MenuItem>

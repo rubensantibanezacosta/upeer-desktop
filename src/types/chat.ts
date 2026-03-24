@@ -40,6 +40,7 @@ export interface Contact {
     address: string;
     name: string;
     alias?: string | null;
+    isFavorite?: boolean;
     status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
     publicKey?: string;
     avatar?: string;
@@ -60,6 +61,7 @@ export interface Group {
     name: string;
     adminUpeerId: string;
     members: string[];
+    isFavorite?: boolean;
     status: 'active' | 'invited';
     avatar?: string | null;
     createdAt?: string;

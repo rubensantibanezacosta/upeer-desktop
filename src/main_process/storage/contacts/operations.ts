@@ -173,6 +173,16 @@ export function updateContactAvatar(upeerId: string, avatar: string) {
         .run();
 }
 
+    export function setContactFavorite(upeerId: string, isFavorite: boolean) {
+        const db = getDb();
+        const schema = getSchema();
+
+        return db.update(schema.contacts)
+        .set({ isFavorite })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+    }
+
 export function blockContact(upeerId: string) {
     const db = getDb();
     const schema = getSchema();

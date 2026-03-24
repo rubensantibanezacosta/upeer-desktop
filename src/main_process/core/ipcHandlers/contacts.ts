@@ -8,6 +8,7 @@ import {
   blockContact,
   unblockContact,
   getBlockedContacts,
+  setContactFavorite,
 } from '../../storage/contacts/operations.js';
 import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
@@ -112,6 +113,10 @@ export function registerContactHandlers(): void {
 
   ipcMain.handle('block-contact', (event, { upeerId }) => blockContact(upeerId));
   ipcMain.handle('unblock-contact', (event, { upeerId }) => unblockContact(upeerId));
+  ipcMain.handle('toggle-favorite-contact', (event, { upeerId, isFavorite }) => {
+    setContactFavorite(upeerId, !!isFavorite);
+    return { success: true };
+  });
   ipcMain.handle('get-blocked-contacts', () => getBlockedContacts());
 
   // Evento para notificar al renderer sobre contactos no confiables

@@ -11,6 +11,7 @@ declare global {
             deleteContact: (upeerId: string) => Promise<any>;
             blockContact: (upeerId: string) => Promise<any>;
             unblockContact: (upeerId: string) => Promise<any>;
+            toggleFavoriteContact: (upeerId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
             sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
@@ -38,6 +39,7 @@ declare global {
             sendGroupMessage: (groupId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<{ id: string; timestamp: number; savedMessage: string } | undefined>;
             inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
+            toggleFavoriteGroup: (groupId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
             onChatCleared: (callback: (data: { upeerId: string }) => void) => void;
             onGroupMessage: (callback: (data: any) => void) => void;

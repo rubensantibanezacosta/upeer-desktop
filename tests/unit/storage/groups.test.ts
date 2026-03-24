@@ -29,6 +29,7 @@ const mockSchema = {
         name: 'name',
         adminUpeerId: 'adminUpeerId',
         members: 'members',
+        isFavorite: 'isFavorite',
         status: 'status',
         epoch: 'epoch',
         senderKey: 'senderKey',
@@ -53,6 +54,9 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 describe('Groups Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRun.mockReset();
+        mockGet.mockReset();
+        mockAll.mockReset();
     });
 
     it('should save or update a group', () => {
@@ -84,7 +88,7 @@ describe('Groups Operations', () => {
 
     it('should list all groups with last message', () => {
         const rawGroups = [
-            { groupId: 'g1', name: 'G1', members: '[]', status: 'active' },
+            { groupId: 'g1', name: 'G1', members: '[]', status: 'active', isFavorite: true },
             { groupId: 'g2', name: 'G2', members: '[]', status: 'active' }
         ];
         mockAll.mockReturnValueOnce(rawGroups);
@@ -96,6 +100,7 @@ describe('Groups Operations', () => {
         const result = groupsOps.getGroups();
 
         expect(result.length).toBe(2);
+        expect(result[1].isFavorite).toBe(true);
         // Debería estar ordenado por tB - tA (más reciente primero)
         expect(result[0].groupId).toBe('g2');
         expect(result[1].groupId).toBe('g1');
@@ -143,6 +148,11 @@ describe('Groups Operations', () => {
     it('should update group status', () => {
         groupsOps.updateGroupStatus('group1', 'invited');
         expect(mockDb.set).toHaveBeenCalledWith({ status: 'invited' });
+    });
+
+    it('should update favorite flag for a group', () => {
+        groupsOps.setGroupFavorite('group1', true);
+        expect(mockDb.set).toHaveBeenCalledWith({ isFavorite: true });
     });
 
     it('should handle member parsing error', () => {

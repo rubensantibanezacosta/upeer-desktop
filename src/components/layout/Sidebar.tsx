@@ -29,6 +29,8 @@ interface SidebarProps {
     groups?: Group[];
     onSelectContact: (id: string) => void;
     onSelectGroup?: (groupId: string) => void;
+    onToggleFavorite: (id: string) => void;
+    onToggleFavoriteGroup: (groupId: string) => void;
     onClearChat: (id: string) => void;
     onLeaveGroup?: (groupId: string) => void;
     selectedId?: string;
@@ -43,6 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     groups = [],
     onSelectContact,
     onSelectGroup,
+    onToggleFavorite,
+    onToggleFavoriteGroup,
     onClearChat,
     onLeaveGroup,
     selectedId,
@@ -85,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         const entries: Entry[] = [
             ...groups
+                .filter(g => sidebarFilter !== 'favorites' || !!g.isFavorite)
                 .filter(g => !q || g.name.toLowerCase().includes(q))
                 .map(g => ({
                     kind: 'group' as const,
@@ -93,6 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 })),
             ...contacts
                 .filter(c => c.status !== 'blocked')
+                .filter(c => sidebarFilter !== 'favorites' || !!c.isFavorite)
                 .filter(c => !q || c.name?.toLowerCase().includes(q) || c.upeerId?.toLowerCase().includes(q))
                 .map(c => ({
                     kind: 'contact' as const,
@@ -101,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 })),
         ];
         return entries.sort((a, b) => b.time - a.time);
-    }, [groups, contacts, sidebarSearch]);
+    }, [groups, contacts, sidebarFilter, sidebarSearch]);
 
     const filteredGroups = useMemo(() => {
         if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];
@@ -184,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onFilterChange={(f) => setSidebarFilter(f as SidebarFilter)}
                 />
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    {sidebarFilter === 'all' && (
+                    {(sidebarFilter === 'all' || sidebarFilter === 'favorites') && (
                         <>
                             {groups.length === 0 && contacts.length === 0 ? (
                                 <EmptyState
@@ -204,11 +210,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     )}
                                     {mergedList.map(entry =>
                                         entry.kind === 'group'
-                                            ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
-                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />
+                                            ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onToggleFavorite={onToggleFavoriteGroup} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
+                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onToggleFavorite={onToggleFavorite} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />
                                     )}
 
-                                    {sidebarSearch && searchResults.length > 0 && (
+                                    {sidebarFilter === 'all' && sidebarSearch && searchResults.length > 0 && (
                                         <>
                                             <Box sx={{ px: 2, pt: 3, pb: 0.5 }}>
                                                 <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.5 }}>
@@ -268,7 +274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         </>
                                     )}
 
-                                    {sidebarSearch && mergedList.length === 0 && searchResults.length === 0 && (
+                                    {sidebarFilter === 'all' && sidebarSearch && mergedList.length === 0 && searchResults.length === 0 && (
                                         <Box sx={{ px: 2, py: 4, textAlign: 'center' }}>
                                             <Typography level="body-sm" color="neutral">Sin resultados para "{sidebarSearch}"</Typography>
                                         </Box>
@@ -294,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         )
                     )}
                     {sidebarFilter === 'unread' && <EmptyState icon={<NotificationsOffIcon sx={{ fontSize: 'inherit' }} />} title="Sin mensajes no leídos" subtitle="Estás al día. Aquí aparecerán los chats con mensajes nuevos." />}
-                    {sidebarFilter === 'favorites' && <EmptyState icon={<StarBorderIcon sx={{ fontSize: 'inherit' }} />} title="Sin favoritos" subtitle="Marca contactos como favoritos para encontrarlos rápidamente aquí." />}
+                    {sidebarFilter === 'favorites' && mergedList.length === 0 && <EmptyState icon={<StarBorderIcon sx={{ fontSize: 'inherit' }} />} title="Sin favoritos" subtitle="Marca contactos o grupos como favoritos para encontrarlos rápidamente aquí." />}
                 </Box>
             </Box>
 

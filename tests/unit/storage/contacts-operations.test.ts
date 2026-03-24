@@ -53,6 +53,7 @@ import {
     deleteContact,
     updateContactName,
     updateContactAvatar,
+    setContactFavorite,
     blockContact,
     unblockContact,
     getBlockedContacts,
@@ -89,7 +90,7 @@ describe('storage/contacts/operations.ts', () => {
     describe('getContacts', () => {
         it('should fetch all contacts and enrich with last message info', () => {
             const mockContacts = [
-                { upeerId: 'u1', name: 'Alice' },
+                { upeerId: 'u1', name: 'Alice', isFavorite: true },
                 { upeerId: 'u2', name: 'Bob' }
             ];
             mockDb.all
@@ -102,6 +103,7 @@ describe('storage/contacts/operations.ts', () => {
 
             expect(result).toHaveLength(2);
             expect(result[0].upeerId).toBe('u1');
+            expect(result[0].isFavorite).toBe(true);
             expect(result[0].lastMessage).toBe('Hello');
             expect(result[1].upeerId).toBe('u2');
             expect(result[1].lastMessage).toBeUndefined();
@@ -212,6 +214,13 @@ describe('storage/contacts/operations.ts', () => {
             updateContactAvatar('u1', 'new-avatar-path');
             expect(mockDb.update).toHaveBeenCalledWith(mockSchema.contacts);
             expect(mockDb.set).toHaveBeenCalledWith({ avatar: 'new-avatar-path' });
+            expect(mockDb.run).toHaveBeenCalled();
+        });
+
+        it('should update contact favorite flag', () => {
+            setContactFavorite('u1', true);
+            expect(mockDb.update).toHaveBeenCalledWith(mockSchema.contacts);
+            expect(mockDb.set).toHaveBeenCalledWith({ isFavorite: true });
             expect(mockDb.run).toHaveBeenCalled();
         });
 

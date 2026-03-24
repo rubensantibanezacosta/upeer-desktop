@@ -60,6 +60,9 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 describe('Contacts Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRun.mockReset();
+        mockGet.mockReset();
+        mockAll.mockReset();
     });
 
     it('should add or update a contact correctly', () => {
@@ -82,16 +85,17 @@ describe('Contacts Operations', () => {
     });
 
     it('should get all contacts with last message info', () => {
-        const fakeContacts = [{ upeerId: 'peer1', name: 'Alice' }];
-        const fakeMsg = { message: 'Hola', timestamp: 1234, isMine: true, status: 'sent' };
+        const fakeContacts = [{ upeerId: 'peer1', name: 'Alice', isFavorite: true }];
+        const fakeMessages = [{ chatUpeerId: 'peer1', message: 'Hola', timestamp: 1234, isMine: true, status: 'sent' }];
 
         mockAll.mockReturnValueOnce(fakeContacts);
-        mockGet.mockReturnValueOnce(fakeMsg); // Para el último mensaje
+        mockAll.mockReturnValueOnce(fakeMessages);
 
         const result = contactsOps.getContacts();
 
         expect(result[0].lastMessage).toBe('Hola');
         expect(result[0].upeerId).toBe('peer1');
+        expect(result[0].isFavorite).toBe(true);
     });
 
     it('should block and unblock a contact', () => {
@@ -120,6 +124,12 @@ describe('Contacts Operations', () => {
         expect(mockDb.set).toHaveBeenCalledWith({ avatar: 'base64-avatar' });
     });
 
+    it('should update favorite status for a contact', () => {
+        contactsOps.setContactFavorite('peer1', true);
+        expect(mockDb.update).toHaveBeenCalledWith(mockSchema.contacts);
+        expect(mockDb.set).toHaveBeenCalledWith({ isFavorite: true });
+    });
+
     it('should delete a contact', () => {
         contactsOps.deleteContact('peer1');
         expect(mockDb.delete).toHaveBeenCalledWith(mockSchema.contacts);
@@ -137,10 +147,10 @@ describe('Contacts Operations', () => {
 
     it('should get all contacts with last message info', () => {
         const mockContacts = [{ upeerId: 'peer1', name: 'Alice' }];
-        const mockLastMsg = { message: 'Hi', timestamp: 1000, isMine: true, status: 'sent' };
+        const mockMessages = [{ chatUpeerId: 'peer1', message: 'Hi', timestamp: 1000, isMine: true, status: 'sent' }];
 
-        mockAll.mockReturnValueOnce(mockContacts); // lista de contactos
-        mockGet.mockReturnValueOnce(mockLastMsg);     // último mensaje de Alice
+        mockAll.mockReturnValueOnce(mockContacts);
+        mockAll.mockReturnValueOnce(mockMessages);
 
         const result = contactsOps.getContacts();
         expect(result[0].name).toBe('Alice');

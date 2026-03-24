@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getGroups, updateGroupAvatar } from '../../storage/groups/operations.js';
+import { getGroups, updateGroupAvatar, setGroupFavorite } from '../../storage/groups/operations.js';
 import {
   createGroup,
   sendGroupMessage,
@@ -47,6 +47,11 @@ export function registerGroupHandlers(): void {
       return { success: false, error: 'Avatar demasiado grande (máx 2 MB)' };
     }
     await updateGroup(groupId, { name: safeName, avatar });
+    return { success: true };
+  });
+
+  ipcMain.handle('toggle-favorite-group', async (event, { groupId, isFavorite }) => {
+    setGroupFavorite(groupId, !!isFavorite);
     return { success: true };
   });
 
