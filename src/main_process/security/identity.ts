@@ -422,6 +422,15 @@ export function decrypt(nonce: Buffer, ciphertext: Buffer, senderEphemeralPublic
     return null;
 }
 
+export function decryptWithIdentityKey(nonce: Buffer, ciphertext: Buffer, senderEphemeralPublicKey: Buffer): Buffer | null {
+    if (_isLocked || !secretKey) return null;
+    const plaintext = Buffer.alloc(ciphertext.length - sodium.crypto_box_MACBYTES);
+    const identityCurveSk = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
+    sodium.crypto_sign_ed25519_sk_to_curve25519(identityCurveSk, secretKey);
+    const ok = sodium.crypto_box_open_easy(plaintext, ciphertext, nonce, senderEphemeralPublicKey, identityCurveSk);
+    return ok ? plaintext : null;
+}
+
 export function decryptX3DH(nonce: Buffer, ciphertext: Buffer, senderEphemeralPublicKey: Buffer, recipientSpkId: number): Buffer | null {
     let targetSk: Buffer | null = null;
     if (recipientSpkId === spkId) {

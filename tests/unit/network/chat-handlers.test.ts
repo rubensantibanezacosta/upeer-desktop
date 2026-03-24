@@ -32,6 +32,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     decrypt: vi.fn(),
+    decryptWithIdentityKey: vi.fn(),
     getMyUPeerId: vi.fn(() => 'my-peer-id'),
     getSpkBySpkId: vi.fn(),
     getMyIdentitySkBuffer: vi.fn(),
@@ -192,6 +193,39 @@ describe('Chat Handlers', () => {
             );
         });
 
+        it('should fall back to identity-key decryption for vaulted static-recipient messages', async () => {
+            const data = {
+                id: '33333333-3333-3333-3333-333333333333',
+                content: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: false,
+            };
+
+            (identity.decrypt as any).mockReturnValue(null);
+            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from('mensaje vaulted recuperado'));
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+
+            await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
+
+            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
+                Buffer.from(data.nonce, 'hex'),
+                Buffer.from(data.content, 'hex'),
+                Buffer.from(data.ephemeralPublicKey, 'hex')
+            );
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                data.id,
+                senderId,
+                false,
+                'mensaje vaulted recuperado',
+                undefined,
+                'sig',
+                'delivered',
+                senderId,
+                undefined
+            );
+        });
+
         it('should handle decryption failure gracefully', async () => {
             const data = {
                 id: '12345678-1234-1234-1234-123456789012',
@@ -250,6 +284,42 @@ describe('Chat Handlers', () => {
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
             // El return corta antes de mandar el ACK
             expect(mockSendResponse).not.toHaveBeenCalled();
+        });
+
+        it('should decrypt and save vaulted self-sync messages as mine', async () => {
+            const myId = 'my-peer-id';
+            const data = {
+                id: '22222222-2222-2222-2222-222222222222',
+                content: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                isInternalSync: true,
+                timestamp: Date.now()
+            };
+
+            (identity.getMyUPeerId as any).mockReturnValue(myId);
+            (messagesOps.getMessageById as any).mockResolvedValue(null);
+            (identity.decrypt as any).mockReturnValue(Buffer.from('mensaje propio vaulted'));
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+
+            await handleChatMessage(myId, { upeerId: myId, publicKey: 'b'.repeat(64) }, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
+
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                data.id,
+                myId,
+                true,
+                'mensaje propio vaulted',
+                undefined,
+                'sig',
+                'read',
+                myId,
+                data.timestamp
+            );
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
+                isMine: true,
+                status: 'read',
+                message: 'mensaje propio vaulted'
+            }));
         });
 
         it('should update contact ephemeral public key if provided in message data', async () => {
@@ -406,6 +476,53 @@ describe('Chat Handlers', () => {
             );
             expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado 2', 'edit-sig-2', 3);
         });
+
+        it('should fallback to identity-key decryption for vaulted static chat updates', async () => {
+            const data = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                version: 4,
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: false,
+            };
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
+            (identity.decrypt as any).mockReturnValue(null);
+            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from('edit vaulted'));
+
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig-3');
+
+            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
+                Buffer.from(data.nonce, 'hex'),
+                Buffer.from(data.content, 'hex'),
+                Buffer.from(data.ephemeralPublicKey, 'hex')
+            );
+            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'edit vaulted', 'edit-sig-3', 4);
+        });
+
+        it('should apply self-synced edits to own messages', async () => {
+            const myId = 'my-peer-id';
+            const data = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'edit local sync',
+                chatUpeerId: 'peer-chat',
+                version: 5,
+                isInternalSync: true,
+            };
+            (identity.getMyUPeerId as any).mockReturnValue(myId);
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1 });
+
+            await handleChatEdit(myId, data, mockWin, 'edit-self-sig');
+
+            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'edit local sync', 'edit-self-sig', 5);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-updated', expect.objectContaining({
+                id: data.msgId,
+                chatUpeerId: 'peer-chat',
+                content: 'edit local sync'
+            }));
+        });
     });
 
     describe('handleChatDelete', () => {
@@ -435,6 +552,29 @@ describe('Chat Handlers', () => {
 
             expect(fileTransferManager.cancelTransfer).toHaveBeenCalledWith('file-1', 'message deleted');
             expect(cleanup.cleanupLocalAttachmentFile).toHaveBeenCalledWith('/tmp/upeer/file-1.bin');
+        });
+
+        it('should apply self-synced deletes to own messages', async () => {
+            const myId = 'my-peer-id';
+            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 5555, chatUpeerId: 'peer-chat', isInternalSync: true };
+            (identity.getMyUPeerId as any).mockReturnValue(myId);
+            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1, message: 'hola' });
+
+            await handleChatDelete(myId, data, mockWin);
+
+            expect(messagesOps.deleteMessageLocally).toHaveBeenCalledWith(data.msgId, data.timestamp);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-deleted', { id: data.msgId, upeerId: myId, chatUpeerId: 'peer-chat' });
+        });
+    });
+
+    describe('handleChatClear', () => {
+        it('should clear the explicit chat context for self-sync packets', async () => {
+            const data = { chatUpeerId: 'peer-chat', timestamp: 9999 };
+
+            await handleChatClear('my-peer-id', data, mockWin);
+
+            expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith('peer-chat', 9999);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('chat-cleared', { upeerId: 'peer-chat' });
         });
     });
 

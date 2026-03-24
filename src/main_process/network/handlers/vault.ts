@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { saveFileMessage } from '../../storage/messages/operations.js';
 import {
+    getMyPublicKeyHex,
     getMyUPeerId,
     verify,
 } from '../../security/identity.js';
@@ -38,7 +39,10 @@ export async function handleVaultDelivery(
     try {
         for (const entry of entries) {
             try {
-                const originalContact = await getContactByUpeerId(entry.senderSid);
+                const isOwnVaultEntry = entry.senderSid === getMyUPeerId();
+                const originalContact = await getContactByUpeerId(entry.senderSid) || (isOwnVaultEntry
+                    ? { upeerId: entry.senderSid, publicKey: getMyPublicKeyHex() }
+                    : null);
                 if (!originalContact) {
                     warn('Vault entry from unknown original sender', { senderSid: entry.senderSid }, 'vault');
                     continue;
@@ -53,6 +57,9 @@ export async function handleVaultDelivery(
 
                 // If it's a signed inner packet (CHAT, FILE_DATA_SMALL, etc.)
                 if (innerPacket && innerPacket.signature) {
+                    if (isOwnVaultEntry) {
+                        innerPacket.isInternalSync = true;
+                    }
                     const { signature: innerSig, senderUpeerId: _senderUpeerId, ...innerData } = innerPacket;
 
                     // End-to-End Integrity Verification

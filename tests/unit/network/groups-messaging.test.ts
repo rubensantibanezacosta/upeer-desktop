@@ -19,6 +19,7 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
+    getMyPublicKeyHex: vi.fn(() => '11'.repeat(32)),
     getMyUPeerId: vi.fn(() => 'self-id'),
     sign: vi.fn(() => Buffer.from('sig')),
     encrypt: vi.fn(() => ({ ciphertext: 'ciphertext', nonce: 'nonce' })),
@@ -40,6 +41,14 @@ vi.mock('../../../src/main_process/network/server/transport.js', () => ({
     sendSecureUDPMessage: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
+    getKademliaInstance: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
+    getYggstackAddress: vi.fn(() => '200::self'),
+}));
+
 vi.mock('../../../src/main_process/network/og-fetcher.js', () => ({
     fetchOgPreview: vi.fn(),
 }));
@@ -59,6 +68,37 @@ vi.mock('../../../src/main_process/network/groupState.js', () => ({
 describe('network/messaging/groups.ts', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it('vaults the initial group invite for self so other own devices receive senderKey and epoch', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { createGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null as any);
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-new',
+            name: 'Grupo nuevo',
+            avatar: null,
+            members: ['self-id', 'peer-a'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+            status: 'active'
+        } as any);
+
+        await createGroup('Grupo nuevo', ['peer-a']);
+
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'self-id',
+            expect.objectContaining({
+                type: 'GROUP_INVITE',
+                senderUpeerId: 'self-id',
+                useRecipientEphemeral: false
+            }),
+            undefined,
+            expect.any(String)
+        );
     });
 
     it('uses static key for offline GROUP_UPDATE delivery', async () => {
@@ -266,6 +306,39 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String)
+        );
+    });
+
+    it('self-syncs group messages without requiring a self contact record', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            name: 'Grupo',
+            status: 'active',
+            members: ['self-id'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null as any);
+        (getKademliaInstance as any).mockReturnValue({
+            findClosestContacts: vi.fn(() => [
+                { upeerId: 'self-id', address: '200::other-device' },
+                { upeerId: 'self-id', address: '200::self' }
+            ])
+        } as any);
+
+        await sendGroupMessage('grp-1', 'hola grupo sync');
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::other-device',
+            expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-1' }),
+            '11'.repeat(32),
+            true
         );
     });
 

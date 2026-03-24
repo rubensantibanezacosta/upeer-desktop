@@ -27,6 +27,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn().mockReturnValue('my-id'),
+    getMyPublicKeyHex: vi.fn().mockReturnValue('a'.repeat(64)),
     verify: vi.fn().mockReturnValue(true),
 }));
 
@@ -141,6 +142,31 @@ describe('Vault Delivery Handler', () => {
             'origin-id',
             mockContact,
             expect.objectContaining({ type: 'CHAT', text: 'secret' }),
+            mockWin,
+            'inner-sig',
+            '1.2.3.4',
+            mockSendResponse
+        );
+    });
+
+    it('should process own vaulted CHAT entries using local identity and internal sync', async () => {
+        const innerPacket = { type: 'CHAT', content: 'aa', nonce: 'bb', senderUpeerId: 'my-id', signature: 'inner-sig' };
+        const entry = {
+            senderSid: 'my-id',
+            data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
+        };
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+        (identity.verify as any).mockReturnValue(true);
+        (validation.validateMessage as any).mockReturnValue({ valid: true });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatMessage).toHaveBeenCalledWith(
+            'my-id',
+            expect.objectContaining({ upeerId: 'my-id', publicKey: 'a'.repeat(64) }),
+            expect.objectContaining({ type: 'CHAT', isInternalSync: true }),
             mockWin,
             'inner-sig',
             '1.2.3.4',

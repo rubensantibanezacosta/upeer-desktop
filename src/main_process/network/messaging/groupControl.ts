@@ -3,6 +3,7 @@ import {
     getMyUPeerId,
     sign,
     encrypt,
+    getMyPublicKeyHex,
     getMyEphemeralPublicKeyHex,
     incrementEphemeralMessageCounter,
 } from '../../security/identity.js';
@@ -65,10 +66,12 @@ function buildSignedPacket(packet: Record<string, unknown>, senderUpeerId: strin
 }
 
 async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string): Promise<void> {
-    const contact = await getContactByUpeerId(targetUpeerId);
+    const myId = getMyUPeerId();
+    const contact = await getContactByUpeerId(targetUpeerId) || (targetUpeerId === myId
+        ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
+        : null);
     if (!contact?.publicKey || !group.senderKey) return;
 
-    const myId = getMyUPeerId();
     const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
     const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
     const sensitivePayload = await buildGroupInvitePayload(
@@ -122,9 +125,9 @@ async function broadcastGroupUpdatePacket(
     });
 
     for (const memberUpeerId of targetMembers) {
-        if (memberUpeerId === myId) continue;
-
-        const contact = await getContactByUpeerId(memberUpeerId);
+        const contact = await getContactByUpeerId(memberUpeerId) || (memberUpeerId === myId
+            ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
+            : null);
         if (!contact?.publicKey) continue;
 
         const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
@@ -204,6 +207,8 @@ export async function createGroup(name: string, memberUpeerIds: string[], avatar
 
     const group = getGroupById(groupId);
     if (!group) return groupId;
+
+    await sendGroupInvitePacket(group, myId);
 
     for (const memberUpeerId of memberUpeerIds) {
         if (memberUpeerId === myId) continue;

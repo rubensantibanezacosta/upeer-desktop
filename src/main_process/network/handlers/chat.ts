@@ -20,6 +20,7 @@ import {
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import {
     decrypt,
+    decryptWithIdentityKey,
     getMyUPeerId,
 } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
@@ -37,7 +38,8 @@ export async function handleChatMessage(
     sendResponse: (ip: string, data: any) => void
 ) {
     const myId = getMyUPeerId();
-    if (data.isInternalSync && upeerId === myId) {
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+    if (isInternalSync) {
         const existing = await getMessageById(data.id);
         if (existing) return;
     }
@@ -153,8 +155,16 @@ export async function handleChatMessage(
                 Buffer.from(data.content, 'hex'),
                 Buffer.from(senderKeyHex, 'hex')
             );
-            if (decrypted) {
-                displayContent = decrypted.toString('utf-8');
+            const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
+                ? decryptWithIdentityKey(
+                    Buffer.from(data.nonce, 'hex'),
+                    Buffer.from(data.content, 'hex'),
+                    Buffer.from(senderKeyHex, 'hex')
+                )
+                : null;
+            const resolvedDecrypted = decrypted ?? staticDecrypted;
+            if (resolvedDecrypted) {
+                displayContent = resolvedDecrypted.toString('utf-8');
             } else {
                 displayContent = "🔒 [Error de descifrado]";
             }
@@ -164,23 +174,33 @@ export async function handleChatMessage(
         }
     }
 
-    const saved = await saveMessage(msgId, upeerId, false, displayContent, data.replyTo, signature, 'delivered', upeerId, data.timestamp);
+    const saved = await saveMessage(
+        msgId,
+        upeerId,
+        isInternalSync,
+        displayContent,
+        data.replyTo,
+        signature,
+        isInternalSync ? 'read' : 'delivered',
+        isInternalSync ? myId : upeerId,
+        data.timestamp
+    );
     const isNew = (saved as any)?.changes > 0;
 
     if (isNew) {
         win?.webContents.send('receive-p2p-message', {
             id: msgId,
             upeerId: upeerId,
-            isMine: false,
+            isMine: isInternalSync,
             message: displayContent,
             replyTo: data.replyTo,
-            status: 'delivered',
+            status: isInternalSync ? 'read' : 'delivered',
             encrypted: !!data.nonce,
             timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now()
         });
 
         const notifWin = getMainWindow();
-        if (notifWin && !notifWin.isFocused()) {
+        if (!isInternalSync && notifWin && !notifWin.isFocused()) {
             const contactName = contact?.name || contact?.alias || upeerId.slice(0, 8);
             const body = displayContent.startsWith('\uD83D\uDD12')
                 ? 'Nuevo mensaje cifrado'
@@ -205,7 +225,7 @@ export async function handleChatMessage(
         status: 'delivered'
     });
 
-    if (isNew) {
+    if (!isInternalSync && isNew) {
         issueVouch(upeerId, VouchType.HANDSHAKE).catch(err => warn('Failed to issue vouch', err, 'reputation'));
     }
 }
@@ -231,9 +251,10 @@ export async function handleChatClear(
     data: any,
     win: BrowserWindow | null
 ) {
+    const chatUpeerId = data.chatUpeerId || upeerId;
     const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
-    deleteMessagesByChatId(upeerId, data.clearTimestamp ?? data.timestamp);
-    win?.webContents.send('chat-cleared', { upeerId });
+    deleteMessagesByChatId(chatUpeerId, data.clearTimestamp ?? data.timestamp);
+    win?.webContents.send('chat-cleared', { upeerId: chatUpeerId });
 }
 
 export async function handleChatEdit(
@@ -246,8 +267,10 @@ export async function handleChatEdit(
     if (!msgId || !_UUID_RE.test(String(msgId))) return;
 
     const chatUpeerId = data.chatUpeerId || upeerId;
+    const myId = getMyUPeerId();
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
     const msg = (await getMessageById(msgId)) as any;
-    if (!msg || msg.chatUpeerId !== chatUpeerId || msg.isMine) return;
+    if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
     let newContent = data.newContent;
     if (typeof newContent !== 'string') {
@@ -266,8 +289,16 @@ export async function handleChatEdit(
                     Buffer.from(data.content, 'hex'),
                     Buffer.from(decryptKeyHex, 'hex')
                 );
-                if (!decrypted) return;
-                newContent = decrypted.toString('utf-8');
+                const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
+                    ? decryptWithIdentityKey(
+                        Buffer.from(data.nonce, 'hex'),
+                        Buffer.from(data.content, 'hex'),
+                        Buffer.from(decryptKeyHex, 'hex')
+                    )
+                    : null;
+                const resolvedDecrypted = decrypted ?? staticDecrypted;
+                if (!resolvedDecrypted) return;
+                newContent = resolvedDecrypted.toString('utf-8');
             } catch {
                 return;
             }
@@ -309,8 +340,10 @@ export async function handleChatDelete(
     const msgId = data.msgId || data.id;
     if (!msgId || !_UUID_RE.test(String(msgId))) return;
     const chatUpeerId = data.chatUpeerId || upeerId;
+    const myId = getMyUPeerId();
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
     const msg = (await getMessageById(msgId)) as any;
-    if (msg && msg.chatUpeerId === chatUpeerId && !msg.isMine) {
+    if (msg && msg.chatUpeerId === chatUpeerId && (!msg.isMine || isInternalSync)) {
         const { extractLocalAttachmentInfo, cleanupLocalAttachmentFile } = await import('../../utils/localAttachmentCleanup.js');
         const attachment = extractLocalAttachmentInfo(msg.message);
 

@@ -32,6 +32,7 @@ vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveMessage: vi.fn(),
     updateMessageStatus: vi.fn(),
+    getMessageById: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/messaging/groupControl.js', () => ({
@@ -40,6 +41,7 @@ vi.mock('../../../src/main_process/network/messaging/groupControl.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     decrypt: vi.fn(),
+    decryptWithIdentityKey: vi.fn(),
     verify: vi.fn(),
     getMyUPeerId: vi.fn().mockReturnValue('my-id'),
 }));
@@ -136,6 +138,35 @@ describe('Group Handlers Final Coverage', () => {
             await handleGroupMessage(senderId, { upeerId: senderId } as any, { groupId }, mockWin);
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
         });
+
+        it('should save self-synced group messages as mine', async () => {
+            const myId = 'my-id';
+            const group = { id: groupId, groupId, members: [senderId, myId], adminUpeerId: 'admin', epoch: 1, senderKey: 'c'.repeat(64) };
+            const data = { id: '550e8400-e29b-41d4-a716-446655440001', groupId, content: 'hi', nonce: '11'.repeat(24), epoch: 1, timestamp: 1710000000001, isInternalSync: true };
+            (identity.getMyUPeerId as any).mockReturnValue(myId);
+            (groupsOps.getGroupById as any).mockReturnValue(group);
+            (messagesOps.getMessageById as any).mockResolvedValue(null);
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+
+            await handleGroupMessage(myId, { upeerId: myId, name: 'Yo' } as any, data, mockWin);
+
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                data.id,
+                groupId,
+                true,
+                'hola grupo',
+                undefined,
+                undefined,
+                'read',
+                myId,
+                data.timestamp
+            );
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-group-message', expect.objectContaining({
+                id: data.id,
+                isMine: true,
+                status: 'read'
+            }));
+        });
     });
 
     describe('handleGroupInvite', () => {
@@ -194,9 +225,42 @@ describe('Group Handlers Final Coverage', () => {
         it('should fail if decryption fails', async () => {
             (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
             (identity.decrypt as any).mockReturnValue(null);
+            (identity.decryptWithIdentityKey as any).mockReturnValue(null);
 
             await handleGroupInvite(senderId, { groupId, payload: 'hex', nonce: 'hex' }, mockWin);
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
+        });
+
+        it('should fallback to identity-key decryption for static-key group invites', async () => {
+            const innerPayload = JSON.stringify({ groupName: 'Static Group', members: [senderId, 'my-id'], epoch: 1, senderKey: 'c'.repeat(64) });
+            (identity.decrypt as any).mockReturnValue(null);
+            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from(innerPayload));
+            (groupsOps.getGroupById as any).mockReturnValue(null);
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' });
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                payload: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: false,
+            }, mockWin);
+
+            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
+                Buffer.from('bb', 'hex'),
+                Buffer.from('aa', 'hex'),
+                Buffer.from('a'.repeat(64), 'hex')
+            );
+            expect(groupsOps.saveGroup).toHaveBeenCalledWith(
+                groupId,
+                'Static Group',
+                senderId,
+                [senderId, 'my-id'],
+                'active',
+                undefined,
+                expect.objectContaining({ epoch: 1, senderKey: 'c'.repeat(64) })
+            );
         });
 
         it('should reject invite updates for existing groups from non-admin members', async () => {
@@ -285,6 +349,29 @@ describe('Group Handlers Final Coverage', () => {
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
+        });
+
+        it('should fallback to identity-key decryption for static-key group updates', async () => {
+            const inner = JSON.stringify({ groupName: 'Static Name' });
+            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] });
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
+            (identity.decrypt as any).mockReturnValue(null);
+            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from(inner));
+
+            await handleGroupUpdate(senderId, {
+                groupId,
+                payload: 'aa',
+                nonce: 'bb',
+                ephemeralPublicKey: 'a'.repeat(64),
+                useRecipientEphemeral: false,
+            }, mockWin);
+
+            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
+                Buffer.from('bb', 'hex'),
+                Buffer.from('aa', 'hex'),
+                Buffer.from('a'.repeat(64), 'hex')
+            );
+            expect(groupsOps.updateGroupInfo).toHaveBeenCalledWith(groupId, { name: 'Static Name' });
         });
     });
 

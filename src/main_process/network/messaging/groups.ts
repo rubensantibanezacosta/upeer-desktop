@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {
+    getMyPublicKeyHex,
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
@@ -95,7 +96,15 @@ export async function sendGroupMessage(
         // En grupos, el emisor (yo) también quiere recibir una copia en sus otros dispositivos
         // if (memberUpeerId === myId) continue; // <-- Eliminado para habilitar Self-Sync
 
-        const contact = await getContactByUpeerId(memberUpeerId);
+        const isSelf = memberUpeerId === myId;
+        const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
+            ? {
+                upeerId: myId,
+                publicKey: getMyPublicKeyHex(),
+                status: 'connected',
+                knownAddresses: '[]'
+            }
+            : null);
         // Si somos nosotros mismos, el "contacto" es nuestra propia info (status connected)
         if (!contact || (memberUpeerId !== myId && contact.status !== 'connected') || !contact.publicKey) continue;
 
@@ -131,7 +140,6 @@ export async function sendGroupMessage(
         const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
         for (const addr of addresses) {
             // Si el destino es una dirección de otro dispositivo mío, mandarlo con mi propia pubkey para Sealed Sender
-            const isSelf = memberUpeerId === myId;
             const targetSealedKey = isSelf ? myPublicKey : contact.publicKey;
             sendSecureUDPMessage(addr, packet, targetSealedKey, isSelf);
         }
@@ -141,10 +149,16 @@ export async function sendGroupMessage(
     // Incluirnos a nosotros mismos para la sincronización si no hay otros dispositivos online.
     const offlineTargetMembers = [...uniqueMembers];
     for (const memberUpeerId of offlineTargetMembers) {
-        const contact = await getContactByUpeerId(memberUpeerId);
+        const isSelf = memberUpeerId === myId;
+        const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
+            ? {
+                upeerId: myId,
+                publicKey: getMyPublicKeyHex(),
+                status: 'connected',
+            }
+            : null);
         // Skip si el contacto está conectado (ya se envió por UDP).
         // PERO si somos nosotros, siempre intentamos vaultear una copia si no hay otros "self-nodes" online.
-        const isSelf = memberUpeerId === myId;
 
         // Determinar si debemos vaultear para este miembro
         if (!contact || !contact.publicKey) continue;

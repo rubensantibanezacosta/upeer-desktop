@@ -7,12 +7,14 @@ import {
     getGroupById,
 } from '../../storage/groups/operations.js';
 import {
+    getMessageById,
     saveMessage,
     updateMessageStatus,
 } from '../../storage/messages/operations.js';
 import { decryptGroupMessage } from '../groupState.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { security, warn, info } from '../../security/secure-logger.js';
+import { getMyUPeerId } from '../../security/identity.js';
 export { handleGroupInvite, handleGroupLeave, handleGroupUpdate } from './groupControl.js';
 
 // Patrón UUID reutilizado en varios handlers para validar msgId/fileId de red.
@@ -27,6 +29,13 @@ export async function handleGroupMessage(
 ) {
     const { id, groupId, content, nonce, replyTo, timestamp, epoch } = data;
     if (!groupId || !content || !nonce || typeof epoch !== 'number') return;
+    const myId = getMyUPeerId();
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+
+    if (isInternalSync && id && _UUID_RE.test(String(id))) {
+        const existing = await getMessageById(id);
+        if (existing) return;
+    }
 
     // BUG CA fix: si el grupo no existe localmente, rechazar el mensaje en lugar
     // de crear un grupo fantasma. Un peer arbitrario podía enviar GROUP_MSG con
@@ -62,12 +71,22 @@ export async function handleGroupMessage(
     }
 
     // BUG AB fix: igual que BUG P (ya corregido para CHAT), los mensajes de grupo\n    // entregados por múltiples custodios simultáneamente llegaban aquí dos veces\n    // con el mismo msgId. saveMessage usa onConflictDoNothing → changes=0 en la segunda\n    // llamada, pero la emit 'receive-group-message' se hacía igualmente → duplicados en UI.
-    const savedGroup = await saveMessage(msgId, groupId, false, displayContent, replyTo, undefined, 'delivered', upeerId, timestamp);
+    const savedGroup = await saveMessage(
+        msgId,
+        groupId,
+        isInternalSync,
+        displayContent,
+        replyTo,
+        undefined,
+        isInternalSync ? 'read' : 'delivered',
+        isInternalSync ? myId : upeerId,
+        timestamp
+    );
     const isNewGroupMsg = (savedGroup as any)?.changes > 0;
 
     // Notify sender that we received the message
     const ackAddress = senderAddress || contact?.address;
-    if (ackAddress) {
+    if (!isInternalSync && ackAddress) {
         const { sendSecureUDPMessage } = await import('../server/transport.js');
         sendSecureUDPMessage(ackAddress, { type: 'GROUP_ACK', id: msgId, groupId });
     }
@@ -76,17 +95,17 @@ export async function handleGroupMessage(
         win?.webContents.send('receive-group-message', {
             id: msgId,
             groupId,
-            senderUpeerId: upeerId,
+            senderUpeerId: isInternalSync ? myId : upeerId,
             senderName: contact.name,
-            isMine: false,
+            isMine: isInternalSync,
             message: displayContent,
             replyTo,
-            status: 'delivered',
+            status: isInternalSync ? 'read' : 'delivered',
             timestamp: typeof timestamp === 'number' ? timestamp : Date.now()
         });
 
         const notifWin = getMainWindow();
-        if (notifWin && !notifWin.isFocused()) {
+        if (!isInternalSync && notifWin && !notifWin.isFocused()) {
             const senderName = contact?.name || contact?.alias || upeerId.slice(0, 8);
             const groupName = existingGroup?.name || groupId.slice(0, 8);
             const body = displayContent.startsWith('\uD83D\uDD12')

@@ -13,7 +13,7 @@ import {
 import { saveMessage } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
-import { decrypt } from '../../security/identity.js';
+import { decrypt, decryptWithIdentityKey } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
@@ -51,9 +51,19 @@ async function decryptGroupControlPayload(upeerId: string, data: any): Promise<G
         Buffer.from(senderKey, 'hex')
     );
 
-    if (!decrypted) return null;
+    const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
+        ? decryptWithIdentityKey(
+            Buffer.from(data.nonce, 'hex'),
+            Buffer.from(data.payload, 'hex'),
+            Buffer.from(senderKey, 'hex')
+        )
+        : null;
 
-    return JSON.parse(decrypted.toString('utf-8')) as GroupPayload;
+    const resolved = decrypted ?? staticDecrypted;
+
+    if (!resolved) return null;
+
+    return JSON.parse(resolved.toString('utf-8')) as GroupPayload;
 }
 
 export async function handleGroupInvite(
