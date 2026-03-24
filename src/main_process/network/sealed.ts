@@ -32,7 +32,7 @@ import sodium from 'sodium-native';
 export const SEALED_TYPES = new Set([
     'CHAT', 'ACK', 'READ', 'TYPING',
     'CHAT_REACTION', 'CHAT_UPDATE', 'CHAT_DELETE',
-    'GROUP_MSG', 'GROUP_ACK',
+    'GROUP_MSG', 'GROUP_ACK', 'GROUP_INVITE', 'GROUP_UPDATE',
     'FILE_PROPOSAL', 'FILE_START', 'FILE_ACCEPT',
     'FILE_CHUNK', 'FILE_CHUNK_ACK', 'FILE_ACK', 'FILE_DONE_ACK',
     'FILE_END', 'FILE_CANCEL',

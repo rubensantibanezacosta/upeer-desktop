@@ -44,6 +44,18 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
     VouchType: { MALICIOUS: 'MALICIOUS' }
 }));
 
+vi.mock('../../../src/main_process/core/windowManager.js', () => ({
+    getMainWindow: vi.fn(() => null),
+}));
+
+vi.mock('../../../src/main_process/utils/desktopNotification.js', () => ({
+    showDesktopNotification: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/utils/windowFocus.js', () => ({
+    focusWindow: vi.fn(),
+}));
+
 describe('Group Handlers Final Coverage', () => {
     const mockWin = { webContents: { send: vi.fn() } } as any;
     const groupId = 'group-uuid-123';
@@ -124,11 +136,12 @@ describe('Group Handlers Final Coverage', () => {
     });
 
     describe('handleGroupInvite', () => {
-        it('should decrypt and save new group', async () => {
-            const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'] });
+        it('should decrypt, save and surface a new group invite', async () => {
+            const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'], avatar: 'data:image/png;base64,abc' });
             (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
             (groupsOps.getGroupById as any).mockReturnValue(null);
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' });
+            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
 
             await handleGroupInvite(senderId, {
                 groupId,
@@ -143,7 +156,28 @@ describe('Group Handlers Final Coverage', () => {
                 Buffer.from('aa', 'hex'),
                 Buffer.from('a'.repeat(64), 'hex')
             );
-            expect(groupsOps.saveGroup).toHaveBeenCalled();
+            expect(groupsOps.saveGroup).toHaveBeenCalledWith(groupId, 'Test Group', senderId, [senderId, 'my-id'], 'active', 'data:image/png;base64,abc');
+            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+                expect.any(String),
+                groupId,
+                false,
+                '__SYS__|Alice te añadió al grupo',
+                undefined,
+                undefined,
+                'delivered',
+                senderId,
+                expect.any(Number)
+            );
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-group-message', expect.objectContaining({
+                groupId,
+                isSystem: true,
+                senderName: 'Alice'
+            }));
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('group-invite-received', expect.objectContaining({
+                groupId,
+                groupName: 'Test Group',
+                avatar: 'data:image/png;base64,abc'
+            }));
         });
 
         it('should fail if decryption fails', async () => {
@@ -152,6 +186,27 @@ describe('Group Handlers Final Coverage', () => {
 
             await handleGroupInvite(senderId, { groupId, payload: 'hex', nonce: 'hex' }, mockWin);
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
+        });
+
+        it('should reject invite updates for existing groups from non-admin members', async () => {
+            const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'] });
+            (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
+            (groupsOps.getGroupById as any).mockReturnValue({
+                groupId,
+                members: [senderId, 'my-id'],
+                adminUpeerId: 'actual-admin'
+            });
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Mallory' });
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId: senderId,
+                payload: 'aa',
+                nonce: 'bb'
+            }, mockWin);
+
+            expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
+            expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
         });
     });
 

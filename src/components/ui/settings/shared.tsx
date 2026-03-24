@@ -11,6 +11,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
 
 // ─── Campo copiable ───────────────────────────────────────────────────────────
 
@@ -111,25 +112,4 @@ export const InfoRow: React.FC<{ label: string; value: string }> = ({ label, val
 // ─── Helper: redimensionar imagen a 128×128 JPEG ─────────────────────────────
 
 export const resizeImageToDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 128;
-                canvas.height = 128;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return reject(new Error('Canvas context not available'));
-                const size = Math.min(img.width, img.height);
-                const sx = (img.width - size) / 2;
-                const sy = (img.height - size) / 2;
-                ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
-                resolve(canvas.toDataURL('image/jpeg', 0.85));
-            };
-            img.onerror = reject;
-            img.src = e.target?.result as string;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
+    resizeImageToDataUrlBase(file, { size: 128, quality: 0.85, maxBytes: 10 * 1024 * 1024 });

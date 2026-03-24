@@ -131,6 +131,107 @@ describe('network/messaging/chat.ts', () => {
         expect(startDhtSearch).toHaveBeenCalledWith('peer-offline', expect.any(Function));
     });
 
+    it('uses the serialized preview payload for offline vault delivery', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-offline',
+            status: 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::2',
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1 as any);
+
+        const preview = { url: 'https://example.com', title: 'Example' };
+        const expectedPayload = JSON.stringify({ text: 'hola https://example.com', linkPreview: preview });
+
+        const result = await sendUDPMessage('peer-offline', {
+            content: 'hola https://example.com',
+            linkPreview: preview,
+        }, 'reply-1');
+
+        expect(result).toEqual(expect.objectContaining({ savedMessage: expectedPayload }));
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            expect.any(String),
+            'peer-offline',
+            true,
+            expectedPayload,
+            'reply-1',
+            '',
+            'sent',
+            'self-id',
+            expect.any(Number)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline',
+            expect.objectContaining({
+                type: 'CHAT',
+                content: 'ciphertext',
+                nonce: 'nonce',
+                replyTo: 'reply-1',
+                senderUpeerId: 'self-id',
+            })
+        );
+    });
+
+    it('drops imageBase64 from previews that would exceed online chat validation limits', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::9',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+
+        const preview = {
+            url: 'https://example.com',
+            title: 'Example',
+            description: 'Preview',
+            domain: 'example.com',
+            imageBase64: `data:image/jpeg;base64,${'a'.repeat(120_000)}`,
+        };
+
+        const result = await sendUDPMessage('peer-online', {
+            content: 'mira https://example.com',
+            linkPreview: preview,
+        });
+
+        const expectedPayload = JSON.stringify({
+            text: 'mira https://example.com',
+            linkPreview: {
+                url: 'https://example.com',
+                title: 'Example',
+                description: 'Preview',
+                domain: 'example.com',
+            }
+        });
+
+        expect(result).toEqual(expect.objectContaining({ savedMessage: expectedPayload }));
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            expect.any(String),
+            'peer-online',
+            true,
+            expectedPayload,
+            undefined,
+            expect.any(String),
+            'sent',
+            'self-id',
+            expect.any(Number)
+        );
+    });
+
     it('uses recipient ephemeral key for chat updates when available', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');

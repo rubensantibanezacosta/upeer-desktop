@@ -1,6 +1,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import type { IncomingMessage } from 'node:http';
+import sharp from 'sharp';
 
 export interface LinkPreview {
     url: string;
@@ -14,6 +15,9 @@ const OG_TIMEOUT_MS = 3500;
 const MAX_HTML_BYTES = 128 * 1024;
 const MAX_IMAGE_BYTES = 512 * 1024;
 const MAX_REDIRECTS = 2;
+const PREVIEW_IMAGE_TARGET_BYTES = 18 * 1024;
+const PREVIEW_IMAGE_SIDES = [320, 240, 160];
+const PREVIEW_IMAGE_QUALITIES = [60, 45, 30];
 
 function getClient(protocol: string) {
     return protocol === 'https:' ? https : http;
@@ -197,6 +201,42 @@ function extractDomain(url: string): string {
     }
 }
 
+async function optimizePreviewImage(data: Buffer, contentType: string): Promise<string | undefined> {
+    if (data.length <= 512) return undefined;
+
+    const mimeType = contentType.split(';')[0] || 'image/webp';
+    const originalDataUrl = `data:${mimeType};base64,${data.toString('base64')}`;
+    if (data.length <= PREVIEW_IMAGE_TARGET_BYTES) {
+        return originalDataUrl;
+    }
+
+    let bestBuffer: Buffer | null = null;
+
+    try {
+        for (const side of PREVIEW_IMAGE_SIDES) {
+            for (const quality of PREVIEW_IMAGE_QUALITIES) {
+                const candidate = await sharp(data, { animated: false, limitInputPixels: 16_000_000 })
+                    .rotate()
+                    .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
+                    .webp({ quality })
+                    .toBuffer();
+
+                if (!bestBuffer || candidate.length < bestBuffer.length) {
+                    bestBuffer = candidate;
+                }
+
+                if (candidate.length <= PREVIEW_IMAGE_TARGET_BYTES) {
+                    return `data:image/webp;base64,${candidate.toString('base64')}`;
+                }
+            }
+        }
+    } catch {
+        return data.length <= PREVIEW_IMAGE_TARGET_BYTES ? originalDataUrl : undefined;
+    }
+
+    return bestBuffer ? `data:image/webp;base64,${bestBuffer.toString('base64')}` : undefined;
+}
+
 export async function fetchOgPreview(url: string): Promise<LinkPreview | null> {
     try {
         const { data, contentType } = await fetchWithTimeout(url, MAX_HTML_BYTES);
@@ -220,7 +260,7 @@ export async function fetchOgPreview(url: string): Promise<LinkPreview | null> {
             try {
                 const { data: imgData, contentType: imgType } = await fetchWithTimeout(candidate, MAX_IMAGE_BYTES);
                 if (imgData.length > 512) {
-                    imageBase64 = `data:${imgType.split(';')[0]};base64,${imgData.toString('base64')}`;
+                    imageBase64 = await optimizePreviewImage(imgData, imgType);
                     break;
                 }
             } catch {

@@ -7,6 +7,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import SearchIcon from '@mui/icons-material/Search';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import { Contact } from '../../../types/chat.js';
+import { resizeImageToDataUrl } from '../../ui/settings/shared.js';
 
 
 interface CreateGroupFormProps {
@@ -30,39 +31,27 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const size = Math.min(img.width, img.height, 256);
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                const sx = (img.width - size) / 2;
-                const sy = (img.height - size) / 2;
-                ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
-                setGroupAvatar(canvas.toDataURL('image/jpeg', 0.75));
-            };
-            img.src = ev.target?.result as string;
-        };
-        reader.readAsDataURL(file);
+        resizeImageToDataUrl(file)
+            .then(setGroupAvatar)
+            .catch(() => undefined);
+        e.target.value = '';
     };
 
-    const connectedContacts = useMemo(() =>
-        contacts.filter(c => c.status === 'connected'), [contacts]
+    const availableContacts = useMemo(() =>
+        contacts.filter(c => !c.isConversationOnly && c.status !== 'blocked' && c.status !== 'incoming' && c.status !== 'pending'), [contacts]
     );
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
-        return q ? connectedContacts.filter(c => c.name.toLowerCase().includes(q)) : connectedContacts;
-    }, [connectedContacts, search]);
+        return q
+            ? availableContacts.filter(c => c.name.toLowerCase().includes(q) || c.upeerId.toLowerCase().includes(q))
+            : availableContacts;
+    }, [availableContacts, search]);
 
     const toggleMember = (id: string) =>
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
     const selectedContacts = useMemo(() =>
-        connectedContacts.filter(c => selectedIds.includes(c.upeerId)), [connectedContacts, selectedIds]
+        availableContacts.filter(c => selectedIds.includes(c.upeerId)), [availableContacts, selectedIds]
     );
 
     const handleCreate = async () => {
@@ -79,7 +68,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
     return (
         <Box sx={{ px: 2, py: 2, flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
-                Crea un grupo de chat seguro con tus contactos conectados.
+                Crea un grupo de chat seguro con tus contactos disponibles. Los que estén offline recibirán la invitación cuando vuelvan a estar accesibles.
             </Typography>
 
             {/* Avatar picker */}
@@ -160,9 +149,9 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                 border: '1px solid', borderColor: 'divider',
                 borderRadius: 'md', backgroundColor: 'background.level1',
             }}>
-                {connectedContacts.length === 0 ? (
+                {availableContacts.length === 0 ? (
                     <Box sx={{ p: 3, textAlign: 'center' }}>
-                        <Typography level="body-sm" color="neutral">No tienes contactos conectados</Typography>
+                        <Typography level="body-sm" color="neutral">No tienes contactos disponibles</Typography>
                     </Box>
                 ) : filtered.length === 0 ? (
                     <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -194,6 +183,9 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                                         </Avatar>
                                         <Typography level="body-sm" sx={{ fontWeight: isChecked ? 600 : 400 }}>
                                             {c.name}
+                                        </Typography>
+                                        <Typography level="body-xs" color="neutral" sx={{ ml: 'auto' }}>
+                                            {c.status === 'connected' ? 'Online' : 'Offline'}
                                         </Typography>
                                     </Box>
                                 </ListItem>

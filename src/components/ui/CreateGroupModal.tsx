@@ -41,9 +41,11 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const connectedContacts = contacts.filter(c => c.status === 'connected');
-    const filtered = connectedContacts.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase())
+    const availableContacts = contacts.filter(c =>
+        !c.isConversationOnly && c.status !== 'blocked' && c.status !== 'incoming' && c.status !== 'pending'
+    );
+    const filtered = availableContacts.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) || c.upeerId.toLowerCase().includes(search.toLowerCase())
     );
 
     const toggleMember = (id: string) => {
@@ -70,7 +72,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
         onClose();
     };
 
-    const selectedContacts = connectedContacts.filter(c => selectedIds.includes(c.upeerId));
+    const selectedContacts = availableContacts.filter(c => selectedIds.includes(c.upeerId));
 
     return (
         <Modal open={open} onClose={handleClose}>
@@ -107,7 +109,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
                 <DialogContent sx={{ px: 3, pt: 2, pb: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                     <Typography level="body-sm">
-                        Crea un grupo de chat seguro con tus contactos. Los mensajes serán cifrados de extremo a extremo para cada miembro.
+                        Crea un grupo de chat seguro con tus contactos. Los miembros offline recibirán la invitación en cuanto vuelvan a estar accesibles.
                     </Typography>
 
                     {/* Group name input */}
@@ -168,9 +170,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                             '&::-webkit-scrollbar': { width: '6px' },
                             '&::-webkit-scrollbar-thumb': { borderRadius: '3px', bgcolor: 'divider' }
                         }}>
-                            {connectedContacts.length === 0 ? (
+                            {availableContacts.length === 0 ? (
                                 <Box sx={{ p: 3, textAlign: 'center' }}>
-                                    <Typography level="body-sm" color="neutral">No tienes contactos conectados</Typography>
+                                    <Typography level="body-sm" color="neutral">No tienes contactos disponibles</Typography>
                                 </Box>
                             ) : filtered.length === 0 ? (
                                 <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -203,6 +205,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                                                     />
                                                     <Avatar size="sm" color="neutral" sx={{ borderRadius: 'md' }}>{c.name[0]}</Avatar>
                                                     <Typography level="body-sm" sx={{ fontWeight: 500 }}>{c.name}</Typography>
+                                                    <Typography level="body-xs" color="neutral" sx={{ ml: 'auto' }}>
+                                                        {c.status === 'connected' ? 'Online' : 'Offline'}
+                                                    </Typography>
                                                 </Box>
                                             </ListItem>
                                         );

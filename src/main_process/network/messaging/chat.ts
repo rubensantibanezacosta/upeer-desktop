@@ -27,6 +27,7 @@ import {
     deleteReaction,
 } from '../../storage/messages/reactions.js';
 import { warn, error } from '../../security/secure-logger.js';
+import { buildMessagePayload } from '../messagePayload.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
@@ -113,6 +114,24 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         return undefined;
     }
 
+    const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
+    const urlMatch = URL_FIRST_RE.exec(content);
+    let payload = content;
+    if (providedLinkPreview) {
+        payload = await buildMessagePayload(content, providedLinkPreview);
+    } else if (urlMatch) {
+        const { fetchOgPreview } = await import('../og-fetcher.js');
+        const preview = await fetchOgPreview(urlMatch[1]);
+        if (preview) {
+            payload = await buildMessagePayload(content, preview);
+        }
+    }
+
+    if (payload.length > MAX_MESSAGE_SIZE_BYTES) {
+        error(`Message payload size exceeds limit (${payload.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { upeerId, msgId }, 'security');
+        return undefined;
+    }
+
     const contact = await getContactByUpeerId(upeerId);
     if (!contact || !contact.publicKey) {
         if (contact && !contact.publicKey) {
@@ -127,14 +146,14 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
 
     if (contact.status !== 'connected') {
         const timestamp = Date.now();
-        await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent', selfId, timestamp);
+        await saveMessage(msgId, upeerId, true, payload, replyTo, '', 'sent', selfId, timestamp);
 
         try {
             const nodes = await vaultChatForOfflineDelivery(
                 upeerId,
                 contact.publicKey,
                 msgId,
-                content,
+                payload,
                 replyTo,
                 selfId,
                 timestamp
@@ -151,20 +170,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
         }
 
         startDhtSearch(upeerId, sendSecureUDPMessage);
-        return { id: msgId, savedMessage: content, timestamp };
-    }
-
-    const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
-    const urlMatch = URL_FIRST_RE.exec(content);
-    let payload = content;
-    if (providedLinkPreview) {
-        payload = JSON.stringify({ text: content, linkPreview: providedLinkPreview });
-    } else if (urlMatch) {
-        const { fetchOgPreview } = await import('../og-fetcher.js');
-        const preview = await fetchOgPreview(urlMatch[1]);
-        if (preview) {
-            payload = JSON.stringify({ text: content, linkPreview: preview });
-        }
+        return { id: msgId, savedMessage: payload, timestamp };
     }
 
     // ── Cifrado: Double Ratchet (preferido) o crypto_box (fallback) ──────────
@@ -309,7 +315,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                 // cualquier instancia con el mnemónico pueda descifrarlo sin depender de DR.
                 const { encrypt: encStatic } = await import('../../security/identity.js');
                 const selfVaultEncrypted = encStatic(
-                    Buffer.from(content, 'utf-8'),
+                    Buffer.from(payload, 'utf-8'),
                     Buffer.from(myPublicKey, 'hex')
                 );
 
@@ -363,7 +369,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
                     upeerId,
                     freshContact.publicKey,
                     msgId,
-                    content,
+                    payload,
                     replyTo,
                     selfId,
                     timestamp
@@ -594,12 +600,12 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     let payload = newContent;
 
     if (linkPreview) {
-        payload = JSON.stringify({ text: newContent, linkPreview });
+        payload = await buildMessagePayload(newContent, linkPreview);
     } else if (urlMatch) {
         const { fetchOgPreview } = await import('../og-fetcher.js');
         const preview = await fetchOgPreview(urlMatch[1]);
         if (preview) {
-            payload = JSON.stringify({ text: newContent, linkPreview: preview });
+            payload = await buildMessagePayload(newContent, preview);
         }
     }
 

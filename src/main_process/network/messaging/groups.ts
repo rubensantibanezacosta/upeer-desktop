@@ -11,14 +11,18 @@ import {
 } from '../../storage/contacts/operations.js';
 import {
     saveMessage,
+    deleteMessagesByChatId,
 } from '../../storage/messages/operations.js';
 import {
     getGroupById,
     saveGroup,
     updateGroupMembers,
     updateGroupInfo,
+    deleteGroup,
 } from '../../storage/groups/operations.js';
 import { warn, error } from '../../security/secure-logger.js';
+import { buildGroupInvitePayload, buildGroupUpdatePayload } from '../groupPayload.js';
+import { buildMessagePayload } from '../messagePayload.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { EPH_FRESHNESS_MS, MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
@@ -58,12 +62,12 @@ export async function sendGroupMessage(
     let payload = message;
 
     if (linkPreview) {
-        payload = JSON.stringify({ text: message, linkPreview });
+        payload = await buildMessagePayload(message, linkPreview);
     } else if (urlMatch) {
         const { fetchOgPreview } = await import('../og-fetcher.js');
         const preview = await fetchOgPreview(urlMatch[1]);
         if (preview) {
-            payload = JSON.stringify({ text: message, linkPreview: preview });
+            payload = await buildMessagePayload(message, preview);
         }
     }
 
@@ -259,7 +263,7 @@ export async function inviteToGroup(
 
     const newMembers = Array.from(new Set([...group.members, upeerId]));
     updateGroupMembers(groupId, newMembers);
-    await _sendGroupInvite(groupId, group.name, newMembers, upeerId);
+    await _sendGroupInvite(groupId, group.name, newMembers, upeerId, group.avatar ?? undefined);
 }
 
 /**
@@ -276,7 +280,7 @@ export async function updateGroup(
     updateGroupInfo(groupId, fields);
 
     const myId = getMyUPeerId();
-    const sensitivePayload = JSON.stringify({
+    const sensitivePayload = await buildGroupUpdatePayload({
         ...(fields.name !== undefined ? { groupName: fields.name } : {}),
         ...(fields.avatar !== undefined ? { avatar: fields.avatar } : {}),
     });
@@ -310,6 +314,12 @@ export async function updateGroup(
             useRecipientEphemeral: useEphemeral,
         };
 
+        const signedPacket = {
+            ...packet,
+            senderUpeerId: myId,
+            signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
+        };
+
         if (contact.status === 'connected') {
             const addresses: string[] = [];
             if (contact.address) addresses.push(contact.address);
@@ -321,14 +331,14 @@ export async function updateGroup(
             for (const addr of addresses) {
                 sendSecureUDPMessage(addr, packet, contact.publicKey);
             }
-        } else {
-            const signedPacket = {
-                ...packet,
-                senderUpeerId: myId,
-                signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
-            };
-            const { VaultManager } = await import('../vault/manager.js');
-            await VaultManager.replicateToVaults(memberUpeerId, signedPacket);
+        }
+
+        const { VaultManager } = await import('../vault/manager.js');
+        const payloadHashOverride = crypto.createHash('sha256')
+            .update(`group-update:${groupId}:${memberUpeerId}:${signedPacket.signature}`)
+            .digest('hex');
+        await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
+        if (contact.status !== 'connected') {
             warn('GROUP_UPDATE vaulted for offline member', { memberUpeerId, groupId }, 'vault');
         }
     }
@@ -352,7 +362,7 @@ async function _sendGroupInvite(
     const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
 
     // Encrypt the sensitive payload (name, members list, avatar)
-    const sensitivePayload = JSON.stringify({ groupName, members, ...(avatar ? { avatar } : {}) });
+    const sensitivePayload = await buildGroupInvitePayload(groupName, members, avatar);
     const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
     const { ciphertext, nonce } = encrypt(
         Buffer.from(sensitivePayload, 'utf-8'),
@@ -370,6 +380,12 @@ async function _sendGroupInvite(
         useRecipientEphemeral: useEphemeral,
     };
 
+    const signedPacket = {
+        ...packet,
+        senderUpeerId: myId,
+        signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
+    };
+
     if (contact.status === 'connected') {
         const addresses: string[] = [];
         if (contact.address) addresses.push(contact.address);
@@ -381,15 +397,14 @@ async function _sendGroupInvite(
         for (const addr of addresses) {
             sendSecureUDPMessage(addr, packet, contact.publicKey);
         }
-    } else {
-        // Vault the encrypted invite for when the member comes back online
-        const signedPacket = {
-            ...packet,
-            senderUpeerId: myId,
-            signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
-        };
-        const { VaultManager } = await import('../vault/manager.js');
-        await VaultManager.replicateToVaults(targetUpeerId, signedPacket);
+    }
+
+    const { VaultManager } = await import('../vault/manager.js');
+    const payloadHashOverride = crypto.createHash('sha256')
+        .update(`group-invite:${groupId}:${targetUpeerId}`)
+        .digest('hex');
+    await VaultManager.replicateToVaults(targetUpeerId, signedPacket, undefined, payloadHashOverride);
+    if (contact.status !== 'connected') {
         warn('GROUP_INVITE vaulted for offline member', { targetUpeerId, groupId }, 'vault');
     }
 }
@@ -431,9 +446,6 @@ export async function leaveGroup(groupId: string): Promise<void> {
         }
     }
 
-    // Delete locally
-    const { deleteGroup } = await import('../../storage/groups/operations.js');
-    const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
     deleteMessagesByChatId(groupId);
     deleteGroup(groupId);
 }

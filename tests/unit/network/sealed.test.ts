@@ -13,6 +13,8 @@ describe('Sealed Sender Unit Tests', () => {
     it('should have a consistent list of SEALED_TYPES', () => {
         expect(SEALED_TYPES.has('CHAT')).toBe(true);
         expect(SEALED_TYPES.has('GROUP_MSG')).toBe(true);
+        expect(SEALED_TYPES.has('GROUP_INVITE')).toBe(true);
+        expect(SEALED_TYPES.has('GROUP_UPDATE')).toBe(true);
         expect(SEALED_TYPES.has('FILE_CHUNK')).toBe(true);
         expect(SEALED_TYPES.has('HANDSHAKE_REQ')).toBe(false);
     });

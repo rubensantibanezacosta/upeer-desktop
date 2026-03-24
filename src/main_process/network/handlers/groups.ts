@@ -150,9 +150,11 @@ export async function handleGroupInvite(
     let groupName: string;
     let members: string[];
     let avatar: string | undefined;
+    let senderDisplayName = upeerId;
 
     try {
         const contact = await getContactByUpeerId(upeerId);
+        senderDisplayName = contact?.name || contact?.alias || upeerId;
         const senderKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
             ? data.ephemeralPublicKey
             : contact?.publicKey;
@@ -210,13 +212,71 @@ export async function handleGroupInvite(
     }
 
     const existing = getGroupById(groupId);
+    const isNewGroup = !existing;
     if (!existing) {
         saveGroup(groupId, groupName, actualAdmin, members || [upeerId], 'active', avatar);
     } else {
+        if (existing.adminUpeerId !== actualAdmin) {
+            security('Group invite from non-admin!', { sender: upeerId, groupId }, 'security');
+            issueVouch(upeerId, VouchType.MALICIOUS).catch(() => { });
+            return;
+        }
         if (!existing.members.includes(upeerId)) {
             security('Group invite from non-member!', { sender: upeerId, groupId }, 'security');
             issueVouch(upeerId, VouchType.MALICIOUS).catch(() => { });
             return;
+        }
+        updateGroupMembers(groupId, members || [upeerId]);
+        if (existing.name !== groupName || avatar !== undefined) {
+            updateGroupInfo(groupId, {
+                name: groupName,
+                ...(avatar !== undefined ? { avatar } : {})
+            });
+        }
+    }
+
+    if (isNewGroup) {
+        const systemMessage = `__SYS__|${senderDisplayName} te añadió al grupo`;
+        const inviteMessageId = randomUUID();
+        const timestamp = Date.now();
+        const savedInvite = await saveMessage(
+            inviteMessageId,
+            groupId,
+            false,
+            systemMessage,
+            undefined,
+            undefined,
+            'delivered',
+            actualAdmin,
+            timestamp
+        );
+
+        if ((savedInvite as any)?.changes > 0) {
+            win?.webContents.send('receive-group-message', {
+                id: inviteMessageId,
+                groupId,
+                senderUpeerId: actualAdmin,
+                senderName: senderDisplayName,
+                isMine: false,
+                message: systemMessage,
+                isSystem: true,
+                status: 'delivered',
+                timestamp
+            });
+        }
+
+        const notifWin = getMainWindow();
+        if (notifWin && !notifWin.isFocused()) {
+            showDesktopNotification({
+                title: 'Nueva invitación de grupo',
+                body: `${senderDisplayName} te añadió a ${groupName}`,
+                onClick: () => {
+                    const currentWin = getMainWindow();
+                    if (!currentWin) return;
+                    focusWindow(currentWin);
+                    currentWin.webContents.send('focus-conversation', { groupId });
+                },
+            });
         }
     }
 
@@ -224,7 +284,8 @@ export async function handleGroupInvite(
         groupId,
         groupName,
         adminUpeerId: actualAdmin,
-        members: members || []
+        members: members || [],
+        ...(avatar ? { avatar } : {})
     });
 }
 

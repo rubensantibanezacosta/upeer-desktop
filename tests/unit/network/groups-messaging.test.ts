@@ -83,7 +83,9 @@ describe('network/messaging/groups.ts', () => {
                 type: 'GROUP_UPDATE',
                 useRecipientEphemeral: false,
                 senderUpeerId: 'self-id'
-            })
+            }),
+            undefined,
+            expect.any(String)
         );
     });
 
@@ -92,6 +94,7 @@ describe('network/messaging/groups.ts', () => {
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const identity = await import('../../../src/main_process/security/identity.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
@@ -122,6 +125,16 @@ describe('network/messaging/groups.ts', () => {
                 ephemeralPublicKey: '22'.repeat(32)
             }),
             'aa'.repeat(32)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-online',
+            expect.objectContaining({
+                type: 'GROUP_UPDATE',
+                groupId: 'grp-1',
+                senderUpeerId: 'self-id'
+            }),
+            undefined,
+            expect.any(String)
         );
     });
 
@@ -170,6 +183,58 @@ describe('network/messaging/groups.ts', () => {
             'sent',
             'self-id',
             expect.any(Number)
+        );
+    });
+
+    it('includes the group avatar when inviting a member to an existing group', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { inviteToGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            name: 'Grupo con avatar',
+            avatar: 'data:image/jpeg;base64,avatar',
+            members: ['self-id', 'peer-online'],
+        } as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::10',
+            knownAddresses: '[]'
+        } as any);
+
+        await inviteToGroup('grp-1', 'peer-online');
+
+        expect(identity.encrypt).toHaveBeenCalledWith(
+            Buffer.from(JSON.stringify({
+                groupName: 'Grupo con avatar',
+                members: ['self-id', 'peer-online'],
+                avatar: 'data:image/jpeg;base64,avatar'
+            }), 'utf-8'),
+            Buffer.from('aa'.repeat(32), 'hex')
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({
+                type: 'GROUP_INVITE',
+                groupId: 'grp-1'
+            }),
+            'aa'.repeat(32)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-online',
+            expect.objectContaining({
+                type: 'GROUP_INVITE',
+                groupId: 'grp-1',
+                senderUpeerId: 'self-id'
+            }),
+            undefined,
+            expect.any(String)
         );
     });
 });

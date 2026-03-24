@@ -21,6 +21,7 @@ import SecurityIcon from '@mui/icons-material/Security';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import EditIcon from '@mui/icons-material/Edit';
+import { resizeImageToDataUrl } from '../ui/settings/shared.js';
 
 interface TopHeaderProps {
     contactName?: string;
@@ -57,33 +58,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !onUpdateGroup || !groupId) return;
-        // BUG EI fix: sin este límite, una imagen RAW de 50 MB se leería entera en
-        // memoria antes del recorte canvas. El FileReader convierte a base64
-        // (~33 % más grande), lo que puede causar OOM en el proceso renderer.
-        const MAX_AVATAR_BYTES = 10 * 1024 * 1024; // 10 MB
-        if (file.size > MAX_AVATAR_BYTES) {
-            // Silencioso: el usuario elegirá otro archivo
-            e.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 256; canvas.height = 256;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                const side = Math.min(img.width, img.height);
-                const sx = (img.width - side) / 2;
-                const sy = (img.height - side) / 2;
-                ctx.drawImage(img, sx, sy, side, side, 0, 0, 256, 256);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                onUpdateGroup({ avatar: dataUrl });
-            };
-            img.src = ev.target?.result as string;
-        };
-        reader.readAsDataURL(file);
+        resizeImageToDataUrl(file)
+            .then((dataUrl) => onUpdateGroup({ avatar: dataUrl }))
+            .catch(() => undefined);
         e.target.value = '';
     };
 
