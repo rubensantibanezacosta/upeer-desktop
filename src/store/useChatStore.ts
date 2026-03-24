@@ -432,7 +432,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     upeerId: activeGroupId,
                     groupId: activeGroupId,
                     isMine: true,
-                    message: msg,
+                    message: sendResult.savedMessage ?? msg,
                     status: 'sent',
                     timestamp: formatMessageTimestamp(sendResult.timestamp),
                     replyTo: replyTo?.id,

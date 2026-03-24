@@ -39,7 +39,7 @@ export async function sendGroupMessage(
     groupId: string,
     message: string,
     replyTo?: string
-): Promise<{ id: string; timestamp: number } | undefined> {
+): Promise<{ id: string; timestamp: number; savedMessage: string } | undefined> {
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (message.length > MAX_MESSAGE_SIZE_BYTES) {
         error(`Group message size exceeds limit (${message.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { groupId }, 'security');
@@ -52,10 +52,21 @@ export async function sendGroupMessage(
     const msgId = crypto.randomUUID();
     const myId = getMyUPeerId();
     const timestamp = Date.now();
+    const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
+    const urlMatch = URL_FIRST_RE.exec(message);
+    let payload = message;
+
+    if (urlMatch) {
+        const { fetchOgPreview } = await import('../og-fetcher.js');
+        const preview = await fetchOgPreview(urlMatch[1]);
+        if (preview) {
+            payload = JSON.stringify({ text: message, linkPreview: preview });
+        }
+    }
 
     // Save locally first
-    const signature = sign(Buffer.from(message));
-    await saveMessage(msgId, groupId, true, message, replyTo, signature.toString('hex'), 'sent', myId, timestamp);
+    const signature = sign(Buffer.from(payload));
+    await saveMessage(msgId, groupId, true, payload, replyTo, signature.toString('hex'), 'sent', myId, timestamp);
 
     // Fan-out: send to every member including other devices of ours for "Self-Sync"
     const membersWithSelf = [...group.members];
@@ -75,7 +86,7 @@ export async function sendGroupMessage(
 
         const ephPubKey = getMyEphemeralPublicKeyHex(); // capture before possible rotation
         const { ciphertext, nonce } = encrypt(
-            Buffer.from(message, 'utf-8'),
+            Buffer.from(payload, 'utf-8'),
             Buffer.from(targetKeyHex, 'hex')
         );
 
@@ -167,7 +178,7 @@ export async function sendGroupMessage(
         const useEphemeral = false;
         const targetKeyHex = contact.publicKey;
         const { ciphertext, nonce } = encrypt(
-            Buffer.from(message, 'utf-8'),
+            Buffer.from(payload, 'utf-8'),
             Buffer.from(targetKeyHex, 'hex')
         );
         const ephPubKey = getMyEphemeralPublicKeyHex();
@@ -207,7 +218,7 @@ export async function sendGroupMessage(
         }
     }
 
-    return { id: msgId, timestamp };
+    return { id: msgId, timestamp, savedMessage: payload };
 }
 
 /**

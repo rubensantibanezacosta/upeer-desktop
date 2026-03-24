@@ -35,7 +35,7 @@ declare global {
             getGroups: () => Promise<any[]>;
             createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
             updateGroupAvatar: (groupId: string, avatar: string) => Promise<void>;
-            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<{ id: string; timestamp: number } | undefined>;
+            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<{ id: string; timestamp: number; savedMessage: string } | undefined>;
             inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;

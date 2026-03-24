@@ -161,8 +161,8 @@ export async function handlePacket(
         if (!upeerId) return;
 
         const contact = await getContactByUpeerId(upeerId);
-        if (!contact || contact.status !== 'connected' || !contact.publicKey) {
-            security('Origin not connected or missing key', { upeerId, ip: rinfo.address, type: data.type }, 'network');
+        if (!contact || !contact.publicKey || contact.status === 'blocked') {
+            security('Origin unknown, blocked or missing key', { upeerId, ip: rinfo.address, type: data.type }, 'network');
             return;
         }
 

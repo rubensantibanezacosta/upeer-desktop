@@ -319,6 +319,7 @@ export interface SendGroupMessageRequest {
 export interface SendGroupMessageResponse {
     id: string;
     timestamp: number;
+    savedMessage: string;
 }
 
 export interface InviteToGroupRequest {
