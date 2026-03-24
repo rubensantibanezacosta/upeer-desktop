@@ -56,6 +56,7 @@ vi.mock('../../../src/main_process/network/handlers/chat.js', () => ({
 vi.mock('../../../src/main_process/network/handlers/groups.js', () => ({
     handleGroupMessage: vi.fn(),
     handleGroupInvite: vi.fn(),
+    handleGroupLeave: vi.fn(),
     handleGroupUpdate: vi.fn(),
 }));
 
@@ -252,15 +253,17 @@ describe('Vault Delivery Handler', () => {
         expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_OFFER' }));
     });
 
-    it('should process GROUP_MSG, GROUP_INVITE, and GROUP_UPDATE entries', async () => {
+    it('should process GROUP_MSG, GROUP_INVITE, GROUP_UPDATE and GROUP_LEAVE entries', async () => {
         const msgPacket = { type: 'GROUP_MSG', groupId: 'g1', text: 'hi', signature: 'sig' };
         const invitePacket = { type: 'GROUP_INVITE', groupId: 'g1', signature: 'sig' };
         const updatePacket = { type: 'GROUP_UPDATE', groupId: 'g1', signature: 'sig' };
+        const leavePacket = { type: 'GROUP_LEAVE', groupId: 'g1', signature: 'sig' };
 
         const entries = [
             { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(msgPacket)).toString('hex') },
             { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(invitePacket)).toString('hex') },
-            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(updatePacket)).toString('hex') }
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(updatePacket)).toString('hex') },
+            { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(leavePacket)).toString('hex') }
         ];
 
         (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
@@ -271,6 +274,27 @@ describe('Vault Delivery Handler', () => {
         expect(groupsModule.handleGroupMessage).toHaveBeenCalled();
         expect(groupsModule.handleGroupInvite).toHaveBeenCalled();
         expect(groupsModule.handleGroupUpdate).toHaveBeenCalled();
+        expect(groupsModule.handleGroupLeave).toHaveBeenCalled();
+    });
+
+    it('should mark own vaulted GROUP_LEAVE entries as internal sync', async () => {
+        const entry = {
+            senderSid: 'my-id',
+            data: Buffer.from(JSON.stringify({ type: 'GROUP_LEAVE', groupId: 'g1', senderUpeerId: 'my-id', signature: 'sig' })).toString('hex')
+        };
+
+        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+        (identity.verify as any).mockReturnValue(true);
+        (validation.validateMessage as any).mockReturnValue({ valid: true });
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const groupsModule = await import('../../../src/main_process/network/handlers/groups.js');
+        expect(groupsModule.handleGroupLeave).toHaveBeenCalledWith(
+            'my-id',
+            expect.objectContaining({ type: 'GROUP_LEAVE', isInternalSync: true }),
+            mockWin
+        );
     });
 
     it('should handle raw file shards', async () => {

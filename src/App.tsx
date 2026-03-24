@@ -8,6 +8,7 @@ import { useFilePersistence } from './hooks/useFilePersistence.js';
 import { parseMessage } from './features/chat/message/MessageItem.js';
 import { MainLayout } from './components/layout/MainLayout.js';
 import type { LinkPreview } from './types/chat.js';
+import { isPreviewableFile } from './utils/fileUtils.js';
 
 export default function App() {
     const navigation = useNavigationStore();
@@ -52,11 +53,7 @@ export default function App() {
         const isMediaFile = (f: any) => {
             if (!f) return false;
             if (f.isVoiceNote) return false;
-            const mime = f.mimeType?.toLowerCase() || '';
-            const ext = f.fileName?.split('.').pop()?.toLowerCase() || '';
-            const isImage = mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
-            const isVideo = mime.startsWith('video/') || ['mp4', 'webm', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v', '3gp', 'ts', 'mts', 'ogg'].includes(ext);
-            return isImage || isVideo;
+            return isPreviewableFile(f.mimeType, f.fileName);
         };
         const allMedia = history.map(msg => {
             const { fileData } = parseMessage(msg.message, msg.isMine, transfers);

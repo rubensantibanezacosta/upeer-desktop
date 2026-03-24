@@ -14,6 +14,7 @@ import * as identity from '../../../src/main_process/security/identity.js';
 
 // Mocks
 vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
+    deleteGroup: vi.fn(),
     getGroupById: vi.fn(),
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
+    deleteMessagesByChatId: vi.fn(),
     saveMessage: vi.fn(),
     updateMessageStatus: vi.fn(),
     getMessageById: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('../../../src/main_process/network/messaging/groupControl.js', () => ({
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     decrypt: vi.fn(),
     decryptWithIdentityKey: vi.fn(),
+    getMyPublicKeyHex: vi.fn().mockReturnValue('a'.repeat(64)),
     verify: vi.fn(),
     getMyUPeerId: vi.fn().mockReturnValue('my-id'),
 }));
@@ -393,6 +396,18 @@ describe('Group Handlers Final Coverage', () => {
             await handleGroupLeave(senderId, { groupId, signature: 'sig' }, mockWin);
             expect(groupsOps.updateGroupMembers).toHaveBeenCalled();
             expect(groupControl.rotateGroupAfterMemberRemoval).toHaveBeenCalledWith(groupId, senderId);
+        });
+
+        it('should delete local group state for internal self leave sync', async () => {
+            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+            (identity.verify as any).mockReturnValue(true);
+            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, members: ['my-id', 'other'], epoch: 1, senderKey: 'd'.repeat(64) });
+
+            await handleGroupLeave('my-id', { groupId, signature: 'sig', isInternalSync: true }, mockWin);
+
+            expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(groupId);
+            expect(groupsOps.deleteGroup).toHaveBeenCalledWith(groupId);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('group-updated', { groupId, members: [] });
         });
     });
 });

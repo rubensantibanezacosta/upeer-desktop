@@ -19,6 +19,7 @@ describe('useChatStore groups integration', () => {
     it('passes replyTo when sending a group message', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
         const preview = { url: 'https://example.com', title: 'Example' };
+        (window as any).upeer.getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
@@ -72,6 +73,33 @@ describe('useChatStore groups integration', () => {
         await useChatStore.getState().handleLeaveGroup('grp-1');
 
         expect(window.upeer.leaveGroup).toHaveBeenCalledWith('grp-1');
+        expect(useChatStore.getState()).toEqual(expect.objectContaining({
+            activeGroupId: '',
+            groupChatHistory: [],
+            isWindowedHistory: false,
+        }));
+    });
+
+    it('clears stale active group state after refresh when the group no longer exists', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+
+        useChatStore.setState({
+            activeGroupId: 'grp-1',
+            groupChatHistory: [{
+                id: 'msg-1',
+                upeerId: 'grp-1',
+                groupId: 'grp-1',
+                isMine: true,
+                message: 'hola',
+                status: 'sent',
+                timestamp: '10:00',
+                date: 1710000000000,
+            }],
+            isWindowedHistory: true,
+        } as any);
+
+        await useChatStore.getState().refreshGroups();
+
         expect(useChatStore.getState()).toEqual(expect.objectContaining({
             activeGroupId: '',
             groupChatHistory: [],

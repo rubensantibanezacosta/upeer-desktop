@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MediaFileMessage } from './MediaFileMessage.js';
 import { DocumentFileMessage } from './DocumentFileMessage.js';
 import { AudioPlayer } from './AudioPlayer.js';
-import { toMediaUrl } from '../../../utils/fileUtils.js';
+import { isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
 
 export interface FileMessageData {
     fileId: string;
@@ -71,12 +71,27 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     const isVideo = mimeType.startsWith('video/') ||
         mimeType.toLowerCase() === 'video/x-matroska' ||
         fileName.toLowerCase().endsWith('.mkv');
+    const isPdf = isPdfFile(mimeType, fileName);
 
     const handleDownload = async () => {
         if (onDownload && isTransferComplete) {
             setIsDownloading(true);
             try { await onDownload(fileId); } finally { setIsDownloading(false); }
         }
+    };
+
+    const handleOpen = () => {
+        if (!isTransferComplete || !(fullPath || savedPath)) return;
+        if (isPdf && onMediaClick) {
+            onMediaClick({
+                url: fullPath || savedPath || '',
+                name: fileName,
+                mimeType,
+                fileId,
+            });
+            return;
+        }
+        onOpen && onOpen(fileId);
     };
 
     const sharedProps = {
@@ -88,7 +103,7 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
         safeProgress, transferState,
         isDownloading, isVaulting,
         filePath: fullPath || savedPath,
-        onOpen: () => onOpen && isTransferComplete && (fullPath || savedPath) && onOpen(fileId),
+        onOpen: handleOpen,
         onCancel: () => onCancel && (transferState === 'pending' || transferState === 'active') && onCancel(fileId),
         onRetry: () => onRetry && isTransferFailed && onRetry(fileId),
         onDownload: handleDownload,

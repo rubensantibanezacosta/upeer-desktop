@@ -335,12 +335,16 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
     refreshGroups: async () => {
         const raw = await window.upeer.getGroups();
+        const groups = raw.map((g: any) => ({
+            ...g,
+            avatar: g.avatar || undefined,
+            members: Array.isArray(g.members) ? g.members : JSON.parse(g.members || '[]')
+        }));
+        const { activeGroupId } = get();
+        const shouldClearActiveGroup = Boolean(activeGroupId) && !groups.some((group: any) => group.groupId === activeGroupId);
         set({
-            groups: raw.map((g: any) => ({
-                ...g,
-                avatar: g.avatar || undefined,
-                members: Array.isArray(g.members) ? g.members : JSON.parse(g.members || '[]')
-            }))
+            groups,
+            ...(shouldClearActiveGroup ? { activeGroupId: '', groupChatHistory: [], isWindowedHistory: false } : {})
         });
     },
     refreshData: async () => {

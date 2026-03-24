@@ -542,7 +542,17 @@ export function validateFileChunk(data: any): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0) return { valid: false, error: 'Invalid chunkIndex' };
     if (!data.data || typeof data.data !== 'string') return { valid: false, error: 'Invalid chunk data' };
-    if (data.data.length > 50_000) return { valid: false, error: 'Chunk data too large' };
+    const maxChunkBytes = 64 * 1024;
+    const maxEncodedLength = Math.ceil(maxChunkBytes / 3) * 4;
+    if (data.data.length > maxEncodedLength) return { valid: false, error: 'Chunk data too large' };
+    try {
+        const chunkLength = Buffer.from(data.data, 'base64').length;
+        if (chunkLength <= 0 || chunkLength > maxChunkBytes) {
+            return { valid: false, error: 'Chunk data too large' };
+        }
+    } catch {
+        return { valid: false, error: 'Invalid chunk data' };
+    }
     if (data.chunkHash !== undefined && (typeof data.chunkHash !== 'string' || !/^[a-f0-9]{64}$/i.test(data.chunkHash))) {
         return { valid: false, error: 'Invalid chunkHash' };
     }

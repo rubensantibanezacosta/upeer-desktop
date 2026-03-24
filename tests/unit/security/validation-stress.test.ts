@@ -65,13 +65,18 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should prevent OOM via large chunks (BUG CN fix)', () => {
-            const base = { fileId: 'f1', chunkIndex: 0, data: 'a'.repeat(50_000) };
+            const base = { fileId: 'f1', chunkIndex: 0, data: Buffer.alloc(64 * 1024, 1).toString('base64') };
             expect(validateFileChunk(base).valid).toBe(true);
 
-            const tooLarge = { ...base, data: 'a'.repeat(50_001) };
+            const tooLarge = { ...base, data: Buffer.alloc((64 * 1024) + 1, 1).toString('base64') };
             const result = validateFileChunk(tooLarge);
             expect(result.valid).toBe(false);
             expect(result.error).toBe('Chunk data too large');
+        });
+
+        it('should accept base64 payload length for binary chunks like pdf pages', () => {
+            const pdfLikeChunk = Buffer.alloc(60 * 1024, 0x25).toString('base64');
+            expect(validateFileChunk({ fileId: 'pdf-1', chunkIndex: 4, data: pdfLikeChunk }).valid).toBe(true);
         });
 
         it('should validate AES-GCM tags and IVs (BUG DI fix)', () => {

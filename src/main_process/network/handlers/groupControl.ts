@@ -4,16 +4,17 @@ import { getMainWindow } from '../../core/windowManager.js';
 import { showDesktopNotification } from '../../utils/desktopNotification.js';
 import { focusWindow } from '../../utils/windowFocus.js';
 import {
+    deleteGroup,
     getGroupById,
     saveGroup,
     updateGroupCrypto,
     updateGroupInfo,
     updateGroupMembers,
 } from '../../storage/groups/operations.js';
-import { saveMessage } from '../../storage/messages/operations.js';
+import { deleteMessagesByChatId, saveMessage } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
-import { decrypt, decryptWithIdentityKey } from '../../security/identity.js';
+import { decrypt, decryptWithIdentityKey, getMyPublicKeyHex, getMyUPeerId } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
@@ -342,7 +343,11 @@ export async function handleGroupLeave(
     const { groupId, signature: leaveSig, ...leaveData } = data;
     if (!groupId) return;
 
-    const contact = await getContactByUpeerId(upeerId);
+    const myId = getMyUPeerId();
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+    const contact = await getContactByUpeerId(upeerId) || (upeerId === myId
+        ? { upeerId: myId, publicKey: getMyPublicKeyHex(), name: 'Tú' }
+        : null);
     if (!contact?.publicKey) {
         warn('GROUP_LEAVE from unknown contact', { upeerId }, 'security');
         return;
@@ -364,6 +369,15 @@ export async function handleGroupLeave(
 
     const group = getGroupById(groupId);
     if (!group) return;
+
+    if (isInternalSync) {
+        deleteMessagesByChatId(groupId);
+        deleteGroup(groupId);
+        win?.webContents.send('group-updated', { groupId, members: [] });
+        return;
+    }
+
+    if (!group.members.includes(upeerId)) return;
 
     const newMembers = group.members.filter((member) => member !== upeerId);
     updateGroupMembers(groupId, newMembers);

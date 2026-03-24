@@ -5,6 +5,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
+    deleteGroup: vi.fn(),
     getGroupById: vi.fn(),
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
@@ -194,6 +195,73 @@ describe('network/messaging/groups.ts', () => {
             undefined,
             expect.any(String)
         );
+    });
+
+    it('vaults GROUP_LEAVE for own devices and offline members', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { leaveGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            members: ['self-id', 'peer-online', 'peer-offline'],
+        } as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
+            if (upeerId === 'peer-online') {
+                return {
+                    upeerId,
+                    status: 'connected',
+                    publicKey: 'aa'.repeat(32),
+                    address: '200::10',
+                    knownAddresses: '[]'
+                } as any;
+            }
+            if (upeerId === 'peer-offline') {
+                return {
+                    upeerId,
+                    status: 'disconnected',
+                    publicKey: 'bb'.repeat(32)
+                } as any;
+            }
+            return null as any;
+        });
+
+        await leaveGroup('grp-1');
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({
+                type: 'GROUP_LEAVE',
+                senderUpeerId: 'self-id',
+                signature: expect.any(String)
+            }),
+            'aa'.repeat(32)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'self-id',
+            expect.objectContaining({
+                type: 'GROUP_LEAVE',
+                senderUpeerId: 'self-id',
+                signature: expect.any(String)
+            }),
+            undefined,
+            expect.any(String)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline',
+            expect.objectContaining({
+                type: 'GROUP_LEAVE',
+                senderUpeerId: 'self-id',
+                signature: expect.any(String)
+            }),
+            undefined,
+            expect.any(String)
+        );
+        expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith('grp-1');
+        expect(groupsOps.deleteGroup).toHaveBeenCalledWith('grp-1');
     });
 
     it('serializes a provided link preview for group messages without refetching', async () => {

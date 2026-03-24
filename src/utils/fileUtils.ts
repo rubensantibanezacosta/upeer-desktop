@@ -45,6 +45,24 @@ export const getMimeType = (fileName: string): string => {
     return mimeMap[ext || ''] || 'application/octet-stream';
 };
 
+export const resolveFileMimeType = (mimeType?: string, fileName?: string): string => {
+    const normalized = mimeType?.toLowerCase() || '';
+    if (normalized && normalized !== 'application/octet-stream') return normalized;
+    return fileName ? getMimeType(fileName).toLowerCase() : 'application/octet-stream';
+};
+
+export const isImageFile = (mimeType?: string, fileName?: string): boolean =>
+    resolveFileMimeType(mimeType, fileName).startsWith('image/');
+
+export const isPdfFile = (mimeType?: string, fileName?: string): boolean =>
+    resolveFileMimeType(mimeType, fileName).includes('pdf');
+
+export const isPreviewableFile = (mimeType?: string, fileName?: string): boolean =>
+    isImageFile(mimeType, fileName)
+    || resolveFileMimeType(mimeType, fileName).startsWith('video/')
+    || fileName?.toLowerCase().endsWith('.mkv')
+    || isPdfFile(mimeType, fileName);
+
 export const toMediaUrl = (filePath: string): string => {
     const raw = filePath.startsWith('media://') ? filePath.slice(8) : filePath;
     const normalized = raw.replace(/\\/g, '/');

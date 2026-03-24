@@ -263,18 +263,31 @@ export async function leaveGroup(groupId: string): Promise<void> {
     if (!group) return;
 
     const myId = getMyUPeerId();
-    const packet = {
+    const packet = buildSignedPacket({
         type: 'GROUP_LEAVE',
         groupId,
-        senderUpeerId: myId,
         timestamp: Date.now(),
-    };
+    }, myId);
 
     for (const memberUpeerId of group.members) {
-        if (memberUpeerId === myId) continue;
-        const contact = await getContactByUpeerId(memberUpeerId);
-        if (contact?.status === 'connected') {
+        const isSelf = memberUpeerId === myId;
+        const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
+            ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
+            : null);
+        if (!contact?.publicKey) continue;
+
+        if (!isSelf && contact.status === 'connected') {
             await sendPacketToKnownAddresses(contact, packet);
+        }
+
+        await vaultPacket(
+            memberUpeerId,
+            packet,
+            `group-leave:${groupId}:${memberUpeerId}:${packet.signature}`
+        );
+
+        if (!isSelf && contact.status !== 'connected') {
+            warn('GROUP_LEAVE vaulted for offline member', { memberUpeerId, groupId }, 'vault');
         }
     }
 

@@ -13,8 +13,11 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ShortcutOutlinedIcon from '@mui/icons-material/ShortcutOutlined';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { UnsupportedVideoFallback } from '../../../components/ui/UnsupportedVideoFallback.js';
+import { PdfPreview } from '../file/PdfPreview.js';
 import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../utils/videoPlayback.js';
+import { isPdfFile } from '../../../utils/fileUtils.js';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '👎'];
 
@@ -265,6 +268,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
 
     const currentItem = items[currentIndex];
     const isMediaVideo = currentItem ? isVideo(currentItem.mimeType, currentItem.fileName) : false;
+    const isCurrentPdf = currentItem ? isPdfFile(currentItem.mimeType, currentItem.fileName) : false;
     const canPlayInlineCurrentVideo = currentItem ? supportsInlineVideoPlayback(currentItem.mimeType, currentItem.fileName) : false;
     const unsupportedCurrentVideoReason = currentItem ? getInlineVideoUnsupportedReason(currentItem.mimeType, currentItem.fileName) : null;
 
@@ -427,7 +431,18 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                 )}
 
                 {!loading && !error && contentUrl && (
-                    isMediaVideo ? (
+                    isCurrentPdf ? (
+                        <PdfPreview
+                            src={contentUrl}
+                            name={currentItem.fileName}
+                            height="100%"
+                            onOpenExternal={async () => {
+                                const cleanPath = fromMediaUrl(contentUrl);
+                                await window.upeer.openFile(cleanPath);
+                                onClose();
+                            }}
+                        />
+                    ) : isMediaVideo ? (
                         canPlayInlineCurrentVideo ? (
                             <VideoPlayerWithControls
                                 src={contentUrl}
@@ -651,8 +666,9 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                             const idx = startIdx + i;
                             const item = items[idx];
                             const thumb = item.thumbnail || generatedThumbnails[item.fileId];
-                            const isImg = !isVideo(item.mimeType, item.fileName);
-                            const showImg = (thumb && thumb.length > 10) || (isImg && item.url);
+                            const isPdf = isPdfFile(item.mimeType, item.fileName);
+                            const isImg = !isVideo(item.mimeType, item.fileName) && !isPdf;
+                            const showImg = !isPdf && ((thumb && thumb.length > 10) || (isImg && item.url));
                             const isCurrent = idx === currentIndex;
 
                             return (
@@ -684,7 +700,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                                         />
                                     ) : (
                                         <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <PlayArrowIcon sx={{ fontSize: 24, color: 'neutral.400' }} />
+                                            {isPdf ? <DescriptionIcon sx={{ fontSize: 24, color: 'neutral.400' }} /> : <PlayArrowIcon sx={{ fontSize: 24, color: 'neutral.400' }} />}
                                         </Box>
                                     )}
                                     {isVideo(item.mimeType, item.fileName) && (

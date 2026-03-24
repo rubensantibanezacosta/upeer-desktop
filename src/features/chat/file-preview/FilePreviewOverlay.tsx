@@ -24,7 +24,8 @@ import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
-import { getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
+import { PdfPreview } from '../file/PdfPreview.js';
+import { getMimeType, isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
 
 interface FileInfo {
     path: string;
@@ -147,6 +148,8 @@ const useFilesPreview = (files: FileInfo[]) => {
                         console.warn('generateVideoThumbnail IPC failed, using canvas fallback', err);
                         thumbnail = await generateVideoThumbnail(previewUrl);
                     }
+                } else if (isPdfFile(effectiveType, file.name)) {
+                    previewUrl = toMediaUrl(assetPath);
                 }
 
                 setPreviews(prev => ({ ...prev, [file.path]: { previewUrl, thumbnail } }));
@@ -474,7 +477,9 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             {/* Preview area */}
             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4, overflow: 'hidden' }}>
                 {currentPreview?.previewUrl ? (
-                    (currentFile.type.startsWith('video/') || getMimeType(currentFile.name).startsWith('video/')) ? (
+                    isPdfFile(currentFile.type, currentFile.name) ? (
+                        <PdfPreview src={currentPreview.previewUrl} name={currentFile.name} height="min(70vh, 960px)" />
+                    ) : (currentFile.type.startsWith('video/') || getMimeType(currentFile.name).startsWith('video/')) ? (
                         <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
                     ) : (
                         <Box component="img" src={currentPreview.previewUrl} sx={{ maxWidth: '90%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 'md', boxShadow: 'lg', transition: 'all 0.3s ease' }} />
