@@ -21,6 +21,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     encrypt: vi.fn(() => ({ ciphertext: 'ciphertext', nonce: 'nonce' })),
     getMyEphemeralPublicKeyHex: vi.fn(() => '22'.repeat(32)),
     incrementEphemeralMessageCounter: vi.fn(),
+    getMyPublicKey: vi.fn(() => Buffer.from('11'.repeat(32), 'hex')),
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -34,6 +35,10 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
     sendSecureUDPMessage: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/og-fetcher.js', () => ({
+    fetchOgPreview: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
@@ -117,6 +122,54 @@ describe('network/messaging/groups.ts', () => {
                 ephemeralPublicKey: '22'.repeat(32)
             }),
             'aa'.repeat(32)
+        );
+    });
+
+    it('serializes a provided link preview for group messages without refetching', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { fetchOgPreview } = await import('../../../src/main_process/network/og-fetcher.js');
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            name: 'Grupo',
+            status: 'active',
+            members: ['self-id', 'peer-online'],
+        } as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::10',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+
+        const preview = {
+            url: 'https://example.com',
+            title: 'Example',
+            description: 'Preview',
+            domain: 'example.com'
+        };
+
+        const result = await sendGroupMessage('grp-1', 'mira https://example.com', undefined, preview);
+
+        expect(fetchOgPreview).not.toHaveBeenCalled();
+        expect(result).toEqual(expect.objectContaining({
+            savedMessage: JSON.stringify({ text: 'mira https://example.com', linkPreview: preview })
+        }));
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            expect.any(String),
+            'grp-1',
+            true,
+            JSON.stringify({ text: 'mira https://example.com', linkPreview: preview }),
+            undefined,
+            expect.any(String),
+            'sent',
+            'self-id',
+            expect.any(Number)
         );
     });
 });

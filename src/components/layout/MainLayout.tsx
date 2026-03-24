@@ -5,6 +5,7 @@ import { ChatArea } from '../../features/chat/ChatArea.js';
 import { IncomingRequestChat } from '../../features/chat/IncomingRequestChat.js';
 import { TopHeader } from './TopHeader.js';
 import { InputArea } from '../../features/chat/input/InputArea.js';
+import type { LinkPreview } from '../../types/chat.js';
 import { AddContactModal } from '../ui/AddContactModal.js';
 import { NavigationRail } from './NavigationRail.js';
 import { ContactsPanel } from './ContactsPanel.js';
@@ -18,6 +19,7 @@ import { CreateGroupModal } from '../ui/CreateGroupModal.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
 import { ForwardModal } from '../../features/chat/message/ForwardModal.js';
+import { forwardMessageToTargets } from '../../features/chat/message/forwardMessage.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 
 interface MainLayoutProps {
@@ -43,8 +45,8 @@ interface MainLayoutProps {
     setMessage: (val: string) => void;
 
     // Handlers
-    handleSend: () => void;
-    handleSendGroupMessage: () => void;
+    handleSend: (linkPreview?: LinkPreview | null) => void;
+    handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void;
     handleAttachFile: (type: any) => void;
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
@@ -57,7 +59,7 @@ interface MainLayoutProps {
     handleClearChat: (id: string) => void;
     handleBlockContact: () => void;
     handleReaction: (id: string, emoji: string, isGroup: boolean) => void;
-    handleUpdateMessage: (id: string, msg: string) => void;
+    handleUpdateMessage: (id: string, msg: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (id: string) => void;
     handleMediaClick: (media: any) => void;
 
@@ -132,23 +134,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
     const handleForward = async (targets: { id: string; isGroup: boolean }[]) => {
         if (!forwardingMsg) return;
-        let content = forwardingMsg.message;
-        if (content.startsWith('{') && content.endsWith('}')) {
-            try {
-                const parsed = JSON.parse(content);
-                if (typeof parsed.text === 'string') content = parsed.text;
-            } catch { /* forward raw */ }
-        }
-
-        for (const target of targets) {
-            if (target.isGroup) {
-                await window.upeer.sendGroupMessage(target.id, content);
-            } else {
-                await window.upeer.sendMessage(target.id, content);
-            }
-        }
-
-        // Refrescar contactos y grupos para actualizar el preview del último mensaje
+        await forwardMessageToTargets(forwardingMsg.message, targets);
         chatStore.refreshContacts();
         chatStore.refreshGroups();
     };
@@ -305,8 +291,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                 message={message}
                                                 setMessage={setMessage}
                                                 onSend={editingMessage
-                                                    ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); setMessage(''); }
-                                                    : (activeGroupId ? () => handleSendGroupMessage() : handleSend)
+                                                    ? async (linkPreview?: LinkPreview | null) => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message, linkPreview); setEditingMessage(null); setMessage(''); }
+                                                    : (activeGroupId ? handleSendGroupMessage : handleSend)
                                                 }
                                                 onTyping={handleTyping}
                                                 onAttachFile={handleAttachFile}
@@ -325,7 +311,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                             {(isFilePickerOpen || isPreparingAttachments || isDragging) && (
                                                 <FilePreviewOverlay
                                                     files={pendingFiles}
-                                                    isPreparingAttachments={isPreparingAttachments}
                                                     isDragging={isDragging}
                                                     vouchScore={activeContact?.vouchScore}
                                                     onDragOver={handleDragOver}

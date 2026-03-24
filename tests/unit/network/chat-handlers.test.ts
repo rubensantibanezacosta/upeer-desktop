@@ -63,6 +63,17 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     deleteRatchetSession: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', () => ({
+    fileTransferManager: {
+        cancelTransfer: vi.fn(),
+    },
+}));
+
+vi.mock('../../../src/main_process/utils/localAttachmentCleanup.js', () => ({
+    extractLocalAttachmentInfo: vi.fn(),
+    cleanupLocalAttachmentFile: vi.fn(),
+}));
+
 // Mock de Electron
 const mockWin = {
     webContents: {
@@ -406,6 +417,24 @@ describe('Chat Handlers', () => {
 
             expect(messagesOps.deleteMessageLocally).toHaveBeenCalledWith(data.msgId, data.timestamp);
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-deleted', { id: data.msgId, upeerId: senderId, chatUpeerId: senderId });
+        });
+
+        it('should cleanup local attachment data for deleted file messages', async () => {
+            const cleanup = await import('../../../src/main_process/utils/localAttachmentCleanup.js');
+            const { fileTransferManager } = await import('../../../src/main_process/network/file-transfer/transfer-manager.js');
+            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
+            (messagesOps.getMessageById as any).mockResolvedValue({
+                id: data.msgId,
+                chatUpeerId: senderId,
+                isMine: 0,
+                message: JSON.stringify({ type: 'file', fileId: 'file-1', savedPath: '/tmp/upeer/file-1.bin' })
+            });
+            (cleanup.extractLocalAttachmentInfo as any).mockReturnValue({ fileId: 'file-1', filePath: '/tmp/upeer/file-1.bin' });
+
+            await handleChatDelete(senderId, data, mockWin);
+
+            expect(fileTransferManager.cancelTransfer).toHaveBeenCalledWith('file-1', 'message deleted');
+            expect(cleanup.cleanupLocalAttachmentFile).toHaveBeenCalledWith('/tmp/upeer/file-1.bin');
         });
     });
 

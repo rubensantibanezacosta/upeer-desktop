@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ChatMessage, Contact, Group } from '../types/chat.js';
+import { ChatMessage, Contact, Group, LinkPreview } from '../types/chat.js';
 import { useNavigationStore } from './useNavigationStore.js';
 import { useNotificationStore } from './useNotificationStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
@@ -70,10 +70,10 @@ interface ChatActions {
     refreshData: () => Promise<void>;
 
     // Actions
-    handleSend: () => Promise<void>;
-    handleSendGroupMessage: (message: string) => Promise<void>;
+    handleSend: (linkPreview?: LinkPreview | null) => Promise<void>;
+    handleSendGroupMessage: (message: string, linkPreview?: LinkPreview | null) => Promise<void>;
     handleReaction: (msgId: string, emoji: string, remove: boolean) => void;
-    handleUpdateMessage: (msgId: string, newContent: string) => void;
+    handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (msgId: string) => void;
     handleTyping: () => void;
 
@@ -383,7 +383,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         if (get().activeGroupId === groupId) set({ activeGroupId: '', groupChatHistory: [], isWindowedHistory: false });
     },
 
-    handleSend: async () => {
+    handleSend: async (linkPreview?: LinkPreview | null) => {
         const { targetUpeerId, activeGroupId, messagesByConversation, replyByConversation, myIdentity } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
@@ -394,11 +394,11 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         if (!msg) return;
 
         if (activeGroupId) {
-            await get().handleSendGroupMessage(msg);
+            await get().handleSendGroupMessage(msg, linkPreview);
             return;
         }
 
-        const sendResult = await window.upeer.sendMessage(targetUpeerId, msg, replyTo?.id);
+        const sendResult = await window.upeer.sendMessage(targetUpeerId, msg, replyTo?.id, linkPreview ?? undefined);
 
         if (sendResult) {
             set(state => ({
@@ -419,12 +419,12 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         get().refreshContacts();
     },
 
-    handleSendGroupMessage: async (msg: string) => {
+    handleSendGroupMessage: async (msg: string, linkPreview?: LinkPreview | null) => {
         const { activeGroupId, myIdentity, replyByConversation } = get();
         if (!activeGroupId || !msg) return;
 
         const replyTo = replyByConversation[activeGroupId];
-        const sendResult = await window.upeer.sendGroupMessage(activeGroupId, msg, replyTo?.id);
+        const sendResult = await window.upeer.sendGroupMessage(activeGroupId, msg, replyTo?.id, linkPreview ?? undefined);
         if (sendResult) {
             set(state => ({
                 groupChatHistory: [...state.groupChatHistory, {
@@ -475,7 +475,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         }));
     },
 
-    handleUpdateMessage: (msgId, newContent) => {
+    handleUpdateMessage: (msgId, newContent, linkPreview) => {
         const { targetUpeerId, activeGroupId, chatHistory, groupChatHistory } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) return;
@@ -489,12 +489,18 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
                     const parsed = JSON.parse(raw);
                     if (parsed.type === 'file') {
                         savedContent = JSON.stringify({ ...parsed, caption: newContent });
+                    } else if (linkPreview) {
+                        savedContent = JSON.stringify({ text: newContent, linkPreview });
+                    } else if (parsed.linkPreview && typeof parsed.text === 'string') {
+                        savedContent = newContent;
                     }
                 } catch { /* ignore */ }
             }
+        } else if (linkPreview) {
+            savedContent = JSON.stringify({ text: newContent, linkPreview });
         }
 
-        window.upeer.sendChatUpdate(effectiveId, msgId, savedContent);
+        window.upeer.sendChatUpdate(effectiveId, msgId, newContent, linkPreview ?? undefined);
 
         const updateFn = (msg: any) => msg.id === msgId ? { ...msg, message: savedContent, isEdited: true } : msg;
 

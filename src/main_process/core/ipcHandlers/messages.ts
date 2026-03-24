@@ -18,8 +18,8 @@ export function registerMessageHandlers(): void {
   ipcMain.handle('search-messages', (_event, { query }) => searchMessages(query));
   ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
 
-  ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo }) =>
-    await sendUDPMessage(upeerId, message, replyTo)
+  ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo, linkPreview }) =>
+    await sendUDPMessage(upeerId, { content: message, linkPreview }, replyTo)
   );
 
   ipcMain.handle('send-typing-indicator', (_event, { upeerId }) => sendTypingIndicator(upeerId));
@@ -34,8 +34,8 @@ export function registerMessageHandlers(): void {
     sendChatReaction(upeerId, msgId, emoji, remove)
   );
 
-  ipcMain.handle('send-chat-update', (_event, { upeerId, msgId, newContent }) =>
-    sendChatUpdate(upeerId, msgId, newContent)
+  ipcMain.handle('send-chat-update', (_event, { upeerId, msgId, newContent, linkPreview }) =>
+    sendChatUpdate(upeerId, msgId, newContent, linkPreview)
   );
 
   ipcMain.handle('send-chat-delete', (_event, { upeerId, msgId }) =>

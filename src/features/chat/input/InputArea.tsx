@@ -13,11 +13,12 @@ import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
 import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
+import type { LinkPreview } from '../../../types/chat.js';
 
 interface InputAreaProps {
     message: string;
     setMessage: (msg: string) => void;
-    onSend: () => void;
+    onSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     onTyping?: () => void;
     disabled: boolean;
     replyToMessage?: { id?: string; message: string; isMine: boolean; senderName?: string } | null;
@@ -45,6 +46,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
         setMessage(val);
         if (onTyping) onTyping();
     };
+
+    const handleSendClick = () => onSend(linkPreview);
 
     const handleMicClick = async () => {
         if (!isRecording) {
@@ -124,14 +127,14 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         <RichInput
                             value={message}
                             onChange={handleChange}
-                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSend()}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendClick()}
                             placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
                             autoComplete="off"
                             disabled={disabled}
                             autoFocus={!disabled}
                             focusKey={focusKey}
                         />
-                        <IconButton variant="plain" color="neutral" onClick={message ? onSend : handleMicClick} disabled={disabled}>
+                        <IconButton variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled}>
                             {message
                                 ? (editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />)
                                 : <MicIcon color="primary" />

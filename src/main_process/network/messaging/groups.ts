@@ -38,7 +38,8 @@ function shouldUseEphemeral(contact: any): boolean {
 export async function sendGroupMessage(
     groupId: string,
     message: string,
-    replyTo?: string
+    replyTo?: string,
+    linkPreview?: { [key: string]: any } | null
 ): Promise<{ id: string; timestamp: number; savedMessage: string } | undefined> {
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (message.length > MAX_MESSAGE_SIZE_BYTES) {
@@ -56,7 +57,9 @@ export async function sendGroupMessage(
     const urlMatch = URL_FIRST_RE.exec(message);
     let payload = message;
 
-    if (urlMatch) {
+    if (linkPreview) {
+        payload = JSON.stringify({ text: message, linkPreview });
+    } else if (urlMatch) {
         const { fetchOgPreview } = await import('../og-fetcher.js');
         const preview = await fetchOgPreview(urlMatch[1]);
         if (preview) {

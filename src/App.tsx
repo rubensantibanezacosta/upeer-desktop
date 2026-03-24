@@ -7,6 +7,7 @@ import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
 import { parseMessage } from './features/chat/message/MessageItem.js';
 import { MainLayout } from './components/layout/MainLayout.js';
+import type { LinkPreview } from './types/chat.js';
 
 export default function App() {
     const navigation = useNavigationStore();
@@ -117,8 +118,8 @@ export default function App() {
                 activeGroupId={chatStore.activeGroupId}
                 message={message}
                 setMessage={(val: string) => chatStore.setMessage(chatStore.activeGroupId || chatStore.targetUpeerId, val)}
-                handleSend={chatStore.handleSend}
-                handleSendGroupMessage={() => chatStore.handleSendGroupMessage(message)}
+                handleSend={(linkPreview?: LinkPreview | null) => chatStore.handleSend(linkPreview)}
+                handleSendGroupMessage={(linkPreview?: LinkPreview | null) => chatStore.handleSendGroupMessage(message, linkPreview)}
                 handleAttachFile={handleAttachFile}
                 handleTyping={handleTyping}
                 handleScrollToMessage={handleScrollToMessage}

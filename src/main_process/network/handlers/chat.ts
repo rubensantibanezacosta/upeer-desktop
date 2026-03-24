@@ -311,6 +311,15 @@ export async function handleChatDelete(
     const chatUpeerId = data.chatUpeerId || upeerId;
     const msg = (await getMessageById(msgId)) as any;
     if (msg && msg.chatUpeerId === chatUpeerId && !msg.isMine) {
+        const { extractLocalAttachmentInfo, cleanupLocalAttachmentFile } = await import('../../utils/localAttachmentCleanup.js');
+        const attachment = extractLocalAttachmentInfo(msg.message);
+
+        if (attachment?.fileId) {
+            const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
+            fileTransferManager.cancelTransfer(attachment.fileId, 'message deleted');
+        }
+
+        await cleanupLocalAttachmentFile(attachment?.filePath);
         deleteMessageLocally(msgId, data.timestamp);
         win?.webContents.send('message-deleted', { id: msgId, upeerId, chatUpeerId });
     }

@@ -17,6 +17,7 @@ describe('useChatStore groups integration', () => {
 
     it('passes replyTo when sending a group message', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        const preview = { url: 'https://example.com', title: 'Example' };
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
@@ -36,9 +37,9 @@ describe('useChatStore groups integration', () => {
             }
         } as any);
 
-        await useChatStore.getState().handleSendGroupMessage('hola');
+        await useChatStore.getState().handleSendGroupMessage('hola', preview as any);
 
-        expect(window.upeer.sendGroupMessage).toHaveBeenCalledWith('grp-1', 'hola', 'parent-1');
+        expect(window.upeer.sendGroupMessage).toHaveBeenCalledWith('grp-1', 'hola', 'parent-1', preview);
         const state = useChatStore.getState();
         expect(state.groupChatHistory.at(-1)).toEqual(expect.objectContaining({
             id: 'msg-1',
@@ -100,5 +101,31 @@ describe('useChatStore groups integration', () => {
 
         expect(window.upeer.clearChat).toHaveBeenCalledWith('grp-1');
         expect(useChatStore.getState().groupChatHistory).toEqual([]);
+    });
+
+    it('keeps link preview payload when editing a message with preview', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        const preview = { url: 'https://example.com', title: 'Example' };
+        (window as any).upeer.sendChatUpdate = vi.fn().mockResolvedValue(undefined);
+
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            chatHistory: [{
+                id: 'msg-1',
+                upeerId: 'peer-1',
+                isMine: true,
+                message: JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }),
+                status: 'sent',
+                timestamp: '10:00',
+                date: 1710000000000,
+            }],
+            groupChatHistory: [],
+        } as any);
+
+        useChatStore.getState().handleUpdateMessage('msg-1', 'hola https://example.com', preview as any);
+
+        expect(window.upeer.sendChatUpdate).toHaveBeenCalledWith('peer-1', 'msg-1', 'hola https://example.com', preview);
+        expect(useChatStore.getState().chatHistory[0].message).toBe(JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }));
     });
 });

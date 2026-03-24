@@ -30,8 +30,8 @@ export function registerGroupHandlers(): void {
     return updateGroupAvatar(groupId, avatar);
   });
 
-  ipcMain.handle('send-group-message', async (event, { groupId, message, replyTo }) => {
-    const msgId = await sendGroupMessage(groupId, message, replyTo);
+  ipcMain.handle('send-group-message', async (event, { groupId, message, replyTo, linkPreview }) => {
+    const msgId = await sendGroupMessage(groupId, message, replyTo, linkPreview);
     return msgId;
   });
 

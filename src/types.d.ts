@@ -13,12 +13,12 @@ declare global {
             unblockContact: (upeerId: string) => Promise<any>;
             clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
-            sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
             sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
-            sendChatUpdate: (upeerId: string, msgId: string, newContent: string) => Promise<void>;
+            sendChatUpdate: (upeerId: string, msgId: string, newContent: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<void>;
             sendChatDelete: (upeerId: string, msgId: string) => Promise<void>;
             getMyIdentity: () => Promise<{ address: string | null, upeerId: string, publicKey: string, alias?: string | null, avatar?: string | null }>;
             getMyReputation: () => Promise<{ vouchScore: number; connectionCount: number } | null>;
@@ -35,7 +35,7 @@ declare global {
             getGroups: () => Promise<any[]>;
             createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
             updateGroupAvatar: (groupId: string, avatar: string) => Promise<void>;
-            sendGroupMessage: (groupId: string, message: string, replyTo?: string) => Promise<{ id: string; timestamp: number; savedMessage: string } | undefined>;
+            sendGroupMessage: (groupId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<{ id: string; timestamp: number; savedMessage: string } | undefined>;
             inviteToGroup: (groupId: string, upeerId: string) => Promise<{ success: boolean }>;
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;

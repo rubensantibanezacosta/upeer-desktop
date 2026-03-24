@@ -20,6 +20,7 @@ import {
     updateMessageStatus,
     updateMessageContent,
     deleteMessageLocally,
+    getMessageById,
 } from '../../storage/messages/operations.js';
 import {
     saveReaction,
@@ -104,6 +105,7 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     const selfId = getMyUPeerId();
     const msgId = crypto.randomUUID();
     const content = typeof message === 'string' ? message : (message as any).content;
+    const providedLinkPreview = typeof message === 'string' ? null : (message as any).linkPreview ?? null;
 
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (content.length > MAX_MESSAGE_SIZE_BYTES) {
@@ -155,7 +157,9 @@ export async function sendUDPMessage(upeerId: string, message: string | { [key: 
     const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
     const urlMatch = URL_FIRST_RE.exec(content);
     let payload = content;
-    if (urlMatch) {
+    if (providedLinkPreview) {
+        payload = JSON.stringify({ text: content, linkPreview: providedLinkPreview });
+    } else if (urlMatch) {
         const { fetchOgPreview } = await import('../og-fetcher.js');
         const preview = await fetchOgPreview(urlMatch[1]);
         if (preview) {
@@ -573,7 +577,7 @@ async function getSelfAddresses(myId: string): Promise<string[]> {
     return selfAddresses;
 }
 
-export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string) {
+export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string, linkPreview?: { [key: string]: any } | null) {
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (newContent.length > MAX_MESSAGE_SIZE_BYTES) {
         error(`Chat update size exceeds limit (${newContent.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { upeerId, msgId }, 'security');
@@ -585,10 +589,23 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     const newVersion = (existing?.version ?? 0) + 1;
     const myId = getMyUPeerId();
     const isGroup = upeerId.startsWith('grp-');
+    const URL_FIRST_RE = /(https?:\/\/[^\s<>"']+)/i;
+    const urlMatch = URL_FIRST_RE.exec(newContent);
+    let payload = newContent;
+
+    if (linkPreview) {
+        payload = JSON.stringify({ text: newContent, linkPreview });
+    } else if (urlMatch) {
+        const { fetchOgPreview } = await import('../og-fetcher.js');
+        const preview = await fetchOgPreview(urlMatch[1]);
+        if (preview) {
+            payload = JSON.stringify({ text: newContent, linkPreview: preview });
+        }
+    }
 
     // Persistir localmente
-    const signature = sign(Buffer.from(newContent)); // Placeholder signature for persistence, will be overwritten by packet signature
-    updateMessageContent(msgId, newContent, signature.toString('hex'), newVersion);
+    const signature = sign(Buffer.from(payload));
+    updateMessageContent(msgId, payload, signature.toString('hex'), newVersion);
 
     const broadcastUpdate = async (targetId: string, isGroupContext: boolean) => {
         const contact = await getContactByUpeerId(targetId);
@@ -600,7 +617,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
 
         const ephPubKey = getMyEphemeralPublicKeyHex();
         const { ciphertext, nonce } = encrypt(
-            Buffer.from(newContent, 'utf-8'),
+            Buffer.from(payload, 'utf-8'),
             Buffer.from(targetKeyHex, 'hex')
         );
 
@@ -650,7 +667,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     const selfSyncPacket = {
         type: 'CHAT_UPDATE',
         msgId,
-        content: newContent, // En sync interno podemos mandar plaintext o cifrar con nuestra propia clave
+        content: payload,
         version: newVersion,
         chatUpeerId: upeerId,
         senderUpeerId: myId
@@ -672,6 +689,17 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
 export async function sendChatDelete(upeerId: string, msgId: string) {
     const myId = getMyUPeerId();
     const isGroup = upeerId.startsWith('grp-');
+
+    const msg = await getMessageById(msgId) as any;
+    const { extractLocalAttachmentInfo, cleanupLocalAttachmentFile } = await import('../../utils/localAttachmentCleanup.js');
+    const attachment = msg?.message ? extractLocalAttachmentInfo(msg.message) : null;
+
+    if (attachment?.fileId) {
+        const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
+        fileTransferManager.cancelTransfer(attachment.fileId, 'message deleted');
+    }
+
+    await cleanupLocalAttachmentFile(attachment?.filePath);
 
     // 1. Borrado local inmediato
     deleteMessageLocally(msgId);

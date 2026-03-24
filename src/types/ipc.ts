@@ -180,6 +180,7 @@ export interface SendMessageRequest {
     upeerId: string;
     message: string;
     replyTo?: string;
+    linkPreview?: LinkPreview | null;
 }
 
 export interface SendMessageResponse {
@@ -237,6 +238,7 @@ export interface SendChatUpdateRequest {
     upeerId: string;
     msgId: string;
     newContent: string;
+    linkPreview?: LinkPreview | null;
 }
 
 export interface SendChatUpdateResponse {
@@ -314,6 +316,7 @@ export interface SendGroupMessageRequest {
     groupId: string;
     message: string;
     replyTo?: string;
+    linkPreview?: LinkPreview | null;
 }
 
 export interface SendGroupMessageResponse {
