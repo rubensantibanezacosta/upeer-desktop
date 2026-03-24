@@ -3,7 +3,10 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 // Types for file transfers
 export interface FileTransfer {
   fileId: string;
+  sessionFileId?: string;
+  messageId?: string;
   upeerId: string;
+  chatUpeerId?: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -38,7 +41,10 @@ export interface FileTransfer {
 
 export interface TransferProgress {
   fileId: string;
+  sessionFileId?: string;
+  messageId?: string;
   upeerId: string;
+  chatUpeerId?: string;
   progress: number;
   bytesTransferred: number;
   totalBytes: number;
@@ -72,6 +78,55 @@ export type TransferStateUpdate = {
   savedPath?: string;
 };
 
+const aggregateTransfers = (transfersList: FileTransfer[]): FileTransfer[] => {
+  const grouped = new Map<string, FileTransfer[]>();
+
+  for (const transfer of transfersList) {
+    const logicalId = transfer.messageId || transfer.fileId;
+    const key = `${transfer.direction}:${logicalId}`;
+    const bucket = grouped.get(key) || [];
+    bucket.push(transfer);
+    grouped.set(key, bucket);
+  }
+
+  return Array.from(grouped.values()).map((group) => {
+    const base = group[0];
+    if (group.length === 1) {
+      return {
+        ...base,
+        fileId: base.messageId || base.fileId,
+      };
+    }
+
+    const totalBytes = group.reduce((sum, item) => sum + (item.totalBytes || item.fileSize || 0), 0);
+    const bytesTransferred = group.reduce((sum, item) => sum + (item.bytesTransferred || 0), 0);
+    const completed = group.filter((item) => item.state === 'completed').length;
+    const failed = group.some((item) => item.state === 'failed');
+    const cancelled = group.some((item) => item.state === 'cancelled');
+    const active = group.some((item) => item.state === 'active' || item.state === 'pending');
+    const progress = totalBytes > 0 ? Math.min(100, Number(((bytesTransferred / totalBytes) * 100).toFixed(2))) : 0;
+
+    let state: FileTransfer['state'] = 'pending';
+    if (completed === group.length) state = 'completed';
+    else if (active) state = 'active';
+    else if (failed) state = 'failed';
+    else if (cancelled) state = 'cancelled';
+
+    return {
+      ...base,
+      fileId: base.messageId || base.fileId,
+      progress,
+      bytesTransferred,
+      totalBytes,
+      chunksTransferred: group.reduce((sum, item) => sum + (item.chunksTransferred || 0), 0),
+      totalChunks: group.reduce((sum, item) => sum + (item.totalChunks || 0), 0),
+      state,
+      isVaulting: group.some((item) => item.isVaulting),
+      lastActivity: Math.max(...group.map((item) => item.lastActivity || 0)),
+    } as FileTransfer;
+  });
+};
+
 export function useFileTransfer(onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void) {
   const [transfers, setTransfers] = useState<FileTransfer[]>([]);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
@@ -95,7 +150,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
         const transfersList = Array.isArray(result.transfers)
           ? result.transfers
           : Object.values(result.transfers);
-        setTransfers(transfersList);
+        setTransfers(aggregateTransfers(transfersList as FileTransfer[]));
       }
     } catch (error) {
       console.error('Error loading transfers:', error);
@@ -103,6 +158,11 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
   };
 
   const updateTransferProgress = useCallback((progress: TransferProgress) => {
+    if ((progress.messageId && progress.messageId !== progress.sessionFileId) || (progress.chatUpeerId && progress.chatUpeerId.startsWith('grp-'))) {
+      loadTransfers();
+      return;
+    }
+
     setTransfers(prev => {
       const exists = prev.some(t => t.fileId === progress.fileId && t.direction === progress.direction);
 
@@ -159,7 +219,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       ));
       loadTransfers();
       // Notifica a useChatState para actualizar el mensaje del chat
-      onTransferStateChangeRef.current?.(data.fileId, {
+      onTransferStateChangeRef.current?.(data.messageId || data.fileId, {
         fileHash: data.fileHash,
         transferState: 'completed',
         savedPath: data.direction === 'receiving' ? data.tempPath : undefined
@@ -168,12 +228,12 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
 
     window.upeer.onFileTransferCancelled((data: any) => {
       loadTransfers();
-      onTransferStateChangeRef.current?.(data.fileId, { transferState: 'cancelled' });
+      onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'cancelled' });
     });
 
     window.upeer.onFileTransferFailed((data: any) => {
       loadTransfers();
-      onTransferStateChangeRef.current?.(data.fileId, { transferState: 'failed' });
+      onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'failed' });
     });
   }, [updateTransferProgress]);
 

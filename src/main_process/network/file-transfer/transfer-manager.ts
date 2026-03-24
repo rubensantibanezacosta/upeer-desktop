@@ -82,12 +82,25 @@ export class TransferManager implements ITransferManager {
         return this.store.getTransfer(fileId, direction);
     }
 
+    public findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving') {
+        return this.store.getAllTransfers().filter((transfer) => {
+            const currentMessageId = (transfer as any).messageId || transfer.fileId;
+            if (currentMessageId !== messageId) return false;
+            return direction ? transfer.direction === direction : true;
+        }) as FileTransfer[];
+    }
+
     /**
      * Retries a transfer if we have the file path
      */
     public async retryTransfer(fileId: string) {
         const transfer = this.store.getTransfer(fileId, 'sending');
-        if (!transfer) return;
+        if (!transfer) {
+            const groupedTransfers = this.findTransfersByMessageId(fileId, 'sending');
+            if (groupedTransfers.length === 0) return;
+            await Promise.all(groupedTransfers.map((groupedTransfer) => this.retryTransfer(groupedTransfer.fileId)));
+            return;
+        }
 
         if (transfer.state === 'failed' || transfer.state === 'cancelled') {
             this.store.updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
@@ -202,9 +215,10 @@ export class TransferManager implements ITransferManager {
         if (transfer.state !== 'active') return;
         try {
             let handle = this.getFileHandle(transfer.fileId);
-            if (!handle && transfer.filePath) {
+            const sourcePath = transfer.sanitizedPath || transfer.filePath;
+            if (!handle && sourcePath) {
                 const fs = await import('node:fs/promises');
-                const h = await fs.open(transfer.filePath, 'r');
+                const h = await fs.open(sourcePath, 'r');
                 this.setFileHandle(transfer.fileId, h);
                 handle = h;
             }
@@ -357,9 +371,10 @@ export class TransferManager implements ITransferManager {
 
             if (updated.direction === 'sending') {
                 const { updateTransferMessageStatus } = await import('./db-helper.js');
-                if (await updateTransferMessageStatus(fileId, 'delivered')) {
-                    this.ui.safeSend('message-delivered', { id: fileId, upeerId: updated.upeerId });
-                    this.ui.notifyStatusUpdated(fileId, 'delivered');
+                const messageId = updated.messageId || fileId;
+                if (await updateTransferMessageStatus(messageId, 'delivered')) {
+                    this.ui.safeSend('message-delivered', { id: messageId, upeerId: updated.upeerId });
+                    this.ui.notifyStatusUpdated(messageId, 'delivered');
                 }
             }
         } finally {
@@ -446,7 +461,14 @@ export class TransferManager implements ITransferManager {
             const receiving = this.store.getTransfer(fileId, 'receiving');
             if (sending) direction = 'sending';
             else if (receiving) direction = 'receiving';
-            else return; // Transfer not found
+            else {
+                const grouped = this.findTransfersByMessageId(fileId);
+                if (grouped.length === 0) return;
+                for (const groupedTransfer of grouped) {
+                    this.cancelTransfer(groupedTransfer.fileId, groupedTransfer.direction, typeof directionOrReason === 'string' ? directionOrReason : reason);
+                }
+                return;
+            }
 
             if (typeof directionOrReason === 'string') reason = directionOrReason;
         }

@@ -24,9 +24,9 @@ describe('network/groupPayload.ts', () => {
         const { buildGroupInvitePayload } = await import('../../../src/main_process/network/groupPayload.js');
         const avatar = `data:image/png;base64,${Buffer.alloc(256, 1).toString('base64')}`;
 
-        const payload = await buildGroupInvitePayload('Grupo', ['a', 'b'], avatar);
+        const payload = await buildGroupInvitePayload('Grupo', ['a', 'b'], 1, 'c'.repeat(64), avatar);
 
-        expect(JSON.parse(payload)).toEqual({ groupName: 'Grupo', members: ['a', 'b'], avatar });
+        expect(JSON.parse(payload)).toEqual({ groupName: 'Grupo', members: ['a', 'b'], epoch: 1, senderKey: 'c'.repeat(64), avatar });
         expect(sharpMock).not.toHaveBeenCalled();
     });
 
@@ -35,11 +35,13 @@ describe('network/groupPayload.ts', () => {
         toBufferMock.mockResolvedValue(Buffer.alloc(4_000, 7));
         const avatar = `data:image/png;base64,${Buffer.alloc(70_000, 2).toString('base64')}`;
 
-        const payload = await buildGroupInvitePayload('Grupo', ['a', 'b'], avatar);
+        const payload = await buildGroupInvitePayload('Grupo', ['a', 'b'], 1, 'c'.repeat(64), avatar);
         const parsed = JSON.parse(payload);
 
         expect(parsed.groupName).toBe('Grupo');
         expect(parsed.members).toEqual(['a', 'b']);
+        expect(parsed.epoch).toBe(1);
+        expect(parsed.senderKey).toBe('c'.repeat(64));
         expect(parsed.avatar).toMatch(/^data:image\/webp;base64,/);
     });
 

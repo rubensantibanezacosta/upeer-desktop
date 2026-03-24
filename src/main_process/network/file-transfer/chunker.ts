@@ -59,7 +59,7 @@ export class FileChunker {
     }
 
     async createChunkData(transfer: FileTransfer, chunkIndex: number): Promise<FileChunkData> {
-        const filePath = transfer.filePath;
+        const filePath = transfer.sanitizedPath || transfer.filePath;
         if (!filePath) {
             throw new Error('No file path for sending transfer');
         }

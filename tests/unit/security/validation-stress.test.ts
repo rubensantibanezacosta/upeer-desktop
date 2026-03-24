@@ -37,14 +37,20 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should handle GROUP types (BUG Z fix)', () => {
-            const validMsg = { groupId: 'g1', content: 'hello' };
+            const validMsg = { groupId: 'g1', content: 'hello', nonce: 'a'.repeat(48), epoch: 1 };
             expect(validateMessage('GROUP_MSG', validMsg).valid).toBe(true);
         });
     });
 
     describe('File Transfer Validation (Defense in Depth)', () => {
         it('should validate FileProposal lengths (BUG DH fix)', () => {
-            const base = { fileId: 'f1', fileName: 'test.txt', fileSize: 100 };
+            const base = {
+                fileId: 'f1',
+                fileName: 'test.txt',
+                fileSize: 100,
+                totalChunks: 1,
+                chunkSize: 100
+            };
 
             // Valid encryptedKey (96 hex) and nonce (48 hex)
             expect(validateFileProposal({
@@ -59,10 +65,10 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should prevent OOM via large chunks (BUG CN fix)', () => {
-            const base = { fileId: 'f1', chunkIndex: 0, data: 'a'.repeat(200_000) };
+            const base = { fileId: 'f1', chunkIndex: 0, data: 'a'.repeat(50_000) };
             expect(validateFileChunk(base).valid).toBe(true);
 
-            const tooLarge = { ...base, data: 'a'.repeat(200_001) };
+            const tooLarge = { ...base, data: 'a'.repeat(50_001) };
             const result = validateFileChunk(tooLarge);
             expect(result.valid).toBe(false);
             expect(result.error).toBe('Chunk data too large');
@@ -89,10 +95,10 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should prevent massive data blobs in Vault (BUG U fix)', () => {
-            const limit = 'a'.repeat(2_000_000);
+            const limit = 'a'.repeat(150_000);
             expect(validateVaultStore({ payloadHash: 'h', recipientSid: 's', data: limit }).valid).toBe(true);
 
-            const tooBig = 'a'.repeat(2_000_001);
+            const tooBig = 'a'.repeat(150_001);
             expect(validateVaultStore({ payloadHash: 'h', recipientSid: 's', data: tooBig }).valid).toBe(false);
         });
 
@@ -151,8 +157,10 @@ describe('Security Validation - Stress & Edge Cases', () => {
         });
 
         it('should validate GroupMsg fields (BUG FQ/FR fixes)', () => {
-            const base = { groupId: 'g1', content: 'hi' };
+            const base = { groupId: 'g1', content: 'hi', nonce: 'a'.repeat(48), epoch: 1 };
             expect(validateGroupMsg({ ...base, id: 'a'.repeat(100), replyTo: 'b'.repeat(100) }).valid).toBe(true);
+            expect(validateGroupMsg({ ...base, nonce: 'a'.repeat(47) }).valid).toBe(false);
+            expect(validateGroupMsg({ ...base, epoch: -1 }).valid).toBe(false);
             expect(validateGroupMsg({ ...base, id: 'a'.repeat(101) }).valid).toBe(false);
             expect(validateGroupMsg({ ...base, replyTo: 'b'.repeat(101) }).valid).toBe(false);
         });

@@ -20,7 +20,10 @@ export enum TransferPhase {
 
 export interface FileTransfer {
     fileId: string;
+    messageId?: string;
     upeerId: string; // Peer ID
+    chatUpeerId?: string;
+    persistMessage?: boolean;
     peerAddress: string; // Current IP address of the peer
     fileName: string;
     fileSize: number;
@@ -62,7 +65,9 @@ export interface FileTransfer {
 
 export interface TransferProgress {
     fileId: string;
+    messageId?: string;
     upeerId: string;
+    chatUpeerId?: string;
     progress: number;
     bytesTransferred: number;
     totalBytes: number;

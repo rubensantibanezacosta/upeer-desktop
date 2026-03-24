@@ -210,6 +210,162 @@ describe('TransferManager - Integration', () => {
         );
     });
 
+    it('should preserve group context in FILE_PROPOSAL and notify renderer as group message', async () => {
+        const fileId = '550e8400-e29b-41d4-a716-446655440088';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'group.txt',
+            fileSize: 50,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'e'.repeat(64),
+            chatUpeerId: 'grp-123',
+            signature: 'sig'
+        };
+
+        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        const transfer = manager.getTransfer(fileId, 'receiving');
+        expect(transfer?.chatUpeerId).toBe('grp-123');
+
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'receive-group-message',
+            expect.objectContaining({
+                id: fileId,
+                groupId: 'grp-123',
+                senderUpeerId: 'peer1'
+            })
+        );
+    });
+
+    it('should preserve caption and voice note metadata for group attachments', async () => {
+        const fileId = '550e8400-e29b-41d4-a716-446655440077';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'voice-note.webm',
+            fileSize: 50,
+            mimeType: 'audio/webm',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'd'.repeat(64),
+            chatUpeerId: 'grp-123',
+            caption: 'nota rápida',
+            isVoiceNote: true,
+            signature: 'sig'
+        };
+
+        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        const transfer = manager.getTransfer(fileId, 'receiving');
+        expect(transfer?.chatUpeerId).toBe('grp-123');
+        expect(transfer?.caption).toBe('nota rápida');
+        expect(transfer?.isVoiceNote).toBe(true);
+
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'receive-group-message',
+            expect.objectContaining({
+                id: fileId,
+                groupId: 'grp-123',
+                senderUpeerId: 'peer1',
+                message: expect.stringContaining('"caption":"nota rápida"')
+            })
+        );
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'receive-group-message',
+            expect.objectContaining({
+                message: expect.stringContaining('"isVoiceNote":true')
+            })
+        );
+    });
+
+    it('should include group chat context in outgoing FILE_PROPOSAL', async () => {
+        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+            name: 'group.txt',
+            size: 100,
+            mimeType: 'text/plain',
+            hash: 'grouphash123'
+        });
+        manager.chunker.calculateChunks = vi.fn().mockReturnValue(1);
+
+        await manager.startSend('peer1', 'addr1', '/path/to/group.txt', undefined, undefined, false, 'group.txt', { chatUpeerId: 'grp-123' });
+
+        expect(mockSend).toHaveBeenCalledWith(
+            'addr1',
+            expect.objectContaining({
+                type: 'FILE_PROPOSAL',
+                chatUpeerId: 'grp-123'
+            }),
+            'pubkey'
+        );
+    });
+
+    it('should include shared messageId in outgoing FILE_PROPOSAL', async () => {
+        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+            name: 'group.txt',
+            size: 100,
+            mimeType: 'text/plain',
+            hash: 'messageidhash123'
+        });
+        manager.chunker.calculateChunks = vi.fn().mockReturnValue(1);
+
+        await manager.startSend('peer1', 'addr1', '/path/to/group.txt', undefined, undefined, false, 'group.txt', { messageId: 'msg-group-1', chatUpeerId: 'grp-123' });
+
+        expect(mockSend).toHaveBeenCalledWith(
+            'addr1',
+            expect.objectContaining({
+                type: 'FILE_PROPOSAL',
+                messageId: 'msg-group-1',
+                chatUpeerId: 'grp-123'
+            }),
+            'pubkey'
+        );
+    });
+
+    it('should cancel grouped sender transfers by logical message id', async () => {
+        manager.store.createTransfer({
+            fileId: 'session-1',
+            messageId: 'msg-group-1',
+            upeerId: 'peer1',
+            chatUpeerId: 'grp-123',
+            peerAddress: 'addr1',
+            fileName: 'group.txt',
+            fileSize: 100,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'a'.repeat(64),
+            direction: 'sending',
+            persistMessage: false
+        });
+        manager.store.createTransfer({
+            fileId: 'session-2',
+            messageId: 'msg-group-1',
+            upeerId: 'peer2',
+            chatUpeerId: 'grp-123',
+            peerAddress: 'addr2',
+            fileName: 'group.txt',
+            fileSize: 100,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'b'.repeat(64),
+            direction: 'sending',
+            persistMessage: false
+        });
+
+        manager.cancelTransfer('msg-group-1', 'User cancelled');
+
+        expect(manager.getTransfer('session-1', 'sending')?.state).toBe('cancelled');
+        expect(manager.getTransfer('session-2', 'sending')?.state).toBe('cancelled');
+    });
+
     it('should accept vault-delivered FILE_PROPOSAL signed without sender metadata', async () => {
         const { verify } = await import('../../../src/main_process/security/identity.js');
         (verify as any).mockImplementation((message: Buffer) => !message.toString().includes('"senderUpeerId"'));

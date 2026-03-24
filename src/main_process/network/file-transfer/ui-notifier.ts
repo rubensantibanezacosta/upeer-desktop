@@ -39,9 +39,10 @@ export class UINotifier {
     }
 
     notifyReceiveMessage(transfer: FileTransfer, upeerId: string) {
+        const messageId = transfer.messageId || transfer.fileId;
         const fileMessage = {
             type: 'file',
-            transferId: transfer.fileId,
+            transferId: messageId,
             fileName: transfer.fileName,
             fileSize: transfer.fileSize,
             mimeType: transfer.mimeType,
@@ -52,8 +53,21 @@ export class UINotifier {
             direction: 'receiving'
         };
 
+        if (transfer.chatUpeerId?.startsWith('grp-')) {
+            this.safeSend('receive-group-message', {
+                id: messageId,
+                groupId: transfer.chatUpeerId,
+                senderUpeerId: upeerId,
+                isMine: false,
+                message: JSON.stringify(fileMessage),
+                status: 'delivered',
+                timestamp: Date.now()
+            });
+            return;
+        }
+
         this.safeSend('receive-p2p-message', {
-            id: transfer.fileId,
+            id: messageId,
             upeerId,
             isMine: false,
             message: JSON.stringify(fileMessage),
@@ -78,8 +92,11 @@ export class UINotifier {
         const bytesTransferred = Math.min(transfer.chunksProcessed * transfer.chunkSize, transfer.fileSize);
 
         return {
-            fileId: transfer.fileId,
+            fileId: transfer.messageId || transfer.fileId,
+            sessionFileId: transfer.fileId,
+            messageId: transfer.messageId || transfer.fileId,
             upeerId: transfer.upeerId,
+            chatUpeerId: transfer.chatUpeerId,
             fileName: transfer.fileName,
             fileSize: transfer.fileSize,
             mimeType: transfer.mimeType,

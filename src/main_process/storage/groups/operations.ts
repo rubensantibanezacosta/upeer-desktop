@@ -6,12 +6,21 @@ export interface GroupRecord {
     adminUpeerId: string;
     members: string[]; // parsed from JSON
     status: 'active' | 'invited';
+    epoch: number;
+    senderKey?: string | null;
+    senderKeyCreatedAt?: number | null;
     avatar?: string | null;
-    createdAt?: string | null;
+    createdAt?: number | null;
     lastMessage?: string;
     lastMessageTime?: string;
     lastMessageStatus?: string;
     lastMessageIsMine?: boolean;
+}
+
+export interface GroupCryptoState {
+    epoch?: number;
+    senderKey?: string;
+    senderKeyCreatedAt?: number;
 }
 
 function parseGroup(raw: any): GroupRecord {
@@ -23,6 +32,9 @@ function parseGroup(raw: any): GroupRecord {
     }
     return {
         ...raw,
+        epoch: typeof raw.epoch === 'number' ? raw.epoch : 1,
+        senderKey: typeof raw.senderKey === 'string' ? raw.senderKey : null,
+        senderKeyCreatedAt: typeof raw.senderKeyCreatedAt === 'number' ? raw.senderKeyCreatedAt : null,
         members
     };
 }
@@ -33,7 +45,8 @@ export function saveGroup(
     adminUpeerId: string,
     members: string[],
     status: 'active' | 'invited' = 'active',
-    avatar?: string
+    avatar?: string,
+    cryptoState?: GroupCryptoState
 ): void {
     const db = getDb();
     const schema = getSchema();
@@ -43,6 +56,9 @@ export function saveGroup(
         adminUpeerId,
         members: JSON.stringify(members),
         status,
+        epoch: cryptoState?.epoch ?? 1,
+        ...(cryptoState?.senderKey !== undefined ? { senderKey: cryptoState.senderKey } : {}),
+        ...(cryptoState?.senderKeyCreatedAt !== undefined ? { senderKeyCreatedAt: cryptoState.senderKeyCreatedAt } : {}),
         createdAt: Date.now(), // BUG DB-GRP-TS fix: inserción manual de integer
         ...(avatar ? { avatar } : {})
     }).onConflictDoUpdate({
@@ -52,6 +68,9 @@ export function saveGroup(
             adminUpeerId,
             members: JSON.stringify(members),
             status,
+            ...(cryptoState?.epoch !== undefined ? { epoch: cryptoState.epoch } : {}),
+            ...(cryptoState?.senderKey !== undefined ? { senderKey: cryptoState.senderKey } : {}),
+            ...(cryptoState?.senderKeyCreatedAt !== undefined ? { senderKeyCreatedAt: cryptoState.senderKeyCreatedAt } : {}),
             ...(avatar !== undefined ? { avatar } : {})
         }
     }).run();
@@ -115,6 +134,20 @@ export function updateGroupMembers(groupId: string, members: string[]): void {
     const schema = getSchema();
     db.update(schema.groups)
         .set({ members: JSON.stringify(members) })
+        .where(eq(schema.groups.groupId, groupId))
+        .run();
+}
+
+export function updateGroupCrypto(groupId: string, cryptoState: GroupCryptoState): void {
+    const db = getDb();
+    const schema = getSchema();
+    const set: Record<string, any> = {};
+    if (cryptoState.epoch !== undefined) set.epoch = cryptoState.epoch;
+    if (cryptoState.senderKey !== undefined) set.senderKey = cryptoState.senderKey;
+    if (cryptoState.senderKeyCreatedAt !== undefined) set.senderKeyCreatedAt = cryptoState.senderKeyCreatedAt;
+    if (Object.keys(set).length === 0) return;
+    db.update(schema.groups)
+        .set(set)
         .where(eq(schema.groups.groupId, groupId))
         .run();
 }

@@ -468,6 +468,25 @@ describe('Chat Handlers', () => {
                 remove: true
             });
         });
+
+        it('should preserve group chat context when processing a group reaction', async () => {
+            const data = {
+                id: '12345678-1234-1234-1234-123456789012',
+                reaction: '🔥',
+                chatUpeerId: 'grp-1'
+            };
+
+            await handleChatReaction(senderId, data, mockWin);
+
+            expect(reactionsOps.saveReaction).toHaveBeenCalledWith(data.id, senderId, '🔥');
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-reaction-updated', {
+                msgId: data.id,
+                upeerId: senderId,
+                chatUpeerId: 'grp-1',
+                emoji: '🔥',
+                remove: false
+            });
+        });
     });
 
     describe('handleChatClear', () => {
@@ -478,6 +497,14 @@ describe('Chat Handlers', () => {
             // En chat.ts se usa un import dinámico. Como tenemos mockeado el módulo,
             // podemos verificar la llamada en el objeto mockeado.
             expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(senderId, 1000);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('chat-cleared', { upeerId: senderId });
+        });
+
+        it('should accept timestamp payloads for chat clear sync', async () => {
+            const data = { timestamp: 2000 };
+            await handleChatClear(senderId, data, mockWin);
+
+            expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(senderId, 2000);
             expect(mockWin.webContents.send).toHaveBeenCalledWith('chat-cleared', { upeerId: senderId });
         });
     });

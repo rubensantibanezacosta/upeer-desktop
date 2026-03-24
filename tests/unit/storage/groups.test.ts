@@ -30,6 +30,9 @@ const mockSchema = {
         adminUpeerId: 'adminUpeerId',
         members: 'members',
         status: 'status',
+        epoch: 'epoch',
+        senderKey: 'senderKey',
+        senderKeyCreatedAt: 'senderKeyCreatedAt',
         createdAt: 'createdAt',
         avatar: 'avatar'
     },
@@ -53,7 +56,11 @@ describe('Groups Operations', () => {
     });
 
     it('should save or update a group', () => {
-        groupsOps.saveGroup('group1', 'Test Group', 'admin1', ['admin1', 'user2']);
+        groupsOps.saveGroup('group1', 'Test Group', 'admin1', ['admin1', 'user2'], 'active', undefined, {
+            epoch: 1,
+            senderKey: 'a'.repeat(64),
+            senderKeyCreatedAt: 123
+        });
 
         expect(mockDb.insert).toHaveBeenCalledWith(mockSchema.groups);
         expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
@@ -99,6 +106,14 @@ describe('Groups Operations', () => {
 
         expect(mockDb.update).toHaveBeenCalled();
         expect(mockDb.set).toHaveBeenCalledWith({ members: '["user1","user3"]' });
+        expect(mockRun).toHaveBeenCalled();
+    });
+
+    it('should update group crypto state', () => {
+        groupsOps.updateGroupCrypto('group1', { epoch: 2, senderKey: 'b'.repeat(64), senderKeyCreatedAt: 456 });
+
+        expect(mockDb.update).toHaveBeenCalled();
+        expect(mockDb.set).toHaveBeenCalledWith({ epoch: 2, senderKey: 'b'.repeat(64), senderKeyCreatedAt: 456 });
         expect(mockRun).toHaveBeenCalled();
     });
 

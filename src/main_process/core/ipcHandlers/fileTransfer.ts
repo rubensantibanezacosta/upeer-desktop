@@ -1,8 +1,12 @@
 import { ipcMain, app } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
 import { error as logError } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../../network/file-transfer/transfer-manager.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { saveFileMessage } from '../../storage/messages/operations.js';
+import { getMyUPeerId } from '../../security/identity.js';
 
 /**
  * Registra los manejadores IPC relacionados con transferencia de archivos
@@ -33,21 +37,53 @@ export function registerFileTransferHandlers(): void {
       if (group) {
         if (group.status !== 'active') return { success: false, error: 'Group is not active' };
 
-        // Multi-send to all connected members
+        // Multi-send to all members with a shared logical message ID
         const myId = (await import('../../security/identity.js')).getMyUPeerId();
-        let firstFileId: string | undefined;
+        const messageId = crypto.randomUUID();
+        let startedTransfers = 0;
+        const stats = await fs.stat(resolvedSrc);
+        const effectiveFileName = fileName || path.basename(resolvedSrc);
+        const mimeType = fileTransferManager.validator.detectMimeType(resolvedSrc);
 
         for (const memberId of group.members) {
           if (memberId === myId) continue;
           const contact = await getContactByUpeerId(memberId);
-          if (contact && contact.status === 'connected') {
-            const fid = await fileTransferManager.startSend(memberId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
-            if (!firstFileId) firstFileId = fid;
+          if (contact?.publicKey) {
+            await fileTransferManager.startSend(
+              memberId,
+              contact.address || '',
+              resolvedSrc,
+              thumbnail,
+              caption,
+              isVoiceNote,
+              effectiveFileName,
+              { chatUpeerId: upeerId, persistMessage: false, messageId }
+            );
+            startedTransfers += 1;
           }
         }
 
-        if (!firstFileId) return { success: false, error: 'No group members are online' };
-        return { success: true, fileId: firstFileId };
+        if (startedTransfers === 0) return { success: false, error: 'No valid group recipients available' };
+
+        await saveFileMessage(
+          messageId,
+          upeerId,
+          true,
+          effectiveFileName,
+          messageId,
+          stats.size,
+          mimeType,
+          resolvedSrc,
+          undefined,
+          'sent',
+          getMyUPeerId(),
+          undefined,
+          thumbnail,
+          caption,
+          isVoiceNote
+        );
+
+        return { success: true, fileId: messageId };
       }
 
       const contact = await getContactByUpeerId(upeerId);
@@ -89,6 +125,9 @@ export function registerFileTransferHandlers(): void {
         const { fileBuffer: _fileBuffer, pendingChunks, timers: _timers, _retryTimer, _chunksSentTimes, ...serializableTransfer } = t;
         return {
           ...serializableTransfer,
+          fileId: t.messageId || t.fileId,
+          sessionFileId: t.fileId,
+          messageId: t.messageId || t.fileId,
           pendingChunks: pendingChunks ? Array.from(pendingChunks) : [],
           progress: (t.chunksProcessed / t.totalChunks) * 100
         };
@@ -119,7 +158,8 @@ export function registerFileTransferHandlers(): void {
         return { success: false, error: 'Destination must be within home directory' };
       }
 
-      const transfer = fileTransferManager.getTransfer(fileId, 'receiving');
+      const transfer = fileTransferManager.getTransfer(fileId, 'receiving')
+        || fileTransferManager.findTransfersByMessageId(fileId, 'receiving')[0];
       if (!transfer || !transfer.tempPath) {
         return { success: false, error: 'Transfer not found or no temporary file' };
       }

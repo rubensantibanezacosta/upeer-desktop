@@ -592,7 +592,10 @@ export interface GroupMessageDeliveredEvent {
 // File Transfer Events
 export interface FileTransferStartedEvent {
     fileId: string;
+    sessionFileId?: string;
     upeerId: string;
+    chatUpeerId?: string;
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType?: string;
@@ -614,7 +617,10 @@ export interface FileTransferStartedEvent {
 
 export interface FileTransferProgressEvent {
     fileId: string;
+    sessionFileId?: string;
     upeerId: string;
+    chatUpeerId?: string;
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType?: string;
@@ -636,7 +642,10 @@ export interface FileTransferProgressEvent {
 
 export interface FileTransferCompletedEvent {
     fileId: string;
+    sessionFileId?: string;
     upeerId: string;
+    chatUpeerId?: string;
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType?: string;

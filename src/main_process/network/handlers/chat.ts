@@ -232,7 +232,7 @@ export async function handleChatClear(
     win: BrowserWindow | null
 ) {
     const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
-    deleteMessagesByChatId(upeerId, data.clearTimestamp);
+    deleteMessagesByChatId(upeerId, data.clearTimestamp ?? data.timestamp);
     win?.webContents.send('chat-cleared', { upeerId });
 }
 

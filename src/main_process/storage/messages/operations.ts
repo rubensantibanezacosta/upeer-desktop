@@ -1,8 +1,41 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { like, gte, lte } from 'drizzle-orm';
-import { getDb, getSchema, eq, desc, and, lt, runTransaction } from '../shared.js';
+import { getDb, getSchema, getSqlite, eq, desc, and, runTransaction } from '../shared.js';
 import { updateMessageStatus, getMessageStatus } from './status.js';
 
 export { updateMessageStatus, getMessageStatus };
+
+const sanitizedTempDir = path.join(os.tmpdir(), 'chat-p2p-sanitized');
+
+function isBrokenLegacySanitizedMessage(message: any): boolean {
+    if (!message || typeof message.message !== 'string' || !message.message.startsWith('{')) return false;
+
+    try {
+        const parsed = JSON.parse(message.message);
+        if (parsed?.type !== 'file' || typeof parsed.savedPath !== 'string' || !parsed.savedPath) return false;
+        return parsed.savedPath.startsWith(sanitizedTempDir) && !fs.existsSync(parsed.savedPath);
+    } catch {
+        return false;
+    }
+}
+
+function purgeBrokenLegacySanitizedMessages(messages: any[], db: any, schema: any) {
+    const validMessages: any[] = [];
+
+    for (const message of messages) {
+        if (!isBrokenLegacySanitizedMessage(message)) {
+            validMessages.push(message);
+            continue;
+        }
+
+        db.delete(schema.reactions).where(eq(schema.reactions.messageId, message.id)).run();
+        db.delete(schema.messages).where(eq(schema.messages.id, message.id)).run();
+    }
+
+    return validMessages;
+}
 
 export async function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
     const db = getDb();
@@ -64,7 +97,9 @@ export function getMessages(chatUpeerId: string) {
         .limit(100)
         .all();
 
-    return msgs.map(m => {
+    const validMessages = purgeBrokenLegacySanitizedMessages(msgs, db, schema);
+
+    return validMessages.map(m => {
         const msgReactions = db.select().from(schema.reactions)
             .where(eq(schema.reactions.messageId, m.id))
             .all();
@@ -102,10 +137,13 @@ export function deleteMessageLocally(id: string, _timestamp?: number) {
         .run();
 }
 
-export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: number): void {
+export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: number) {
     const db = getDb();
+    const sqlite = getSqlite();
     const schema = getSchema();
     const timestamp = clearTimestamp || Date.now();
+    let deletedMessages = 0;
+    let deletedReactions = 0;
 
     runTransaction(() => {
         if (chatUpeerId.startsWith('grp-')) {
@@ -120,18 +158,11 @@ export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: num
                 .run();
         }
 
-        const messagesToDelete = db.select({ id: schema.messages.id }).from(schema.messages)
-            .where(and(
-                eq(schema.messages.chatUpeerId, chatUpeerId),
-                lt(schema.messages.timestamp, timestamp + 1000)
-            ))
-            .all();
-
-        for (const msg of messagesToDelete) {
-            db.delete(schema.reactions).where(eq(schema.reactions.messageId, msg.id)).run();
-            db.delete(schema.messages).where(eq(schema.messages.id, msg.id)).run();
-        }
+        deletedReactions = sqlite.prepare('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_upeer_id = ?)').run(chatUpeerId).changes;
+        deletedMessages = sqlite.prepare('DELETE FROM messages WHERE chat_upeer_id = ?').run(chatUpeerId).changes;
     });
+
+    return { deletedMessages, deletedReactions, timestamp };
 }
 
 export function getMessageById(id: string) {
@@ -174,7 +205,7 @@ export function getMessagesAround(chatUpeerId: string, targetMsgId: string, cont
         .limit(half)
         .all();
 
-    const merged = [...before, ...after];
+    const merged = purgeBrokenLegacySanitizedMessages([...before, ...after], db, schema);
     const unique = Array.from(new Map(merged.map(m => [m.id, m])).values())
         .sort((a, b) => a.timestamp - b.timestamp);
 

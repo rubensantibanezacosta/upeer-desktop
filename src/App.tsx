@@ -48,7 +48,7 @@ export default function App() {
 
     const handleMediaClick = (media: any) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
-        const transfers = chatStore.activeGroupId ? [] : fileTransfer.allTransfers.filter(t => t.upeerId === chatStore.targetUpeerId);
+        const transfers = fileTransfer.allTransfers.filter(t => chatStore.activeGroupId ? t.chatUpeerId === chatStore.activeGroupId : t.upeerId === chatStore.targetUpeerId);
         const isMediaFile = (f: any) => {
             if (!f) return false;
             if (f.isVoiceNote) return false;

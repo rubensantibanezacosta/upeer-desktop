@@ -3,12 +3,17 @@ import sharp from 'sharp';
 type GroupInvitePayload = {
     groupName: string;
     members: string[];
+    epoch: number;
+    senderKey: string;
     avatar?: string;
 };
 
 type GroupUpdatePayload = {
     groupName?: string;
     avatar?: string | null;
+    members?: string[];
+    epoch?: number;
+    senderKey?: string;
 };
 
 const MAX_SERIALIZED_GROUP_PAYLOAD_CHARS = 90_000;
@@ -64,8 +69,14 @@ async function shrinkAvatar(avatar: string): Promise<string | null> {
     return bestBuffer ? `data:image/webp;base64,${bestBuffer.toString('base64')}` : null;
 }
 
-export async function buildGroupInvitePayload(groupName: string, members: string[], avatar?: string): Promise<string> {
-    const fullPayload = serializePayload({ groupName, members, ...(avatar ? { avatar } : {}) });
+export async function buildGroupInvitePayload(
+    groupName: string,
+    members: string[],
+    epoch: number,
+    senderKey: string,
+    avatar?: string
+): Promise<string> {
+    const fullPayload = serializePayload({ groupName, members, epoch, senderKey, ...(avatar ? { avatar } : {}) });
     if (fullPayload) {
         return fullPayload;
     }
@@ -73,19 +84,19 @@ export async function buildGroupInvitePayload(groupName: string, members: string
     if (avatar) {
         const shrunkAvatar = await shrinkAvatar(avatar);
         if (shrunkAvatar && shrunkAvatar !== avatar) {
-            const shrunkPayload = serializePayload({ groupName, members, avatar: shrunkAvatar });
+            const shrunkPayload = serializePayload({ groupName, members, epoch, senderKey, avatar: shrunkAvatar });
             if (shrunkPayload) {
                 return shrunkPayload;
             }
         }
 
-        const withoutAvatarPayload = serializePayload({ groupName, members });
+        const withoutAvatarPayload = serializePayload({ groupName, members, epoch, senderKey });
         if (withoutAvatarPayload) {
             return withoutAvatarPayload;
         }
     }
 
-    return JSON.stringify({ groupName, members });
+    return JSON.stringify({ groupName, members, epoch, senderKey });
 }
 
 export async function buildGroupUpdatePayload(fields: GroupUpdatePayload): Promise<string> {

@@ -67,10 +67,12 @@ describe('Validation - Advanced Components', () => {
 
     describe('Group Validation', () => {
         it('should validate Group Messages', () => {
-            const base = { groupId: 'g1', content: 'hello', id: 'm1', replyTo: 'm0' };
+            const base = { groupId: 'g1', content: 'hello', nonce: 'a'.repeat(48), epoch: 1, id: 'm1', replyTo: 'm0' };
             expect(validateGroupMsg(base).valid).toBe(true);
             expect(validateGroupMsg({ ...base, groupId: 'a'.repeat(101) }).valid).toBe(false);
             expect(validateGroupMsg({ ...base, content: 'a'.repeat(200001) }).valid).toBe(false);
+            expect(validateGroupMsg({ ...base, nonce: 'a'.repeat(47) }).valid).toBe(false);
+            expect(validateGroupMsg({ ...base, epoch: 0 }).valid).toBe(false);
             expect(validateGroupMsg({ ...base, id: 'a'.repeat(101) }).valid).toBe(false);
             expect(validateGroupMsg({ ...base, replyTo: 'a'.repeat(101) }).valid).toBe(false);
         });
@@ -204,7 +206,9 @@ describe('Validation - Advanced Components', () => {
                 mimeType: 'application/octet-stream',
                 totalChunks: 1,
                 chunkSize: 64 * 1024,
-                fileHash: 'a'.repeat(64)
+                fileHash: 'a'.repeat(64),
+                chatUpeerId: 'grp-123'
+                messageId: 'msg-123',
             }).valid).toBe(true);
 
             // Vault types
@@ -215,7 +219,7 @@ describe('Validation - Advanced Components', () => {
             expect(validateMessage('VAULT_RENEW', { payloadHash: 'a'.repeat(64), newExpiresAt: 1 }).valid).toBe(true);
 
             // Group types
-            expect(validateMessage('GROUP_MSG', { groupId: 'g', content: 'c' }).valid).toBe(true);
+            expect(validateMessage('GROUP_MSG', { groupId: 'g', content: 'c', nonce: 'n'.repeat(48), epoch: 1 }).valid).toBe(true);
             expect(validateMessage('GROUP_ACK', { id: 'm', groupId: 'g' }).valid).toBe(true);
             expect(validateMessage('GROUP_INVITE', { groupId: 'g', payload: 'p', nonce: 'n'.repeat(48) }).valid).toBe(true);
             expect(validateMessage('GROUP_UPDATE', { groupId: 'g', payload: 'p', nonce: 'n'.repeat(48) }).valid).toBe(true);

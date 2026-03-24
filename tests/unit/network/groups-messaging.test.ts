@@ -7,12 +7,15 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     getGroupById: vi.fn(),
     saveGroup: vi.fn(),
+    updateGroupCrypto: vi.fn(),
     updateGroupMembers: vi.fn(),
     updateGroupInfo: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveMessage: vi.fn(),
+    deleteMessagesByChatId: vi.fn(),
+    updateMessageStatus: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -47,6 +50,12 @@ vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
     },
 }));
 
+vi.mock('../../../src/main_process/network/groupState.js', () => ({
+    encryptGroupMessage: vi.fn(() => ({ ciphertext: 'group-ciphertext', nonce: '11'.repeat(24) })),
+    generateGroupSenderState: vi.fn(() => ({ epoch: 1, senderKey: 'cc'.repeat(32), senderKeyCreatedAt: 123 })),
+    rotateGroupSenderState: vi.fn(() => ({ epoch: 2, senderKey: 'dd'.repeat(32), senderKeyCreatedAt: 456 })),
+}));
+
 describe('network/messaging/groups.ts', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -62,6 +71,8 @@ describe('network/messaging/groups.ts', () => {
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
             members: ['self-id', 'peer-offline'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
         } as any);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-offline',
@@ -97,9 +108,16 @@ describe('network/messaging/groups.ts', () => {
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
-        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+        vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
             members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as any).mockReturnValueOnce({
+            groupId: 'grp-1',
+            members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
         } as any);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
@@ -150,6 +168,8 @@ describe('network/messaging/groups.ts', () => {
             name: 'Grupo',
             status: 'active',
             members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
         } as any);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
@@ -194,11 +214,20 @@ describe('network/messaging/groups.ts', () => {
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { inviteToGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
-        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+        vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
             members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as any).mockReturnValueOnce({
+            groupId: 'grp-1',
+            name: 'Grupo con avatar',
+            avatar: 'data:image/jpeg;base64,avatar',
+            members: ['self-id', 'peer-online'],
+            epoch: 2,
+            senderKey: 'dd'.repeat(32),
         } as any);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
@@ -214,6 +243,8 @@ describe('network/messaging/groups.ts', () => {
             Buffer.from(JSON.stringify({
                 groupName: 'Grupo con avatar',
                 members: ['self-id', 'peer-online'],
+                epoch: 2,
+                senderKey: 'dd'.repeat(32),
                 avatar: 'data:image/jpeg;base64,avatar'
             }), 'utf-8'),
             Buffer.from('aa'.repeat(32), 'hex')
@@ -235,6 +266,41 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String)
+        );
+    });
+
+    it('still sends to primary address when knownAddresses is malformed', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
+            groupId: 'grp-1',
+            members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as any).mockReturnValueOnce({
+            groupId: 'grp-1',
+            members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as any);
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::10',
+            knownAddresses: 'not-json'
+        } as any);
+
+        await updateGroup('grp-1', { name: 'Nombre' });
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-1' }),
+            'aa'.repeat(32)
         );
     });
 });

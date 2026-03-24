@@ -80,13 +80,14 @@ interface ChatActions {
     // Group Mgmt
     handleCreateGroup: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
     handleUpdateGroup: (groupId: string, fields: { name?: string, avatar?: string | null }) => Promise<void>;
+    handleInviteGroupMembers: (groupId: string, memberIds: string[]) => Promise<void>;
     handleLeaveGroup: (groupId: string) => Promise<void>;
 
     // Contact Mgmt
     handleAddContact: (idAtAddress: string, name: string) => void;
     handleAcceptContact: () => void;
     handleDeleteContact: (id?: string) => void;
-    handleClearChat: (id?: string) => void;
+    handleClearChat: (id?: string) => Promise<void>;
     handleBlockContact: (id?: string) => void;
     handleUnblockContact: (id: string) => void;
 
@@ -377,6 +378,13 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         get().refreshGroups();
     },
 
+    handleInviteGroupMembers: async (groupId, memberIds) => {
+        for (const memberId of memberIds) {
+            await window.upeer.inviteToGroup(groupId, memberId);
+        }
+        await get().refreshGroups();
+    },
+
     handleLeaveGroup: async (groupId) => {
         await window.upeer.leaveGroup(groupId);
         get().refreshGroups();
@@ -569,24 +577,28 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         });
     },
 
-    handleClearChat: (id) => {
+    handleClearChat: async (id) => {
         const { targetUpeerId, activeGroupId } = get();
         const targetId = id || activeGroupId || targetUpeerId;
         if (!targetId) return;
 
-        window.upeer.clearChat(targetId).then(() => {
-            // Limpiar historial de mensajes en el estado local inmediatamente
-            if (targetId === targetUpeerId) {
-                set({ chatHistory: [] });
+        const result = await window.upeer.clearChat(targetId);
+        if (!result?.success) {
+            await get().reloadLatestHistory();
+            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert(result?.error || 'No se pudo vaciar el chat.');
             }
-            // Si es un grupo el que se vació
-            if (targetId === get().activeGroupId) {
-                set({ groupChatHistory: [] });
-            }
+            return;
+        }
 
-            // Actualizar el estado de los contactos para limpiar la última vista previa del mensaje en el sidebar
-            get().refreshContacts();
-        });
+        if (targetId === targetUpeerId) {
+            set({ chatHistory: [] });
+        }
+        if (targetId === get().activeGroupId) {
+            set({ groupChatHistory: [] });
+        }
+
+        get().refreshContacts();
     },
 
     handleBlockContact: (id) => {

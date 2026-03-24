@@ -81,7 +81,8 @@ export async function startSend(
     thumbnail?: string,
     caption?: string,
     isVoiceNote?: boolean,
-    fileName?: string
+    fileName?: string,
+    options?: { chatUpeerId?: string; persistMessage?: boolean; messageId?: string }
 ): Promise<string> {
     try {
         const preliminaryMime = this.validator.detectMimeType(filePath);
@@ -141,7 +142,10 @@ export async function startSend(
         const originalFileName = fileName || path.basename(filePath) || fileInfo.name;
 
         const transfer = this.store.createTransfer({
+            messageId: options?.messageId,
             upeerId,
+            chatUpeerId: options?.chatUpeerId,
+            persistMessage: options?.persistMessage,
             peerAddress: address,
             fileName: originalFileName,
             fileSize: fileInfo.size,
@@ -153,7 +157,7 @@ export async function startSend(
             caption,
             isVoiceNote,
             direction: 'sending' as const,
-            filePath: effectivePath,
+            filePath,
             sanitizedPath: sanitizationResult?.wasProcessed ? effectivePath : undefined
         });
 
@@ -200,6 +204,8 @@ export async function startSend(
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: transfer.caption,
             isVoiceNote: transfer.isVoiceNote,
+            ...(transfer.messageId && transfer.messageId !== transfer.fileId ? { messageId: transfer.messageId } : {}),
+            ...(transfer.chatUpeerId?.startsWith('grp-') ? { chatUpeerId: transfer.chatUpeerId } : {}),
         };
 
         const sig = sign(Buffer.from(canonicalStringify(proposal)));
@@ -215,9 +221,13 @@ export async function startSend(
             hasThumbnail: !!encThumb
         }, 'file-transfer');
 
-        this.send(address, proposal, contact?.publicKey);
+        if (address) {
+            this.send(address, proposal, contact?.publicKey);
+        }
         this.ui.notifyStarted(transfer);
-        await saveTransferToDB(transfer);
+        if (options?.persistMessage !== false) {
+            await saveTransferToDB(transfer);
+        }
 
         let attempts = 0;
         const proposalTimer = setInterval(() => {
@@ -247,8 +257,10 @@ export async function startSend(
                 }
             }
 
-            debug('Retrying FILE_PROPOSAL', { fileId: transfer.fileId, attempt: attempts + 1 }, 'file-transfer');
-            this.send(address, proposal, contact?.publicKey);
+            if (address) {
+                debug('Retrying FILE_PROPOSAL', { fileId: transfer.fileId, attempt: attempts + 1 }, 'file-transfer');
+                this.send(address, proposal, contact?.publicKey);
+            }
         }, 1000);
 
         return transfer.fileId;
@@ -277,9 +289,10 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
     const updated = this.store.updateTransfer(data.fileId, 'sending', { phase: TransferPhase.TRANSFERRING, state: 'active' });
     if (updated) {
         this.ui.notifyProgress(updated, true);
-        if (await updateTransferMessageStatus(data.fileId, 'delivered')) {
-            this.ui.safeSend('message-delivered', { id: data.fileId, upeerId });
-            this.ui.notifyStatusUpdated(data.fileId, 'delivered');
+        const messageId = updated.messageId || data.fileId;
+        if (await updateTransferMessageStatus(messageId, 'delivered')) {
+            this.ui.safeSend('message-delivered', { id: messageId, upeerId });
+            this.ui.notifyStatusUpdated(messageId, 'delivered');
         }
         this.sendNextChunks(updated);
     }
@@ -388,6 +401,8 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
             ...(vaultEncKey ? { encryptedKey: vaultEncKey, ...(vaultEncKeyNonce ? { encryptedKeyNonce: vaultEncKeyNonce } : {}), useRecipientEphemeral: false } : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: currentTransfer.caption,
+            ...(currentTransfer.messageId && currentTransfer.messageId !== currentTransfer.fileId ? { messageId: currentTransfer.messageId } : {}),
+            ...(currentTransfer.chatUpeerId?.startsWith('grp-') ? { chatUpeerId: currentTransfer.chatUpeerId } : {}),
         };
 
         const sig = sign(Buffer.from(canonicalStringify(proposalData)));
@@ -400,8 +415,9 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
                 signature: sig.toString('hex')
             }).then(async (nodes: number) => {
                 if (nodes > 0) {
-                    if (await updateTransferMessageStatus(fileId, 'vaulted')) {
-                        this.ui.notifyStatusUpdated(fileId, 'vaulted');
+                    const statusMessageId = currentTransfer.messageId || fileId;
+                    if (await updateTransferMessageStatus(statusMessageId, 'vaulted')) {
+                        this.ui.notifyStatusUpdated(statusMessageId, 'vaulted');
                     }
                 } else {
                     warn('No nodes available for vault replication, marking as failed', { fileId, upeerId }, 'vault');
@@ -419,8 +435,9 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
             warn('Failed to vault file proposal', err, 'vault');
         }
 
-        if (currentTransfer.filePath) {
-            const filePath = currentTransfer.filePath;
+        const replicationPath = currentTransfer.sanitizedPath || currentTransfer.filePath;
+        if (replicationPath) {
+            const filePath = replicationPath;
             this.store.updateTransfer(fileId, 'sending', {
                 phase: TransferPhase.REPLICATING,
                 state: 'active'
@@ -462,10 +479,11 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
         if (availableWindow <= 0) return;
 
         let handle = this.getFileHandle(transfer.fileId);
-        if (!handle && current.filePath) {
+        const sourcePath = current.sanitizedPath || current.filePath;
+        if (!handle && sourcePath) {
             const fs = await import('node:fs/promises');
             try {
-                const h = await fs.open(current.filePath, 'r');
+                const h = await fs.open(sourcePath, 'r');
                 this.setFileHandle(current.fileId, h);
                 handle = h;
             } catch (err) {

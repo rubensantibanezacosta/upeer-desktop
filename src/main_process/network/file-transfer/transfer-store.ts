@@ -6,7 +6,10 @@ export class FileTransferStore {
 
     createTransfer(data: {
         fileId?: string;
+        messageId?: string;
         upeerId: string;
+        chatUpeerId?: string;
+        persistMessage?: boolean;
         peerAddress: string;
         fileName: string;
         fileSize: number;
@@ -25,7 +28,10 @@ export class FileTransferStore {
 
         const transfer: FileTransfer = {
             fileId,
+            messageId: data.messageId || fileId,
             upeerId: data.upeerId,
+            chatUpeerId: data.chatUpeerId,
+            persistMessage: data.persistMessage ?? true,
             peerAddress: data.peerAddress,
             fileName: data.fileName,
             fileSize: data.fileSize,

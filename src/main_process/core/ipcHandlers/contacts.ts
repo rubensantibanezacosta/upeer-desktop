@@ -9,9 +9,11 @@ import {
   unblockContact,
   getBlockedContacts,
 } from '../../storage/contacts/operations.js';
+import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
 import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
+import { warn } from '../../security/secure-logger.js';
 
 /**
  * Registra los manejadores IPC relacionados con contactos
@@ -28,7 +30,9 @@ export function registerContactHandlers(): void {
           known = typeof contact.knownAddresses === 'string'
             ? JSON.parse(contact.knownAddresses)
             : contact.knownAddresses;
-        } catch { /* ignore */ }
+        } catch (parseError) {
+          warn('Failed to parse contact knownAddresses', { upeerId: contact.upeerId, parseError: String(parseError) }, 'contacts');
+        }
       }
 
       return {
@@ -91,13 +95,14 @@ export function registerContactHandlers(): void {
 
   ipcMain.handle('clear-chat', async (event, { upeerId }) => {
     try {
-      // 1. Limpieza local y persistencia del timestamp Anti-Zombi
       const now = Date.now();
-      await deleteMessagesByChatId(upeerId, now);
+      deleteMessagesByChatId(upeerId, now);
 
-      // 2. Propagación global: Sincroniza el vaciado con mis otros dispositivos y mis bóvedas
-      // Esto asegura que si entro desde otro PC, el chat también se vea vacío.
-      await sendChatClear(upeerId, now);
+      try {
+        await sendChatClear(upeerId, now);
+      } catch (syncError) {
+        warn('Failed to sync chat clear to other devices', { upeerId, syncError: String(syncError) }, 'network');
+      }
 
       return { success: true };
     } catch (error: any) {

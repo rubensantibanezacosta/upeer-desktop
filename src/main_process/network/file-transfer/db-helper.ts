@@ -7,9 +7,13 @@ export async function saveTransferToDB(transfer: FileTransfer) {
     try {
         const myId = getMyUPeerId();
         const isSelf = transfer.upeerId === myId;
+        const chatUpeerId = transfer.chatUpeerId || transfer.upeerId;
+        const messageId = transfer.messageId || transfer.fileId;
+        const displayFileId = transfer.messageId || transfer.fileId;
 
         // Skip duplicates for self-transfers
         if (isSelf && transfer.direction === 'receiving') return;
+        if (transfer.persistMessage === false) return;
 
         // Correct arguments for saveFileMessage in storage/messages/operations.ts
         const persistedPath = transfer.direction === 'sending'
@@ -17,17 +21,17 @@ export async function saveTransferToDB(transfer: FileTransfer) {
             : transfer.tempPath;
 
         await saveFileMessage(
-            transfer.fileId,
-            transfer.upeerId,
+            messageId,
+            chatUpeerId,
             transfer.direction === 'sending' || isSelf,
             transfer.fileName,
-            transfer.fileId,
+            displayFileId,
             transfer.fileSize,
             transfer.mimeType,
             persistedPath,
             undefined, // signature
             isSelf ? 'read' : (transfer.state === 'completed' ? 'delivered' : 'sent'),
-            myId, // senderUpeerId
+            transfer.direction === 'sending' || isSelf ? myId : transfer.upeerId,
             undefined, // timestamp
             transfer.thumbnail,
             transfer.caption,

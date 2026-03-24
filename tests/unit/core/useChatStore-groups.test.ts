@@ -9,6 +9,7 @@ describe('useChatStore groups integration', () => {
         vi.resetModules();
         (window as any).upeer = {
             sendGroupMessage: vi.fn().mockResolvedValue({ id: 'msg-1', timestamp: 1710000000000 }),
+            inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
             leaveGroup: vi.fn().mockResolvedValue({ success: true }),
             clearChat: vi.fn().mockResolvedValue({ success: true }),
             getGroups: vi.fn().mockResolvedValue([]),
@@ -76,6 +77,16 @@ describe('useChatStore groups integration', () => {
             groupChatHistory: [],
             isWindowedHistory: false,
         }));
+    });
+
+    it('invites multiple members to an existing group', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+
+        await useChatStore.getState().handleInviteGroupMembers('grp-1', ['peer-1', 'peer-2']);
+
+        expect(window.upeer.inviteToGroup).toHaveBeenNthCalledWith(1, 'grp-1', 'peer-1');
+        expect(window.upeer.inviteToGroup).toHaveBeenNthCalledWith(2, 'grp-1', 'peer-2');
+        expect(window.upeer.getGroups).toHaveBeenCalled();
     });
 
     it('clears the active group chat when no explicit id is passed', async () => {

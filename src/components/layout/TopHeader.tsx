@@ -13,6 +13,7 @@ import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import GroupsIcon from '@mui/icons-material/Groups';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
@@ -40,12 +41,13 @@ interface TopHeaderProps {
     isAdmin?: boolean;
     groupId?: string;
     onUpdateGroup?: (fields: { name?: string; avatar?: string | null }) => Promise<void>;
+    onInviteMembers?: () => void;
     onOpenInfo?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
     contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
-    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onOpenInfo
+    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo
 }) => {
     const avatarFileRef = useRef<HTMLInputElement>(null);
     const [editingName, setEditingName] = useState(false);
@@ -275,6 +277,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                         <Tooltip title="Videollamada" variant="soft">
                             <IconButton size="md" variant="plain" color="neutral"><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
                         </Tooltip>
+                        {isGroup && isAdmin && onInviteMembers && (
+                            <Tooltip title="Añadir miembros" variant="soft">
+                                <IconButton size="md" variant="plain" color="neutral" onClick={onInviteMembers}>
+                                    <PersonAddAlt1Icon sx={{ fontSize: '22px' }} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                         <Box sx={{ width: '1px', height: '24px', backgroundColor: 'divider', mx: 0.5 }} />
                         <IconButton size="md" variant="plain" color="neutral"><MoreVertIcon /></IconButton>
                     </>

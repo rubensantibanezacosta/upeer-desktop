@@ -520,6 +520,16 @@ export function validateFileProposal(data: any): ValidationResult {
         (typeof data.encryptedKeyNonce !== 'string' || data.encryptedKeyNonce.length !== 48)) {
         return { valid: false, error: 'Invalid encryptedKeyNonce (expected 48 hex chars)' };
     }
+    if (data.chatUpeerId !== undefined && (
+        typeof data.chatUpeerId !== 'string'
+        || data.chatUpeerId.length > 128
+        || !data.chatUpeerId.startsWith('grp-')
+    )) {
+        return { valid: false, error: 'Invalid chatUpeerId' };
+    }
+    if (data.messageId !== undefined && (typeof data.messageId !== 'string' || data.messageId.length > 100)) {
+        return { valid: false, error: 'Invalid messageId' };
+    }
     return { valid: true };
 }
 
@@ -635,6 +645,12 @@ export function validateGroupMsg(data: any): ValidationResult {
     }
     if (!data.content || typeof data.content !== 'string' || data.content.length > 200_000) {
         return { valid: false, error: 'Invalid or missing content' };
+    }
+    if (!data.nonce || typeof data.nonce !== 'string' || data.nonce.length !== 48) {
+        return { valid: false, error: 'Invalid nonce' };
+    }
+    if (typeof data.epoch !== 'number' || !Number.isInteger(data.epoch) || data.epoch <= 0) {
+        return { valid: false, error: 'Invalid epoch' };
     }
     // BUG FQ fix: data.id no se validaba. Un peer puede omitirlo (crypto.randomUUID() lo genera)
     // o enviarlo como string arbitrario largo que queda almacenado como PK en messages.

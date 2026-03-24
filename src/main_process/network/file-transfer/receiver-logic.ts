@@ -73,7 +73,9 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
 
         const transfer = this.store.createTransfer({
             fileId: data.fileId,
+            messageId: typeof data.messageId === 'string' ? data.messageId : data.fileId,
             upeerId,
+            chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : upeerId,
             peerAddress: address,
             fileName: data.fileName,
             fileSize: data.fileSize,

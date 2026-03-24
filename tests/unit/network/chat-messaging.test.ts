@@ -50,6 +50,10 @@ vi.mock('../../../src/main_process/network/dht/core.js', () => ({
     startDhtSearch: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
+    getKademliaInstance: vi.fn(),
+}));
+
 vi.mock('../../../src/main_process/network/og-fetcher.js', () => ({
     fetchOgPreview: vi.fn(),
 }));
@@ -75,6 +79,10 @@ vi.mock('electron', () => ({
     BrowserWindow: {
         getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]),
     },
+}));
+
+vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
+    getYggstackAddress: vi.fn(() => '200::self'),
 }));
 
 describe('network/messaging/chat.ts', () => {
@@ -359,6 +367,87 @@ describe('network/messaging/chat.ts', () => {
         );
     });
 
+    it('synchronizes a normal chat message to another own device in real time', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::10',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn(() => [
+                { upeerId: 'self-id', address: '200::other-device' },
+                { upeerId: 'self-id', address: '200::self' }
+            ])
+        } as any);
+
+        await sendUDPMessage('peer-online', 'hola sync');
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({
+                type: 'CHAT',
+                replyTo: undefined,
+                useRecipientEphemeral: false,
+                ephemeralPublicKey: '22'.repeat(32)
+            }),
+            'aa'.repeat(32),
+            false
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::other-device',
+            expect.objectContaining({
+                type: 'CHAT',
+                replyTo: undefined,
+                useRecipientEphemeral: false,
+                ephemeralPublicKey: '22'.repeat(32)
+            }),
+            '11'.repeat(32),
+            true
+        );
+    });
+
+    it('vaults a normal chat message for self-sync when no other own device is reachable', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::10',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn(() => [])
+        } as any);
+
+        await sendUDPMessage('peer-online', 'hola vault sync');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'self-id',
+            expect.objectContaining({
+                type: 'CHAT',
+                senderUpeerId: 'self-id',
+                useRecipientEphemeral: false,
+                signature: Buffer.from('sig').toString('hex')
+            })
+        );
+    });
+
     it('cleans local attachment data when deleting a file message', async () => {
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const cleanup = await import('../../../src/main_process/utils/localAttachmentCleanup.js');
@@ -379,5 +468,84 @@ describe('network/messaging/chat.ts', () => {
         expect(fileTransferManager.cancelTransfer).toHaveBeenCalledWith('file-1', 'message deleted');
         expect(cleanup.cleanupLocalAttachmentFile).toHaveBeenCalledWith('/tmp/upeer/file-1.bin');
         expect(messagesOps.deleteMessageLocally).toHaveBeenCalledWith('file-1');
+    });
+
+    it('fans out group reactions with group context to online, offline, and self devices', async () => {
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const reactionsOps = await import('../../../src/main_process/storage/messages/reactions.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendChatReaction } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            status: 'active',
+            members: ['self-id', 'peer-online', 'peer-offline']
+        } as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
+            if (upeerId === 'peer-online') {
+                return {
+                    upeerId,
+                    status: 'connected',
+                    publicKey: 'aa'.repeat(32),
+                    address: '200::10',
+                    knownAddresses: '[]'
+                } as any;
+            }
+
+            if (upeerId === 'peer-offline') {
+                return {
+                    upeerId,
+                    status: 'disconnected',
+                    publicKey: 'bb'.repeat(32),
+                    address: '200::20',
+                    knownAddresses: '[]'
+                } as any;
+            }
+
+            return null as any;
+        });
+        vi.mocked(getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn(() => [
+                { upeerId: 'self-id', address: '200::other-device' },
+                { upeerId: 'self-id', address: '200::self' }
+            ])
+        } as any);
+
+        await sendChatReaction('grp-1', '12345678-1234-1234-1234-123456789012', '🔥', false);
+
+        expect(reactionsOps.saveReaction).toHaveBeenCalledWith('12345678-1234-1234-1234-123456789012', 'self-id', '🔥');
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({
+                type: 'CHAT_REACTION',
+                msgId: '12345678-1234-1234-1234-123456789012',
+                emoji: '🔥',
+                chatUpeerId: 'grp-1',
+                senderUpeerId: 'self-id',
+                signature: Buffer.from('sig').toString('hex')
+            }),
+            'aa'.repeat(32)
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::other-device',
+            expect.objectContaining({
+                type: 'CHAT_REACTION',
+                chatUpeerId: 'grp-1',
+                senderUpeerId: 'self-id'
+            }),
+            '11'.repeat(32),
+            true
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline',
+            expect.objectContaining({
+                type: 'CHAT_REACTION',
+                chatUpeerId: 'grp-1',
+                senderUpeerId: 'self-id'
+            })
+        );
     });
 });

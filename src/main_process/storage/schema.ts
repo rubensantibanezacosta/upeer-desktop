@@ -18,6 +18,9 @@ export const groups = sqliteTable('groups', {
     members: text('members').notNull().default('[]'), // JSON array of upeerIds
     status: text('status').notNull().default('active'), // 'active' | 'invited'
     avatar: text('avatar'), // base64 data URL, local only
+    epoch: integer('epoch').notNull().default(1),
+    senderKey: text('sender_key'),
+    senderKeyCreatedAt: integer('sender_key_created_at'),
     createdAt: integer('created_at').notNull(), // Unix ms
     // ── Resiliencia de vaciado de chat (Anti-Zombi) para Grupos ─────────────
     lastClearedAt: integer('last_cleared_at').notNull().default(0), // unix timestamp ms

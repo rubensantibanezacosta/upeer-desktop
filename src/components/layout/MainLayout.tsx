@@ -16,6 +16,7 @@ import { YggstackSplash } from '../ui/YggstackSplash.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
 import { MediaViewerOverlay } from '../../features/chat/media-viewer/MediaViewerOverlay.js';
 import { CreateGroupModal } from '../ui/CreateGroupModal.js';
+import { InviteGroupMembersModal } from '../ui/InviteGroupMembersModal.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
 import { ForwardModal } from '../../features/chat/message/ForwardModal.js';
@@ -98,12 +99,19 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [forwardingMsg, setForwardingMsg] = useState<any>(null);
     const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
+    const [isInviteGroupMembersOpen, setIsInviteGroupMembersOpen] = useState(false);
 
     useEffect(() => {
         if (activeGroupId || !targetUpeerId) {
             setIsContactInfoOpen(false);
         }
     }, [activeGroupId, targetUpeerId]);
+
+    useEffect(() => {
+        if (!activeGroupId) {
+            setIsInviteGroupMembersOpen(false);
+        }
+    }, [activeGroupId]);
 
     if (isAppLocked === null) {
         return (
@@ -224,6 +232,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                             isAdmin={activeGroup?.adminUpeerId === chatStore.myIdentity?.upeerId}
                                             groupId={activeGroupId}
                                             onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
+                                            onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
                                         />
                                     ) : (
@@ -282,7 +291,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                                     onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
                                                     onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
                                                     onMediaClick={handleMediaClick}
-                                                    activeTransfers={activeGroupId ? [] : fileTransfer.allTransfers.filter((t: any) => t.upeerId === targetUpeerId)}
+                                                    activeTransfers={fileTransfer.allTransfers.filter((t: any) => activeGroupId ? t.chatUpeerId === activeGroupId : t.upeerId === targetUpeerId)}
                                                     onTransferStateChange={chatStore.updateFileTransferMessage}
                                                 />
                                             </Box>
@@ -379,6 +388,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     <AddContactModal open={navigation.isAddModalOpen} onClose={() => navigation.setAddModalOpen(false)} onAdd={chatStore.handleAddContact} />
                     <ShareContactModal open={navigation.isShareModalOpen} onClose={() => navigation.setShareModalOpen(false)} contacts={chatStore.contacts} onShare={(contact) => { if (targetUpeerId) window.upeer.sendContactCard(targetUpeerId, contact); }} />
 
+
+                    <InviteGroupMembersModal
+                        open={isInviteGroupMembersOpen}
+                        onClose={() => setIsInviteGroupMembersOpen(false)}
+                        contacts={chatStore.contacts}
+                        group={activeGroup || null}
+                        onInvite={chatStore.handleInviteGroupMembers}
+                    />
 
 
                     <CreateGroupModal open={navigation.isCreateGroupModalOpen} onClose={() => navigation.setCreateGroupModalOpen(false)} contacts={chatStore.contacts} onCreate={chatStore.handleCreateGroup} />

@@ -22,4 +22,5 @@ export interface ITransferManager {
     startVaultingFailover(fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: any): Promise<void>;
     notifyVaultProgress(fileId: string, processed: number, total: number): void;
     sendNextChunks(transfer: FileTransfer, address: string): Promise<void>;
+    findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving'): FileTransfer[];
 }

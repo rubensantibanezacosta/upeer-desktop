@@ -2,7 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { saveMessage, getMessages, updateMessageContent, deleteMessageLocally, deleteMessagesByChatId, getMessageById, saveFileMessage, searchMessages, getMessagesAround } from '../../../src/main_process/storage/messages/operations.js';
 import { updateMessageStatus, getMessageStatus } from '../../../src/main_process/storage/messages/status.js';
 import { saveReaction, deleteReaction } from '../../../src/main_process/storage/messages/reactions.js';
-import { getDb, getSchema } from '../../../src/main_process/storage/shared.js';
+import { getDb, getSchema, getSqlite } from '../../../src/main_process/storage/shared.js';
+
+vi.mock('node:fs', async () => {
+    const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+    return {
+        ...actual,
+        default: {
+            ...actual,
+            existsSync: vi.fn(() => false)
+        },
+        existsSync: vi.fn(() => false)
+    };
+});
 
 vi.mock('drizzle-orm', () => ({
     like: (a: any, b: any) => ({ type: 'like', a, b }),
@@ -13,6 +25,7 @@ vi.mock('drizzle-orm', () => ({
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(),
+    getSqlite: vi.fn(),
     eq: (a: any, b: any) => ({ type: 'eq', a, b }),
     lt: (a: any, b: any) => ({ type: 'lt', a, b }),
     desc: (a: any) => ({ type: 'desc', a }),
@@ -77,6 +90,12 @@ describe('Storage - Message Operations', () => {
         })),
     };
 
+    const mockSqlite = {
+        prepare: vi.fn().mockReturnValue({
+            run: vi.fn().mockReturnValue({ changes: 1 })
+        })
+    };
+
     const mockSchema = {
         messages: {
             id: 'id',
@@ -104,6 +123,7 @@ describe('Storage - Message Operations', () => {
         vi.clearAllMocks();
         (getDb as any).mockReturnValue(mockDb);
         (getSchema as any).mockReturnValue(mockSchema);
+        (getSqlite as any).mockReturnValue(mockSqlite);
     });
 
     it('should save a message and handle conflict by updating status', async () => {
@@ -237,6 +257,43 @@ describe('Storage - Message Operations', () => {
         expect(mockDb.select).toHaveBeenCalled();
     });
 
+    it('should purge legacy sanitized file messages that no longer exist', async () => {
+        const brokenMessage = {
+            id: 'msg-broken',
+            chatUpeerId: 'contact-1',
+            message: JSON.stringify({
+                type: 'file',
+                fileId: 'file-broken',
+                fileName: 'voice.webm',
+                savedPath: '/tmp/chat-p2p-sanitized/missing.webm'
+            }),
+            timestamp: 1000
+        };
+
+        mockDb.select.mockReturnValueOnce({
+            from: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                    orderBy: vi.fn().mockReturnValue({
+                        limit: vi.fn().mockReturnValue({
+                            all: vi.fn().mockReturnValue([brokenMessage])
+                        })
+                    })
+                })
+            })
+        });
+
+        mockDb.delete = vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+                run: vi.fn().mockReturnValue({ changes: 1 })
+            })
+        });
+
+        const result = getMessages('contact-1');
+
+        expect(result).toEqual([]);
+        expect(mockDb.delete).toHaveBeenCalledTimes(2);
+    });
+
     it('should update message with signature and version', async () => {
         const mockRun = vi.fn();
         mockDb.update.mockReturnValue({
@@ -362,15 +419,6 @@ describe('Storage - Message Operations', () => {
     it('should delete all messages in a chat and update lastClearedAt', async () => {
         const mockRun = vi.fn().mockReturnValue({ changes: 1 });
 
-        // Mock get for messages to delete
-        mockDb.select = vi.fn().mockReturnValue({
-            from: vi.fn().mockReturnValue({
-                where: vi.fn().mockReturnValue({
-                    all: vi.fn().mockReturnValue([{ id: 'msg-1' }])
-                })
-            })
-        });
-
         mockDb.delete = vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
                 run: mockRun
@@ -387,8 +435,9 @@ describe('Storage - Message Operations', () => {
 
         await deleteMessagesByChatId('peer-1');
 
-        expect(mockDb.delete).toHaveBeenCalledTimes(2); // messages and reactions
         expect(mockDb.update).toHaveBeenCalled(); // lastClearedAt
+        expect(mockSqlite.prepare).toHaveBeenCalledWith('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_upeer_id = ?)');
+        expect(mockSqlite.prepare).toHaveBeenCalledWith('DELETE FROM messages WHERE chat_upeer_id = ?');
     });
 
     it('should retrieve a single message by ID', async () => {
