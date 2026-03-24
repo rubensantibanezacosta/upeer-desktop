@@ -24,11 +24,18 @@ export function getContacts() {
     const schema = getSchema();
 
     const contactsList = db.select().from(schema.contacts).all();
+    const messageRows = db.select().from(schema.messages)
+        .orderBy(desc(schema.messages.timestamp))
+        .all() as any[];
+
+    const lastMessageByChat = new Map<string, any>();
+    for (const message of messageRows) {
+        if (!message?.chatUpeerId || lastMessageByChat.has(message.chatUpeerId)) continue;
+        lastMessageByChat.set(message.chatUpeerId, message);
+    }
+
     const result = contactsList.map(c => {
-        const lastMsgObj = db.select().from(schema.messages)
-            .where(eq(schema.messages.chatUpeerId, c.upeerId || ''))
-            .orderBy(desc(schema.messages.timestamp))
-            .limit(1).get() as any;
+        const lastMsgObj = lastMessageByChat.get(c.upeerId || '');
 
         return {
             ...c,
@@ -38,6 +45,23 @@ export function getContacts() {
             lastMessageStatus: lastMsgObj?.status
         };
     });
+
+    const knownUpeerIds = new Set(result.map(contact => contact.upeerId));
+    for (const [chatUpeerId, lastMsgObj] of lastMessageByChat.entries()) {
+        if (!chatUpeerId || chatUpeerId.startsWith('grp-') || knownUpeerIds.has(chatUpeerId)) continue;
+
+        result.push({
+            upeerId: chatUpeerId,
+            address: '',
+            name: 'Contacto eliminado',
+            status: 'offline',
+            isConversationOnly: true,
+            lastMessage: lastMsgObj?.message,
+            lastMessageTime: lastMsgObj?.timestamp,
+            lastMessageIsMine: lastMsgObj?.isMine,
+            lastMessageStatus: lastMsgObj?.status
+        });
+    }
 
     result.sort((a, b) => {
         const tA = a.lastMessageTime ? Number(a.lastMessageTime) : 0;

@@ -32,10 +32,7 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import BlockIcon from '@mui/icons-material/Block';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import DeleteIcon from '@mui/icons-material/Delete';
-import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import SecurityIcon from '@mui/icons-material/Security';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
@@ -50,14 +47,12 @@ interface ContactItemProps {
     contact: Contact;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onDelete: (id: string) => void;
     onClear: (id: string) => void;
     isTyping: boolean;
     highlight?: string;
 }
 
-export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onDelete, onClear, isTyping, highlight = '' }) => {
-    const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onClear, isTyping, highlight = '' }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
     const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
     const isPending = c.status === 'pending' || c.status === 'incoming';
@@ -337,9 +332,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                     <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
                                     <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><FavoriteBorderIcon /></ListItemDecorator> Añadir a Favoritos</MenuItem>
                                     <ListDivider />
-                                    <MenuItem><ListItemDecorator sx={{ color: 'inherit' }}><BlockIcon /></ListItemDecorator> Bloquear</MenuItem>
                                     <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmClearOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
-                                    <MenuItem onClick={(e) => { e.stopPropagation(); setConfirmDeleteOpen(true); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteIcon /></ListItemDecorator> Eliminar chat</MenuItem>
                                 </Menu>
                             </Dropdown>
                         </Box>
@@ -374,40 +367,6 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                 Vaciar historial
                             </Button>
                             <Button variant="plain" color="neutral" onClick={(e) => { e.stopPropagation(); setConfirmClearOpen(false); }}>
-                                Cancelar
-                            </Button>
-                        </DialogActions>
-                    </ModalDialog>
-                </Modal>
-
-                <Modal open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
-                    <ModalDialog variant="outlined" role="alertdialog" sx={{ minWidth: 400 }}>
-                        <DialogTitle>
-                            <WarningRoundedIcon color="error" />
-                            Confirmar eliminación
-                        </DialogTitle>
-                        <Divider />
-                        <DialogContent>
-                            <Typography level="body-md">
-                                ¿Estás seguro de que quieres eliminar la conversación con <b>{c.name}</b>?
-                            </Typography>
-                            <Typography level="body-sm" sx={{ mt: 1 }}>
-                                Esta acción no se puede deshacer y se perderán todos los datos de este contacto.
-                            </Typography>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button
-                                variant="solid"
-                                color="danger"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(c.upeerId);
-                                    setConfirmDeleteOpen(false);
-                                }}
-                            >
-                                Eliminar permanentemente
-                            </Button>
-                            <Button variant="plain" color="neutral" onClick={(e) => { e.stopPropagation(); setConfirmDeleteOpen(false); }}>
                                 Cancelar
                             </Button>
                         </DialogActions>

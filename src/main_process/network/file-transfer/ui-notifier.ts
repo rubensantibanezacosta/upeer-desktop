@@ -48,6 +48,7 @@ export class UINotifier {
             fileHash: transfer.fileHash,
             thumbnail: transfer.thumbnail,
             caption: transfer.caption,
+            isVoiceNote: transfer.isVoiceNote,
             direction: 'receiving'
         };
 
@@ -91,6 +92,7 @@ export class UINotifier {
             fileHash: transfer.fileHash,
             tempPath: transfer.tempPath,
             isVaulting: !!transfer.isVaulting,
+            isVoiceNote: !!transfer.isVoiceNote,
             progress,
             bytesTransferred,
             totalBytes: transfer.fileSize,

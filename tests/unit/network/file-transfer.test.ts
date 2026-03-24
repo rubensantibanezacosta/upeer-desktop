@@ -52,6 +52,7 @@ describe('TransferManager - Integration', () => {
     const mockWindow = {
         isDestroyed: vi.fn(() => false),
         webContents: {
+            isDestroyed: vi.fn(() => false),
             send: vi.fn()
         }
     } as any;
@@ -97,6 +98,29 @@ describe('TransferManager - Integration', () => {
         await manager.handleDoneAck(fileId);
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.state).toBe('completed');
+    });
+
+    it('should include isVoiceNote in FILE_PROPOSAL when sending a voice note', async () => {
+        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+            name: 'voice.webm',
+            size: 100,
+            mimeType: 'audio/webm',
+            hash: 'voicehash123'
+        });
+        manager.chunker.calculateChunks = vi.fn().mockReturnValue(1);
+
+        await manager.startSend('peer1', 'addr1', '/path/to/voice.webm', undefined, undefined, true, 'voice.webm');
+
+        expect(mockSend).toHaveBeenCalledWith(
+            'addr1',
+            expect.objectContaining({
+                type: 'FILE_PROPOSAL',
+                isVoiceNote: true,
+                fileName: 'voice.webm',
+                mimeType: 'audio/webm'
+            }),
+            'pubkey'
+        );
     });
 
     it('should handle a complete receiving flow', async () => {
@@ -153,6 +177,37 @@ describe('TransferManager - Integration', () => {
 
         // Since it was the last chunk (totalChunks: 1), it should finalize
         expect(transfer?.state).toBe('completed');
+    });
+
+    it('should preserve isVoiceNote in receiving flow and notify renderer with it', async () => {
+        const fileId = '550e8400-e29b-41d4-a716-446655440099';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'voice.webm',
+            fileSize: 50,
+            mimeType: 'audio/webm',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'f'.repeat(64),
+            isVoiceNote: true,
+            signature: 'sig'
+        };
+
+        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        const transfer = manager.getTransfer(fileId, 'receiving');
+        expect(transfer?.isVoiceNote).toBe(true);
+
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'receive-p2p-message',
+            expect.objectContaining({
+                id: fileId,
+                message: expect.stringContaining('"isVoiceNote":true')
+            })
+        );
     });
 
     it('should accept vault-delivered FILE_PROPOSAL signed without sender metadata', async () => {

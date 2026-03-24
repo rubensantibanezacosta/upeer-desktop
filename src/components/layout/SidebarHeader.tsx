@@ -5,7 +5,6 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 interface SidebarHeaderProps {
-    onShowMyIdentity: () => void;
     onAddNew: () => void;
     onCreateGroup?: () => void;
 }

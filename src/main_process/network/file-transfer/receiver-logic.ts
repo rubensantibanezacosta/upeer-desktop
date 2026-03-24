@@ -83,6 +83,7 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             fileHash: data.fileHash,
             thumbnail,
             caption: data.caption,
+            isVoiceNote: data.isVoiceNote,
             direction: 'receiving' as const
         });
 

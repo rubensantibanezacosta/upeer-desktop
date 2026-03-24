@@ -9,7 +9,6 @@ import {
   unblockContact,
   getBlockedContacts,
 } from '../../storage/contacts/operations.js';
-import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
 import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
@@ -87,7 +86,6 @@ export function registerContactHandlers(): void {
   });
 
   ipcMain.handle('delete-contact', (event, { upeerId }) => {
-    deleteMessagesByChatId(upeerId); // Bug EX fix: borrar mensajes huérfanos del contacto eliminado
     return deleteContact(upeerId);
   });
 

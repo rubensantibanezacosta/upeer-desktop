@@ -27,7 +27,10 @@ const mockSchema = {
     },
     messages: {
         chatUpeerId: { name: 'chatUpeerId' },
-        timestamp: { name: 'timestamp' }
+        timestamp: { name: 'timestamp' },
+        message: { name: 'message' },
+        isMine: { name: 'isMine' },
+        status: { name: 'messageStatus' }
     }
 };
 
@@ -89,16 +92,11 @@ describe('storage/contacts/operations.ts', () => {
                 { upeerId: 'u1', name: 'Alice' },
                 { upeerId: 'u2', name: 'Bob' }
             ];
-            mockDb.all.mockReturnValueOnce(mockContacts);
-
-            // Mock last message for Alice
-            mockDb.get.mockReturnValueOnce({
-                message: 'Hello',
-                timestamp: 1000,
-                isMine: true
-            });
-            // Mock last message for Bob (null)
-            mockDb.get.mockReturnValueOnce(null);
+            mockDb.all
+                .mockReturnValueOnce(mockContacts)
+                .mockReturnValueOnce([
+                    { chatUpeerId: 'u1', message: 'Hello', timestamp: 1000, isMine: true, status: 'sent' }
+                ]);
 
             const result = getContacts();
 
@@ -114,14 +112,37 @@ describe('storage/contacts/operations.ts', () => {
                 { upeerId: 'u1', name: 'Alice' },
                 { upeerId: 'u2', name: 'Bob' }
             ];
-            mockDb.all.mockReturnValueOnce(mockContacts);
-
-            mockDb.get.mockReturnValueOnce({ timestamp: 1000 }); // Alice
-            mockDb.get.mockReturnValueOnce({ timestamp: 5000 }); // Bob (más reciente)
+            mockDb.all
+                .mockReturnValueOnce(mockContacts)
+                .mockReturnValueOnce([
+                    { chatUpeerId: 'u1', timestamp: 1000 },
+                    { chatUpeerId: 'u2', timestamp: 5000 }
+                ]);
 
             const result = getContacts();
             expect(result[0].upeerId).toBe('u2');
             expect(result[1].upeerId).toBe('u1');
+        });
+
+        it('should include orphan conversations when the contact was deleted', () => {
+            mockDb.all
+                .mockReturnValueOnce([{ upeerId: 'u1', name: 'Alice', status: 'connected' }])
+                .mockReturnValueOnce([
+                    { chatUpeerId: 'u1', message: 'Hola', timestamp: 1000, isMine: false, status: 'read' },
+                    { chatUpeerId: 'u3', message: 'Sigo aquí', timestamp: 4000, isMine: false, status: 'delivered' },
+                    { chatUpeerId: 'grp-1', message: 'Grupo', timestamp: 3000, isMine: false, status: 'delivered' }
+                ]);
+
+            const result = getContacts();
+
+            expect(result[0]).toEqual(expect.objectContaining({
+                upeerId: 'u3',
+                name: 'Contacto eliminado',
+                status: 'offline',
+                isConversationOnly: true,
+                lastMessage: 'Sigo aquí'
+            }));
+            expect(result.some(contact => contact.upeerId === 'grp-1')).toBe(false);
         });
     });
 

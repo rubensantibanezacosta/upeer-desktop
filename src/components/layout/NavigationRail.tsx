@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, IconButton, Avatar, Tooltip } from '@mui/joy';
 import ChatIcon from '@mui/icons-material/Chat';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -9,15 +10,19 @@ interface NavigationRailProps {
     myIp: string;
     myAvatar?: string | null;
     myInitial?: string;
+    onOpenChats?: () => void;
+    onOpenContacts?: () => void;
     onOpenSettings?: () => void;
     onOpenIdentity?: () => void;
-    activeView?: 'chat' | 'settings';
+    activeView?: 'chat' | 'contacts' | 'settings';
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
     myIp: _myIp,
     myAvatar,
     myInitial,
+    onOpenChats,
+    onOpenContacts,
     onOpenSettings,
     onOpenIdentity,
     activeView = 'chat',
@@ -42,10 +47,22 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     <IconButton
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
-                        onClick={() => onOpenSettings && activeView === 'settings' && onOpenSettings()}
+                        onClick={onOpenChats}
                         sx={{ borderRadius: 'sm' }}
                     >
                         <ChatIcon />
+                    </IconButton>
+                </Box>
+            </Tooltip>
+            <Tooltip title="Contactos" placement="right">
+                <Box>
+                    <IconButton
+                        variant={activeView === 'contacts' ? 'soft' : 'plain'}
+                        color={activeView === 'contacts' ? 'primary' : 'neutral'}
+                        onClick={onOpenContacts}
+                        sx={{ borderRadius: 'sm' }}
+                    >
+                        <AccountCircleIcon />
                     </IconButton>
                 </Box>
             </Tooltip>

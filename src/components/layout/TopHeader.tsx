@@ -30,7 +30,7 @@ interface TopHeaderProps {
     onAccept?: () => void;
     isOnline?: boolean;
     isTyping?: boolean;
-    status?: 'pending' | 'incoming' | 'connected' | 'blocked';
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
     lastSeen?: string;
     onShowSecurity?: () => void;
     isGroup?: boolean;
@@ -39,11 +39,12 @@ interface TopHeaderProps {
     isAdmin?: boolean;
     groupId?: string;
     onUpdateGroup?: (fields: { name?: string; avatar?: string | null }) => Promise<void>;
+    onOpenInfo?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
     contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
-    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup
+    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onOpenInfo
 }) => {
     const avatarFileRef = useRef<HTMLInputElement>(null);
     const [editingName, setEditingName] = useState(false);
@@ -155,7 +156,30 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             height: '60px',
             boxSizing: 'border-box'
         }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    minWidth: 0,
+                    borderRadius: 'lg',
+                    cursor: !isGroup && onOpenInfo ? 'pointer' : 'default',
+                    px: !isGroup && onOpenInfo ? 0.75 : 0,
+                    py: !isGroup && onOpenInfo ? 0.5 : 0,
+                    ml: !isGroup && onOpenInfo ? -0.75 : 0,
+                    transition: 'background-color 0.15s ease',
+                    '&:hover': !isGroup && onOpenInfo ? { backgroundColor: 'background.level1' } : undefined,
+                }}
+                onClick={!isGroup ? onOpenInfo : undefined}
+                onKeyDown={!isGroup && onOpenInfo ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onOpenInfo();
+                    }
+                } : undefined}
+                role={!isGroup && onOpenInfo ? 'button' : undefined}
+                tabIndex={!isGroup && onOpenInfo ? 0 : -1}
+            >
                 {/* Hidden file input for group avatar */}
                 {isGroup && isAdmin && (
                     <input

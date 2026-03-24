@@ -27,12 +27,13 @@ interface InputAreaProps {
     onAttachFile?: (type: AttachmentType) => void;
     onScrollToMessage?: (msgId: string) => void;
     onSendVoiceNote?: (file: File) => Promise<void>;
+    focusKey?: string;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
     message, setMessage, onSend, onTyping, disabled,
     replyToMessage, onCancelReply, editingMessage, onCancelEdit,
-    onAttachFile, onScrollToMessage, onSendVoiceNote
+    onAttachFile, onScrollToMessage, onSendVoiceNote, focusKey
 }) => {
     const { isRecording, duration, stream, startRecording, stopRecording, cancelRecording } = useAudioRecorder();
     const canvasRef = useRecordingWaveform(isRecording, stream);
@@ -127,6 +128,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
                             autoComplete="off"
                             disabled={disabled}
+                            autoFocus={!disabled}
+                            focusKey={focusKey}
                         />
                         <IconButton variant="plain" color="neutral" onClick={message ? onSend : handleMicClick} disabled={disabled}>
                             {message

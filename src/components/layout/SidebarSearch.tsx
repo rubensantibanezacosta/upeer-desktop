@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Input, IconButton, Chip, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -7,17 +7,41 @@ import ClearIcon from '@mui/icons-material/Clear';
 interface SidebarSearchProps {
     value: string;
     onChange: (val: string) => void;
-    activeFilter: string;
-    onFilterChange: (filter: string) => void;
+    activeFilter?: string;
+    onFilterChange?: (filter: string) => void;
+    placeholder?: string;
+    showFilters?: boolean;
+    autoFocus?: boolean;
+    focusKey?: string;
 }
 
-export const SidebarSearch: React.FC<SidebarSearchProps> = ({ value, onChange, activeFilter, onFilterChange }) => {
+export const SidebarSearch: React.FC<SidebarSearchProps> = ({
+    value,
+    onChange,
+    activeFilter = 'all',
+    onFilterChange,
+    placeholder = 'Buscar un chat o iniciar uno nuevo',
+    showFilters = true,
+    autoFocus = false,
+    focusKey,
+}) => {
+    const inputRef = useRef<HTMLInputElement | null>(null);
     const filters = [
         { label: 'Todos', value: 'all' },
         { label: 'No leídos', value: 'unread' },
         { label: 'Favoritos', value: 'favorites' },
         { label: 'Grupos', value: 'groups' }
     ];
+
+    useEffect(() => {
+        if (!autoFocus) return;
+        const input = inputRef.current;
+        if (!input) return;
+        const timer = window.setTimeout(() => {
+            input.focus({ preventScroll: true });
+        }, 230);
+        return () => window.clearTimeout(timer);
+    }, [autoFocus, focusKey]);
 
     return (
         <Box sx={{ p: 1, px: 1.5, display: 'flex', flexDirection: 'column', gap: 1, backgroundColor: 'background.surface' }}>
@@ -39,10 +63,10 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({ value, onChange, a
                     <SearchIcon sx={{ color: 'text.tertiary', fontSize: '18px', mr: 1 }} />
                     <Input
                         size="sm"
-                        placeholder="Buscar un chat o iniciar uno nuevo"
+                        placeholder={placeholder}
                         variant="plain"
                         value={value}
-                        slotProps={{ input: { maxLength: 80 } }}
+                        slotProps={{ input: { maxLength: 80, ref: inputRef } }}
                         onChange={(e) => onChange(e.target.value)}
                         sx={{
                             flexGrow: 1,
@@ -67,24 +91,26 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({ value, onChange, a
                 </Box>
             </Box>
 
-            <Stack direction="row" spacing={1} sx={{ mt: 0.5, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
-                {filters.map((f) => (
-                    <Chip
-                        key={f.value}
-                        variant={activeFilter === f.value ? "solid" : "soft"}
-                        color={activeFilter === f.value ? "primary" : "neutral"}
-                        onClick={() => onFilterChange(f.value)}
-                        size="sm"
-                        sx={{
-                            borderRadius: 'xl',
-                            fontWeight: activeFilter === f.value ? 600 : 400,
-                            px: 1.5
-                        }}
-                    >
-                        {f.label}
-                    </Chip>
-                ))}
-            </Stack>
+            {showFilters && onFilterChange && (
+                <Stack direction="row" spacing={1} sx={{ mt: 0.5, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
+                    {filters.map((f) => (
+                        <Chip
+                            key={f.value}
+                            variant={activeFilter === f.value ? "solid" : "soft"}
+                            color={activeFilter === f.value ? "primary" : "neutral"}
+                            onClick={() => onFilterChange(f.value)}
+                            size="sm"
+                            sx={{
+                                borderRadius: 'xl',
+                                fontWeight: activeFilter === f.value ? 600 : 400,
+                                px: 1.5
+                            }}
+                        >
+                            {f.label}
+                        </Chip>
+                    ))}
+                </Stack>
+            )}
         </Box>
     );
 };

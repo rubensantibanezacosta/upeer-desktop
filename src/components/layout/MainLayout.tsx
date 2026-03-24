@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/joy';
 import { Sidebar } from './Sidebar.js';
 import { ChatArea } from '../../features/chat/ChatArea.js';
@@ -7,9 +7,9 @@ import { TopHeader } from './TopHeader.js';
 import { InputArea } from '../../features/chat/input/InputArea.js';
 import { AddContactModal } from '../ui/AddContactModal.js';
 import { NavigationRail } from './NavigationRail.js';
-import { IdentityModal } from '../ui/IdentityModal.js';
+import { ContactsPanel } from './ContactsPanel.js';
 import { ShareContactModal } from '../ui/ShareContactModal.js';
-import { SecurityModal } from '../ui/SecurityModal.js';
+
 import { SettingsPanel } from '../ui/SettingsPanel.js';
 import { YggstackSplash } from '../ui/YggstackSplash.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
@@ -18,6 +18,7 @@ import { CreateGroupModal } from '../ui/CreateGroupModal.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
 import { ForwardModal } from '../../features/chat/message/ForwardModal.js';
+import { ContactInfoPanel } from './ContactInfoPanel.js';
 
 interface MainLayoutProps {
     // State & Stores
@@ -87,13 +88,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     targetUpeerId, activeGroupId, message, setMessage,
     handleSend, handleSendGroupMessage, handleAttachFile, handleTyping, handleScrollToMessage,
     currentReplyToMessage, setReplyToMessage,
-    handleAcceptContact, handleDeleteContact, handleBlockContact,
+    handleAcceptContact, handleDeleteContact, handleClearChat, handleBlockContact,
     handleReaction, handleUpdateMessage, handleDeleteMessage, handleMediaClick,
     navigation, appStore, chatStore,
     isFilePickerOpen, isPreparingAttachments, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
     const [forwardingMsg, setForwardingMsg] = useState<any>(null);
+    const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
+
+    useEffect(() => {
+        if (activeGroupId || !targetUpeerId) {
+            setIsContactInfoOpen(false);
+        }
+    }, [activeGroupId, targetUpeerId]);
 
     if (isAppLocked === null) {
         return (
@@ -167,6 +175,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 myAvatar={chatStore.myIdentity?.avatar}
                 myInitial={(chatStore.myIdentity?.alias || chatStore.myIdentity?.upeerId || '?').charAt(0).toUpperCase()}
                 activeView={navigation.appView}
+                onOpenChats={() => navigation.goToChat()}
+                onOpenContacts={() => navigation.goToContacts()}
                 onOpenSettings={() => navigation.toggleSettings()}
                 onOpenIdentity={() => navigation.goToSettings('perfil')}
             />
@@ -183,6 +193,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         onLockSession={() => { setAuthenticated(false); navigation.goToChat(); }}
                     />
                 </Box>
+            ) : navigation.appView === 'contacts' ? (
+                <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
+                    <ContactsPanel
+                        contacts={chatStore.contacts}
+                        selectedContactId={chatStore.targetUpeerId}
+                        onSelectContact={chatStore.setTargetUpeerId}
+                        onOpenChat={(upeerId) => {
+                            chatStore.setTargetUpeerId(upeerId);
+                            navigation.goToChat();
+                        }}
+                        onDeleteContact={chatStore.handleDeleteContact}
+                        onBlockContact={(upeerId) => chatStore.handleBlockContact(upeerId)}
+                        onUnblockContact={chatStore.handleUnblockContact}
+                    />
+                </Box>
             ) : (
                 <>
                     <Sidebar
@@ -190,135 +215,155 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         groups={chatStore.groups}
                         onSelectContact={chatStore.setTargetUpeerId}
                         onSelectGroup={chatStore.setActiveGroupId}
-                        onDeleteContact={chatStore.handleDeleteContact}
                         onClearChat={chatStore.handleClearChat}
                         selectedId={chatStore.targetUpeerId}
                         selectedGroupId={chatStore.activeGroupId}
                         onAddContact={chatStore.handleAddContact}
-                        onShowMyIdentity={() => navigation.setIdentityModalOpen(true)}
                         onCreateGroup={chatStore.handleCreateGroup}
                         onLeaveGroup={chatStore.handleLeaveGroup}
                         typingStatus={chatStore.typingStatus}
                     />
 
-                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, backgroundColor: 'background.body', position: 'relative', overflow: 'hidden' }}>
+                    <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', minWidth: 0, backgroundColor: 'background.body', position: 'relative', overflow: 'hidden' }}>
                         {(targetUpeerId || activeGroupId) ? (
                             <>
-                                {activeGroupId ? (
-                                    <TopHeader
-                                        contactName={activeGroup?.name}
-                                        isGroup={true}
-                                        avatar={activeGroup?.avatar || undefined}
-                                        memberCount={activeGroup?.members.length}
-                                        isAdmin={activeGroup?.adminUpeerId === chatStore.myIdentity?.upeerId}
-                                        groupId={activeGroupId}
-                                        onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
-                                        onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
-                                    />
-                                ) : (
-                                    <TopHeader
-                                        contactName={activeContact?.name}
-                                        avatar={activeContactAvatar}
-                                        isOnline={activeContact?.lastSeen && (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000}
-                                        isTyping={!!chatStore.typingStatus[targetUpeerId]}
-                                        status={activeContact?.status}
-                                        lastSeen={activeContact?.lastSeen}
-                                        vouchScore={effectiveVouchScore}
-                                        onDelete={() => handleDeleteContact(targetUpeerId)}
-                                        onShare={() => navigation.setShareModalOpen(true)}
-                                        onAccept={isIncomingRequest ? undefined : () => handleAcceptContact(targetUpeerId)}
-                                        onShowSecurity={() => navigation.setSecurityModalOpen(true)}
-                                    />
-                                )}
-
-                                {isIncomingRequest ? (
-                                    <IncomingRequestChat
-                                        contactName={activeContact?.name}
-                                        avatar={activeContactAvatar}
-                                        receivedAt={incomingRequest?.receivedAt}
-                                        onAccept={() => handleAcceptContact(targetUpeerId)}
-                                        onReject={handleBlockContact}
-                                        untrustworthyInfo={untrustworthyInfo}
-                                        vouchScore={effectiveVouchScore}
-                                    />
-                                ) : (
-                                    <Box onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-                                        <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}>
-                                            <ChatArea
-                                                key={activeGroupId || targetUpeerId}
-                                                chatHistory={activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory}
-                                                isGroup={!!activeGroupId}
-                                                myIp={appStore.networkAddress || ''}
-                                                contacts={chatStore.contacts.map((c: any) => ({ address: c.address, name: c.name, upeerId: c.upeerId }))}
-                                                onReply={(msg: any) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
-                                                onReact={handleReaction}
-                                                onEdit={(msg: any) => {
-                                                    let editText = msg.message;
-                                                    if (editText.startsWith('{') && editText.endsWith('}')) {
-                                                        try {
-                                                            const parsed = JSON.parse(editText);
-                                                            if (typeof parsed.text === 'string') editText = parsed.text;
-                                                            else if (parsed.type === 'file' && typeof parsed.caption === 'string') editText = parsed.caption;
-                                                        } catch { /* ignore */ }
-                                                    }
-                                                    setEditingMessage(msg);
-                                                    setMessage(editText);
-                                                }}
-                                                onDelete={handleDeleteMessage}
-                                                onForward={(msg: any) => setForwardingMsg(msg)}
-                                                onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
-                                                onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
-                                                onMediaClick={handleMediaClick}
-                                                activeTransfers={activeGroupId ? [] : fileTransfer.allTransfers.filter((t: any) => t.upeerId === targetUpeerId)}
-                                                onTransferStateChange={chatStore.updateFileTransferMessage}
-                                            />
-                                        </Box>
-                                        <InputArea
-                                            message={message}
-                                            setMessage={setMessage}
-                                            onSend={editingMessage
-                                                ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); setMessage(''); }
-                                                : (activeGroupId ? () => handleSendGroupMessage() : handleSend)
-                                            }
-                                            onTyping={handleTyping}
-                                            onAttachFile={handleAttachFile}
-                                            onSendVoiceNote={handleSendVoiceNote}
-                                            disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? activeContact?.status !== 'connected' : false)}
-                                            replyToMessage={currentReplyToMessage ? {
-                                                ...currentReplyToMessage,
-                                                senderName: currentReplyToMessage.senderName || (currentReplyToMessage.isMine ? 'Tú' : activeContact?.name)
-                                            } : null}
-                                            onCancelReply={() => setReplyToMessage(activeGroupId || targetUpeerId, null)}
-                                            editingMessage={editingMessage}
-                                            onCancelEdit={() => { setEditingMessage(null); setMessage(''); }}
-                                            onScrollToMessage={handleScrollToMessage}
+                                <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', position: 'relative', overflow: 'hidden' }}>
+                                    {activeGroupId ? (
+                                        <TopHeader
+                                            contactName={activeGroup?.name}
+                                            isGroup={true}
+                                            avatar={activeGroup?.avatar || undefined}
+                                            memberCount={activeGroup?.members.length}
+                                            isAdmin={activeGroup?.adminUpeerId === chatStore.myIdentity?.upeerId}
+                                            groupId={activeGroupId}
+                                            onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
+                                            onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
                                         />
+                                    ) : (
+                                        <TopHeader
+                                            contactName={activeContact?.name}
+                                            avatar={activeContactAvatar}
+                                            isOnline={activeContact?.lastSeen && (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000}
+                                            isTyping={!!chatStore.typingStatus[targetUpeerId]}
+                                            status={activeContact?.status}
+                                            lastSeen={activeContact?.lastSeen}
+                                            vouchScore={effectiveVouchScore}
+                                            onDelete={() => handleClearChat(targetUpeerId)}
+                                            onShare={() => navigation.setShareModalOpen(true)}
+                                            onAccept={isIncomingRequest ? undefined : () => handleAcceptContact(targetUpeerId)}
+                                            onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
+                                        />
+                                    )}
 
-                                        {(isFilePickerOpen || isPreparingAttachments || isDragging) && (
-                                            <FilePreviewOverlay
-                                                files={pendingFiles}
-                                                isPreparingAttachments={isPreparingAttachments}
-                                                isDragging={isDragging}
-                                                vouchScore={activeContact?.vouchScore}
-                                                onDragOver={handleDragOver}
-                                                onDragLeave={handleDragLeave}
-                                                onDrop={handleDrop}
-                                                onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setPreparingAttachments(false); navigation.setIsDragging(false); }}
-                                                onSend={handleFileSubmit}
-                                                onAddMore={() => handleAttachFile('any')}
-                                                onRemove={(index: number) => {
-                                                    const newFiles = [...pendingFiles];
-                                                    newFiles.splice(index, 1);
-                                                    setPendingFiles(newFiles);
-                                                    if (newFiles.length === 0) setFilePickerOpen(false);
-                                                }}
+                                    {isIncomingRequest ? (
+                                        <IncomingRequestChat
+                                            contactName={activeContact?.name}
+                                            avatar={activeContactAvatar}
+                                            receivedAt={incomingRequest?.receivedAt}
+                                            onAccept={() => handleAcceptContact(targetUpeerId)}
+                                            onReject={handleBlockContact}
+                                            untrustworthyInfo={untrustworthyInfo}
+                                            vouchScore={effectiveVouchScore}
+                                        />
+                                    ) : (
+                                        <Box onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+                                            <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}>
+                                                <ChatArea
+                                                    key={activeGroupId || targetUpeerId}
+                                                    chatHistory={activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory}
+                                                    isGroup={!!activeGroupId}
+                                                    myIp={appStore.networkAddress || ''}
+                                                    contacts={chatStore.contacts.map((c: any) => ({ address: c.address, name: c.name, upeerId: c.upeerId }))}
+                                                    onReply={(msg: any) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
+                                                    onReact={handleReaction}
+                                                    onEdit={(msg: any) => {
+                                                        let editText = msg.message;
+                                                        if (editText.startsWith('{') && editText.endsWith('}')) {
+                                                            try {
+                                                                const parsed = JSON.parse(editText);
+                                                                if (typeof parsed.text === 'string') editText = parsed.text;
+                                                                else if (parsed.type === 'file' && typeof parsed.caption === 'string') editText = parsed.caption;
+                                                            } catch {
+                                                                editText = msg.message;
+                                                            }
+                                                        }
+                                                        setEditingMessage(msg);
+                                                        setMessage(editText);
+                                                    }}
+                                                    onDelete={handleDeleteMessage}
+                                                    onForward={(msg: any) => setForwardingMsg(msg)}
+                                                    onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
+                                                    onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
+                                                    onMediaClick={handleMediaClick}
+                                                    activeTransfers={activeGroupId ? [] : fileTransfer.allTransfers.filter((t: any) => t.upeerId === targetUpeerId)}
+                                                    onTransferStateChange={chatStore.updateFileTransferMessage}
+                                                />
+                                            </Box>
+                                            <InputArea
+                                                focusKey={`${activeGroupId || targetUpeerId}:${editingMessage?.id || ''}`}
+                                                message={message}
+                                                setMessage={setMessage}
+                                                onSend={editingMessage
+                                                    ? () => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message); setEditingMessage(null); setMessage(''); }
+                                                    : (activeGroupId ? () => handleSendGroupMessage() : handleSend)
+                                                }
+                                                onTyping={handleTyping}
+                                                onAttachFile={handleAttachFile}
+                                                onSendVoiceNote={handleSendVoiceNote}
+                                                disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? activeContact?.status !== 'connected' : false)}
+                                                replyToMessage={currentReplyToMessage ? {
+                                                    ...currentReplyToMessage,
+                                                    senderName: currentReplyToMessage.senderName || (currentReplyToMessage.isMine ? 'Tú' : activeContact?.name)
+                                                } : null}
+                                                onCancelReply={() => setReplyToMessage(activeGroupId || targetUpeerId, null)}
+                                                editingMessage={editingMessage}
+                                                onCancelEdit={() => { setEditingMessage(null); setMessage(''); }}
+                                                onScrollToMessage={handleScrollToMessage}
                                             />
-                                        )}
-                                    </Box>
+
+                                            {(isFilePickerOpen || isPreparingAttachments || isDragging) && (
+                                                <FilePreviewOverlay
+                                                    files={pendingFiles}
+                                                    isPreparingAttachments={isPreparingAttachments}
+                                                    isDragging={isDragging}
+                                                    vouchScore={activeContact?.vouchScore}
+                                                    onDragOver={handleDragOver}
+                                                    onDragLeave={handleDragLeave}
+                                                    onDrop={handleDrop}
+                                                    onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setPreparingAttachments(false); navigation.setIsDragging(false); }}
+                                                    onSend={handleFileSubmit}
+                                                    onAddMore={() => handleAttachFile('any')}
+                                                    onRemove={(index: number) => {
+                                                        const newFiles = [...pendingFiles];
+                                                        newFiles.splice(index, 1);
+                                                        setPendingFiles(newFiles);
+                                                        if (newFiles.length === 0) setFilePickerOpen(false);
+                                                    }}
+                                                />
+                                            )}
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                {!activeGroupId && activeContact && isContactInfoOpen && (
+                                    <ContactInfoPanel
+                                        contact={activeContact}
+                                        chatHistory={chatStore.chatHistory}
+                                        activeTransfers={fileTransfer.allTransfers.filter((t: any) => t.upeerId === targetUpeerId)}
+                                        onClose={() => setIsContactInfoOpen(false)}
+                                        onShare={() => navigation.setShareModalOpen(true)}
+                                        onClearChat={() => handleClearChat(targetUpeerId)}
+                                        onBlockContact={handleBlockContact}
+                                        onDeleteContact={() => handleDeleteContact(targetUpeerId)}
+                                        onOpenMedia={handleMediaClick}
+                                    />
                                 )}
                             </>
                         ) : (
                             <Box sx={{
+                                flexGrow: 1,
+                                width: '100%',
+                                minWidth: 0,
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 height: '100%', position: 'relative', px: 3, textAlign: 'center',
                                 backgroundColor: 'background.body',
@@ -346,19 +391,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     </Box>
 
                     <AddContactModal open={navigation.isAddModalOpen} onClose={() => navigation.setAddModalOpen(false)} onAdd={chatStore.handleAddContact} />
-                    <IdentityModal open={navigation.isIdentityModalOpen} onClose={() => navigation.setIdentityModalOpen(false)} identity={chatStore.myIdentity} />
                     <ShareContactModal open={navigation.isShareModalOpen} onClose={() => navigation.setShareModalOpen(false)} contacts={chatStore.contacts} onShare={(contact) => { if (targetUpeerId) window.upeer.sendContactCard(targetUpeerId, contact); }} />
 
-                    {navigation.isSecurityModalOpen && activeContact && (
-                        <SecurityModal
-                            open={navigation.isSecurityModalOpen}
-                            onClose={() => navigation.setSecurityModalOpen(false)}
-                            contactName={activeContact.name}
-                            contactPublicKey={activeContact.publicKey || ''}
-                            myPublicKey={chatStore.myIdentity?.publicKey || ''}
-                            knownAddresses={activeContact.knownAddresses}
-                        />
-                    )}
+
 
                     <CreateGroupModal open={navigation.isCreateGroupModalOpen} onClose={() => navigation.setCreateGroupModalOpen(false)} contacts={chatStore.contacts} onCreate={chatStore.handleCreateGroup} />
 

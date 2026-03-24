@@ -80,7 +80,7 @@ declare global {
                 error?: string;
             }>;
             getPathForFile: (file: File) => string;
-            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean, fileName?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
             retryFileTransfer: (fileId: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: any[]; error?: string }>;

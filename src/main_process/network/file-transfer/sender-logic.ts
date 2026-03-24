@@ -199,6 +199,7 @@ export async function startSend(
             ...(encryptedKey ? { encryptedKey, ...(encryptedKeyNonce ? { encryptedKeyNonce } : {}), useRecipientEphemeral: false } : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: transfer.caption,
+            isVoiceNote: transfer.isVoiceNote,
         };
 
         const sig = sign(Buffer.from(canonicalStringify(proposal)));

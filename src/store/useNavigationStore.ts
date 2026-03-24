@@ -5,7 +5,7 @@ import { MediaItem } from '../types/chat.js';
 // ── Tipos de vista de la sidebar ──────────────────────────────────────────────
 export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group';
 export type SidebarFilter = 'all' | 'unread' | 'favorites' | 'groups';
-export type AppView = 'chat' | 'settings';
+export type AppView = 'chat' | 'contacts' | 'settings';
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 interface NavigationState {
@@ -23,9 +23,7 @@ interface NavigationState {
 
     // Modals
     isAddModalOpen: boolean;
-    isIdentityModalOpen: boolean;
     isShareModalOpen: boolean;
-    isSecurityModalOpen: boolean;
     isCreateGroupModalOpen: boolean;
 
     // Overlays
@@ -45,6 +43,7 @@ interface NavigationState {
 interface NavigationActions {
     // Vista principal
     goToChat: () => void;
+    goToContacts: () => void;
     goToSettings: (section?: SettingsSection) => void;
     toggleSettings: () => void;
 
@@ -61,9 +60,7 @@ interface NavigationActions {
 
     // Modal Actions
     setAddModalOpen: (open: boolean) => void;
-    setIdentityModalOpen: (open: boolean) => void;
     setShareModalOpen: (open: boolean) => void;
-    setSecurityModalOpen: (open: boolean) => void;
     setCreateGroupModalOpen: (open: boolean) => void;
 
     // Overlays
@@ -90,9 +87,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
     sidebarSearch: '',
 
     isAddModalOpen: false,
-    isIdentityModalOpen: false,
     isShareModalOpen: false,
-    isSecurityModalOpen: false,
     isCreateGroupModalOpen: false,
 
     isFilePickerOpen: false,
@@ -105,6 +100,8 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
 
     // ── Acciones vista principal
     goToChat: () => set({ appView: 'chat', sidebarView: 'list', newChatSearch: '' }),
+
+    goToContacts: () => set({ appView: 'contacts', sidebarView: 'list', newChatSearch: '' }),
 
     goToSettings: (section) => set({
         appView: 'settings',
@@ -136,9 +133,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
 
     // ── Acciones Modals
     setAddModalOpen: (open) => set({ isAddModalOpen: open }),
-    setIdentityModalOpen: (open) => set({ isIdentityModalOpen: open }),
     setShareModalOpen: (open) => set({ isShareModalOpen: open }),
-    setSecurityModalOpen: (open) => set({ isSecurityModalOpen: open }),
     setCreateGroupModalOpen: (open) => set({ isCreateGroupModalOpen: open }),
 
     // ── Acciones Overlays

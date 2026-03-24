@@ -39,7 +39,8 @@ export interface Contact {
     upeerId: string;
     address: string;
     name: string;
-    status: 'pending' | 'incoming' | 'connected' | 'blocked';
+    alias?: string | null;
+    status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
     publicKey?: string;
     avatar?: string;
     lastSeen?: string;
@@ -50,6 +51,8 @@ export interface Contact {
     isTyping?: boolean;
     vouchScore?: number;
     knownAddresses?: string[];
+    blockedAt?: string | null;
+    isConversationOnly?: boolean;
 }
 
 export interface Group {

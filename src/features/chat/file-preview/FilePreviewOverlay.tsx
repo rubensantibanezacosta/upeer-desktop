@@ -24,9 +24,7 @@ import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
-import { UnsupportedVideoFallback } from '../../../components/ui/UnsupportedVideoFallback.js';
 import { getMimeType, toMediaUrl } from '../../../utils/fileUtils.js';
-import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../utils/videoPlayback.js';
 
 interface FileInfo {
     path: string;
@@ -38,7 +36,6 @@ interface FileInfo {
 
 interface FilePreviewOverlayProps {
     files: FileInfo[];
-    isPreparingAttachments?: boolean;
     onClose: () => void;
     onSend: (files: FileInfo[], thumbnails?: (string | undefined)[], captions?: string[]) => void;
     onAddMore: () => void;
@@ -357,7 +354,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
-    files, isPreparingAttachments = false, onClose, onSend, onAddMore, onRemove,
+    files, onClose, onSend, onAddMore, onRemove,
     isDragging, onDragOver, onDragLeave, onDrop,
 }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -370,9 +367,6 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 
     const currentFile = files[selectedIndex];
     const currentPreview = currentFile ? previews[currentFile.path] : null;
-    const isCurrentVideo = currentFile ? isVideoFile(currentFile.type, currentFile.name) : false;
-    const canPlayCurrentVideoInline = currentFile ? supportsInlineVideoPlayback(currentFile.type, currentFile.name) : false;
-    const currentVideoUnsupportedReason = currentFile ? getInlineVideoUnsupportedReason(currentFile.type, currentFile.name) : null;
 
     const handleSendAll = () => {
         const filesToSend = files.map(f => ({ ...f, path: assetPaths[f.path] || f.path }));
@@ -390,21 +384,6 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
 
     // Empty drag-only state
     if (!currentFile) {
-        if (isPreparingAttachments) {
-            return (
-                <Sheet variant="solid" color="neutral" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} sx={sheetSx}>
-                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2.5, p: 4, borderRadius: 'xl', backgroundColor: 'background.level1', minWidth: 320, boxShadow: 'lg' }}>
-                            <Box sx={{ width: 42, height: 42, border: '3px solid', borderColor: 'primary.500', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} />
-                            <Box sx={{ textAlign: 'center' }}>
-                                <Typography level="title-md" sx={{ mb: 0.5 }}>Preparando adjuntos…</Typography>
-                                <Typography level="body-sm" sx={{ color: 'text.secondary' }}>Copiando archivos al almacenamiento interno seguro.</Typography>
-                            </Box>
-                        </Box>
-                    </Box>
-                </Sheet>
-            );
-        }
         if (!isDragging) return null;
         return (
             <Sheet variant="solid" color="neutral" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} sx={sheetSx}>
@@ -492,30 +471,11 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                 </Typography>
             </Box>
 
-            {isPreparingAttachments && (
-                <Box sx={{ px: 2, pb: 1, display: 'flex', justifyContent: 'center' }}>
-                    <Box sx={{ px: 1.5, py: 0.75, borderRadius: 'md', backgroundColor: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 14, height: 14, border: '2px solid', borderColor: 'primary.400', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                        <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.75)' }}>Copiando a almacenamiento interno…</Typography>
-                    </Box>
-                </Box>
-            )}
-
             {/* Preview area */}
             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4, overflow: 'hidden' }}>
                 {currentPreview?.previewUrl ? (
-                    isCurrentVideo ? (
-                        canPlayCurrentVideoInline ? (
-                            <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
-                        ) : (
-                            <UnsupportedVideoFallback
-                                compact
-                                fileName={currentFile.name}
-                                reason={currentVideoUnsupportedReason || 'Este vídeo no se puede reproducir aquí.'}
-                                thumbnailSrc={currentPreview.thumbnail || undefined}
-                                onAction={() => window.upeer.openFile(assetPaths[currentFile.path] || currentFile.path)}
-                            />
-                        )
+                    (currentFile.type.startsWith('video/') || getMimeType(currentFile.name).startsWith('video/')) ? (
+                        <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
                     ) : (
                         <Box component="img" src={currentPreview.previewUrl} sx={{ maxWidth: '90%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 'md', boxShadow: 'lg', transition: 'all 0.3s ease' }} />
                     )

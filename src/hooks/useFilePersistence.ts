@@ -12,7 +12,7 @@ export interface PendingFile {
 }
 
 interface FileTransferApi {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean }) => Promise<{ success: boolean; fileId?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string }>;
 }
 
 export function useFilePersistence(fileTransfer: FileTransferApi) {
@@ -149,6 +149,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
             upeerId: effectiveId,
             filePath: finalPath,
             isVoiceNote: true,
+            fileName: file.name,
         });
 
         if (result.success && result.fileId) {

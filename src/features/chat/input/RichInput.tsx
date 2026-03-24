@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useRef, useCallback, useLayoutEffect, useEffect } from 'react';
 import { Box } from '@mui/joy';
 
 const DIM = 'opacity:0.4';
@@ -81,9 +81,11 @@ interface RichInputProps {
     placeholder?: string;
     disabled?: boolean;
     autoComplete?: string;
+    autoFocus?: boolean;
+    focusKey?: string;
 }
 
-export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown, placeholder, disabled }) => {
+export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown, placeholder, disabled, autoFocus = false, focusKey }) => {
     const ref = useRef<HTMLDivElement>(null);
     const composing = useRef(false);
     const fromInput = useRef(false);
@@ -95,6 +97,17 @@ export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown
             el.innerHTML = mdToHtml(value);
         }
     }, [value]);
+
+    useEffect(() => {
+        if (!autoFocus || disabled) return;
+        const el = ref.current;
+        if (!el) return;
+        const timer = window.setTimeout(() => {
+            el.focus({ preventScroll: true });
+            setOffset(el, (el.textContent ?? '').length);
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [autoFocus, disabled, focusKey]);
 
     const handleInput = useCallback(() => {
         const el = ref.current;

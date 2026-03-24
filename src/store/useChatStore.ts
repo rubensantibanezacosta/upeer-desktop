@@ -88,6 +88,7 @@ interface ChatActions {
     handleDeleteContact: (id?: string) => void;
     handleClearChat: (id?: string) => void;
     handleBlockContact: (id?: string) => void;
+    handleUnblockContact: (id: string) => void;
 
     // Utilities
     clearUntrustworthyAlert: () => void;
@@ -585,6 +586,14 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         window.upeer.blockContact(targetId).then(() => {
             get().refreshContacts();
             if (targetId === targetUpeerId) set({ targetUpeerId: '' });
+        });
+    },
+
+    handleUnblockContact: (id) => {
+        if (!id) return;
+
+        window.upeer.unblockContact(id).then(() => {
+            get().refreshContacts();
         });
     },
 

@@ -388,6 +388,9 @@ export interface StartFileTransferRequest {
     upeerId: string;
     filePath: string;
     thumbnail?: string;
+    caption?: string;
+    isVoiceNote?: boolean;
+    fileName?: string;
 }
 
 export interface StartFileTransferResponse {
@@ -597,6 +600,8 @@ export interface FileTransferStartedEvent {
     thumbnail?: string;
     fileHash: string;
     isVaulting?: boolean;
+    isVoiceNote?: boolean;
+    tempPath?: string;
     progress: number;
     bytesTransferred: number;
     totalBytes: number;
@@ -617,6 +622,8 @@ export interface FileTransferProgressEvent {
     thumbnail?: string;
     fileHash: string;
     isVaulting?: boolean;
+    isVoiceNote?: boolean;
+    tempPath?: string;
     progress: number;
     bytesTransferred: number;
     totalBytes: number;
@@ -637,6 +644,8 @@ export interface FileTransferCompletedEvent {
     thumbnail?: string;
     fileHash: string;
     isVaulting?: boolean;
+    isVoiceNote?: boolean;
+    tempPath?: string;
     progress: number;
     bytesTransferred: number;
     totalBytes: number;

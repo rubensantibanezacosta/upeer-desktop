@@ -29,14 +29,12 @@ interface SidebarProps {
     groups?: Group[];
     onSelectContact: (id: string) => void;
     onSelectGroup?: (groupId: string) => void;
-    onDeleteContact: (id: string) => void;
     onClearChat: (id: string) => void;
     onLeaveGroup?: (groupId: string) => void;
     selectedId?: string;
     selectedGroupId?: string;
     typingStatus?: Record<string, any>;
     onAddContact: (idAtAddress: string, name: string) => void;
-    onShowMyIdentity: () => void;
     onCreateGroup?: (name: string, memberIds: string[], avatar?: string) => Promise<any>;
 }
 
@@ -45,13 +43,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     groups = [],
     onSelectContact,
     onSelectGroup,
-    onDeleteContact,
     onClearChat,
     onLeaveGroup,
     selectedId,
     selectedGroupId,
     onAddContact,
-    onShowMyIdentity,
     typingStatus = {},
     onCreateGroup,
 }) => {
@@ -62,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         sidebarSearch,
         setSidebarView,
         setSidebarFilter,
+        setNewChatSearch,
         setSidebarSearch,
         setPendingScrollMsgId,
         openNewChat,
@@ -114,9 +111,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const searchedContacts = useMemo(() => {
         const q = newChatSearch.trim().toLowerCase();
-        if (!q) return contacts.filter(c => c.status === 'connected');
+        if (!q) return contacts.filter(c => c.status !== 'blocked' && !c.isConversationOnly);
         return contacts.filter(c =>
             c.status !== 'blocked' &&
+            !c.isConversationOnly &&
             (c.name?.toLowerCase().includes(q) ||
                 c.upeerId?.toLowerCase().includes(q))
         );
@@ -176,7 +174,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* ══ Panel 0: Lista principal ══════════════════════ */}
             <Box sx={panelSx('list')}>
                 <SidebarHeader
-                    onShowMyIdentity={onShowMyIdentity}
                     onAddNew={handleOpenNew}
                     onCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                 />
@@ -208,7 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     {mergedList.map(entry =>
                                         entry.kind === 'group'
                                             ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => { })} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
-                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onDelete={onDeleteContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />
+                                            : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />
                                     )}
 
                                     {sidebarSearch && searchResults.length > 0 && (
@@ -304,6 +301,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* ══ Panel 1: Nuevo chat ════════════════════════════ */}
             <Box sx={panelSx('new')}>
                 <NewChatHeader onBack={handleBack} />
+                <SidebarSearch
+                    value={newChatSearch}
+                    onChange={setNewChatSearch}
+                    placeholder="Buscar contactos"
+                    showFilters={false}
+                    autoFocus={sidebarView === 'new'}
+                    focusKey={sidebarView}
+                />
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
                     {!newChatSearch && (
                         <Box>
@@ -361,7 +366,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 contact={c}
                                 isSelected={false}
                                 onSelect={handleSelectExisting}
-                                onDelete={() => { }}
                                 onClear={() => { }}
                                 isTyping={false}
                             />

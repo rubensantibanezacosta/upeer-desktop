@@ -18,7 +18,6 @@ import StorageIcon from '@mui/icons-material/Storage';
 import InfoIcon from '@mui/icons-material/Info';
 import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
 import LogoutIcon from '@mui/icons-material/Logout';
-import BlockIcon from '@mui/icons-material/Block';
 
 import { SettingsPanelProps, SettingsSection } from './settings/types.js';
 import { SectionPerfil } from './settings/SectionPerfil.js';
@@ -29,14 +28,12 @@ import { SectionApariencia } from './settings/SectionApariencia.js';
 import { SectionAlmacenamiento } from './settings/SectionAlmacenamiento.js';
 import { SectionRed } from './settings/SectionRed.js';
 import { SectionAcerca } from './settings/SectionAcerca.js';
-import { SectionBloqueados } from './settings/SectionBloqueados.js';
 
 // ─── Definicion de secciones ─────────────────────────────────────────────────
 
 const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.ReactNode }[] = [
     { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <AccountCircleIcon /> },
     { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <LockIcon /> },
-    { id: 'bloqueados', label: 'Bloqueados', desc: 'Usuarios que no pueden contactarte', icon: <BlockIcon /> },
     { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <ShieldIcon /> },
     { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <NotificationsIcon /> },
     { id: 'apariencia', label: 'Apariencia', desc: 'Tema y tamaño de texto', icon: <PaletteIcon /> },
@@ -64,7 +61,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         switch (active) {
             case 'perfil': return <SectionPerfil identity={identity} networkAddress={networkAddress} onIdentityUpdate={onIdentityUpdate} />;
             case 'privacidad': return <SectionPrivacidad />;
-            case 'bloqueados': return <SectionBloqueados />;
             case 'seguridad': return <SectionSeguridad />;
             case 'notificaciones': return <SectionNotificaciones />;
             case 'apariencia': return <SectionApariencia />;

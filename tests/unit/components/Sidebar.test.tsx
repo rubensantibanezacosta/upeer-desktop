@@ -138,4 +138,19 @@ describe('Sidebar Component', () => {
 
         expect(defaultProps.onSelectContact).toHaveBeenCalledWith('c1');
     });
+
+    it('shows offline contacts in new conversation view', () => {
+        mockStore.sidebarView = 'new';
+
+        render(
+            <Sidebar
+                {...defaultProps}
+                contacts={[
+                    { upeerId: 'c3', name: 'Carol', status: 'offline', address: 'addr3', publicKey: 'pk3' } as any,
+                ]}
+            />
+        );
+
+        expect(screen.getAllByTestId('contact-c3').length).toBeGreaterThan(0);
+    });
 });
