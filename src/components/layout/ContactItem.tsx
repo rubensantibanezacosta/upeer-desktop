@@ -183,6 +183,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
                         <Typography
                             level="body-sm"
+                            component="div"
                             color={isPending ? "neutral" : (isTyping ? "primary" : "neutral")}
                             noWrap
                             sx={{

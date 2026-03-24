@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, IconButton, Avatar, Tooltip } from '@mui/joy';
 import ChatIcon from '@mui/icons-material/Chat';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -62,7 +62,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         onClick={onOpenContacts}
                         sx={{ borderRadius: 'sm' }}
                     >
-                        <AccountCircleIcon />
+                        <ContactsRoundedIcon />
                     </IconButton>
                 </Box>
             </Tooltip>

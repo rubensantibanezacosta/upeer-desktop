@@ -9,6 +9,7 @@ interface SidebarSearchProps {
     onChange: (val: string) => void;
     activeFilter?: string;
     onFilterChange?: (filter: string) => void;
+    filters?: Array<{ label: string; value: string }>;
     placeholder?: string;
     showFilters?: boolean;
     autoFocus?: boolean;
@@ -20,13 +21,14 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
     onChange,
     activeFilter = 'all',
     onFilterChange,
+    filters,
     placeholder = 'Buscar un chat o iniciar uno nuevo',
     showFilters = true,
     autoFocus = false,
     focusKey,
 }) => {
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const filters = [
+    const availableFilters = filters ?? [
         { label: 'Todos', value: 'all' },
         { label: 'No leídos', value: 'unread' },
         { label: 'Favoritos', value: 'favorites' },
@@ -93,7 +95,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
 
             {showFilters && onFilterChange && (
                 <Stack direction="row" spacing={1} sx={{ mt: 0.5, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
-                    {filters.map((f) => (
+                    {availableFilters.map((f) => (
                         <Chip
                             key={f.value}
                             variant={activeFilter === f.value ? "solid" : "soft"}

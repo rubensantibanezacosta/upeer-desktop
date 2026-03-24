@@ -527,24 +527,29 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     },
 
     handleAcceptContact: () => {
-        const { targetUpeerId, incomingRequests } = get();
+        const { targetUpeerId, incomingRequests, contacts } = get();
+        if (!targetUpeerId) return;
+
         const request = incomingRequests[targetUpeerId];
-        if (request?.publicKey) {
-            window.upeer.acceptContactRequest(targetUpeerId, request.publicKey).then(() => {
-                get().refreshContacts();
-                set(state => {
-                    const newRequests = { ...state.incomingRequests };
-                    delete newRequests[targetUpeerId];
-                    const newAlerts = { ...state.untrustworthyAlerts };
-                    delete newAlerts[targetUpeerId];
-                    return {
-                        incomingRequests: newRequests,
-                        untrustworthyAlerts: newAlerts,
-                        untrustworthyAlert: state.untrustworthyAlert?.upeerId === targetUpeerId ? null : state.untrustworthyAlert
-                    };
-                });
+        const contact = contacts.find(c => c.upeerId === targetUpeerId);
+        const publicKey = request?.publicKey || contact?.publicKey;
+
+        if (!publicKey) return;
+
+        window.upeer.acceptContactRequest(targetUpeerId, publicKey).then(() => {
+            get().refreshContacts();
+            set(state => {
+                const newRequests = { ...state.incomingRequests };
+                delete newRequests[targetUpeerId];
+                const newAlerts = { ...state.untrustworthyAlerts };
+                delete newAlerts[targetUpeerId];
+                return {
+                    incomingRequests: newRequests,
+                    untrustworthyAlerts: newAlerts,
+                    untrustworthyAlert: state.untrustworthyAlert?.upeerId === targetUpeerId ? null : state.untrustworthyAlert
+                };
             });
-        }
+        });
     },
 
     handleDeleteContact: (id) => {

@@ -197,6 +197,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
                     <ContactsPanel
                         contacts={chatStore.contacts}
+                        groups={chatStore.groups}
                         selectedContactId={chatStore.targetUpeerId}
                         onSelectContact={chatStore.setTargetUpeerId}
                         onOpenChat={(upeerId) => {

@@ -17,7 +17,7 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
     if (m.startsWith('{') && m.endsWith('}')) {
         try {
             const parsed = JSON.parse(m);
-            if (parsed.type === 'file' && (parsed.mimeType?.startsWith('image/') || parsed.mimeType?.startsWith('video/'))) {
+            if (parsed.type === 'file' && !parsed.isVoiceNote && (parsed.mimeType?.startsWith('image/') || parsed.mimeType?.startsWith('video/'))) {
                 thumbnail = parsed.thumbnail;
             }
         } catch { /* ignore */ }

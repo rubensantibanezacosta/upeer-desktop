@@ -50,6 +50,7 @@ export default function App() {
         const transfers = chatStore.activeGroupId ? [] : fileTransfer.allTransfers.filter(t => t.upeerId === chatStore.targetUpeerId);
         const isMediaFile = (f: any) => {
             if (!f) return false;
+            if (f.isVoiceNote) return false;
             const mime = f.mimeType?.toLowerCase() || '';
             const ext = f.fileName?.split('.').pop()?.toLowerCase() || '';
             const isImage = mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);

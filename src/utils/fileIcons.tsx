@@ -13,15 +13,26 @@ export const getFileIcon = (mimeType: string, fileName = '') => {
     const type = mimeType.toLowerCase();
     const name = fileName.toLowerCase();
 
-    if (type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) {
+    if (type.startsWith('image/')) {
         return <ImageIcon />;
     }
-    if (type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/.test(name)) {
+    if (type.startsWith('video/')) {
         return <VideoFileIcon />;
     }
-    if (type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a)$/.test(name)) {
+    if (type.startsWith('audio/')) {
         return <AudioFileIcon />;
     }
+
+    if (/\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) {
+        return <ImageIcon />;
+    }
+    if (/\.(mp4|mov|avi|mkv|webm)$/.test(name)) {
+        return <VideoFileIcon />;
+    }
+    if (/\.(mp3|wav|ogg|flac|m4a)$/.test(name)) {
+        return <AudioFileIcon />;
+    }
+
     if (
         type.includes('pdf') ||
         type.includes('word') ||

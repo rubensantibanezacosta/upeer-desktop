@@ -63,6 +63,10 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
         : (isTransferComplete ? 100 : 0);
 
     const [isDownloading, setIsDownloading] = useState(false);
+    if (data.isVoiceNote) {
+        return <AudioPlayer url={isTransferComplete && (fullPath || savedPath) ? toMediaUrl(fullPath || savedPath!) : ''} isMe={isMe} timestamp={timestamp} status={status} />;
+    }
+
     const isImage = mimeType.startsWith('image/');
     const isVideo = mimeType.startsWith('video/') ||
         mimeType.toLowerCase() === 'video/x-matroska' ||
@@ -93,10 +97,6 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
 
     if (isImage || isVideo) {
         return <MediaFileMessage {...sharedProps} thumbnail={thumbnail} isImage={isImage} isVideo={isVideo} />;
-    }
-
-    if (data.isVoiceNote) {
-        return <AudioPlayer url={isTransferComplete && (fullPath || savedPath) ? toMediaUrl(fullPath || savedPath!) : ''} isMe={isMe} timestamp={timestamp} status={status} />;
     }
 
     return <DocumentFileMessage {...sharedProps} />;
