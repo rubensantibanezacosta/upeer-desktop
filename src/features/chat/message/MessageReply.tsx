@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
 import { getFileIcon } from '../../../utils/fileIcons.js';
+import { getContactCardSummary } from './messageItemSupport.js';
 
 interface MessageReplyProps {
     originalMessage?: string;
@@ -60,7 +61,8 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
             {(() => {
                 if (!originalMessage) return 'Mensaje original';
                 const m = originalMessage;
-                if (m.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
+                const contactCardSummary = getContactCardSummary(m);
+                if (contactCardSummary) return contactCardSummary;
                 if (m.startsWith('{') && m.endsWith('}')) {
                     try {
                         const parsed = JSON.parse(m);
@@ -75,7 +77,6 @@ export const MessageReply: React.FC<MessageReplyProps> = ({ originalMessage, ori
                             );
                         }
                     } catch {
-                        // Si no es un JSON válido después de todo, devolvemos el texto original
                         return m;
                     }
                 }

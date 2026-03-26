@@ -61,6 +61,17 @@ export async function sendContactCard(targetUpeerId: string, contact: any): Prom
     if (!targetContact || targetContact.status !== 'connected') return undefined;
 
     const msgId = crypto.randomUUID();
+    const serializedMessage = JSON.stringify({
+        type: 'contact_card',
+        text: '',
+        contact: {
+            name: contact.name || '',
+            address: contact.address || '',
+            upeerId: contact.upeerId || '',
+            publicKey: contact.publicKey || '',
+            avatar: contact.avatar || undefined,
+        },
+    });
     const data = {
         type: 'CHAT_CONTACT',
         id: msgId,
@@ -68,9 +79,10 @@ export async function sendContactCard(targetUpeerId: string, contact: any): Prom
         contactAddress: contact.address,
         upeerId: contact.upeerId,
         contactPublicKey: contact.publicKey,
+        contactAvatar: contact.avatar,
     };
     const signature = sign(Buffer.from(canonicalStringify(data)));
-    await saveMessage(msgId, targetUpeerId, true, `CONTACT_CARD|${contact.name}`, undefined, signature.toString('hex'));
+    await saveMessage(msgId, targetUpeerId, true, serializedMessage, undefined, signature.toString('hex'));
 
     for (const address of getFanOutAddresses(targetContact)) {
         sendSecureUDPMessage(address, data, targetContact.publicKey);

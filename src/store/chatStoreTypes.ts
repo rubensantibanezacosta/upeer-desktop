@@ -38,6 +38,7 @@ export interface ChatActions {
     refreshGroups: () => Promise<void>;
     refreshData: () => Promise<void>;
     handleSend: (linkPreview?: LinkPreview | null) => Promise<void>;
+    handleShareContact: (contact: { name: string; address: string; upeerId?: string; publicKey?: string; avatar?: string }) => Promise<void>;
     handleSendGroupMessage: (message: string, linkPreview?: LinkPreview | null) => Promise<void>;
     handleReaction: (msgId: string, emoji: string, remove: boolean) => void;
     handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: LinkPreview | null) => void;

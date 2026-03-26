@@ -6,7 +6,7 @@ import { broadcastDhtUpdate, checkHeartbeat } from '../network/messaging/heartbe
 import { getContacts } from '../storage/contacts/operations.js';
 import { fileTransferManager } from '../network/file-transfer/transfer-manager.js';
 import { info, error as logError } from '../security/secure-logger.js';
-import { MAIN_WINDOW_VITE_DEV_SERVER_URL, MAIN_WINDOW_VITE_NAME } from './viteGlobals.js';
+import { onYggstackAddress } from '../sidecars/yggstack.js';
 
 export const ensureInternalAssetsDir = () => {
     const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
@@ -131,7 +131,7 @@ export const registerMediaProtocol = async () => {
     info('[Protocol] media:// registrado', {}, 'app');
 };
 
-export const createMainWindow = async (baseDir: string) => {
+export const createMainWindow = async (baseDir: string, devServerUrl: string | undefined, viteName: string) => {
     const mainWindow = new BrowserWindow({
         width: 1000,
         height: 800,
@@ -146,10 +146,10 @@ export const createMainWindow = async (baseDir: string) => {
 
     mainWindow.maximize();
 
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-        await mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    if (devServerUrl) {
+        await mainWindow.loadURL(devServerUrl);
     } else {
-        await mainWindow.loadFile(path.join(baseDir, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+        await mainWindow.loadFile(path.join(baseDir, `../renderer/${viteName}/index.html`));
     }
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {

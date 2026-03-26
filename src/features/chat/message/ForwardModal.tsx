@@ -6,6 +6,7 @@ import {
 } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import GroupsIcon from '@mui/icons-material/Groups';
+import { getContactCardSummary } from './messageItemSupport.js';
 
 interface ForwardTarget {
     id: string;
@@ -25,7 +26,8 @@ interface ForwardModalProps {
 
 const parseSubtitle = (raw?: string): string => {
     if (!raw) return '';
-    if (raw.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
+    const contactCardSummary = getContactCardSummary(raw);
+    if (contactCardSummary) return contactCardSummary;
     if (raw.startsWith('{') && raw.endsWith('}')) {
         try {
             const parsed = JSON.parse(raw);

@@ -15,6 +15,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import DescriptionIcon from '@mui/icons-material/Description';
+import ShareIcon from '@mui/icons-material/Share';
 
 
 export type AttachmentType =
@@ -23,12 +24,14 @@ export type AttachmentType =
     | 'video'
     | 'audio'
     | 'document'
+    | 'contact'
     | 'file'
     | 'folder';
 
 interface AttachmentButtonProps {
     onSelect: (type: AttachmentType) => void;
     disabled?: boolean;
+    allowContactShare?: boolean;
 }
 
 const ATTACHMENT_OPTIONS: Array<{
@@ -71,8 +74,21 @@ const ATTACHMENT_OPTIONS: Array<{
 
 export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
     onSelect,
-    disabled = false
+    disabled = false,
+    allowContactShare = false,
 }) => {
+    const options = allowContactShare
+        ? [
+            ...ATTACHMENT_OPTIONS,
+            {
+                type: 'contact' as AttachmentType,
+                label: 'Contacto',
+                icon: <ShareIcon />,
+                description: 'Comparte una tarjeta de contacto'
+            }
+        ]
+        : ATTACHMENT_OPTIONS;
+
     return (
         <Dropdown>
             <MenuButton
@@ -111,7 +127,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                 </MenuItem>
                 <ListDivider />
 
-                {ATTACHMENT_OPTIONS.map((option) => (
+                {options.map((option) => (
                     <MenuItem
                         key={option.type}
                         onClick={() => onSelect(option.type)}

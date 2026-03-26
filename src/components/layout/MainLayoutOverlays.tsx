@@ -42,7 +42,7 @@ export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
 }) => (
     <>
         <AddContactModal open={navigation.isAddModalOpen} onClose={() => navigation.setAddModalOpen(false)} onAdd={chatStore.handleAddContact} />
-        <ShareContactModal open={navigation.isShareModalOpen} onClose={() => navigation.setShareModalOpen(false)} contacts={chatStore.contacts} onShare={(contact) => { if (targetUpeerId) window.upeer.sendContactCard(targetUpeerId, contact); }} />
+        <ShareContactModal open={navigation.isShareModalOpen} onClose={() => navigation.setShareModalOpen(false)} contacts={chatStore.contacts} onShare={chatStore.handleShareContact} />
         <InviteGroupMembersModal open={isInviteGroupMembersOpen} onClose={() => setIsInviteGroupMembersOpen(false)} contacts={chatStore.contacts} group={activeGroup || null} onInvite={chatStore.handleInviteGroupMembers} />
         <CreateGroupModal open={navigation.isCreateGroupModalOpen} onClose={() => navigation.setCreateGroupModalOpen(false)} contacts={chatStore.contacts} onCreate={chatStore.handleCreateGroup} />
         <ForwardModal open={!!forwardingMsg} onClose={() => setForwardingMsg(null)} contacts={chatStore.contacts} groups={chatStore.groups} onSend={handleForward} />

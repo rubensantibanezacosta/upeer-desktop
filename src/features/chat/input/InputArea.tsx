@@ -26,6 +26,7 @@ interface InputAreaProps {
     editingMessage?: { id?: string; message: string } | null;
     onCancelEdit?: () => void;
     onAttachFile?: (type: AttachmentType) => void;
+    allowContactShare?: boolean;
     onScrollToMessage?: (msgId: string) => void;
     onSendVoiceNote?: (file: File) => Promise<void>;
     focusKey?: string;
@@ -34,7 +35,7 @@ interface InputAreaProps {
 export const InputArea: React.FC<InputAreaProps> = ({
     message, setMessage, onSend, onTyping, disabled,
     replyToMessage, onCancelReply, editingMessage, onCancelEdit,
-    onAttachFile, onScrollToMessage, onSendVoiceNote, focusKey
+    onAttachFile, allowContactShare = false, onScrollToMessage, onSendVoiceNote, focusKey
 }) => {
     const { isRecording, duration, stream, startRecording, stopRecording, cancelRecording } = useAudioRecorder();
     const canvasRef = useRecordingWaveform(isRecording, stream);
@@ -123,7 +124,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 ) : (
                     <>
                         <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
-                        <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} />
+                        <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
                         <RichInput
                             value={message}
                             onChange={handleChange}

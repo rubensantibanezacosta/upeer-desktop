@@ -7,6 +7,7 @@ import MicIcon from '@mui/icons-material/Mic';
 import { Group } from '../../types/chat.js';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
+import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 
 export const formatGroupItemTime = (iso?: string) => {
     if (!iso) {
@@ -55,8 +56,9 @@ export const renderGroupLastMessage = (group: Group, highlight: string) => {
     if (!group.lastMessage) {
         return `${group.members.length} miembro${group.members.length !== 1 ? 's' : ''}`;
     }
-    if (group.lastMessage.startsWith('CONTACT_CARD|')) {
-        return 'Tarjeta de contacto';
+    const contactCardSummary = getContactCardSummary(group.lastMessage);
+    if (contactCardSummary) {
+        return contactCardSummary;
     }
     if (group.lastMessage.startsWith('{') && group.lastMessage.endsWith('}')) {
         try {

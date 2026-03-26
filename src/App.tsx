@@ -5,9 +5,9 @@ import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
-import { parseMessage } from './features/chat/message/MessageItem.js';
+import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
-import type { LinkPreview } from './types/chat.js';
+import type { LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
 
 export default function App() {
@@ -16,6 +16,8 @@ export default function App() {
     const chatStore = useChatStore();
     const [editingMessage, setEditingMessage] = useState<any>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
+    const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
+    const { initListeners, refreshData, refreshGroups } = chatStore;
 
     const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage);
 
@@ -25,24 +27,24 @@ export default function App() {
 
     useEffect(() => {
         window.upeer.isPinEnabled().then((enabled: boolean) => setIsAppLocked(enabled));
-        appStore.checkAuth();
-        chatStore.initListeners();
-        chatStore.refreshData();
-        chatStore.refreshGroups();
+        checkAuth();
+        initListeners();
+        refreshData();
+        refreshGroups();
 
         window.upeer.getMyNetworkAddress().then((addr: string) => {
             if (addr && addr !== 'No detectado') {
-                appStore.setYggAddress(addr);
-                appStore.setNetworkStatus('up');
-                appStore.setFirstConnect(false);
+                setYggAddress(addr);
+                setNetworkStatus('up');
+                setFirstConnect(false);
             }
         });
-        const unsubscribeAddress = window.upeer.onYggstackAddress(appStore.setYggAddress) || (() => undefined);
+        const unsubscribeAddress = window.upeer.onYggstackAddress(setYggAddress) || (() => undefined);
         const unsubscribeStatus = window.upeer.onYggstackStatus((status: string, _addr?: string) => {
-            appStore.setNetworkStatus(status as any);
+            setNetworkStatus(status as any);
             if (status === 'up') {
-                appStore.setFirstConnect(false);
-                if (_addr) appStore.setYggAddress(_addr);
+                setFirstConnect(false);
+                if (_addr) setYggAddress(_addr);
             }
         }) || (() => undefined);
 
@@ -50,35 +52,57 @@ export default function App() {
             unsubscribeAddress();
             unsubscribeStatus();
         };
-    }, []);
+    }, [checkAuth, initListeners, refreshData, refreshGroups, setFirstConnect, setNetworkStatus, setYggAddress]);
 
     const handleMediaClick = (media: any) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
         const transfers = fileTransfer.allTransfers.filter(t => chatStore.activeGroupId ? t.chatUpeerId === chatStore.activeGroupId : t.upeerId === chatStore.targetUpeerId);
-        const isMediaFile = (f: any) => {
-            if (!f) return false;
-            if (f.isVoiceNote) return false;
-            return isPreviewableFile(f.mimeType, f.fileName);
-        };
-        const allMedia = history.map(msg => {
+        const activeContact = chatStore.contacts.find(c => c.upeerId === chatStore.targetUpeerId);
+        const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[chatStore.targetUpeerId]?.avatar;
+        const allMedia = history.reduce<MediaItem[]>((items, msg) => {
             const { fileData } = parseMessage(msg.message, msg.isMine, transfers);
-            if (!fileData) return null;
-            const activeContact = chatStore.contacts.find(c => c.upeerId === chatStore.targetUpeerId);
-            const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[chatStore.targetUpeerId]?.avatar;
-            const senderName = msg.isMine ? 'Tú' : (chatStore.activeGroupId ? (chatStore.contacts.find(c => c.upeerId === msg.senderUpeerId)?.name || msg.senderName) : activeContact?.name);
-            const senderAvatar = msg.isMine ? chatStore.myIdentity?.avatar : (chatStore.activeGroupId ? chatStore.contacts.find(c => c.upeerId === msg.senderUpeerId)?.avatar : activeContactAvatar);
-            return { ...fileData, messageId: msg.id, senderName, senderAvatar, timestamp: msg.timestamp };
-        }).filter(isMediaFile)
-            .map(f => ({ url: f.savedPath || f.filePath || '', fileName: f.fileName, mimeType: f.mimeType, fileId: f.fileId, messageId: f.messageId, thumbnail: f.thumbnail, senderName: f.senderName, senderAvatar: f.senderAvatar, timestamp: f.timestamp }));
+            if (!fileData || fileData.isVoiceNote || !isPreviewableFile(fileData.mimeType, fileData.fileName)) {
+                return items;
+            }
+
+            const url = fileData.savedPath || '';
+            if (!url) {
+                return items;
+            }
+
+            const senderName = msg.isMine
+                ? 'Tú'
+                : (chatStore.activeGroupId
+                    ? (chatStore.contacts.find(c => c.upeerId === msg.senderUpeerId)?.name || msg.senderName)
+                    : activeContact?.name);
+            const senderAvatar = (msg.isMine
+                ? chatStore.myIdentity?.avatar
+                : (chatStore.activeGroupId
+                    ? chatStore.contacts.find(c => c.upeerId === msg.senderUpeerId)?.avatar
+                    : activeContactAvatar)) ?? undefined;
+
+            items.push({
+                url,
+                fileName: fileData.fileName,
+                mimeType: fileData.mimeType,
+                fileId: fileData.fileId,
+                messageId: msg.id,
+                thumbnail: fileData.thumbnail,
+                senderName,
+                senderAvatar,
+                timestamp: msg.timestamp,
+            });
+            return items;
+        }, []);
 
         const initialIndex = allMedia.findIndex(m => m.fileId === media.fileId);
         if (initialIndex !== -1) {
             navigation.openMediaViewer(allMedia, initialIndex);
         } else if (allMedia.length > 0) {
-            const clickedMedia = { url: media.url, fileName: media.name, mimeType: media.mimeType, fileId: media.fileId, senderName: 'Tú', senderAvatar: chatStore.myIdentity?.avatar || undefined };
+            const clickedMedia: MediaItem = { url: media.url, fileName: media.name, mimeType: media.mimeType, fileId: media.fileId, senderName: 'Tú', senderAvatar: chatStore.myIdentity?.avatar ?? undefined };
             navigation.openMediaViewer([clickedMedia, ...allMedia], 0);
         } else {
-            navigation.openMediaViewer([{ url: media.url, fileName: media.name, mimeType: media.mimeType, fileId: media.fileId, senderName: 'Tú', senderAvatar: chatStore.myIdentity?.avatar || undefined }], 0);
+            navigation.openMediaViewer([{ url: media.url, fileName: media.name, mimeType: media.mimeType, fileId: media.fileId, senderName: 'Tú', senderAvatar: chatStore.myIdentity?.avatar ?? undefined }], 0);
         }
     };
 
@@ -130,7 +154,6 @@ export default function App() {
                 handleAcceptContact={chatStore.handleAcceptContact}
                 handleDeleteContact={chatStore.handleDeleteContact}
                 handleToggleFavorite={chatStore.handleToggleFavorite}
-                handleToggleFavoriteGroup={chatStore.handleToggleFavoriteGroup}
                 handleClearChat={chatStore.handleClearChat}
                 handleBlockContact={chatStore.handleBlockContact}
                 handleReaction={chatStore.handleReaction}

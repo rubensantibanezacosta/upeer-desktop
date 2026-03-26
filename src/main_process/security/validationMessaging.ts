@@ -249,6 +249,9 @@ export function validateChatContact(data: any): ValidationResult {
     if (!data.contactPublicKey || typeof data.contactPublicKey !== 'string' || data.contactPublicKey.length !== 64) {
         return { valid: false, error: 'Invalid contactPublicKey' };
     }
+    if (data.contactAvatar !== undefined && (typeof data.contactAvatar !== 'string' || !data.contactAvatar.startsWith('data:image/') || data.contactAvatar.length > 2_000_000)) {
+        return { valid: false, error: 'Invalid contactAvatar' };
+    }
     return { valid: true };
 }
 

@@ -85,6 +85,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         }
     };
 
+    const bubbleText = (() => {
+        if (isFile && fileData?.caption) return fileData.caption;
+        if (textContent !== null) return textContent;
+        if (isJSONFile || isContactCard) return '';
+        return msg.message;
+    })();
+
     return (
         <Box
             id={`msg-${msg.id}`}
@@ -137,7 +144,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                     borderRadius: '12px',
                                     borderTopRightRadius: isMe ? '4px' : '12px',
                                     borderTopLeftRadius: isMe ? '12px' : '4px',
-                                    maxWidth: isContactCard ? '320px' : '100%',
+                                    maxWidth: isContactCard ? '360px' : '100%',
                                     position: 'relative',
                                     opacity: msg.isDeleted ? 0.6 : 1,
                                     outline: '0px solid transparent',
@@ -151,11 +158,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                     </Box>
                                 )}
 
-                                {isContactCard && cardData && !msg.isDeleted ? (
-                                    <Box sx={{ p: 0.5 }}>
-                                        <ContactCard name={cardData.name} address={cardData.address} upeerId={cardData.upeerId} isMe={isMe} />
-                                    </Box>
-                                ) : isFile && fileData && !msg.isDeleted ? (
+                                {isFile && fileData && !msg.isDeleted ? (
                                     <FileMessageItem
                                         data={{ ...fileData, timestamp: msg.timestamp } as any}
                                         isMe={isMe}
@@ -192,24 +195,32 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                         px: 1,
                                         pb: 0.25
                                     }}>
-                                        <RichText
-                                            isMe={isMe}
-                                            level="body-md"
-                                            sx={{
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'pre-wrap',
-                                                fontStyle: msg.isDeleted ? 'italic' : 'normal',
-                                                pb: 0.5,
-                                                transform: msg.isDeleted ? 'translateY(2px)' : 'none'
-                                            }}
-                                        >
-                                            {(() => {
-                                                if (isFile && fileData && fileData.caption) return fileData.caption;
-                                                if (isJSONFile) return '';
-                                                if (textContent !== null) return textContent;
-                                                return msg.message;
-                                            })()}
-                                        </RichText>
+                                        {bubbleText ? (
+                                            <RichText
+                                                isMe={isMe}
+                                                level="body-md"
+                                                sx={{
+                                                    wordBreak: 'break-word',
+                                                    whiteSpace: 'pre-wrap',
+                                                    fontStyle: msg.isDeleted ? 'italic' : 'normal',
+                                                    pb: (linkPreviewData || cardData) ? 0 : 0.5,
+                                                    transform: msg.isDeleted ? 'translateY(2px)' : 'none'
+                                                }}
+                                            >
+                                                {bubbleText}
+                                            </RichText>
+                                        ) : null}
+                                        {cardData && !msg.isDeleted && (
+                                            <Box sx={{ width: '100%', mt: bubbleText ? 1 : 0.5 }}>
+                                                <ContactCard
+                                                    name={cardData.name}
+                                                    address={cardData.address}
+                                                    upeerId={cardData.upeerId}
+                                                    avatar={cardData.avatar}
+                                                    isMe={isMe}
+                                                />
+                                            </Box>
+                                        )}
                                         {linkPreviewData && !msg.isDeleted && (
                                             <Box sx={{ width: '100%', mt: 1 }}>
                                                 <LinkPreviewCard data={linkPreviewData} />

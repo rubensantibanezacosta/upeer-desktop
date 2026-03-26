@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Box } from '@mui/joy';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -8,7 +9,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import BlockIcon from '@mui/icons-material/Block';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
-import { parseMessage } from '../../features/chat/message/MessageItem.js';
+import { parseMessage } from '../../features/chat/message/messageItemSupport.js';
 import { toMediaUrl } from '../../utils/fileUtils.js';
 import { ChatMessage, Contact } from '../../types/chat.js';
 import { isMediaFile } from './contactInfoHelpers.js';

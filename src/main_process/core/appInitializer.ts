@@ -15,6 +15,9 @@ import {
   startBackgroundIntervals,
 } from './appInitializerSupport.js';
 
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare const MAIN_WINDOW_VITE_NAME: string;
+
 let heartbeatInterval: NodeJS.Timeout | null = null;
 let dhtInterval: NodeJS.Timeout | null = null;
 
@@ -60,7 +63,7 @@ export async function initializeApp(baseDir: string): Promise<void> {
   initIdentity(userDataPath);
   await initDB(userDataPath);
 
-  const mainWindow = await createMainWindow(baseDir);
+  const mainWindow = await createMainWindow(baseDir, MAIN_WINDOW_VITE_DEV_SERVER_URL, MAIN_WINDOW_VITE_NAME);
   setMainWindow(mainWindow);
 
   if (!isSessionLocked()) {

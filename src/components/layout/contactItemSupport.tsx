@@ -14,6 +14,7 @@ import MicIcon from '@mui/icons-material/Mic';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
+import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 
 const parseJsonMessage = (message: string) => {
     try {
@@ -90,8 +91,9 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
     if (!contact.lastMessage) {
         return '';
     }
-    if (contact.lastMessage.startsWith('CONTACT_CARD|')) {
-        return 'Tarjeta de contacto';
+    const contactCardSummary = getContactCardSummary(contact.lastMessage);
+    if (contactCardSummary) {
+        return contactCardSummary;
     }
 
     if (contact.lastMessage.startsWith('{') && contact.lastMessage.endsWith('}')) {

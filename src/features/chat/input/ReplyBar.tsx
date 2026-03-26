@@ -3,6 +3,7 @@ import { Box, IconButton, Typography } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 import { toMediaUrl } from '../../../utils/fileUtils.js';
+import { getContactCardSummary } from '../message/messageItemSupport.js';
 
 interface ReplyBarProps {
     replyToMessage: { id?: string; message: string; isMine: boolean; senderName?: string };
@@ -29,7 +30,8 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
     }
 
     const previewText = (() => {
-        if (m.startsWith('CONTACT_CARD|')) return 'Tarjeta de contacto';
+        const contactCardSummary = getContactCardSummary(m);
+        if (contactCardSummary) return contactCardSummary;
         if (m.startsWith('{') && m.endsWith('}')) {
             try {
                 const parsed = JSON.parse(m);

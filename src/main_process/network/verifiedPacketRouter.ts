@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import { verify, getMyUPeerId, setMyAlias, setMyAvatar } from '../security/identity.js';
 import { info, warn } from '../security/secure-logger.js';
 import { fileTransferManager } from './file-transfer/transfer-manager.js';
-import { handleChatAck, handleChatDelete, handleChatEdit, handleChatMessage, handleChatReaction, handleChatClear } from './handlers/chat.js';
+import { handleChatAck, handleChatClear, handleChatContact, handleChatDelete, handleChatEdit, handleChatMessage, handleChatReaction } from './handlers/chat.js';
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
 import { handleReputationDeliver, handleReputationGossip, handleReputationRequest } from './handlers/reputation.js';
 import { handleSyncPulse } from './handlers/sync.js';
@@ -97,6 +97,7 @@ export async function routeVerifiedPacket(args: {
             win?.webContents.send('peer-typing', { upeerId: upeerId });
             break;
         case 'CHAT_CONTACT':
+            await handleChatContact(upeerId, data, win, signature, rinfo.address, sendResponse);
             break;
         case 'CHAT_REACTION':
             handleChatReaction(upeerId, data, win);

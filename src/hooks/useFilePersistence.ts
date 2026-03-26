@@ -20,7 +20,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         contacts, targetUpeerId, activeGroupId, pendingFiles, setPendingFiles,
         setIsDragging, addFileTransferMessage
     } = useChatStore();
-    const { setFilePickerOpen, setPreparingAttachments } = useNavigationStore();
+    const { setFilePickerOpen, setPreparingAttachments, setShareModalOpen } = useNavigationStore();
 
     const effectiveId = activeGroupId || targetUpeerId;
     const activeContact = contacts.find(c => c.upeerId === targetUpeerId);
@@ -66,6 +66,12 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
 
     const handleAttachFile = async (type: AttachmentType) => {
         if (!effectiveId) return;
+        if (type === 'contact') {
+            if (!activeGroupId && targetUpeerId) {
+                setShareModalOpen(true);
+            }
+            return;
+        }
         let filters: any[] = [];
         let title = 'Seleccionar archivo';
         switch (type) {

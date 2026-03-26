@@ -1,8 +1,17 @@
 import type { LinkPreview } from '../../../types/chat.js';
 import type { FileMessageData } from '../file/FileMessageItem.js';
 
+export interface ContactCardData {
+    name: string;
+    address: string;
+    upeerId: string;
+    publicKey?: string;
+    avatar?: string;
+    text?: string | null;
+}
+
 export interface ParsedMessageData {
-    cardData: any;
+    cardData: ContactCardData | null;
     fileData: FileMessageData | null;
     isJSONFile: boolean;
     linkPreviewData: LinkPreview | null;
@@ -17,21 +26,50 @@ const parseMessageJson = (message: string) => {
     }
 };
 
+const parseContactCardJson = (message: string): ContactCardData | null => {
+    if (!message.startsWith('{') || !message.endsWith('}')) {
+        return null;
+    }
+
+    const parsed = parseMessageJson(message);
+    if (parsed?.type !== 'contact_card') {
+        return null;
+    }
+
+    const contact = parsed.contact ?? {};
+    return {
+        name: contact.name || '',
+        address: contact.address || '',
+        upeerId: contact.upeerId || '',
+        publicKey: contact.publicKey || undefined,
+        avatar: contact.avatar || undefined,
+        text: typeof parsed.text === 'string' ? parsed.text : null,
+    };
+};
+
+export const getContactCardSummary = (message: string): string | null => {
+    const cardData = parseContactCardJson(message);
+    if (!cardData) {
+        return null;
+    }
+
+    return cardData.text?.trim() || 'Tarjeta de contacto';
+};
+
 export const parseMessage = (message: string, isMe: boolean, activeTransfers: any[]): ParsedMessageData => {
-    let cardData: any = null;
+    let cardData: ContactCardData | null = null;
     let fileData: FileMessageData | null = null;
     let isJSONFile = false;
     let linkPreviewData: LinkPreview | null = null;
     let textContent: string | null = null;
 
-    if (message.startsWith('CONTACT_CARD|')) {
-        const parts = message.split('|');
-        cardData = { name: parts[1], address: parts[2], upeerId: parts[3], publicKey: parts[4] };
-    }
-
     if (message.startsWith('{') && message.endsWith('}')) {
         const parsed = parseMessageJson(message);
-        if (parsed?.type === 'file') {
+        const parsedCardData = parseContactCardJson(message);
+        if (parsedCardData) {
+            cardData = parsedCardData;
+            textContent = parsedCardData.text ?? null;
+        } else if (parsed?.type === 'file') {
             isJSONFile = true;
             const direction = parsed.direction || (isMe ? 'sending' : 'receiving');
             const activeTransfer = activeTransfers.find((transfer) =>

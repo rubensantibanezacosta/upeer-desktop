@@ -83,6 +83,21 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         get().refreshContacts();
     },
 
+    handleShareContact: async (contact: { name: string; address: string; upeerId?: string; publicKey?: string; avatar?: string }) => {
+        const { targetUpeerId, activeGroupId } = get();
+        if (!targetUpeerId || activeGroupId) {
+            return;
+        }
+
+        const msgId = await window.upeer.sendContactCard(targetUpeerId, contact);
+        if (!msgId) {
+            return;
+        }
+
+        await get().reloadLatestHistory();
+        await get().refreshContacts();
+    },
+
     handleSendGroupMessage: async (message: string, linkPreview?: any) => {
         const { activeGroupId, myIdentity, replyByConversation } = get();
         if (!activeGroupId || !message) {

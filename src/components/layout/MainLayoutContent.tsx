@@ -113,7 +113,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+        <Box sx={{ display: 'flex', flexGrow: 1, minWidth: 0, width: '100%', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
             <DragOverlay isDragging={isDragging} />
             <NavigationRail
                 myIp={appStore.networkAddress}
@@ -223,6 +223,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 }
                                                 onTyping={handleTyping}
                                                 onAttachFile={handleAttachFile}
+                                                allowContactShare={!activeGroupId && !!targetUpeerId}
                                                 onSendVoiceNote={handleSendVoiceNote}
                                                 disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? activeContact?.status !== 'connected' : false)}
                                                 replyToMessage={currentReplyToMessage ? {
