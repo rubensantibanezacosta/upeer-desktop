@@ -1,19 +1,26 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AppLock } from '../../../../src/components/ui/AppLock';
 
 // Mock de la API de uPeer expuesta en el objeto window
 const mockVerifyPin = vi.fn();
+const mockDeleteIdentity = vi.fn();
 const mockIsPinEnabled = vi.fn();
 (window as any).upeer = {
     verifyPin: mockVerifyPin,
-    isPinEnabled: mockIsPinEnabled
+    isPinEnabled: mockIsPinEnabled,
+    deleteIdentity: mockDeleteIdentity
 };
 
 describe('AppLock Component (UI-to-Backend Integration)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubGlobal('confirm', vi.fn(() => true));
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it('should handle segmented PIN input and auto-submit', async () => {
@@ -73,5 +80,16 @@ describe('AppLock Component (UI-to-Backend Integration)', () => {
         fireEvent.keyDown(input2, { key: 'Backspace' });
 
         expect(document.activeElement).toBe(input1);
+    });
+
+    it('should delete local identity when choosing another account', async () => {
+        render(<AppLock onUnlock={vi.fn()} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Iniciar sesión con otra cuenta/i }));
+
+        await waitFor(() => {
+            expect(window.confirm).toHaveBeenCalled();
+            expect(mockDeleteIdentity).toHaveBeenCalledTimes(1);
+        });
     });
 });

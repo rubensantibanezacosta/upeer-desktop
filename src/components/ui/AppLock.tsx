@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Box, Typography, Input, Button, Stack, Sheet } from '@mui/joy';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
+import { Box, Typography, Input, Button, Stack, Sheet, Avatar } from '@mui/joy';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useChatStore } from '../../store/useChatStore.js';
 
 interface AppLockProps {
     onUnlock: () => void;
@@ -11,6 +12,7 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+    const myIdentity = useChatStore((state) => state.myIdentity);
 
     React.useEffect(() => {
         // Autofocus the first input shortly after mounting
@@ -95,23 +97,17 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
                     gap: 3,
                 }}
             >
-                <Box
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        mx: 'auto',
-                        width: 48,
-                        height: 48,
-                        borderRadius: '50%',
-                        bgcolor: 'primary.softBg',
-                        alignItems: 'center'
-                    }}
+                <Avatar
+                    size="lg"
+                    src={myIdentity?.avatar || undefined}
+                    variant="soft"
+                    sx={{ width: 64, height: 64, mx: 'auto', borderRadius: 'md', fontSize: '2rem' }}
                 >
-                    <LockRoundedIcon sx={{ fontSize: '1.5rem', color: 'primary.solidBg' }} />
-                </Box>
+                    {(myIdentity?.alias || 'U')[0].toUpperCase()}
+                </Avatar>
 
                 <Box>
-                    <Typography level="h4" sx={{ fontWeight: 'xl' }}>uPeer</Typography>
+                    <Typography level="h4" sx={{ fontWeight: 'xl' }}>{myIdentity?.alias || 'uPeer'}</Typography>
                     <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
                         Introduce tu PIN de acceso para continuar
                     </Typography>
@@ -156,6 +152,21 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
                         fullWidth
                     >
                         Desbloquear
+                    </Button>
+
+                    <Button
+                        variant="plain"
+                        color="neutral"
+                        startDecorator={<LogoutIcon />}
+                        onClick={async () => {
+                            if (confirm('Se borrarán todos tus datos locales para iniciar sesión con otra cuenta. ¿Estás seguro?')) {
+                                await window.upeer.deleteIdentity();
+                            }
+                        }}
+                        fullWidth
+                        sx={{ mt: -1 }}
+                    >
+                        Iniciar sesión con otra cuenta
                     </Button>
                 </Stack>
             </Box>
