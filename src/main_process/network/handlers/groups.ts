@@ -51,7 +51,9 @@ export async function handleGroupMessage(
     // Security check: Is the sender a member of the group?
     if (!existingGroup.members.includes(upeerId)) {
         security('Unauthorized group message!', { sender: upeerId, groupId }, 'security');
-        issueVouch(upeerId, VouchType.MALICIOUS).catch(() => { });
+        issueVouch(upeerId, VouchType.MALICIOUS).catch((err) => {
+            warn('Failed to issue malicious group message vouch', { upeerId, err: String(err) }, 'reputation');
+        });
         return;
     }
 

@@ -1,10 +1,11 @@
 import React, { useRef } from 'react';
-import { Box, IconButton, Typography } from '@mui/joy';
+import { Box, IconButton } from '@mui/joy';
 import { EmptyChat } from './EmptyChat.js';
 import { MessageItem } from './message/MessageItem.js';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
+import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
 
 interface ChatMessage {
     id?: string;
@@ -34,6 +35,7 @@ interface ChatAreaProps {
     onDelete: (msgId: string) => void;
     onForward?: (msg: ChatMessage) => void;
     activeTransfers?: any[];
+    onRetryMessage?: (msgId: string) => void;
     onRetryTransfer?: (fileId: string) => void;
     onCancelTransfer?: (fileId: string) => void;
     onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
@@ -41,7 +43,7 @@ interface ChatAreaProps {
     onTransferStateChange?: (fileId: string, updates: any) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
@@ -119,18 +121,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
     };
 
     const handleScrollToMessage = (id: string) => {
-        const element = document.getElementById(`msg-${id}`);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            // Highlight effect instead of shadow
-            const sheet = element.querySelector('.MuiSheet-root');
-            if (sheet) {
-                sheet.classList.remove('highlight-message-active');
-                void (sheet as HTMLElement).offsetWidth; // Force reflow
-                sheet.classList.add('highlight-message-active');
-            }
-        }
+        highlightChatMessage(id);
     };
 
     if (chatHistory.length === 0) {
@@ -146,25 +137,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
         );
     }
 
-    // We use column-reverse to force the scroll to start at the bottom naturally.
-    // This requires us to render the history in reverse order.
     const reversedHistory = [...chatHistory].reverse();
-
-    const formatDateLabel = (date: number) => {
-        const d = new Date(date);
-        const now = new Date();
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
-
-        if (d.toDateString() === now.toDateString()) return 'Hoy';
-        if (d.toDateString() === yesterday.toDateString()) return 'Ayer';
-
-        // If same year, don't show year
-        if (d.getFullYear() === now.getFullYear()) {
-            return d.toLocaleDateString([], { day: '2-digit', month: 'long' });
-        }
-        return d.toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' });
-    };
 
     return (
         <Box
@@ -207,6 +180,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 originalSenderName={getReplySenderName(msg.replyTo)}
                                 activeTransfers={activeTransfers}
                                 onScrollToMessage={handleScrollToMessage}
+                                onRetryMessage={onRetryMessage}
                                 onRetryTransfer={onRetryTransfer}
                                 onCancelTransfer={onCancelTransfer}
                                 onMediaClick={onMediaClick}
@@ -216,53 +190,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 onTransferStateChange={onTransferStateChange}
                             />
                         ) : (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', my: 0.5 }}>
-                                <Typography
-                                    level="body-xs"
-                                    sx={{
-                                        px: 1.5, py: 0.4,
-                                        borderRadius: 'xl',
-                                        backgroundColor: 'background.level2',
-                                        color: 'text.tertiary',
-                                        fontStyle: 'italic',
-                                        userSelect: 'none',
-                                    }}
-                                >
-                                    {msg.message}
-                                </Typography>
-                            </Box>
+                            <ChatSystemMessage message={msg.message} />
                         )}
                         {showSeparator && (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
-                                <Box sx={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-                                    <Typography
-                                        level="body-xs"
-                                        sx={{
-                                            px: 2, py: 0.5,
-                                            borderRadius: 'lg',
-                                            backgroundColor: 'background.level1',
-                                            color: 'text.secondary',
-                                            fontWeight: 600,
-                                            fontSize: '11px',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            zIndex: 1
-                                        }}
-                                    >
-                                        {formatDateLabel(msg.date)}
-                                    </Typography>
-                                    <Box sx={{
-                                        position: 'absolute', top: '50%', left: 0, right: 0,
-                                        height: '1px', backgroundColor: 'divider', zIndex: 0
-                                    }} />
-                                </Box>
-                            </Box>
+                            <ChatDateSeparator date={msg.date} />
                         )}
                     </React.Fragment>
                 );
             })}
 
-            {/* Scroll to bottom floating button */}
             {showScrollButton && (
                 <IconButton
                     variant="soft"

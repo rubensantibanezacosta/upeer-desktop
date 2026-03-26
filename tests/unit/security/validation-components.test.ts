@@ -207,7 +207,7 @@ describe('Validation - Advanced Components', () => {
                 totalChunks: 1,
                 chunkSize: 64 * 1024,
                 fileHash: 'a'.repeat(64),
-                chatUpeerId: 'grp-123'
+                chatUpeerId: 'grp-123',
                 messageId: 'msg-123',
             }).valid).toBe(true);
 

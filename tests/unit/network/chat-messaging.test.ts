@@ -17,6 +17,10 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     getMessageById: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/messages/status.js', () => ({
+    getMessageStatus: vi.fn(),
+}));
+
 vi.mock('../../../src/main_process/storage/messages/reactions.js', () => ({
     saveReaction: vi.fn(),
     deleteReaction: vi.fn(),
@@ -88,6 +92,7 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
 describe('network/messaging/chat.ts', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useRealTimers();
     });
 
     it('vaults immediately when contact is known but disconnected', async () => {
@@ -187,6 +192,65 @@ describe('network/messaging/chat.ts', () => {
         );
     });
 
+    it('marks offline messages as failed when vault replication has no custodians', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-offline',
+            status: 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::2',
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0 as any);
+
+        const result = await sendUDPMessage('peer-offline', 'sin custodios');
+
+        expect(result).toBeDefined();
+        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
+    });
+
+    it('encrypts legacy chat fallback to the recipient identity key even when ephemeral is available', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            ephemeralPublicKey: 'bb'.repeat(32),
+            ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
+            address: '200::9',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+
+        await sendUDPMessage('peer-online', 'hola legacy');
+
+        expect(identity.encrypt).toHaveBeenCalledWith(
+            Buffer.from('hola legacy', 'utf-8'),
+            Buffer.from('aa'.repeat(32), 'hex')
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::9',
+            expect.objectContaining({
+                type: 'CHAT',
+                useRecipientEphemeral: false,
+                ephemeralPublicKey: '22'.repeat(32),
+            }),
+            'aa'.repeat(32),
+            false
+        );
+    });
+
     it('drops imageBase64 from previews that would exceed online chat validation limits', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
@@ -240,7 +304,7 @@ describe('network/messaging/chat.ts', () => {
         );
     });
 
-    it('uses recipient ephemeral key for chat updates when available', async () => {
+    it('uses recipient identity key for chat updates even when ephemeral is available', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const identity = await import('../../../src/main_process/security/identity.js');
@@ -263,13 +327,13 @@ describe('network/messaging/chat.ts', () => {
 
         expect(identity.encrypt).toHaveBeenCalledWith(
             Buffer.from('mensaje editado', 'utf-8'),
-            Buffer.from('bb'.repeat(32), 'hex')
+            Buffer.from('aa'.repeat(32), 'hex')
         );
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::9',
             expect.objectContaining({
                 type: 'CHAT_UPDATE',
-                useRecipientEphemeral: true,
+                useRecipientEphemeral: false,
                 ephemeralPublicKey: '22'.repeat(32),
             }),
             'aa'.repeat(32)
@@ -278,7 +342,7 @@ describe('network/messaging/chat.ts', () => {
             'peer-online',
             expect.objectContaining({
                 type: 'CHAT_UPDATE',
-                useRecipientEphemeral: true,
+                useRecipientEphemeral: false,
             })
         );
         expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(
@@ -319,7 +383,7 @@ describe('network/messaging/chat.ts', () => {
         );
         expect(identity.encrypt).toHaveBeenCalledWith(
             Buffer.from(JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }), 'utf-8'),
-            Buffer.from('bb'.repeat(32), 'hex')
+            Buffer.from('aa'.repeat(32), 'hex')
         );
     });
 
@@ -446,6 +510,35 @@ describe('network/messaging/chat.ts', () => {
                 signature: Buffer.from('sig').toString('hex')
             })
         );
+    });
+
+    it('marks connected messages as failed after ack timeout when vault fallback also fails', async () => {
+        vi.useFakeTimers();
+
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const messageStatus = await import('../../../src/main_process/storage/messages/status.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            address: '200::9',
+            knownAddresses: '[]'
+        } as any);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
+        vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as any);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0 as any);
+
+        const result = await sendUDPMessage('peer-online', 'sin ack');
+
+        await vi.advanceTimersByTimeAsync(2600);
+
+        expect(result).toBeDefined();
+        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
     });
 
     it('cleans local attachment data when deleting a file message', async () => {

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { like, gte, lte } from 'drizzle-orm';
 import { getDb, getSchema, getSqlite, eq, desc, and, runTransaction } from '../shared.js';
-import { updateMessageStatus, getMessageStatus } from './status.js';
+import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
 
 export { updateMessageStatus, getMessageStatus };
 
@@ -37,7 +37,7 @@ function purgeBrokenLegacySanitizedMessages(messages: any[], db: any, schema: an
     return validMessages;
 }
 
-export async function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number) {
+export async function saveMessage(id: string, chatUpeerId: string, isMine: boolean, message: string, replyTo?: string, signature?: string, status: MessageDeliveryStatus = 'sent', senderUpeerId?: string, timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
 
@@ -75,8 +75,12 @@ export async function saveMessage(id: string, chatUpeerId: string, isMine: boole
     }).onConflictDoUpdate({
         target: schema.messages.id,
         set: {
-            message: message, // Actualizar el JSON con thumbnail/caption
-            status: status
+            message,
+            replyTo,
+            signature,
+            senderUpeerId,
+            status,
+            timestamp: messageTimestamp
         }
     }).run();
 
@@ -234,7 +238,7 @@ export function searchMessages(query: string, limit = 25) {
         .all();
 }
 
-export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: 'sent' | 'delivered' | 'read' | 'vaulted' = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string, isVoiceNote?: boolean) {
+export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: MessageDeliveryStatus = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string, isVoiceNote?: boolean) {
     const _db = getDb();
     const _schema = getSchema();
 

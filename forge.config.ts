@@ -8,6 +8,10 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import * as path from 'path';
 
+const createDebMaker = (options: Record<string, unknown>) => new MakerDeb({
+  options,
+} as unknown as ConstructorParameters<typeof MakerDeb>[0]);
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
@@ -28,55 +32,47 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
-    // Debian para x64
-    new MakerDeb({
-      // @ts-ignore
-      options: {
-        name: 'upeer-chat',
-        productName: 'uPeer P2P',
-        icon: './resources/icon.png',
-        categories: ['Network', 'Utility'],
-        maintainer: 'upeer Team',
-        description: 'Chat descentralizado P2P con red mesh Yggdrasil',
-        productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
-        bin: 'upeer-chat',
-        scripts: {
-          postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
-          postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
-          prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
-        },
-        // extraFiles no está soportado por electron-installer-debian
-        // Usamos scripts postinst para copiar archivos necesarios
-        mimeType: [
-          'x-scheme-handler/upeer'
-        ],
-        section: 'net'
-      }
+    createDebMaker({
+      name: 'upeer-chat',
+      productName: 'uPeer P2P',
+      icon: './resources/icon.png',
+      categories: ['Network', 'Utility'],
+      maintainer: 'upeer Team',
+      description: 'Chat descentralizado P2P con red mesh Yggdrasil',
+      productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
+      bin: 'upeer-chat',
+      scripts: {
+        postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
+        postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
+        prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
+      },
+      // extraFiles no está soportado por electron-installer-debian
+      // Usamos scripts postinst para copiar archivos necesarios
+      mimeType: [
+        'x-scheme-handler/upeer'
+      ],
+      section: 'net'
     }),
-    // Debian para arm64
-    new MakerDeb({
-      // @ts-ignore
-      options: {
-        name: 'upeer-chat',
-        productName: 'uPeer P2P',
-        icon: './resources/icon.png',
-        categories: ['Network', 'Utility'],
-        maintainer: 'upeer Team',
-        description: 'Chat descentralizado P2P con red mesh Yggdrasil',
-        productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
-        bin: 'upeer-chat',
-        scripts: {
-          postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
-          postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
-          prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
-        },
-        // extraFiles no está soportado por electron-installer-debian
-        // Usamos scripts postinst para copiar archivos necesarios
-        mimeType: [
-          'x-scheme-handler/upeer'
-        ],
-        section: 'net'
-      }
+    createDebMaker({
+      name: 'upeer-chat',
+      productName: 'uPeer P2P',
+      icon: './resources/icon.png',
+      categories: ['Network', 'Utility'],
+      maintainer: 'upeer Team',
+      description: 'Chat descentralizado P2P con red mesh Yggdrasil',
+      productDescription: 'Aplicación de chat completamente descentralizada que utiliza redes mesh Yggdrasil para comunicaciones privadas y seguras sin servidores centrales.',
+      bin: 'upeer-chat',
+      scripts: {
+        postinst: path.resolve(__dirname, 'install-scripts/debian/postinst'),
+        postrm: path.resolve(__dirname, 'install-scripts/debian/postrm'),
+        prerm: path.resolve(__dirname, 'install-scripts/debian/prerm')
+      },
+      // extraFiles no está soportado por electron-installer-debian
+      // Usamos scripts postinst para copiar archivos necesarios
+      mimeType: [
+        'x-scheme-handler/upeer'
+      ],
+      section: 'net'
     }),
     // MakerDeb para arm64 (comentado - usar el mismo paquete para ambas arquitecturas)
     // new MakerDeb({

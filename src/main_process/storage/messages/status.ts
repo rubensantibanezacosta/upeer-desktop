@@ -1,24 +1,36 @@
 import { getDb, getSchema, eq } from '../shared.js';
 
-export async function updateMessageStatus(id: string, status: 'sent' | 'delivered' | 'read' | 'vaulted'): Promise<boolean> {
+export type MessageDeliveryStatus = 'failed' | 'sent' | 'delivered' | 'read' | 'vaulted';
+
+export async function updateMessageStatus(id: string, status: MessageDeliveryStatus): Promise<boolean> {
     const db = getDb();
     const schema = getSchema();
 
-    // Status precedence order to prevent race conditions (e.g., ACK arriving after READ)
     const statusOrder: Record<string, number> = {
-        'sent': 0,
-        'vaulted': 1,
-        'delivered': 2,
-        'read': 3
+        'failed': 0,
+        'sent': 1,
+        'vaulted': 2,
+        'delivered': 3,
+        'read': 4
     };
 
     const currentStatus = getMessageStatus(id);
     if (currentStatus) {
-        const currentRank = statusOrder[currentStatus] ?? 0;
-        const newRank = statusOrder[status] ?? 0;
+        if (status === 'failed') {
+            if (currentStatus !== 'sent') return false;
+        } else if (currentStatus === 'failed' && status === 'sent') {
+            const result = db.update(schema.messages)
+                .set({ status })
+                .where(eq(schema.messages.id, id))
+                .run();
 
-        // Don't downgrade status (e.g., from 'read' to 'delivered')
-        if (newRank <= currentRank) return false;
+            return result.changes > 0;
+        } else {
+            const currentRank = statusOrder[currentStatus] ?? 0;
+            const newRank = statusOrder[status] ?? 0;
+
+            if (newRank <= currentRank) return false;
+        }
     }
 
     const result = db.update(schema.messages)

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TransferValidator } from '../../../src/main_process/network/file-transfer/validator.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -22,7 +22,7 @@ describe('TransferValidator - Unit Tests', () => {
         await fs.writeFile(testFile, 'hello world');
 
         const result = await validator.validateAndPrepareFile(testFile);
-        
+
         expect(result.name).toBe('valid.txt');
         expect(result.size).toBe(11);
         expect(result.hash).toBeDefined();
@@ -73,7 +73,7 @@ describe('TransferValidator - Unit Tests', () => {
         });
 
         it('should reject mismatch in totalChunks/fileSize (implicit in chunkSize)', () => {
-            const invalid = { ...validMeta, fileSize: 5000, totalChunks: 1, chunkSize: 100 };
+            const _invalid = { ...validMeta, fileSize: 5000, totalChunks: 1, chunkSize: 100 };
             // Este test depende de si el validador comprueba la coherencia matemática
             // Agreguemos una comprobación de coherencia si no existe
         });

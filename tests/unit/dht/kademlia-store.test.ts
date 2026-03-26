@@ -123,8 +123,6 @@ describe('Kademlia ValueStore', () => {
         });
 
         it('should create unique Vault Pointer keys each day', () => {
-            const k1 = createVaultPointerKey('recipient1');
-
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-01'));
             const kA = createVaultPointerKey('recipient1');

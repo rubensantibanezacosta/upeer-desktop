@@ -60,18 +60,6 @@ export class BootstrapManager {
             warn('Failed to load seed nodes from file', error, 'kademlia-bootstrap');
         }
 
-        try {
-            const lanSeeds = await this.loadSeedNodesFromLAN();
-            for (const seed of lanSeeds) {
-                if (!seenIds.has(seed.upeerId)) {
-                    seedNodes.push(seed);
-                    seenIds.add(seed.upeerId);
-                }
-            }
-        } catch (error) {
-            warn('Failed to load seed nodes from LAN', error, 'kademlia-bootstrap');
-        }
-
         info(`Loaded ${seedNodes.length} seed nodes from ${seenIds.size} unique sources`, undefined, 'kademlia-bootstrap');
         return seedNodes;
     }
@@ -137,10 +125,6 @@ export class BootstrapManager {
             warn('Error reading seed nodes from file', error, 'kademlia-bootstrap');
             return [];
         }
-    }
-
-    private async loadSeedNodesFromLAN(): Promise<SeedNode[]> {
-        return [];
     }
 
     bootstrapFromContacts(): number {

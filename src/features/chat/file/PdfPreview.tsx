@@ -49,6 +49,9 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
                 component="iframe"
                 title={`Vista previa de ${name}`}
                 src={buildPdfSrc(src)}
+                sandbox="allow-downloads allow-same-origin allow-scripts"
+                referrerPolicy="no-referrer"
+                loading="lazy"
                 sx={{ width: '100%', height: '100%', border: 0, backgroundColor: 'background.body' }}
             />
         </Box>

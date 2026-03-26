@@ -37,14 +37,19 @@ export default function App() {
                 appStore.setFirstConnect(false);
             }
         });
-        window.upeer.onYggstackAddress(appStore.setYggAddress);
-        window.upeer.onYggstackStatus((status: string, _addr?: string) => {
+        const unsubscribeAddress = window.upeer.onYggstackAddress(appStore.setYggAddress) || (() => undefined);
+        const unsubscribeStatus = window.upeer.onYggstackStatus((status: string, _addr?: string) => {
             appStore.setNetworkStatus(status as any);
             if (status === 'up') {
                 appStore.setFirstConnect(false);
                 if (_addr) appStore.setYggAddress(_addr);
             }
-        });
+        }) || (() => undefined);
+
+        return () => {
+            unsubscribeAddress();
+            unsubscribeStatus();
+        };
     }, []);
 
     const handleMediaClick = (media: any) => {

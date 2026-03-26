@@ -22,7 +22,7 @@ export async function handleDhtUpdate(upeerId: string, contact: any, data: any) 
         network('Updating location', undefined, { upeerId, address: block.address, dhtSeq: block.dhtSeq }, 'dht');
         // Multi-device persistence: save device info from block if available
         if (block.deviceId && block.deviceMeta) {
-            upsertDevice(upeerId, block.deviceId, block.deviceMeta).catch(err => {
+            upsertDevice(upeerId, block.deviceId, block.deviceMeta).catch(() => {
                 security('Failed to upsert device from DHT', { upeerId, deviceId: block.deviceId }, 'dht');
             });
         }
@@ -56,7 +56,7 @@ export async function handleDhtExchange(upeerId: string, data: any) {
         if (block.dhtSeq > (existing.dhtSeq || 0)) {
             // Multi-device persistence: save device info from block if available
             if (block.deviceId && block.deviceMeta) {
-                upsertDevice(peer.upeerId, block.deviceId, block.deviceMeta).catch(err => {
+                upsertDevice(peer.upeerId, block.deviceId, block.deviceMeta).catch(() => {
                     security('Failed to upsert device from PEEREX', { upeerId: peer.upeerId, deviceId: block.deviceId }, 'dht');
                 });
             }

@@ -469,6 +469,41 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.state).toBe('cancelled');
     });
 
+    it('should notify file-transfer-failed when a stale transfer is marked failed', () => {
+        const transfer = manager.store.createTransfer({
+            fileId: 'stale-file',
+            upeerId: 'peer1',
+            peerAddress: 'addr1',
+            fileName: 'stale.txt',
+            fileSize: 100,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'f'.repeat(64),
+            direction: 'sending',
+            filePath: '/tmp/stale.txt'
+        });
+
+        manager.store.updateTransfer(transfer.fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+        });
+        const current = manager.getTransfer(transfer.fileId, 'sending');
+        if (!current) throw new Error('Transfer not found');
+        current.lastActivity = Date.now() - 10_000;
+
+        manager.checkStaleTransfers(1000);
+
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'file-transfer-failed',
+            expect.objectContaining({
+                fileId: 'stale-file',
+                reason: 'peer_disconnected',
+                state: 'failed'
+            })
+        );
+    });
+
     it('should handle peer cancellation', async () => {
         const fileId = '550e8400-e29b-41d4-a716-446655440003';
         // Simulamos que el peer nos propone algo

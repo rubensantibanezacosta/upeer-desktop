@@ -174,7 +174,7 @@ describe('Kademlia ProtocolHandler', () => {
             lastSeen: Date.now()
         });
 
-        const findPromise = handler.findValue(remoteKey);
+        void handler.findValue(remoteKey);
 
         // Ensure message was sent
         expect(mockSendMessage).toHaveBeenCalledWith('3.3.3.3', expect.objectContaining({

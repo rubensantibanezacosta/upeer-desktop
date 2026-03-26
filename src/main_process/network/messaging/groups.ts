@@ -19,16 +19,8 @@ import { buildMessagePayload } from '../messagePayload.js';
 import { encryptGroupMessage } from '../groupState.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
-import { EPH_FRESHNESS_MS, MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 export { createGroup, inviteToGroup, updateGroup, leaveGroup } from './groupControl.js';
-
-function shouldUseEphemeral(contact: any): boolean {
-    if (!contact?.ephemeralPublicKey) return false;
-    const updatedAt = contact.ephemeralPublicKeyUpdatedAt
-        ? new Date(contact.ephemeralPublicKeyUpdatedAt).getTime()
-        : 0;
-    return updatedAt > 0 && (Date.now() - updatedAt) < EPH_FRESHNESS_MS;
-}
 
 /**
  * Send a text message to a group (fan-out to each member).
@@ -125,7 +117,9 @@ export async function sendGroupMessage(
                         if (!addresses.includes(node.address)) addresses.push(node.address);
                     }
                 }
-            } catch { /* silent */ }
+            } catch (err) {
+                warn('Failed to discover self addresses for group fan-out', { groupId, err: String(err) }, 'network');
+            }
         }
 
         // Añadir todas las direcciones conocidas del contacto
@@ -134,7 +128,9 @@ export async function sendGroupMessage(
             for (const addr of known) {
                 if (!addresses.includes(addr)) addresses.push(addr);
             }
-        } catch { /* ignore */ }
+        } catch (err) {
+            warn('Failed to parse knownAddresses for group fan-out', { groupId, memberUpeerId, err: String(err) }, 'network');
+        }
 
         // Enviar a todas las direcciones conocidas del miembro (o de nosotros mismos)
         const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');

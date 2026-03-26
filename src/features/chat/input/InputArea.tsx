@@ -40,7 +40,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const canvasRef = useRecordingWaveform(isRecording, stream);
     const [voiceError, setVoiceError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
-    const { linkPreview, isLoadingPreview, hasMd, dismissPreview } = useInputPreview(message);
+    const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
 
     const handleChange = (val: string) => {
         setMessage(val);

@@ -2,81 +2,18 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
-import sharp from 'sharp';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { debug, warn, error as logError } from '../../security/secure-logger.js';
-
-const FFMPEG_PATH = ffmpegInstaller.path;
-
-const SUPPORTED_IMAGE_TYPES = new Set([
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp',
-    'image/tiff',
-    'image/avif'
-]);
-
-const SUPPORTED_VIDEO_TYPES = new Set([
-    'video/mp4',
-    'video/webm',
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska',
-    'video/ogg',
-    'video/3gpp',
-    'video/3gpp2'
-]);
-
-const SUPPORTED_AUDIO_TYPES = new Set([
-    'audio/mpeg',
-    'audio/mp3',
-    'audio/ogg',
-    'audio/wav',
-    'audio/x-wav',
-    'audio/flac',
-    'audio/aac',
-    'audio/mp4',
-    'audio/x-m4a',
-    'audio/webm'
-]);
-
-const MIME_TO_FORMAT: Record<string, keyof sharp.FormatEnum> = {
-    'image/jpeg': 'jpeg',
-    'image/jpg': 'jpeg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/tiff': 'tiff',
-    'image/avif': 'avif'
-};
-
-const MIME_TO_EXTENSION: Record<string, string> = {
-    'image/jpeg': '.jpg',
-    'image/jpg': '.jpg',
-    'image/png': '.png',
-    'image/webp': '.webp',
-    'image/tiff': '.tiff',
-    'image/avif': '.avif',
-    'video/mp4': '.mp4',
-    'video/webm': '.webm',
-    'video/quicktime': '.mov',
-    'video/x-msvideo': '.avi',
-    'video/x-matroska': '.mkv',
-    'video/ogg': '.ogv',
-    'video/3gpp': '.3gp',
-    'video/3gpp2': '.3g2',
-    'audio/mpeg': '.mp3',
-    'audio/mp3': '.mp3',
-    'audio/ogg': '.ogg',
-    'audio/wav': '.wav',
-    'audio/x-wav': '.wav',
-    'audio/flac': '.flac',
-    'audio/aac': '.aac',
-    'audio/mp4': '.m4a',
-    'audio/x-m4a': '.m4a',
-    'audio/webm': '.weba'
-};
+import {
+    canSanitizeMime,
+    checkFfmpegAvailable,
+    isImageMime,
+    isVideoOrAudioMime,
+} from './metadataSanitizerSupport.js';
+import {
+    stripImageMetadata,
+    stripMediaMetadata,
+    verifySanitizedOutput,
+} from './metadataSanitizerProcessing.js';
 
 export interface SanitizationResult {
     sanitizedPath: string;
@@ -104,39 +41,20 @@ export class MetadataSanitizer {
     }
 
     private async checkFfmpegAvailable(): Promise<boolean> {
-        if (this.ffmpegAvailable !== null) return this.ffmpegAvailable;
-
-        return new Promise((resolve) => {
-            const proc = spawn(FFMPEG_PATH, ['-version'], { stdio: ['ignore', 'ignore', 'ignore'] });
-            proc.on('close', (code) => {
-                this.ffmpegAvailable = code === 0;
-                if (this.ffmpegAvailable) {
-                    debug('FFmpeg available (bundled)', { path: FFMPEG_PATH }, 'metadata-sanitizer');
-                }
-                resolve(this.ffmpegAvailable);
-            });
-            proc.on('error', () => {
-                this.ffmpegAvailable = false;
-                warn('FFmpeg not available', { path: FFMPEG_PATH }, 'metadata-sanitizer');
-                resolve(false);
-            });
-        });
+        this.ffmpegAvailable = await checkFfmpegAvailable(this.ffmpegAvailable);
+        return this.ffmpegAvailable;
     }
 
     canSanitize(mimeType: string): boolean {
-        const normalized = mimeType.toLowerCase();
-        return SUPPORTED_IMAGE_TYPES.has(normalized) ||
-            SUPPORTED_VIDEO_TYPES.has(normalized) ||
-            SUPPORTED_AUDIO_TYPES.has(normalized);
+        return canSanitizeMime(mimeType);
     }
 
     private isImage(mimeType: string): boolean {
-        return SUPPORTED_IMAGE_TYPES.has(mimeType.toLowerCase());
+        return isImageMime(mimeType);
     }
 
     private isVideoOrAudio(mimeType: string): boolean {
-        const normalized = mimeType.toLowerCase();
-        return SUPPORTED_VIDEO_TYPES.has(normalized) || SUPPORTED_AUDIO_TYPES.has(normalized);
+        return isVideoOrAudioMime(mimeType);
     }
 
     async sanitizeFile(filePath: string, mimeType: string): Promise<SanitizationResult> {
@@ -224,91 +142,15 @@ export class MetadataSanitizer {
     }
 
     private async verifySanitization(outputPath: string): Promise<boolean> {
-        try {
-            const stats = await fs.stat(outputPath);
-            return stats.size > 0;
-        } catch (err) {
-            warn('Sanitized file not accessible for verification', { err: String(err) }, 'metadata-sanitizer');
-            return false;
-        }
+        return verifySanitizedOutput(outputPath);
     }
 
     private async stripImageMetadata(inputPath: string, outputPath: string, mimeType: string): Promise<string[]> {
-        const metadataRemoved: string[] = [];
-        const format = MIME_TO_FORMAT[mimeType] || 'jpeg';
-
-        const image = sharp(inputPath);
-        const metadata = await image.metadata();
-
-        if (metadata.exif) metadataRemoved.push('EXIF');
-        if (metadata.icc) metadataRemoved.push('ICC');
-        if (metadata.iptc) metadataRemoved.push('IPTC');
-        if (metadata.xmp) metadataRemoved.push('XMP');
-
-        const pipeline = image.rotate();
-
-        switch (format) {
-            case 'jpeg':
-                await pipeline.jpeg({ quality: 95, mozjpeg: true }).toFile(outputPath);
-                break;
-            case 'png':
-                await pipeline.png({ compressionLevel: 6 }).toFile(outputPath);
-                break;
-            case 'webp':
-                await pipeline.webp({ quality: 95 }).toFile(outputPath);
-                break;
-            case 'tiff':
-                await pipeline.tiff({ quality: 95 }).toFile(outputPath);
-                break;
-            case 'avif':
-                await pipeline.avif({ quality: 85 }).toFile(outputPath);
-                break;
-            default:
-                await pipeline.toFile(outputPath);
-        }
-
-        return metadataRemoved;
+        return stripImageMetadata(inputPath, outputPath, mimeType);
     }
 
     private async stripMediaMetadata(inputPath: string, outputPath: string): Promise<string[]> {
-        return new Promise((resolve, reject) => {
-            const args = [
-                '-i', inputPath,
-                '-map_metadata', '-1',
-                '-map_chapters', '-1',
-                '-fflags', '+bitexact',
-                '-flags:v', '+bitexact',
-                '-flags:a', '+bitexact',
-                '-c', 'copy',
-                '-y',
-                outputPath
-            ];
-
-            const ffmpeg = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-
-            let stderr = '';
-            ffmpeg.stderr?.on('data', (data: Buffer) => {
-                stderr += data.toString();
-            });
-
-            ffmpeg.on('close', (code) => {
-                if (code === 0) {
-                    const metadataRemoved: string[] = [];
-                    if (stderr.includes('Metadata')) metadataRemoved.push('Metadata');
-                    if (stderr.includes('encoder')) metadataRemoved.push('Encoder');
-                    if (stderr.includes('creation_time')) metadataRemoved.push('CreationTime');
-                    if (stderr.includes('location')) metadataRemoved.push('GPS');
-                    if (metadataRemoved.length === 0) metadataRemoved.push('AllMetadata');
-                    resolve(metadataRemoved);
-                } else {
-                    reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`));
-                }
-            });
-
-            ffmpeg.on('error', (err) => {
-                reject(new Error(`FFmpeg spawn error: ${err.message}`));
-            });
-        });
+        return stripMediaMetadata(inputPath, outputPath);
     }
 
     private getExtensionFromMime(mimeType: string): string {

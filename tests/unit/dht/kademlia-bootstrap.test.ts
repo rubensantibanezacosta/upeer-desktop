@@ -79,14 +79,6 @@ describe('BootstrapManager Unit Tests', () => {
         });
     });
 
-    describe('loadSeedNodesFromLAN', () => {
-        it('should return an empty array (currently placeholder)', async () => {
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromLAN();
-            expect(Array.isArray(seeds)).toBe(true);
-            expect(seeds.length).toBe(0);
-        });
-    });
-
     describe('loadSeedNodes', () => {
         it('should aggregate seeds from all sources and filter duplicates', async () => {
             const mockDnsRecord = [['upeerId=dns1;address=1.1.1.1;publicKey=pub1']];

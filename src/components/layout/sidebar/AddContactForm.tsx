@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Input, FormControl, FormLabel, Stack, Alert, Button } from '@mui/joy';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
 
 interface AddContactFormProps {
     onAdd: (id: string, name: string) => void;
@@ -24,11 +25,8 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onAdd, onDone })
             return;
         }
         const normalizedIp = ip.trim();
-        const segments = normalizedIp.split(':');
-        // BUG DW fix: validar rango completo 200::/7 (200:-3ff:), igual que main.ts
-        const YGG_REGEX = /^[23][0-9a-f]{2}:/i;
-        if (!YGG_REGEX.test(normalizedIp) || segments.length !== 8) {
-            setError('Dirección Yggdrasil inválida. Debe tener 8 segmentos comenzando con 200:-3ff:');
+        if (!isYggdrasilAddress(normalizedIp)) {
+            setError('Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo 200::/8 y 300::/8.');
             return;
         }
         if (upeerId && name) {
@@ -64,7 +62,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onAdd, onDone })
                             sx={{ fontFamily: 'monospace', fontSize: '12px', backgroundColor: 'background.level1' }}
                         />
                         <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.6 }}>
-                            Formato: UPeerID@200:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
+                            Formato: UPeerID@200:... o UPeerID@300:...
                         </Typography>
                     </FormControl>
                     <FormControl required>

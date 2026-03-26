@@ -31,7 +31,9 @@ export async function handleVaultDelivery(
 
     debug('Handling vault delivery', { count: entries.length, from: senderSid }, 'vault');
 
-    issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch(() => { });
+    issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => {
+        warn('Failed to issue vault retrieved vouch', { senderSid, err: String(err) }, 'reputation');
+    });
 
     // Solo ACK-ar entradas que pasaron integridad y fueron procesadas sin error.
     // Entradas corrompidas o manipuladas NO se ACKên → el custodio las conserva.
@@ -71,7 +73,9 @@ export async function handleVaultDelivery(
 
                     if (!isInnerValid) {
                         security('Vault delivery integrity failure!', { originalSender: entry.senderSid, custodian: senderSid }, 'vault');
-                        issueVouch(senderSid, VouchType.INTEGRITY_FAIL).catch(() => { });
+                        issueVouch(senderSid, VouchType.INTEGRITY_FAIL).catch((err) => {
+                            warn('Failed to issue integrity failure vouch', { senderSid, err: String(err) }, 'reputation');
+                        });
                         continue;
                     }
 
@@ -146,7 +150,9 @@ export async function handleVaultDelivery(
                     // Raw Data / Shards
                     if (entry.payloadHash.startsWith('shard:')) {
                         debug('Received file shard from vault', { cid: entry.payloadHash }, 'vault');
-                        issueVouch(senderSid, VouchType.VAULT_CHUNK).catch(() => { });
+                        issueVouch(senderSid, VouchType.VAULT_CHUNK).catch((err) => {
+                            warn('Failed to issue vault chunk vouch', { senderSid, err: String(err) }, 'reputation');
+                        });
 
                         // For shards, we store them as assets. 
                         // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)

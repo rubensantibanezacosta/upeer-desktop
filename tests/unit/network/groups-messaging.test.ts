@@ -141,7 +141,7 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
-    it('uses recipient ephemeral key for online GROUP_UPDATE delivery', async () => {
+    it('uses static identity key for online GROUP_UPDATE delivery', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const identity = await import('../../../src/main_process/security/identity.js');
@@ -174,13 +174,13 @@ describe('network/messaging/groups.ts', () => {
 
         expect(identity.encrypt).toHaveBeenCalledWith(
             Buffer.from(JSON.stringify({ groupName: 'Nuevo nombre' }), 'utf-8'),
-            Buffer.from('bb'.repeat(32), 'hex')
+            Buffer.from('aa'.repeat(32), 'hex')
         );
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_UPDATE',
-                useRecipientEphemeral: true,
+                useRecipientEphemeral: false,
                 ephemeralPublicKey: '22'.repeat(32)
             }),
             'aa'.repeat(32)
@@ -283,6 +283,8 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            ephemeralPublicKey: 'bb'.repeat(32),
+            ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
             address: '200::10',
             knownAddresses: '[]'
         } as any);

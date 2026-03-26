@@ -14,14 +14,7 @@ import {
     validateVaultRenew,
     validateFileChunk,
     validateGroupMsg,
-    validateGroupAck,
-    validateGroupInvite,
-    validateGroupUpdate,
-    validateGroupLeave,
-    validateReputationGossip,
-    validateReputationRequest,
-    validateReputationDeliver,
-    validateMessage
+    validateGroupLeave
 } from '../../../src/main_process/security/validation.js';
 
 describe('Security Validation - Comprehensive Tests', () => {

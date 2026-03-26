@@ -64,7 +64,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     safeProgress,
     transferState,
     isDownloading,
-    isVaulting,
+    isVaulting: _isVaulting,
     onOpen,
     onCancel,
     onRetry,

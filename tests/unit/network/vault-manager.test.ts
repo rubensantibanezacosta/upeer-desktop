@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VaultManager } from '../../../src/main_process/network/vault/manager.js';
 
+type VaultManagerPrivate = typeof VaultManager & {
+    getDynamicReplicationFactor: (targetUpeerId: string) => Promise<number>;
+    sendWithRetry: (address: string, packet: Record<string, unknown>, maxRetries: number, baseDelayMs: number) => Promise<void>;
+};
+
+const vaultManagerPrivate = VaultManager as unknown as VaultManagerPrivate;
+
 // Mocks
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
@@ -46,8 +53,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
         vi.mocked(getVouchScore).mockResolvedValue(95);
 
-        // @ts-ignore - Accediendo a método privado para test
-        const factor = await VaultManager.getDynamicReplicationFactor('target-id');
+        const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
         expect(factor).toBe(3); // MIN_REPLICATION_FACTOR
     });
 
@@ -55,8 +61,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
         vi.mocked(getVouchScore).mockResolvedValue(20);
 
-        // @ts-ignore
-        const factor = await VaultManager.getDynamicReplicationFactor('target-id');
+        const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
         expect(factor).toBe(12); // MAX_REPLICATION_FACTOR
     });
 
@@ -72,8 +77,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
             status: 'connected'
         } as any);
 
-        // @ts-ignore
-        const factor = await VaultManager.getDynamicReplicationFactor('target-id');
+        const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
         expect(factor).toBeGreaterThanOrEqual(6); // DEFAULT_REPLICATION_FACTOR o más
     });
 
@@ -88,8 +92,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
             { upeerId: 'friend-3', address: '127.0.0.1:3', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'friend-4', address: '127.0.0.1:4', status: 'connected', lastSeen: new Date().toISOString() }
         ];
-        // @ts-ignore
-        vi.mocked(getContacts).mockResolvedValue(mockContacts);
+        vi.mocked(getContacts).mockReturnValue(mockContacts as never);
         vi.mocked(sendSecureUDPMessage).mockResolvedValue(undefined);
 
         const packet = { type: 'CHAT', content: 'test msg' };
@@ -110,8 +113,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
             .mockRejectedValueOnce(new Error('UDP Timeout'))
             .mockResolvedValueOnce(undefined);
 
-        // @ts-ignore - Accediendo a método privado para test de reintentos
-        await VaultManager.sendWithRetry('127.0.0.1:999', { type: 'TEST' }, 3, 10);
+        await vaultManagerPrivate.sendWithRetry('127.0.0.1:999', { type: 'TEST' }, 3, 10);
 
         expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
     });

@@ -77,11 +77,7 @@ export class ChunkVault {
         const { sign } = await import('../../security/identity.js');
         const { canonicalStringify } = await import('../utils.js');
         const myId = getMyUPeerId();
-        const allContacts = await getContacts();
-
-        const candidates = allContacts
-            .filter(c => c.status === 'connected' && c.upeerId !== myId)
-            .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
+        await getContacts();
 
         const fileDataPacket = {
             type: 'FILE_DATA_SMALL',

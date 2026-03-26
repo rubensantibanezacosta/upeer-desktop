@@ -4,6 +4,7 @@ import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import SecurityIcon from '@mui/icons-material/Security';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { Contact } from '../../types/chat.js';
+import { isPreviewableFile } from '../../utils/fileUtils.js';
 
 export const getStatusMeta = (contact: Contact, isOnline: boolean) => {
     if (contact.status === 'blocked') return { label: 'Bloqueado', color: 'danger' as const };
@@ -37,11 +38,7 @@ export const formatSeen = (iso?: string): string | null => {
 
 export const isMediaFile = (mimeType?: string, fileName?: string, isVoiceNote = false): boolean => {
     if (isVoiceNote) return false;
-    const mime = mimeType?.toLowerCase() || '';
-    const ext = fileName?.split('.').pop()?.toLowerCase() || '';
-    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-    const videoExts = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v', '3gp', 'ts', 'mts', 'ogg'];
-    return mime.startsWith('image/') || mime.startsWith('video/') || imageExts.includes(ext) || videoExts.includes(ext);
+    return isPreviewableFile(mimeType, fileName);
 };
 
 export const isVideoMediaFile = (mimeType?: string, fileName?: string): boolean => {

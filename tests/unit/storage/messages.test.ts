@@ -556,6 +556,61 @@ describe('Storage - Message Operations', () => {
             expect(res3).toBe(true);
         });
 
+        it('should allow moving from sent to failed but not from delivered to failed', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            mockDb.update.mockReturnValue({
+                set: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        run: mockRun
+                    })
+                })
+            });
+
+            mockDb.select.mockReturnValueOnce({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ status: 'sent' })
+                    })
+                })
+            });
+
+            const res1 = await updateMessageStatus('msg1', 'failed');
+            expect(res1).toBe(true);
+
+            mockDb.select.mockReturnValueOnce({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ status: 'delivered' })
+                    })
+                })
+            });
+
+            const res2 = await updateMessageStatus('msg1', 'failed');
+            expect(res2).toBe(false);
+        });
+
+        it('should allow retry reset from failed to sent', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            mockDb.update.mockReturnValue({
+                set: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        run: mockRun
+                    })
+                })
+            });
+
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ status: 'failed' })
+                    })
+                })
+            });
+
+            const result = await updateMessageStatus('msg1', 'sent');
+            expect(result).toBe(true);
+        });
+
         it('should return null when getting status of non-existent message', () => {
             mockDb.select.mockReturnValue({
                 from: vi.fn().mockReturnValue({
@@ -580,6 +635,35 @@ describe('Storage - Message Operations', () => {
 
             const status = getMessageStatus('msg1');
             expect(status).toBe('delivered');
+        });
+
+        it('should update timestamp on conflict when retrying the same message id', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            const onConflictDoUpdate = vi.fn().mockReturnValue({ run: mockRun });
+            const values = vi.fn().mockReturnValue({
+                onConflictDoUpdate,
+                onConflictDoNothing: vi.fn(),
+                run: mockRun
+            });
+
+            mockDb.insert.mockReturnValue({ values });
+            mockDb.select.mockReturnValue({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue(null)
+                    })
+                })
+            });
+
+            await saveMessage('msg-1', 'contact-1', true, 'retry', undefined, 'sig', 'sent', 'self', 123456);
+
+            expect(onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                set: expect.objectContaining({
+                    timestamp: 123456,
+                    status: 'sent',
+                    signature: 'sig'
+                })
+            }));
         });
     });
 

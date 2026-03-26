@@ -97,7 +97,7 @@ describe('PeerManager Hardening', () => {
     });
 
     it('should cover fetch/probe errors', async () => {
-        vi.spyOn(https, 'get').mockImplementation(((url: any, opts: any, cb: any) => {
+        vi.spyOn(https, 'get').mockImplementation(((_url: any, _opts: any, _cb: any) => {
             const req = new EventEmitter() as any;
             req.on = (ev: string, h: any) => { if (ev === 'error') setImmediate(() => h(new Error('FAIL'))); return req; };
             req.destroy = vi.fn();
@@ -160,8 +160,7 @@ describe('PeerManager Hardening', () => {
         }));
 
         // Mock dns.promises.lookup to fail for one host
-        // @ts-ignore
-        dns.promises.lookup = vi.fn().mockImplementation(async (h) => {
+        vi.mocked(dns.promises.lookup).mockImplementation(async (h) => {
             if (h === 'fail.com') throw new Error('dns fail');
             return { address: '1.2.3.4' };
         });
@@ -231,8 +230,7 @@ describe('PeerManager Hardening', () => {
             return { on: vi.fn(), destroy: vi.fn() };
         }) as any);
 
-        // @ts-ignore
-        dns.promises = { lookup: vi.fn().mockResolvedValue({ address: '1.2.3.4' }) };
+        vi.mocked(dns.promises.lookup).mockResolvedValue({ address: '1.2.3.4' } as any);
 
         vi.spyOn(https, 'request').mockImplementation(((opts: any, cb: any) => {
             const req = new EventEmitter() as any;
@@ -257,7 +255,7 @@ describe('PeerManager Hardening', () => {
     });
     it('should cover error paths in http helpers and edge cases in scoring', async () => {
         // httpPost with error/timeout
-        vi.spyOn(https, 'request').mockImplementation(((opts: any, cb: any) => {
+        vi.spyOn(https, 'request').mockImplementation(((_opts: any, _cb: any) => {
             const req = new EventEmitter() as any;
             req.write = vi.fn();
             req.end = vi.fn();
@@ -267,8 +265,7 @@ describe('PeerManager Hardening', () => {
         }) as any);
 
         vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-        // @ts-ignore
-        dns.promises = { lookup: vi.fn().mockResolvedValue({ address: '1.2.3.4' }) };
+        vi.mocked(dns.promises.lookup).mockResolvedValue({ address: '1.2.3.4' } as any);
 
         vi.spyOn(https, 'get').mockImplementation(((url: string, opts: any, cb: any) => {
             const res = new EventEmitter() as any;
@@ -290,7 +287,7 @@ describe('PeerManager Hardening', () => {
     });
 
     it('should cover error paths in http helpers', async () => {
-        vi.spyOn(https, 'get').mockImplementation(((url: any, opts: any, cb: any) => {
+        vi.spyOn(https, 'get').mockImplementation(((_url: any, _opts: any, _cb: any) => {
             const req = new EventEmitter() as any;
             req.on = (ev: string, h: any) => {
                 // Disparamos error inmediatamente en lugar de timeout para evitar el timeout del test

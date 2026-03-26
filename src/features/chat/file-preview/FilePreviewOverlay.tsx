@@ -1,19 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Box, IconButton, Typography, Input, Sheet, Slider, Tooltip,
+    Box, IconButton, Typography, Input, Sheet, Tooltip,
 } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
-import ImageIcon from '@mui/icons-material/Image';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import DescriptionIcon from '@mui/icons-material/Description';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import AddIcon from '@mui/icons-material/Add';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import CropIcon from '@mui/icons-material/Crop';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import EditIcon from '@mui/icons-material/Edit';
@@ -23,17 +14,11 @@ import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined';
 import AppsIcon from '@mui/icons-material/Apps';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
+import { FilePreviewVideoPlayer } from './FilePreviewVideoPlayer.js';
+import { FileInfo, getFileTypeIcon, useFilesPreview } from './filePreviewSupport.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
 import { PdfPreview } from '../file/PdfPreview.js';
-import { getMimeType, isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
-
-interface FileInfo {
-    path: string;
-    name: string;
-    size: number;
-    type: string;
-    lastModified: number;
-}
+import { getMimeType, isPdfFile } from '../../../utils/fileUtils.js';
 
 interface FilePreviewOverlayProps {
     files: FileInfo[];
@@ -47,314 +32,6 @@ interface FilePreviewOverlayProps {
     onDragLeave?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
 }
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
-const useFilesPreview = (files: FileInfo[]) => {
-    const [previews, setPreviews] = useState<Record<string, { previewUrl: string; thumbnail: string }>>({});
-    const [assetPaths, setAssetPaths] = useState<Record<string, string>>({});
-    const [isGenerating, setIsGenerating] = useState(false);
-    const processingRef = useRef(new Set<string>());
-
-    const generateThumbnail = (imageUrl: string): Promise<string> =>
-        new Promise((resolve) => {
-            let settled = false;
-            const resolveOnce = (v: string) => { if (!settled) { settled = true; resolve(v); } };
-            const timeout = setTimeout(() => resolveOnce(''), 5000);
-            const img = new Image();
-            img.onload = () => {
-                clearTimeout(timeout);
-                try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) { resolveOnce(''); return; }
-                    const maxSize = 240;
-                    let { width, height } = img;
-                    if (width > height) { if (width > maxSize) { height = (height * maxSize) / width; width = maxSize; } }
-                    else { if (height > maxSize) { width = (width * maxSize) / height; height = maxSize; } }
-                    canvas.width = width; canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolveOnce(canvas.toDataURL('image/jpeg', 0.7));
-                } catch { resolveOnce(''); }
-            };
-            img.onerror = () => { clearTimeout(timeout); resolveOnce(''); };
-            img.crossOrigin = 'anonymous';
-            img.src = imageUrl;
-        });
-
-    const generateVideoThumbnail = (videoUrl: string): Promise<string> =>
-        new Promise((resolve) => {
-            const video = document.createElement('video');
-            video.preload = 'metadata';
-            video.src = videoUrl;
-            video.muted = true;
-            video.playsInline = true;
-            const timeout = setTimeout(() => { video.onseeked = null; video.onerror = null; resolve(''); }, 5000);
-            video.onloadedmetadata = () => { video.currentTime = Math.min(1, video.duration * 0.1); };
-            video.onseeked = () => {
-                clearTimeout(timeout);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                if (!ctx) { resolve(''); return; }
-                const maxSize = 240;
-                let { videoWidth: width, videoHeight: height } = video;
-                if (width > height) { if (width > maxSize) { height = (height * maxSize) / width; width = maxSize; } }
-                else { if (height > maxSize) { width = (width * maxSize) / height; height = maxSize; } }
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(video, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
-            };
-            video.onerror = () => { clearTimeout(timeout); resolve(''); };
-        });
-
-    useEffect(() => {
-        const currentPaths = new Set(files.map(f => f.path));
-        for (const p of processingRef.current) {
-            if (!currentPaths.has(p)) processingRef.current.delete(p);
-        }
-
-        const unprocessed = files.filter(f => !processingRef.current.has(f.path));
-        if (unprocessed.length === 0) return;
-
-        for (const f of unprocessed) processingRef.current.add(f.path);
-
-        setIsGenerating(true);
-
-        const process = async () => {
-            for (const file of unprocessed) {
-                let assetPath = file.path;
-                try {
-                    const result = await (window as any).upeer?.persistInternalAsset({ filePath: file.path, fileName: file.name });
-                    if (result?.success && result.path) assetPath = result.path;
-                } catch (err) { console.warn('persistInternalAsset failed, using original path', err); }
-
-                setAssetPaths(prev => ({ ...prev, [file.path]: assetPath }));
-
-                let effectiveType = file.type;
-                if (!effectiveType || effectiveType === 'application/octet-stream') effectiveType = getMimeType(file.name);
-
-                let thumbnail = '';
-                let previewUrl = '';
-
-                if (effectiveType.startsWith('image/')) {
-                    previewUrl = toMediaUrl(assetPath);
-                    thumbnail = await generateThumbnail(previewUrl);
-                } else if (effectiveType.startsWith('video/')) {
-                    previewUrl = toMediaUrl(assetPath);
-                    try {
-                        const result = await (window as any).upeer.generateVideoThumbnail(assetPath);
-                        thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(previewUrl);
-                    } catch (err) {
-                        console.warn('generateVideoThumbnail IPC failed, using canvas fallback', err);
-                        thumbnail = await generateVideoThumbnail(previewUrl);
-                    }
-                } else if (isPdfFile(effectiveType, file.name)) {
-                    previewUrl = toMediaUrl(assetPath);
-                }
-
-                setPreviews(prev => ({ ...prev, [file.path]: { previewUrl, thumbnail } }));
-            }
-            setIsGenerating(false);
-        };
-
-        process();
-    }, [files]);
-
-    return { previews, isGenerating, assetPaths };
-};
-
-// ── File icon helper ──────────────────────────────────────────────────────────
-
-const getFileTypeIcon = (fileType: string, fileName: string, size = 60) => {
-    let effectiveType = fileType;
-    if (!effectiveType || effectiveType === 'application/octet-stream') {
-        effectiveType = getMimeType(fileName);
-    }
-    if (effectiveType.startsWith('image/')) return <ImageIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('audio/')) return <AudioFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('video/')) return <VideoFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.includes('pdf')) return <DescriptionIcon sx={{ fontSize: size }} />;
-    return <InsertDriveFileIcon sx={{ fontSize: size }} />;
-};
-
-// ── Video Player Component ───────────────────────────────────────────────────
-
-interface VideoPlayerProps {
-    src: string;
-    name: string;
-}
-
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, name }) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [isMuted, setIsMuted] = useState(false);
-    const [showControls, setShowControls] = useState(true);
-    const controlsTimeoutRef = useRef<any>(null);
-
-    const togglePlay = (e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-            } else {
-                videoRef.current.play();
-            }
-        }
-    };
-
-    const handleTimeUpdate = () => {
-        if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-        }
-    };
-
-    const handleLoadedMetadata = () => {
-        if (videoRef.current) {
-            setDuration(videoRef.current.duration);
-        }
-    };
-
-    const handleSliderChange = (_: any, value: number | number[]) => {
-        if (videoRef.current && typeof value === 'number') {
-            videoRef.current.currentTime = value;
-            setCurrentTime(value);
-        }
-    };
-
-    const toggleMute = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (videoRef.current) {
-            const newMuted = !isMuted;
-            videoRef.current.muted = newMuted;
-            setIsMuted(newMuted);
-        }
-    };
-
-    const handleMouseMove = () => {
-        setShowControls(true);
-        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-        controlsTimeoutRef.current = setTimeout(() => {
-            if (isPlaying) setShowControls(false);
-        }, 2500);
-    };
-
-    useEffect(() => {
-        return () => {
-            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-        };
-    }, []);
-
-    const formatTime = (time: number) => {
-        const mins = Math.floor(time / 60);
-        const secs = Math.floor(time % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    return (
-        <Box
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => isPlaying && setShowControls(false)}
-            sx={{
-                position: 'relative',
-                width: '100%',
-                maxWidth: '90%',
-                maxHeight: '60vh',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                bgcolor: 'black',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-                '&:hover .video-controls': { opacity: 1 }
-            }}
-        >
-            <video
-                ref={videoRef}
-                src={src}
-                playsInline
-                crossOrigin="anonymous"
-                style={{
-                    maxWidth: '100%',
-                    maxHeight: '60vh',
-                    display: 'block',
-                    cursor: 'pointer'
-                }}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-                onEnded={() => setIsPlaying(false)}
-                onClick={() => togglePlay()}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-            />
-
-
-            {/* Controls Bar */}
-            <Box
-                className="video-controls"
-                sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    p: 1.5,
-                    pt: 4,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.5,
-                    opacity: showControls || !isPlaying ? 1 : 0,
-                    transition: 'opacity 0.3s ease',
-                    zIndex: 3,
-                    pointerEvents: showControls || !isPlaying ? 'auto' : 'none',
-                }}
-            >
-                <Slider
-                    size="sm"
-                    value={currentTime}
-                    max={duration || 100}
-                    onChange={handleSliderChange}
-                    sx={{
-                        mx: 1,
-                        width: 'calc(100% - 16px)',
-                        color: 'primary.400',
-                        '--Slider-trackSize': '4px',
-                        '& .MuiSlider-thumb': {
-                            width: 12,
-                            height: 12,
-                            transition: 'transform 0.2s',
-                            '&:hover': { transform: 'scale(1.2)' }
-                        },
-                    }}
-                />
-
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <IconButton size="sm" variant="plain" color="neutral" onClick={togglePlay} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-                        </IconButton>
-
-                        <IconButton size="sm" variant="plain" color="neutral" onClick={toggleMute} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                            {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
-                        </IconButton>
-
-                        <Typography level="body-xs" sx={{ color: 'white', fontWeight: 500, ml: 1 }}>
-                            {formatTime(currentTime)} / {formatTime(duration)}
-                        </Typography>
-                    </Box>
-
-                    <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.5)', pr: 1, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {name}
-                    </Typography>
-                </Box>
-            </Box>
-        </Box>
-    );
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
     files, onClose, onSend, onAddMore, onRemove,
@@ -480,7 +157,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                     isPdfFile(currentFile.type, currentFile.name) ? (
                         <PdfPreview src={currentPreview.previewUrl} name={currentFile.name} height="min(70vh, 960px)" />
                     ) : (currentFile.type.startsWith('video/') || getMimeType(currentFile.name).startsWith('video/')) ? (
-                        <VideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
+                        <FilePreviewVideoPlayer src={currentPreview.previewUrl} name={currentFile.name} />
                     ) : (
                         <Box component="img" src={currentPreview.previewUrl} sx={{ maxWidth: '90%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 'md', boxShadow: 'lg', transition: 'all 0.3s ease' }} />
                     )

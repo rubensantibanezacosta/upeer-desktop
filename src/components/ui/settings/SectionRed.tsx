@@ -1,177 +1,29 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Button, Chip, CircularProgress, Divider, Typography } from '@mui/joy';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import SyncIcon from '@mui/icons-material/Sync';
 import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
-import SecurityIcon from '@mui/icons-material/Security';
-import HubIcon from '@mui/icons-material/Hub';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { CopyableField } from './shared.js';
 import { NetworkMap } from './NetworkMap.js';
 import type { Identity } from './types.js';
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface PeerStat {
-    host: string;
-    country: string;
-    latencyMs: number | null;
-    score: number;
-    alive: boolean;
-    lat: number | null;
-    lon: number | null;
-}
-
-interface NetworkStats {
-    peerCount: number;
-    peers: PeerStat[];
-    restartAttempts: number;
-    maxRestartAttempts: number;
-    selfLat: number | null;
-    selfLon: number | null;
-}
+import {
+    LATENCY_MAX,
+    LiveDot,
+    PeerRow,
+    STATUS_META,
+    STATUS_SUBTITLE,
+    TECH_ITEMS,
+    latencyChipColor,
+    latencyLabel,
+    type NetworkStats,
+} from './sectionRedSupport.js';
 
 interface Props {
     identity: Identity | null;
     networkAddress: string;
     networkStatus: string;
 }
-
-// ─── Config de estado ─────────────────────────────────────────────────────────
-
-type StatusColor = 'success' | 'danger' | 'warning' | 'neutral';
-
-const STATUS_META: Record<string, { color: StatusColor; Icon: React.ElementType; title: string; spinning?: boolean }> = {
-    up: { color: 'success', Icon: CheckCircleIcon, title: 'Conexión activa' },
-    connecting: { color: 'neutral', Icon: SyncIcon, title: 'Preparando la red…', spinning: true },
-    reconnecting: { color: 'warning', Icon: SyncIcon, title: 'Reconectando…', spinning: true },
-    down: { color: 'danger', Icon: WifiOffIcon, title: 'Sin conexión' },
-};
-
-const STATUS_SUBTITLE: Record<string, (r: number, max: number) => string> = {
-    up: () => 'Tus mensajes viajan cifrados de extremo a extremo.',
-    connecting: () => 'Un momento, estamos conectando tu app a la red segura.',
-    reconnecting: (r, max) => r > 0 ? `Intento ${r} de ${max} para restaurar la conexión.` : 'Intentando restaurar la conexión con la red.',
-    down: () => 'No hay conexión disponible. Comprueba tu conexión a Internet.',
-};
-
-// ─── Tech details ─────────────────────────────────────────────────────────────
-
-const TECH_ITEMS = [
-    { Icon: SecurityIcon, accent: '#4ade80', label: 'Cifrado', value: 'ChaCha20-Poly1305 · extremo a extremo' },
-    { Icon: HubIcon, accent: '#60a5fa', label: 'Protocolo', value: 'Yggdrasil · red IPv6 descentralizada' },
-    { Icon: SwapHorizIcon, accent: '#a78bfa', label: 'Transporte', value: 'TCP directo entre nodos de la red' },
-    { Icon: VisibilityOffIcon, accent: '#fb923c', label: 'Privacidad', value: 'Sin servidores centrales ni metadatos' },
-    { Icon: TravelExploreIcon, accent: '#22d3ee', label: 'Descubrimiento', value: 'Lista pública de peers global' },
-];
-
-// ─── Helpers latencia ─────────────────────────────────────────────────────────
-
-const LATENCY_MAX = 500; // ms — normalización de la barra
-
-const latencyHex = (ms: number) =>
-    ms < 100 ? '#22c55e' : ms < 250 ? '#f59e0b' : '#ef4444';
-
-const latencyLabel = (ms: number) =>
-    ms < 100 ? 'Excelente' : ms < 250 ? 'Buena' : 'Alta';
-
-const latencyChipColor = (ms: number): 'success' | 'warning' | 'danger' =>
-    ms < 100 ? 'success' : ms < 250 ? 'warning' : 'danger';
-
-// ─── Sub-componente: barra de latencia de un nodo ────────────────────────────
-
-const PeerRow: React.FC<{ peer: PeerStat; maxLatency: number }> = ({ peer, maxLatency }) => {
-    const { host, country, latencyMs } = peer;
-    const hasLatency = latencyMs !== null && latencyMs !== undefined;
-    const currentMs = latencyMs ?? 0;
-    const pct = hasLatency ? Math.min((currentMs / Math.max(maxLatency, LATENCY_MAX)) * 100, 100) : 0;
-    const color = hasLatency ? latencyHex(currentMs) : '#6b7280';
-
-    // Host abreviado: mostrar solo los 2 últimos octetos / segmentos
-    const shortHost = host.length > 22 ? host.slice(0, 10) + '…' + host.slice(-8) : host;
-
-    return (
-        <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: '160px 1fr 56px',
-            alignItems: 'center',
-            gap: 1.5,
-            py: 0.75,
-            px: 0.5,
-            borderRadius: 'sm',
-            '&:hover': { backgroundColor: 'background.level1' },
-        }}>
-            {/* País */}
-            <Box>
-                <Typography level="body-xs" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-                    {country || 'Desconocido'}
-                </Typography>
-                <Typography
-                    level="body-xs"
-                    sx={{ color: 'text.tertiary', fontSize: '0.65rem', fontFamily: 'monospace', lineHeight: 1.2 }}
-                >
-                    {shortHost}
-                </Typography>
-            </Box>
-
-            {/* Barra animada */}
-            <Box sx={{
-                height: 6,
-                borderRadius: 'xl',
-                backgroundColor: 'background.level2',
-                overflow: 'hidden',
-                position: 'relative',
-            }}>
-                <Box sx={{
-                    height: '100%',
-                    width: `${pct}%`,
-                    backgroundColor: color,
-                    borderRadius: 'xl',
-                    transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease',
-                    boxShadow: hasLatency ? `0 0 6px ${color}88` : 'none',
-                }} />
-            </Box>
-
-            {/* Valor */}
-            <Box sx={{ textAlign: 'right' }}>
-                {hasLatency ? (
-                    <Typography level="body-xs" sx={{ fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
-                        {latencyMs} ms
-                    </Typography>
-                ) : (
-                    <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
-                )}
-            </Box>
-        </Box>
-    );
-};
-
-// ─── Sub-componente: dot "en vivo" pulsante ───────────────────────────────────
-
-const LiveDot: React.FC<{ freshSec: number }> = ({ freshSec }) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Box sx={{
-            width: 7, height: 7, borderRadius: 'sm',
-            backgroundColor: freshSec < 12 ? 'success.400' : 'neutral.400',
-            animation: freshSec < 12 ? 'pulse 2s ease-in-out infinite' : 'none',
-            '@keyframes pulse': {
-                '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                '50%': { opacity: 0.5, transform: 'scale(1.4)' },
-            },
-        }} />
-        <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem' }}>
-            {freshSec < 5 ? 'Ahora mismo' : `Hace ${freshSec}s`}
-        </Typography>
-    </Box>
-);
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkStatus }) => {
     const [stats, setStats] = useState<NetworkStats | null>(null);
@@ -191,17 +43,17 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
             const s = await window.upeer.getNetworkStats();
             setStats(s);
             setLastUpdated(Math.floor(Date.now() / 1000));
-        } catch { /* silencioso */ }
+        } catch {
+            setStats((currentStats) => currentStats);
+        }
     }, []);
 
-    // Poll cada 8 s
     useEffect(() => {
         fetchStats();
         timerRef.current = setInterval(fetchStats, 8_000);
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, [fetchStats]);
 
-    // Reloj interno para "hace X s"
     useEffect(() => {
         const t = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1_000);
         return () => clearInterval(t);
@@ -211,7 +63,12 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
     const handleRestart = async () => {
         setRestarting(true);
-        try { await window.upeer.restartYggstack(); } catch { /* silencioso */ }
+        try {
+            await window.upeer.restartYggstack();
+        } catch {
+            setRestarting(false);
+            return;
+        }
         setTimeout(() => setRestarting(false), 4_000);
     };
 
@@ -233,8 +90,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
     return (
         <Box sx={{ pb: 2 }}>
-
-            {/* ── 1. Tarjeta de estado ─────────────────────────────────────── */}
             <Box sx={{
                 mx: 1.5, mt: 2, mb: 1.5, px: 2.5, py: 2,
                 borderRadius: 'lg',
@@ -265,13 +120,10 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </Box>
             </Box>
 
-            {/* ── 2. Monitor de nodos en tiempo real ──────────────────────── */}
             {isUp && peers.length > 0 && (
                 <>
                     <Divider sx={{ mx: 1.5, my: 0.5 }} />
                     <Box sx={{ px: 2, py: 1.5 }}>
-
-                        {/* Cabecera: título + resumen + dot live */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                 <PublicIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
@@ -282,7 +134,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             <LiveDot freshSec={freshSec} />
                         </Box>
 
-                        {/* Resumen en chips: media + países */}
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
                             {avgLatency !== null && (
                                 <Chip
@@ -301,14 +152,12 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             ))}
                         </Box>
 
-                        {/* Mapa geográfico de nodos */}
                         <NetworkMap
                             peers={peers}
                             selfLat={stats?.selfLat ?? null}
                             selfLon={stats?.selfLon ?? null}
                         />
 
-                        {/* Leyenda de la barra */}
                         <Box sx={{ display: 'grid', gridTemplateColumns: '160px 1fr 56px', gap: 1.5, mb: 0.5, px: 0.5 }}>
                             <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem' }}>Nodo</Typography>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -318,7 +167,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem', textAlign: 'right' }}>Latencia</Typography>
                         </Box>
 
-                        {/* Filas de nodos */}
                         {peers.map((peer, i) => (
                             <PeerRow key={peer.host || i} peer={peer} maxLatency={maxLatency} />
                         ))}
@@ -326,7 +174,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </>
             )}
 
-            {/* ── 3. Tu dirección de red ───────────────────────────────────── */}
             {isUp && addr && addr !== 'No detectado' && (
                 <>
                     <Divider sx={{ mx: 1.5, my: 0.5 }} />
@@ -336,7 +183,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </>
             )}
 
-            {/* ── 4. Cómo funciona (acordeón) ─────────────────────────────── */}
             <Divider sx={{ mx: 1.5, my: 0.5 }} />
             <Box
                 component="button"

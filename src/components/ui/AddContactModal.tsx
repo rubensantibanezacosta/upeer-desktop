@@ -18,6 +18,7 @@ import {
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import { isYggdrasilAddress } from '../../utils/yggdrasilAddress.js';
 
 interface AddContactModalProps {
     open: boolean;
@@ -47,20 +48,10 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
         }
 
         const normalizedIp = ip.trim();
-
-        // Validar formato de dirección Yggdrasil: rango 200::/7 (200: hasta 3ff:)
-        // Coincide con la misma regex que usa el backend en main.ts
-        const segments = normalizedIp.split(':');
-        const YGG_REGEX = /^[23][0-9a-f]{2}:/i;
-        const isValidYggdrasil = YGG_REGEX.test(normalizedIp) && segments.length === 8;
-
-        if (!isValidYggdrasil) {
-            setError('Dirección Yggdrasil inválida. Debe tener 8 segmentos comenzando con 200:-3ff: (ej: 200:7704:49e5:b4cd:7910:2191:2574:351b)');
+        if (!isYggdrasilAddress(normalizedIp)) {
+            setError('Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo 200::/8 y 300::/8.');
             return;
         }
-
-        // Ya tiene prefijo 200: y 8 segmentos, usar tal cual
-        // (no se necesita normalización adicional)
 
         // Construir el formato final para el backend (ID@IP)
         const finalAddress = `${upeerId}@${normalizedIp}`;

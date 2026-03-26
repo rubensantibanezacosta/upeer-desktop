@@ -5,7 +5,6 @@ import sodium from 'sodium-native';
 
 import * as yggstack from '../../../src/main_process/sidecars/yggstack';
 import * as dhtShared from '../../../src/main_process/network/dht/shared';
-import { networkInterfaces } from 'node:os';
 
 vi.mock('../../../src/main_process/security/identity');
 vi.mock('../../../src/main_process/security/secure-logger');

@@ -137,7 +137,7 @@ export const useFileTransferHandlers = ({
         }
     };
 
-    const handleDrop = (e: React.DragEvent) => {
+    const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
@@ -148,8 +148,13 @@ export const useFileTransferHandlers = ({
         // We use the webUtils.getPathForFile helper exposed in preload.ts
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
 
-        const mappedFiles = droppedFilesRaw.map((f: any) => {
-            const filePath = window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path;
+        const mappedFiles = (await Promise.all(droppedFilesRaw.map(async (f: File & { path?: string }) => {
+            const persisted = window.upeer?.persistSelectedFile
+                ? await window.upeer.persistSelectedFile(f)
+                : null;
+            const filePath = persisted?.success && persisted.path
+                ? persisted.path
+                : (window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path);
             return {
                 path: filePath,
                 name: f.name,
@@ -157,7 +162,7 @@ export const useFileTransferHandlers = ({
                 type: f.type || 'application/octet-stream',
                 lastModified: f.lastModified
             } as PendingFile;
-        }).filter((f: any) => !!f.path);
+        }))).filter((f: any) => !!f.path);
 
         if (mappedFiles.length > 0) {
 

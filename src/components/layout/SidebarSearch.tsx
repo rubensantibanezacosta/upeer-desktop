@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Input, IconButton, Chip, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 
 interface SidebarSearchProps {

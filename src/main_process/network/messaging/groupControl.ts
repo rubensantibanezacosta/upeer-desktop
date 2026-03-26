@@ -1,13 +1,7 @@
 import crypto from 'node:crypto';
 import {
     getMyUPeerId,
-    sign,
-    encrypt,
-    getMyPublicKeyHex,
-    getMyEphemeralPublicKeyHex,
-    incrementEphemeralMessageCounter,
 } from '../../security/identity.js';
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import {
     deleteGroup,
@@ -18,62 +12,20 @@ import {
     updateGroupMembers,
     type GroupRecord,
 } from '../../storage/groups/operations.js';
-import { warn } from '../../security/secure-logger.js';
 import { buildGroupInvitePayload, buildGroupUpdatePayload } from '../groupPayload.js';
-import { rotateGroupSenderState, generateGroupSenderState, type GroupSenderState } from '../groupState.js';
-import { canonicalStringify } from '../utils.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
-import { EPH_FRESHNESS_MS } from '../server/constants.js';
-
-function shouldUseEphemeral(contact: any): boolean {
-    if (!contact?.ephemeralPublicKey) return false;
-    const updatedAt = contact.ephemeralPublicKeyUpdatedAt
-        ? new Date(contact.ephemeralPublicKeyUpdatedAt).getTime()
-        : 0;
-    return updatedAt > 0 && (Date.now() - updatedAt) < EPH_FRESHNESS_MS;
-}
-
-async function sendPacketToKnownAddresses(contact: any, packet: Record<string, unknown>): Promise<void> {
-    const addresses: string[] = [];
-    if (contact.address) addresses.push(contact.address);
-
-    try {
-        const known = JSON.parse((contact as any).knownAddresses ?? '[]');
-        for (const addr of known) {
-            if (!addresses.includes(addr)) addresses.push(addr);
-        }
-    } catch {
-        // conservar al menos la dirección primaria si el JSON está corrupto
-    }
-
-    for (const addr of addresses) {
-        sendSecureUDPMessage(addr, packet, contact.publicKey);
-    }
-}
-
-async function vaultPacket(targetUpeerId: string, packet: Record<string, unknown>, seed: string): Promise<void> {
-    const { VaultManager } = await import('../vault/manager.js');
-    const payloadHashOverride = crypto.createHash('sha256').update(seed).digest('hex');
-    await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride);
-}
-
-function buildSignedPacket(packet: Record<string, unknown>, senderUpeerId: string): Record<string, unknown> {
-    return {
-        ...packet,
-        senderUpeerId,
-        signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
-    };
-}
+import { rotateGroupSenderState, generateGroupSenderState } from '../groupState.js';
+import {
+    buildEncryptedGroupPacket,
+    buildSignedPacket,
+    deliverGroupPacket,
+    resolveGroupContact,
+} from './groupControlSupport.js';
 
 async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string): Promise<void> {
     const myId = getMyUPeerId();
-    const contact = await getContactByUpeerId(targetUpeerId) || (targetUpeerId === myId
-        ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
-        : null);
+    const contact = await resolveGroupContact(targetUpeerId);
     if (!contact?.publicKey || !group.senderKey) return;
 
-    const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
-    const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
     const sensitivePayload = await buildGroupInvitePayload(
         group.name,
         group.members,
@@ -81,33 +33,17 @@ async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string):
         group.senderKey,
         group.avatar ?? undefined
     );
-    const ephPubKey = getMyEphemeralPublicKeyHex();
-    const { ciphertext, nonce } = encrypt(
-        Buffer.from(sensitivePayload, 'utf-8'),
-        Buffer.from(targetKeyHex, 'hex')
-    );
-
-    if (useEphemeral) incrementEphemeralMessageCounter();
-
-    const packet = {
-        type: 'GROUP_INVITE',
-        groupId: group.groupId,
-        adminUpeerId: myId,
-        payload: ciphertext,
-        nonce,
-        ephemeralPublicKey: ephPubKey,
-        useRecipientEphemeral: useEphemeral,
-    };
+    const packet = await buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, contact.publicKey);
     const signedPacket = buildSignedPacket(packet, myId);
-
-    if (contact.status === 'connected') {
-        await sendPacketToKnownAddresses(contact, packet);
-    }
-
-    await vaultPacket(targetUpeerId, signedPacket, `group-invite:${group.groupId}:${targetUpeerId}:${group.epoch}`);
-    if (contact.status !== 'connected') {
-        warn('GROUP_INVITE vaulted for offline member', { targetUpeerId, groupId: group.groupId }, 'vault');
-    }
+    await deliverGroupPacket({
+        targetUpeerId,
+        packet,
+        signedPacket,
+        contact,
+        vaultSeed: `group-invite:${group.groupId}:${targetUpeerId}:${group.epoch}`,
+        warnMessage: 'GROUP_INVITE vaulted for offline member',
+        warnContext: { targetUpeerId, groupId: group.groupId },
+    });
 }
 
 async function broadcastGroupUpdatePacket(
@@ -125,45 +61,20 @@ async function broadcastGroupUpdatePacket(
     });
 
     for (const memberUpeerId of targetMembers) {
-        const contact = await getContactByUpeerId(memberUpeerId) || (memberUpeerId === myId
-            ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
-            : null);
+        const contact = await resolveGroupContact(memberUpeerId);
         if (!contact?.publicKey) continue;
 
-        const useEphemeral = contact.status === 'connected' ? shouldUseEphemeral(contact) : false;
-        const targetKeyHex = useEphemeral ? contact.ephemeralPublicKey : contact.publicKey;
-        const ephPubKey = getMyEphemeralPublicKeyHex();
-        const { ciphertext, nonce } = encrypt(
-            Buffer.from(sensitivePayload, 'utf-8'),
-            Buffer.from(targetKeyHex, 'hex')
-        );
-
-        if (useEphemeral) incrementEphemeralMessageCounter();
-
-        const packet = {
-            type: 'GROUP_UPDATE',
-            groupId: group.groupId,
-            adminUpeerId: myId,
-            payload: ciphertext,
-            nonce,
-            ephemeralPublicKey: ephPubKey,
-            useRecipientEphemeral: useEphemeral,
-        };
+        const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, contact.publicKey);
         const signedPacket = buildSignedPacket(packet, myId);
-
-        if (contact.status === 'connected') {
-            await sendPacketToKnownAddresses(contact, packet);
-        }
-
-        await vaultPacket(
-            memberUpeerId,
+        await deliverGroupPacket({
+            targetUpeerId: memberUpeerId,
+            packet,
             signedPacket,
-            `group-update:${group.groupId}:${memberUpeerId}:${signedPacket.signature}`
-        );
-
-        if (contact.status !== 'connected') {
-            warn('GROUP_UPDATE vaulted for offline member', { memberUpeerId, groupId: group.groupId }, 'vault');
-        }
+            contact,
+            vaultSeed: `group-update:${group.groupId}:${memberUpeerId}:${signedPacket.signature}`,
+            warnMessage: 'GROUP_UPDATE vaulted for offline member',
+            warnContext: { memberUpeerId, groupId: group.groupId },
+        });
     }
 }
 
@@ -271,24 +182,19 @@ export async function leaveGroup(groupId: string): Promise<void> {
 
     for (const memberUpeerId of group.members) {
         const isSelf = memberUpeerId === myId;
-        const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
-            ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
-            : null);
+        const contact = await resolveGroupContact(memberUpeerId);
         if (!contact?.publicKey) continue;
 
-        if (!isSelf && contact.status === 'connected') {
-            await sendPacketToKnownAddresses(contact, packet);
-        }
-
-        await vaultPacket(
-            memberUpeerId,
+        await deliverGroupPacket({
+            targetUpeerId: memberUpeerId,
             packet,
-            `group-leave:${groupId}:${memberUpeerId}:${packet.signature}`
-        );
-
-        if (!isSelf && contact.status !== 'connected') {
-            warn('GROUP_LEAVE vaulted for offline member', { memberUpeerId, groupId }, 'vault');
-        }
+            signedPacket: packet,
+            contact,
+            vaultSeed: `group-leave:${groupId}:${memberUpeerId}:${packet.signature}`,
+            warnMessage: 'GROUP_LEAVE vaulted for offline member',
+            warnContext: { memberUpeerId, groupId },
+            skipDirectSend: isSelf,
+        });
     }
 
     deleteMessagesByChatId(groupId);

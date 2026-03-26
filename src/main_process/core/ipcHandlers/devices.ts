@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getMyDeviceId, getMyUPeerId } from '../../security/identity.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import { getDevicesByUPeerId, setDeviceTrust, deleteDevice } from '../../storage/devices-operations.js';
 
 /**

@@ -9,7 +9,6 @@ interface SidebarHeaderProps {
     onCreateGroup?: () => void;
 }
 
-// Header principal — lista de chats
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew }) => (
     <Box sx={{
         p: 2, pt: 2.5,
@@ -29,7 +28,6 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew }) => (
     </Box>
 );
 
-// Header del panel "Nuevo chat"
 export const NewChatHeader: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <Box sx={{
         px: 2, display: 'flex', alignItems: 'center', gap: 1.5,

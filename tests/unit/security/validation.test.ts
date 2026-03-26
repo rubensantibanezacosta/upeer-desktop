@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateHandshakeReq, validateHandshakeAccept, validateChat } from '../../../src/main_process/security/validation.js';
+import { validateHandshakeReq, validateChat } from '../../../src/main_process/security/validation.js';
 
 describe('Security Validation', () => {
     describe('validateHandshakeReq', () => {

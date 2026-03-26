@@ -427,7 +427,8 @@ export class TransferManager implements ITransferManager {
                 this.fileHandles.delete(transfer.fileId);
             }
 
-            this.ui.notifyCancelled(transfer, 'peer_disconnected');
+            const failedTransfer = this.store.getTransfer(transfer.fileId, transfer.direction) || transfer;
+            this.ui.notifyFailed(failedTransfer, 'peer_disconnected');
         }
     }
 

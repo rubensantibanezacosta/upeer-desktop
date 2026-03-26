@@ -15,6 +15,7 @@ import { sendContactRequest, acceptContactRequest } from '../../network/messagin
 import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
 import { warn } from '../../security/secure-logger.js';
+import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
 
 /**
  * Registra los manejadores IPC relacionados con contactos
@@ -45,28 +46,22 @@ export function registerContactHandlers(): void {
   });
 
   ipcMain.handle('add-contact', async (event, { address, name }) => {
-    // Único formato válido: UPeerID@IP (separador @)
-    const separator = '@';
-    if (!address.includes(separator)) {
-      return { success: false, error: 'Formato UPeerID@IP requerido. Usa ID@200:xxxx:xxxx:...' };
+    const candidateAddress = typeof address === 'string' ? address.trim() : '';
+    const separatorIndex = candidateAddress.indexOf('@');
+    if (separatorIndex <= 0 || separatorIndex === candidateAddress.length - 1) {
+      return { success: false, error: 'Formato UPeerID@IP requerido. Usa ID@200:... o ID@300:...' };
     }
 
-    const [targetUpeerId, rawTargetIp] = address.split(separator);
+    const targetUpeerId = candidateAddress.slice(0, separatorIndex).trim();
+    const rawTargetIp = candidateAddress.slice(separatorIndex + 1);
     const targetIp = rawTargetIp.trim();
-
-    // Validar formato de dirección Yggdrasil
-    // El rango real es 200::/7, que en hex cubre de 200: hasta 3fe:
-    // (primer octeto: 0x200-0x3fe, o sea, cualquier prefijo de 2xx: o 3xx:)
-    const segments = targetIp.split(':');
-    const YGG_REGEX = /^[23][0-9a-f]{2}:/i;
-    const isValidYggdrasil = YGG_REGEX.test(targetIp) && segments.length === 8;
-
-    if (!isValidYggdrasil) {
-      return { success: false, error: 'Dirección Yggdrasil inválida. Debe tener 8 segmentos comenzando con 200:-3fe: (ej: 201:5884:ec67:1c3e:d713:8b32:ed5e:9de3)' };
+    if (!targetUpeerId || !targetIp) {
+      return { success: false, error: 'Formato UPeerID@IP requerido. Usa ID@200:... o ID@300:...' };
     }
 
-    // Ya tiene prefijo 200: y 8 segmentos, usar tal cual
-    // (no se necesita normalización adicional)
+    if (!isYggdrasilAddress(targetIp)) {
+      return { success: false, error: 'Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo nodos 200::/8 y prefijos 300::/8.' };
+    }
 
     // Limpieza de fantasmas: Borramos cualquier rastro previo de esta IP
     const oldGhost = await getContactByAddress(targetIp);

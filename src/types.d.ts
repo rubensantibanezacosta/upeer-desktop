@@ -1,4 +1,6 @@
 declare global {
+    type UpeerUnsubscribe = () => void;
+
     interface Window {
         upeer: {
             getMyNetworkAddress: () => Promise<string>;
@@ -14,7 +16,7 @@ declare global {
             toggleFavoriteContact: (upeerId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             clearChat: (upeerId: string) => Promise<any>;
             getBlockedContacts: () => Promise<any[]>;
-            sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
+            sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null, messageId?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
@@ -41,26 +43,26 @@ declare global {
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             toggleFavoriteGroup: (groupId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
-            onChatCleared: (callback: (data: { upeerId: string }) => void) => void;
-            onGroupMessage: (callback: (data: any) => void) => void;
-            onGroupInvite: (callback: (data: any) => void) => void;
-            onGroupUpdated: (callback: (data: any) => void) => void;
-            onGroupMessageDelivered: (callback: (data: { id: string, groupId: string, upeerId: string }) => void) => void;
+            onChatCleared: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
+            onGroupMessage: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onGroupInvite: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onGroupUpdated: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onGroupMessageDelivered: (callback: (data: { id: string, groupId: string, upeerId: string }) => void) => UpeerUnsubscribe;
 
-            onReceive: (callback: (data: any) => void) => void;
-            onMessageDelivered: (callback: (data: { id: string, upeerId: string }) => void) => void;
-            onMessageRead: (callback: (data: { id: string, upeerId: string }) => void) => void;
-            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, chatUpeerId: string, emoji: string, remove: boolean }) => void) => void;
-            onMessageUpdated: (callback: (data: { id: string, upeerId: string, chatUpeerId: string, content: string }) => void) => void;
-            onMessageDeleted: (callback: (data: { id: string, upeerId: string, chatUpeerId: string }) => void) => void;
-            onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => void;
-            onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => void;
-            onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => void;
-            onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
-            onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
-            onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => void;
-            onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => void;
-            onReputationUpdated: (callback: () => void) => void;
+            onReceive: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onMessageDelivered: (callback: (data: { id: string, upeerId: string }) => void) => UpeerUnsubscribe;
+            onMessageRead: (callback: (data: { id: string, upeerId: string }) => void) => UpeerUnsubscribe;
+            onMessageReactionUpdated: (callback: (data: { msgId: string, upeerId: string, chatUpeerId: string, emoji: string, remove: boolean }) => void) => UpeerUnsubscribe;
+            onMessageUpdated: (callback: (data: { id: string, upeerId: string, chatUpeerId: string, content: string }) => void) => UpeerUnsubscribe;
+            onMessageDeleted: (callback: (data: { id: string, upeerId: string, chatUpeerId: string }) => void) => UpeerUnsubscribe;
+            onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => UpeerUnsubscribe;
+            onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => UpeerUnsubscribe;
+            onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => UpeerUnsubscribe;
+            onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
+            onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => UpeerUnsubscribe;
+            onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => UpeerUnsubscribe;
+            onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => UpeerUnsubscribe;
+            onReputationUpdated: (callback: () => void) => UpeerUnsubscribe;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;
@@ -81,6 +83,7 @@ declare global {
                 size?: number;
                 error?: string;
             }>;
+            persistSelectedFile: (file: File) => Promise<{ success: boolean; path?: string; error?: string }>;
             getPathForFile: (file: File) => string;
             startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean, fileName?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
@@ -92,11 +95,11 @@ declare global {
             openFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
             openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
             fetchOgPreview: (url: string) => Promise<{ url: string; title?: string; description?: string; imageBase64?: string; domain?: string } | null>;
-            onFileTransferStarted: (callback: (data: any) => void) => void;
-            onFileTransferProgress: (callback: (data: any) => void) => void;
-            onFileTransferCompleted: (callback: (data: any) => void) => void;
-            onFileTransferCancelled: (callback: (data: any) => void) => void;
-            onFileTransferFailed: (callback: (data: any) => void) => void;
+            onFileTransferStarted: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onFileTransferProgress: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onFileTransferCompleted: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onFileTransferCancelled: (callback: (data: any) => void) => UpeerUnsubscribe;
+            onFileTransferFailed: (callback: (data: any) => void) => UpeerUnsubscribe;
             /** Estadísticas de red: peers activos, latencias, reintentos */
             getNetworkStats: () => Promise<{
                 peerCount: number;
@@ -117,9 +120,9 @@ declare global {
             /** Fuerza un reinicio de yggstack desde la UI */
             restartYggstack: () => Promise<void>;
             /** Callback cuando yggstack reporta su dirección IPv6 Yggdrasil asignada */
-            onYggstackAddress: (callback: (address: string) => void) => void;
+            onYggstackAddress: (callback: (address: string) => void) => UpeerUnsubscribe;
             /** Callback para cambios de estado de la red: 'connecting'|'up'|'down'|'reconnecting' */
-            onYggstackStatus: (callback: (status: string, address?: string) => void) => void;
+            onYggstackStatus: (callback: (status: string, address?: string) => void) => UpeerUnsubscribe;
             /** Obtiene la lista de dispositivos (nodos) activos ligados a esta Identidad */
             getMyDevices: () => Promise<Array<{
                 deviceId: string;
@@ -141,8 +144,8 @@ declare global {
             saveBufferToTemp: (data: { base64: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             /** Mantenimiento de la red */
             isPinEnabled: () => Promise<boolean>;
-            onYggstackAddress: (callback: (addr: string) => void) => void;
-            onYggstackStatus: (callback: (status: string, addr?: string) => void) => void;
+            onYggstackAddress: (callback: (addr: string) => void) => UpeerUnsubscribe;
+            onYggstackStatus: (callback: (status: string, addr?: string) => void) => UpeerUnsubscribe;
             persistInternalAsset: (data: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
         }
     }

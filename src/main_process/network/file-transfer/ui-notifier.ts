@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { FileTransfer } from './types.js';
+import { warn } from '../../security/secure-logger.js';
 
 export class UINotifier {
     private lastUINotify = new Map<string, number>();
@@ -32,6 +33,10 @@ export class UINotifier {
 
     notifyCancelled(transfer: FileTransfer, reason: string) {
         this.safeSend('file-transfer-cancelled', { ...this.mapToUI(transfer), reason });
+    }
+
+    notifyFailed(transfer: FileTransfer, reason: string) {
+        this.safeSend('file-transfer-failed', { ...this.mapToUI(transfer), reason });
     }
 
     notifyStatusUpdated(id: string, status: string) {
@@ -82,7 +87,9 @@ export class UINotifier {
             if (this.window.webContents && !this.window.webContents.isDestroyed()) {
                 this.window.webContents.send(channel, data);
             }
-        } catch (err) { /* ignore */ }
+        } catch (err) {
+            warn('Failed to send file-transfer UI event', { channel, err: String(err) }, 'ipc');
+        }
     }
 
     private mapToUI(transfer: FileTransfer) {

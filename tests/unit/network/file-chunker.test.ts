@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileChunker } from '../../../src/main_process/network/file-transfer/chunker.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -26,7 +26,7 @@ describe('FileChunker - Unit Tests', () => {
         };
 
         await chunker.createTempFile(transfer);
-        
+
         expect(transfer.tempPath).toBeDefined();
         const stats = await fs.stat(transfer.tempPath);
         expect(stats.size).toBe(5000);
@@ -45,7 +45,7 @@ describe('FileChunker - Unit Tests', () => {
 
         const data1 = Buffer.alloc(1024, 'a');
         const hash1 = crypto.createHash('sha256').update(data1).digest('hex');
-        
+
         const chunkData = {
             chunkIndex: 0,
             data: data1.toString('base64'),
@@ -59,7 +59,7 @@ describe('FileChunker - Unit Tests', () => {
         const buffer = Buffer.alloc(1024);
         await fd.read(buffer, 0, 1024, 0);
         await fd.close();
-        
+
         expect(buffer.toString()).toBe(data1.toString());
     });
 
@@ -117,7 +117,7 @@ describe('FileChunker - Unit Tests', () => {
 
         // Leer segundo chunk (index 1: 1024 a 2048)
         const chunk = await chunker.createChunkData(transfer, 1);
-        
+
         expect(chunk.chunkIndex).toBe(1);
         const decoded = Buffer.from(chunk.data, 'base64');
         expect(decoded.length).toBe(1024);

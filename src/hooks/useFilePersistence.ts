@@ -42,23 +42,21 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         if (!effectiveId || (!activeGroupId && activeContact?.status !== 'connected')) return;
 
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
-        const mappedFiles = droppedFilesRaw.map((f: any) => {
-            const filePath = window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path;
+        const mappedFiles = (await Promise.all(droppedFilesRaw.map(async (f: File & { path?: string }) => {
+            const persisted = window.upeer?.persistSelectedFile
+                ? await window.upeer.persistSelectedFile(f)
+                : null;
+            const filePath = persisted?.success && persisted.path
+                ? persisted.path
+                : (window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path);
             const type = f.type || getMimeType(f.name);
             return { path: filePath, name: f.name, size: f.size, type, lastModified: f.lastModified };
-        }).filter(f => !!f.path);
+        }))).filter(f => !!f.path);
 
         if (mappedFiles.length > 0) {
             setPreparingAttachments(true);
             try {
-                const persistedFiles = await Promise.all(mappedFiles.map(async f => {
-                    const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
-                    if (persistResult.success && persistResult.path) {
-                        return { ...f, path: persistResult.path };
-                    }
-                    return f;
-                }));
-                setPendingFiles([...pendingFiles, ...persistedFiles]);
+                setPendingFiles([...pendingFiles, ...mappedFiles]);
                 setFilePickerOpen(true);
             } finally {
                 setPreparingAttachments(false);
@@ -82,14 +80,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
             if (result.success && !result.canceled && result.files && result.files.length > 0) {
                 setPreparingAttachments(true);
                 try {
-                    const persistedFiles = await Promise.all(result.files.map(async (f: any) => {
-                        const persistResult = await window.upeer.persistInternalAsset({ filePath: f.path, fileName: f.name });
-                        if (persistResult.success && persistResult.path) {
-                            return { ...f, path: persistResult.path };
-                        }
-                        return f;
-                    }));
-                    setPendingFiles([...pendingFiles, ...persistedFiles]);
+                    setPendingFiles([...pendingFiles, ...result.files]);
                     setFilePickerOpen(true);
                 } finally {
                     setPreparingAttachments(false);

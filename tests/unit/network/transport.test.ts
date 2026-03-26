@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as socks5_orig from '../../../src/main_process/network/server/socks5.js';
 
 // Mocks de dependencias
 vi.mock('../../../src/main_process/security/identity.js', () => ({

@@ -1,40 +1,12 @@
-import React, { useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, IconButton, Input, LinearProgress, Stack, Textarea, Typography } from '@mui/joy';
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import React, { useState } from 'react';
+import { Alert, Box, Button, Chip, IconButton, LinearProgress, Stack, Textarea, Typography } from '@mui/joy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckIcon from '@mui/icons-material/Check';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { resizeImageToDataUrl } from './utils.js';
-
-const WordChip: React.FC<{ index: number; word: string; reveal: boolean }> = ({ index, word, reveal }) => (
-    <Box
-        sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            minWidth: 0,
-            px: 1.25,
-            py: 1,
-            borderRadius: '14px',
-            border: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.level1',
-            userSelect: reveal ? 'text' : 'none',
-            filter: reveal ? 'none' : 'blur(6px)',
-            transition: 'filter 0.2s ease'
-        }}
-    >
-        <Typography level="body-xs" sx={{ fontFamily: 'monospace', color: 'text.tertiary', minWidth: 20 }}>
-            {index + 1}.
-        </Typography>
-        <Typography level="body-sm" sx={{ fontFamily: 'monospace', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {word}
-        </Typography>
-    </Box>
-);
+import { CreateFlowMnemonicPanel } from './CreateFlowMnemonicPanel.js';
+import { CreateFlowProfileSetup } from './CreateFlowProfileSetup.js';
 
 interface CreateExplainStepProps {
     onBack: () => void;
@@ -105,20 +77,7 @@ export const CreateGenerateStep: React.FC<CreateGenerateStepProps> = ({ mnemonic
                 Escríbelas en papel o guárdalas en un lugar privado antes de continuar.
             </Alert>
 
-            <Box sx={{ position: 'relative' }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1.25 }}>
-                    {mnemonic.map((word, index) => (
-                        <WordChip key={`${word}-${index}`} index={index} word={word} reveal={revealed} />
-                    ))}
-                </Box>
-                {!revealed && (
-                    <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', backdropFilter: 'blur(2px)' }}>
-                        <Button variant="soft" startDecorator={<VisibilityIcon />} onClick={() => setRevealed(true)} sx={{ borderRadius: '999px', px: 2.5 }}>
-                            Mostrar palabras
-                        </Button>
-                    </Box>
-                )}
-            </Box>
+            <CreateFlowMnemonicPanel mnemonic={mnemonic} revealed={revealed} onReveal={() => setRevealed(true)} />
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
                 <Button
@@ -156,17 +115,8 @@ export const CreateConfirmStep: React.FC<CreateConfirmStepProps> = ({ mnemonic, 
     const [input, setInput] = useState('');
     const [alias, setAlias] = useState('');
     const [avatar, setAvatar] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const words = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const isValid = words.length === 12 && mnemonic.every((word, index) => word === words[index]);
-
-    const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const dataUrl = await resizeImageToDataUrl(file);
-        setAvatar(dataUrl);
-        event.target.value = '';
-    };
 
     return (
         <Stack spacing={2.5}>
@@ -212,49 +162,7 @@ export const CreateConfirmStep: React.FC<CreateConfirmStepProps> = ({ mnemonic, 
                 </Stack>
             )}
 
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' } }}>
-                <Stack spacing={1} alignItems="center" sx={{ minWidth: { sm: 112 } }}>
-                    <Box
-                        onClick={() => !isLoading && fileInputRef.current?.click()}
-                        sx={{
-                            width: 88,
-                            height: 88,
-                            borderRadius: '24px',
-                            cursor: isLoading ? 'default' : 'pointer',
-                            border: '1px dashed',
-                            borderColor: avatar ? 'primary.500' : 'divider',
-                            backgroundColor: 'background.level1',
-                            overflow: 'hidden',
-                            display: 'grid',
-                            placeItems: 'center'
-                        }}
-                    >
-                        {avatar ? (
-                            <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <AddPhotoAlternateIcon sx={{ fontSize: 30, color: 'text.tertiary' }} />
-                        )}
-                    </Box>
-                    <Button size="sm" variant="plain" color={avatar ? 'danger' : 'primary'} onClick={() => (avatar ? setAvatar('') : fileInputRef.current?.click())} disabled={isLoading} sx={{ borderRadius: '999px' }}>
-                        {avatar ? 'Quitar foto' : 'Añadir foto'}
-                    </Button>
-                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
-                </Stack>
-
-                <Stack spacing={1.25} sx={{ flex: 1, width: '100%' }}>
-                    <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
-                        Elige un nombre visible para tus contactos. Puedes cambiarlo más tarde.
-                    </Typography>
-                    <Input
-                        placeholder="Cómo quieres que te vean tus contactos"
-                        value={alias}
-                        onChange={(event) => setAlias(event.target.value)}
-                        disabled={isLoading}
-                        slotProps={{ input: { maxLength: 64 } }}
-                        sx={{ minHeight: 48, borderRadius: '14px' }}
-                    />
-                </Stack>
-            </Box>
+            <CreateFlowProfileSetup alias={alias} avatar={avatar} isLoading={isLoading} onAliasChange={setAlias} onAvatarChange={setAvatar} />
 
             <Button
                 fullWidth

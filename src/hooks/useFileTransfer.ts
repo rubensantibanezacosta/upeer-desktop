@@ -1,139 +1,15 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { aggregateTransfers, buildTransferError, formatTransferFileSize, formatTransferProgress } from './fileTransferSupport.js';
+import { registerFileTransferListeners } from './useFileTransferListeners.js';
+import type { FileTransfer, SaveFileParams, StartTransferParams, TransferProgress, TransferStateUpdate } from './fileTransferTypes.js';
 
-// Types for file transfers
-export interface FileTransfer {
-  fileId: string;
-  sessionFileId?: string;
-  messageId?: string;
-  upeerId: string;
-  chatUpeerId?: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  totalChunks: number;
-  chunkSize: number;
-  fileHash: string;
-  thumbnail?: string;
-
-  // Transfer state
-  state: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
-  phase?: number;
-  direction: 'sending' | 'receiving';
-  chunksReceived: number[];
-  chunksAcked: number[];
-  chunksSent: number[];
-
-  // Progress
-  progress: number;
-  bytesTransferred: number;
-  totalBytes: number;
-  chunksTransferred: number;
-  isVaulting?: boolean;
-
-  // Timing
-  startedAt: number;
-  lastActivity: number;
-
-  // File data
-  tempPath?: string;
-  filePath?: string;
-}
-
-export interface TransferProgress {
-  fileId: string;
-  sessionFileId?: string;
-  messageId?: string;
-  upeerId: string;
-  chatUpeerId?: string;
-  progress: number;
-  bytesTransferred: number;
-  totalBytes: number;
-  chunksTransferred: number;
-  totalChunks: number;
-  direction: 'sending' | 'receiving';
-  state?: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
-  phase?: number;
-  isVaulting?: boolean;
-}
-
-export interface StartTransferParams {
-  upeerId: string;
-  filePath: string;
-  thumbnail?: string;
-  caption?: string;
-  isVoiceNote?: boolean;
-  fileName?: string;
-}
-
-export interface SaveFileParams {
-  fileId: string;
-  destinationPath: string;
-}
-
-export type TransferStateUpdate = {
-  fileHash?: string;
-  thumbnail?: string;
-  transferState?: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
-  direction?: 'sending' | 'receiving';
-  savedPath?: string;
-};
-
-const aggregateTransfers = (transfersList: FileTransfer[]): FileTransfer[] => {
-  const grouped = new Map<string, FileTransfer[]>();
-
-  for (const transfer of transfersList) {
-    const logicalId = transfer.messageId || transfer.fileId;
-    const key = `${transfer.direction}:${logicalId}`;
-    const bucket = grouped.get(key) || [];
-    bucket.push(transfer);
-    grouped.set(key, bucket);
-  }
-
-  return Array.from(grouped.values()).map((group) => {
-    const base = group[0];
-    if (group.length === 1) {
-      return {
-        ...base,
-        fileId: base.messageId || base.fileId,
-      };
-    }
-
-    const totalBytes = group.reduce((sum, item) => sum + (item.totalBytes || item.fileSize || 0), 0);
-    const bytesTransferred = group.reduce((sum, item) => sum + (item.bytesTransferred || 0), 0);
-    const completed = group.filter((item) => item.state === 'completed').length;
-    const failed = group.some((item) => item.state === 'failed');
-    const cancelled = group.some((item) => item.state === 'cancelled');
-    const active = group.some((item) => item.state === 'active' || item.state === 'pending');
-    const progress = totalBytes > 0 ? Math.min(100, Number(((bytesTransferred / totalBytes) * 100).toFixed(2))) : 0;
-
-    let state: FileTransfer['state'] = 'pending';
-    if (completed === group.length) state = 'completed';
-    else if (active) state = 'active';
-    else if (failed) state = 'failed';
-    else if (cancelled) state = 'cancelled';
-
-    return {
-      ...base,
-      fileId: base.messageId || base.fileId,
-      progress,
-      bytesTransferred,
-      totalBytes,
-      chunksTransferred: group.reduce((sum, item) => sum + (item.chunksTransferred || 0), 0),
-      totalChunks: group.reduce((sum, item) => sum + (item.totalChunks || 0), 0),
-      state,
-      isVaulting: group.some((item) => item.isVaulting),
-      lastActivity: Math.max(...group.map((item) => item.lastActivity || 0)),
-    } as FileTransfer;
-  });
-};
+export type { FileTransfer, SaveFileParams, StartTransferParams, TransferProgress, TransferStateUpdate } from './fileTransferTypes.js';
 
 export function useFileTransfer(onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void) {
   const [transfers, setTransfers] = useState<FileTransfer[]>([]);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
   const [selectedUpeerId, setSelectedUpeerId] = useState<string>('');
 
-  // BUG DT fix: ref estable para el callback externo; evita que onTransferStateChange
-  // sea una dependencia del useEffect y no provoca re-registro de listeners.
   const onTransferStateChangeRef = useRef(onTransferStateChange);
   useEffect(() => {
     onTransferStateChangeRef.current = onTransferStateChange;
@@ -143,7 +19,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     return transfers;
   }, [transfers]);
 
-  const loadTransfers = async () => {
+  const loadTransfers = useCallback(async () => {
     try {
       const result = await window.upeer.getFileTransfers();
       if (result.success && result.transfers) {
@@ -152,10 +28,10 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
           : Object.values(result.transfers);
         setTransfers(aggregateTransfers(transfersList as FileTransfer[]));
       }
-    } catch (error) {
-      console.error('Error loading transfers:', error);
+    } catch {
+      setTransfers((prev) => prev);
     }
-  };
+  }, []);
 
   const updateTransferProgress = useCallback((progress: TransferProgress) => {
     if ((progress.messageId && progress.messageId !== progress.sessionFileId) || (progress.chatUpeerId && progress.chatUpeerId.startsWith('grp-'))) {
@@ -195,47 +71,13 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     });
   }, []);
 
-  // Load initial transfers
   useEffect(() => {
-    loadTransfers();
-  }, []);
+    void loadTransfers();
+  }, [loadTransfers]);
 
-  // Setup event listeners for file transfer events
-  // BUG DT fix: registro único aquí; el callback onTransferStateChange (de App.tsx)
-  // se llama vía ref para no duplicar registros ni silenciar ninguno de los dos handlers.
   useEffect(() => {
-    window.upeer.onFileTransferStarted((_data: any) => {
-      loadTransfers();
-    });
-
-    window.upeer.onFileTransferProgress((data: any) => {
-      updateTransferProgress(data);
-    });
-
-    window.upeer.onFileTransferCompleted((data: any) => {
-      // Optimistic immediate update
-      setTransfers(prev => prev.map(t =>
-        t.fileId === data.fileId ? { ...t, state: 'completed', progress: 100 } : t
-      ));
-      loadTransfers();
-      // Notifica a useChatState para actualizar el mensaje del chat
-      onTransferStateChangeRef.current?.(data.messageId || data.fileId, {
-        fileHash: data.fileHash,
-        transferState: 'completed',
-        savedPath: data.direction === 'receiving' ? data.tempPath : undefined
-      });
-    });
-
-    window.upeer.onFileTransferCancelled((data: any) => {
-      loadTransfers();
-      onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'cancelled' });
-    });
-
-    window.upeer.onFileTransferFailed((data: any) => {
-      loadTransfers();
-      onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'failed' });
-    });
-  }, [updateTransferProgress]);
+    return registerFileTransferListeners({ loadTransfers, updateTransferProgress, setTransfers, onTransferStateChangeRef });
+  }, [loadTransfers, updateTransferProgress]);
 
   const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string }> => {
     try {
@@ -254,11 +96,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
 
       return result;
     } catch (error) {
-      console.error('Error starting transfer:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return buildTransferError(error);
     }
   };
 
@@ -270,11 +108,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       }
       return result;
     } catch (error) {
-      console.error('Error cancelling transfer:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return buildTransferError(error);
     }
   };
 
@@ -282,17 +116,12 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     try {
       const result = await window.upeer.retryFileTransfer(fileId);
       if (result.success) {
-        // Al reintentar, actualizamos el estado del mensaje localmente a 'active' o 'pending'
         onTransferStateChangeRef.current?.(fileId, { transferState: 'pending' });
         await loadTransfers();
       }
       return result;
     } catch (error) {
-      console.error('Error retrying transfer:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return buildTransferError(error);
     }
   };
 
@@ -301,11 +130,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       const result = await window.upeer.saveTransferredFile(params.fileId, params.destinationPath);
       return result;
     } catch (error) {
-      console.error('Error saving file:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return buildTransferError(error);
     }
   };
 
@@ -327,22 +152,6 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     setSelectedUpeerId('');
   };
 
-  const formatFileSize = (bytes?: number): string => {
-    const num = bytes || 0;
-    if (num === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(num) / Math.log(k));
-    return parseFloat((num / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatProgress = (transfer: FileTransfer): string => {
-    if (transfer.state === 'completed') return 'Completado';
-    if (transfer.state === 'failed') return 'Falló';
-    if (transfer.state === 'cancelled') return 'Cancelado';
-    return `${(transfer.progress || 0).toFixed(1)}%`;
-  };
-
   return {
     transfers,
     allTransfers,
@@ -359,9 +168,8 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     openFilePicker,
     closeFilePicker,
 
-    // Utilities
-    formatFileSize,
-    formatProgress,
+    formatFileSize: formatTransferFileSize,
+    formatProgress: formatTransferProgress,
     loadTransfers
   };
 }

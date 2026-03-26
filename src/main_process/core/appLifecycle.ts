@@ -3,7 +3,6 @@ import { stopYggstack } from '../sidecars/yggstack.js';
 import { stopPeerManager } from '../sidecars/peer-manager.js';
 import { closeDatabase as closeDB } from '../storage/shared.js';
 import { closeUDPServer } from '../network/server/tcpServer.js';
-import { stopLanDiscovery } from '../network/lan/discovery.js';
 import { stopHeartbeat } from './appInitializer.js';
 
 /**
@@ -23,7 +22,6 @@ export function setupAppLifecycleHandlers(): void {
     stopHeartbeat();
     closeDB();
     closeUDPServer();
-    stopLanDiscovery();
     if (process.platform !== 'darwin') app.quit();
   });
 }

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app } from 'electron';
-import { info, error as logError } from '../security/secure-logger.js';
+import { error as logError } from '../security/secure-logger.js';
 
 /**
  * Genera una miniatura de un video usando ffmpeg
@@ -48,7 +48,7 @@ export async function generateVideoThumbnail(videoPath: string): Promise<string>
                     const buffer = await fs.readFile(outputPath);
                     const base64 = buffer.toString('base64');
                     const dataUrl = `data:image/jpeg;base64,${base64}`;
-                    fs.unlink(outputPath).catch(() => {});
+                    fs.unlink(outputPath).catch(() => { });
                     resolve(dataUrl);
                 } catch (err) {
                     reject(err);
@@ -65,7 +65,7 @@ export async function generateVideoThumbnail(videoPath: string): Promise<string>
                     '-y',
                     outputPath
                 ]);
-                
+
                 let retryStderr = '';
                 ffmpegRetry.stderr.on('data', (data) => {
                     retryStderr += data.toString();
@@ -78,7 +78,7 @@ export async function generateVideoThumbnail(videoPath: string): Promise<string>
                             const buffer = await fs.readFile(outputPath);
                             const base64 = buffer.toString('base64');
                             const dataUrl = `data:image/jpeg;base64,${base64}`;
-                            fs.unlink(outputPath).catch(() => {});
+                            fs.unlink(outputPath).catch(() => { });
                             resolve(dataUrl);
                         } catch (err) {
                             reject(err);

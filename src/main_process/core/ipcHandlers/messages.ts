@@ -18,8 +18,8 @@ export function registerMessageHandlers(): void {
   ipcMain.handle('search-messages', (_event, { query }) => searchMessages(query));
   ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
 
-  ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo, linkPreview }) =>
-    await sendUDPMessage(upeerId, { content: message, linkPreview }, replyTo)
+  ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo, linkPreview, messageId }) =>
+    await sendUDPMessage(upeerId, { content: message, linkPreview }, replyTo, messageId)
   );
 
   ipcMain.handle('send-typing-indicator', (_event, { upeerId }) => sendTypingIndicator(upeerId));

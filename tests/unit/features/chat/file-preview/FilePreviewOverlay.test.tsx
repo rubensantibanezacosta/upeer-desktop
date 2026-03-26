@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { FilePreviewOverlay } from '../../../../../src/features/chat/file-preview/FilePreviewOverlay';
 
+vi.mock('../../../../../src/features/chat/file/pdfThumbnail.js', () => ({
+    generatePdfThumbnail: vi.fn().mockResolvedValue('data:image/jpeg;base64,pdf-thumb'),
+}));
+
 vi.mock('../../../../../src/features/chat/file-preview/FilePreviewCarousel.js', () => ({
     FilePreviewCarousel: () => <div data-testid="preview-carousel" />,
 }));
