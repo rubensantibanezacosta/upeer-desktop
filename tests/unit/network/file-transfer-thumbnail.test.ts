@@ -91,7 +91,7 @@ describe('thumbnail roundtrip – emisor → receptor', () => {
     const mockWindow = {
         isDestroyed: vi.fn(() => false),
         webContents: { send: vi.fn() },
-    } as unknown as TransferWindow;
+    } as TransferWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();

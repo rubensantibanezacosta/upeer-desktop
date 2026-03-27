@@ -16,7 +16,9 @@ const mockUpeer = {
     saveTransferredFile: vi.fn(),
 };
 
-window.upeer = mockUpeer as unknown as Window['upeer'];
+type FileTransferWindow = Window & { upeer: typeof mockUpeer };
+
+(window as FileTransferWindow).upeer = mockUpeer;
 
 type TransferResult = Awaited<ReturnType<ReturnType<typeof useFileTransfer>['startTransfer']>>;
 type ProgressInput = Pick<FileTransfer, 'state' | 'progress'>;

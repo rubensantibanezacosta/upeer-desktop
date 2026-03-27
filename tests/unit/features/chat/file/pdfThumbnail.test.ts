@@ -27,7 +27,7 @@ describe('generatePdfThumbnail', () => {
                     getContext: vi.fn(() => ({})),
                     toDataURL: vi.fn(() => 'data:image/jpeg;base64,pdf-thumb'),
                 };
-                return canvas as unknown as HTMLElement;
+                return canvas as HTMLCanvasElement;
             }
             return document.createElementNS('http://www.w3.org/1999/xhtml', tagName);
         });

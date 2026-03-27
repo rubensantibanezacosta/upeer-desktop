@@ -53,11 +53,12 @@ vi.mock('../../../src/main_process/network/sealed.js', () => ({
 }));
 
 describe('network/handlers.ts - handlePacket', () => {
-    const mockWin = {
+    const mockWindowLike: object = {
         webContents: {
             send: vi.fn()
         }
-    } as unknown as PacketWindow;
+    };
+    const mockWin = mockWindowLike as PacketWindow;
     const mockSendResponse = vi.fn<SendResponse>();
     const mockStartDhtSearch = vi.fn<StartDhtSearch>();
     const mockRinfo: PacketRinfo = { address: '201:1234::1', port: 12345 };

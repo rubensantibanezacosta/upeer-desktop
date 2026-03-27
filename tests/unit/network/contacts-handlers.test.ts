@@ -78,7 +78,7 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as unknown as HandshakeWindow;
+} as HandshakeWindow;
 
 describe('Contact Handlers', () => {
     const rinfo: HandshakeRinfo = { address: '1.2.3.4', port: 12345 };

@@ -64,6 +64,6 @@ describe('Adaptive Proof-of-Work (PoW) - Unit Tests', () => {
 
     it('should return false for empty or non-string proofs', () => {
         expect(AdaptivePow.verifyLightProof('', testUpeerId)).toBe(false);
-        expect(AdaptivePow.verifyLightProof(null as unknown as string, testUpeerId)).toBe(false);
+        expect(AdaptivePow.verifyLightProof(null as never, testUpeerId)).toBe(false);
     });
 });

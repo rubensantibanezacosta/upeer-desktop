@@ -36,6 +36,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 vi.mock('../../../src/main_process/network/utils.js', () => ({
     generateSignedLocationBlock: vi.fn(),
     getNetworkAddresses: vi.fn(() => ['127.0.0.1']),
+    isYggdrasilAddress: vi.fn(() => true),
     AUTO_RENEW_THRESHOLD_MS: 3600 * 1000 // 1 hora para el test
 }));
 
@@ -86,7 +87,7 @@ describe('DHT Renewal Service', () => {
             upeerId: 'peer-1',
             dhtExpiresAt: 100,
             renewalToken: JSON.stringify({ signature: 'sig', targetId: 'peer-1' }),
-            address: '1.2.3.4',
+            address: '200:1::4',
             dhtSeq: 5
         };
         mockDb.all.mockReturnValue([mockContact]);

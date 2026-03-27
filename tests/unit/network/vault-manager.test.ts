@@ -14,7 +14,7 @@ type KnownContact = Awaited<ReturnType<typeof contactsOps.getContacts>>[number];
 type KnownRecipient = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
 type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInstance>>;
 
-const vaultManagerPrivate = VaultManager as unknown as VaultManagerPrivate;
+const vaultManagerPrivate = VaultManager as VaultManagerPrivate;
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),

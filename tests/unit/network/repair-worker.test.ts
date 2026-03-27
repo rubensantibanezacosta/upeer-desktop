@@ -91,7 +91,14 @@ type RepairWorkerInternals = {
     redistributeSegmentShards: (fileHash: string, segIdx: number, segmentData: Buffer) => Promise<void>;
 };
 
-const repairWorkerInternals = RepairWorker as unknown as RepairWorkerInternals;
+const repairWorkerInternals: RepairWorkerInternals = {
+    runMaintenance: Reflect.get(RepairWorker, 'runMaintenance').bind(RepairWorker) as RepairWorkerInternals['runMaintenance'],
+    renewExpiring: Reflect.get(RepairWorker, 'renewExpiring').bind(RepairWorker) as RepairWorkerInternals['renewExpiring'],
+    repairAsset: Reflect.get(RepairWorker, 'repairAsset').bind(RepairWorker) as RepairWorkerInternals['repairAsset'],
+    reconstructSegment: Reflect.get(RepairWorker, 'reconstructSegment').bind(RepairWorker) as RepairWorkerInternals['reconstructSegment'],
+    collectMissingShards: Reflect.get(RepairWorker, 'collectMissingShards').bind(RepairWorker) as RepairWorkerInternals['collectMissingShards'],
+    redistributeSegmentShards: Reflect.get(RepairWorker, 'redistributeSegmentShards').bind(RepairWorker) as RepairWorkerInternals['redistributeSegmentShards'],
+};
 
 describe('RepairWorker', () => {
     beforeEach(() => {

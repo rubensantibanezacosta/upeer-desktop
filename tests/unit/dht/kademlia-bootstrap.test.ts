@@ -2,22 +2,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import dns from 'node:dns';
 import fs from 'node:fs';
 import { BootstrapManager } from '../../../src/main_process/network/dht/kademlia/bootstrap.js';
-import type { RoutingTable } from '../../../src/main_process/network/dht/kademlia/routing.js';
 import type { KademliaContact, SeedNode } from '../../../src/main_process/network/dht/kademlia/types.js';
 
-type MockRoutingTable = Pick<RoutingTable, 'addContact' | 'getContactCount'> & {
-    addContact: ReturnType<typeof vi.fn>;
-    getContactCount: ReturnType<typeof vi.fn>;
+type MockRoutingTable = {
+    addContact: (contact: KademliaContact) => boolean;
+    getContactCount: () => number;
 };
 type SendMessage = ConstructorParameters<typeof BootstrapManager>[1];
-type BootstrapManagerInternals = BootstrapManager & {
+type BootstrapManagerInternals = {
     loadSeedNodesFromDNS: () => Promise<SeedNode[]>;
     loadSeedNodes: () => Promise<SeedNode[]>;
     loadSeedNodesFromFile: () => Promise<SeedNode[]>;
+    attemptBootstrapFromSeeds: () => Promise<void>;
 };
 
+const createBootstrapManager = (...args: ConstructorParameters<typeof BootstrapManager>) => new BootstrapManager(...args);
+const bootstrapInternalsCache = new WeakMap<BootstrapManager, BootstrapManagerInternals>();
+
 function getInternals(manager: BootstrapManager): BootstrapManagerInternals {
-    return manager as unknown as BootstrapManagerInternals;
+    const cached = bootstrapInternalsCache.get(manager);
+    if (cached) return cached;
+
+    const internals: BootstrapManagerInternals = {
+        loadSeedNodesFromDNS: Reflect.get(manager, 'loadSeedNodesFromDNS').bind(manager) as BootstrapManagerInternals['loadSeedNodesFromDNS'],
+        loadSeedNodes: Reflect.get(manager, 'loadSeedNodes').bind(manager) as BootstrapManagerInternals['loadSeedNodes'],
+        loadSeedNodesFromFile: Reflect.get(manager, 'loadSeedNodesFromFile').bind(manager) as BootstrapManagerInternals['loadSeedNodesFromFile'],
+        attemptBootstrapFromSeeds: Reflect.get(manager, 'attemptBootstrapFromSeeds').bind(manager) as BootstrapManagerInternals['attemptBootstrapFromSeeds'],
+    };
+
+    bootstrapInternalsCache.set(manager, internals);
+    return internals;
 }
 
 vi.mock('node:dns', () => ({
@@ -43,16 +57,20 @@ describe('BootstrapManager Unit Tests', () => {
     let bootstrapManager: BootstrapManager;
     let mockRoutingTable: MockRoutingTable;
     let mockSendMessage: ReturnType<typeof vi.fn<SendMessage>>;
+    let mockAddContact: ReturnType<typeof vi.fn<(contact: KademliaContact) => boolean>>;
+    let mockGetContactCount: ReturnType<typeof vi.fn<() => number>>;
     const userDataPath = '/tmp/upeer-test';
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockAddContact = vi.fn(() => true);
+        mockGetContactCount = vi.fn().mockReturnValue(0);
         mockRoutingTable = {
-            addContact: vi.fn(),
-            getContactCount: vi.fn().mockReturnValue(0),
+            addContact: mockAddContact,
+            getContactCount: mockGetContactCount,
         };
         mockSendMessage = vi.fn();
-        bootstrapManager = new BootstrapManager(mockRoutingTable, mockSendMessage, undefined, userDataPath);
+        bootstrapManager = createBootstrapManager(mockRoutingTable as object as ConstructorParameters<typeof BootstrapManager>[0], mockSendMessage, undefined, userDataPath);
     });
 
     it('should initialize correctly', () => {
@@ -134,7 +152,7 @@ describe('BootstrapManager Unit Tests', () => {
         });
 
         it('should handle findFileSync returning empty on non-string path', async () => {
-            const mgrNoPath = new BootstrapManager(mockRoutingTable, mockSendMessage, undefined, undefined);
+            const mgrNoPath = createBootstrapManager(mockRoutingTable as object as ConstructorParameters<typeof BootstrapManager>[0], mockSendMessage, undefined, undefined);
             const seeds = await getInternals(mgrNoPath).loadSeedNodesFromFile();
             expect(seeds).toEqual([]);
         });
@@ -169,7 +187,7 @@ describe('BootstrapManager Unit Tests', () => {
 
     describe('bootstrapFromContacts', () => {
         it('should return 0 if no getContacts function provided', () => {
-            const mgr = new BootstrapManager(mockRoutingTable, mockSendMessage);
+            const mgr = createBootstrapManager(mockRoutingTable as object as ConstructorParameters<typeof BootstrapManager>[0], mockSendMessage);
             expect(mgr.bootstrapFromContacts()).toBe(0);
         });
 
@@ -177,21 +195,21 @@ describe('BootstrapManager Unit Tests', () => {
             const mockContacts = [
                 { upeerId: '0123456789abcdef0123456789abcdef', publicKey: 'pub1', address: 'addr1', status: 'connected' },
                 { upeerId: 'deadbeefdeadbeefdeadbeefdeadbeef', publicKey: 'pub2', address: 'addr2', status: 'pending' },
-                { upeerId: 'badid', status: 'connected' }
+                { upeerId: 'badid', publicKey: '', address: '', status: 'connected' }
             ];
             const getContacts = () => mockContacts;
-            const mgr = new BootstrapManager(mockRoutingTable, mockSendMessage, getContacts);
+            const mgr = createBootstrapManager(mockRoutingTable as object as ConstructorParameters<typeof BootstrapManager>[0], mockSendMessage, getContacts);
 
-            mockRoutingTable.addContact.mockReturnValue(true);
+            mockAddContact.mockReturnValue(true);
             const count = mgr.bootstrapFromContacts();
 
             expect(count).toBe(1);
-            expect(mockRoutingTable.addContact).toHaveBeenCalledTimes(1);
+            expect(mockAddContact).toHaveBeenCalledTimes(1);
         });
 
         it('should return 0 if no contacts are provided', () => {
             const getContacts = () => [];
-            const mgr = new BootstrapManager(mockRoutingTable, mockSendMessage, getContacts);
+            const mgr = createBootstrapManager(mockRoutingTable as object as ConstructorParameters<typeof BootstrapManager>[0], mockSendMessage, getContacts);
             expect(mgr.bootstrapFromContacts()).toBe(0);
         });
     });
@@ -199,10 +217,10 @@ describe('BootstrapManager Unit Tests', () => {
     describe('attemptBootstrapFromSeeds', () => {
         it('should respect retry timeout', async () => {
             await bootstrapManager.attemptBootstrapFromSeeds();
-            vi.mocked(mockRoutingTable.addContact).mockClear();
+            mockAddContact.mockClear();
 
             await bootstrapManager.attemptBootstrapFromSeeds();
-            expect(mockRoutingTable.addContact).not.toHaveBeenCalled();
+            expect(mockAddContact).not.toHaveBeenCalled();
         });
 
         it('should load seeds and attempt to ping each', async () => {
@@ -211,7 +229,7 @@ describe('BootstrapManager Unit Tests', () => {
 
             await getInternals(bootstrapManager).attemptBootstrapFromSeeds();
 
-            expect(mockRoutingTable.addContact).toHaveBeenCalled();
+            expect(mockAddContact).toHaveBeenCalled();
             expect(mockSendMessage).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({ type: 'DHT_PING' }));
         });
 
@@ -220,27 +238,27 @@ describe('BootstrapManager Unit Tests', () => {
             mockSendMessage.mockImplementation(() => { throw new Error('Send fail'); });
 
             await getInternals(bootstrapManager).attemptBootstrapFromSeeds();
-            expect(mockRoutingTable.addContact).toHaveBeenCalled();
+            expect(mockAddContact).toHaveBeenCalled();
         });
     });
 
     describe('updateBootstrapStatus', () => {
         it('should update bootstrapped status correctly', () => {
-            mockRoutingTable.getContactCount.mockReturnValue(1);
+            mockGetContactCount.mockReturnValue(1);
             bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.isBootstrapped()).toBe(false);
 
-            mockRoutingTable.getContactCount.mockReturnValue(10);
+            mockGetContactCount.mockReturnValue(10);
             bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.isBootstrapped()).toBe(true);
         });
 
         it('should increment bootstrapSuccesses when gaining status', () => {
-            mockRoutingTable.getContactCount.mockReturnValue(0);
+            mockGetContactCount.mockReturnValue(0);
             bootstrapManager.updateBootstrapStatus();
             const initialStats = bootstrapManager.getStats();
 
-            mockRoutingTable.getContactCount.mockReturnValue(10);
+            mockGetContactCount.mockReturnValue(10);
             bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.getStats().bootstrapSuccesses).toBe(initialStats.bootstrapSuccesses + 1);
         });
@@ -249,16 +267,16 @@ describe('BootstrapManager Unit Tests', () => {
     describe('retryBootstrap', () => {
         it('should bypass the timeout and retry', async () => {
             await bootstrapManager.attemptBootstrapFromSeeds();
-            const spy = vi.spyOn(getInternals(bootstrapManager), 'loadSeedNodes');
+            const attemptsBeforeRetry = bootstrapManager.getStats().bootstrapAttempts;
 
             await bootstrapManager.retryBootstrap();
-            expect(spy).toHaveBeenCalled();
+            expect(bootstrapManager.getStats().bootstrapAttempts).toBe(attemptsBeforeRetry + 1);
         });
     });
 
     describe('helper methods', () => {
         it('should return contact count', () => {
-            mockRoutingTable.getContactCount.mockReturnValue(5);
+            mockGetContactCount.mockReturnValue(5);
             bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.getContactCount()).toBe(5);
         });

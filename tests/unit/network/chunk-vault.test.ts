@@ -47,7 +47,7 @@ describe('ChunkVault', () => {
         const transport = await import('../../../src/main_process/network/server/transport.js');
 
         const shards = [Buffer.from('aa', 'hex'), Buffer.from('bb', 'hex')];
-        const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('file-hash', shards, 'recipient-id');
+        const stored = await (ChunkVault as ChunkVaultInternals)._distributeShards('file-hash', shards, 'recipient-id');
 
         expect(stored).toBe(2);
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledTimes(2);

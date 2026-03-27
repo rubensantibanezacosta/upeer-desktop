@@ -12,6 +12,8 @@ import { parseMessage } from './messageItemSupport.js';
 import type { FileTransfer } from '../../../hooks/fileTransferTypes.js';
 import type { ChatMessage, TransferMessageUpdates } from '../../../types/chat.js';
 
+export { parseMessage } from './messageItemSupport.js';
+
 interface MediaClickPayload {
     url: string;
     name: string;

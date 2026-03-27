@@ -66,7 +66,7 @@ vi.mock('../../../src/main_process/network/handlers/groups.js', () => ({
 
 describe('Vault Delivery Handler', () => {
     const mockSendResponse = vi.fn<VaultSendResponse>();
-    const mockWin = {} as unknown as VaultWindow;
+    const mockWin = {} as VaultWindow;
     const custodianSid = 'custodian-id';
     const publicContact = { publicKey: 'pub' } as NonNullable<VaultContact>;
     const originContact = { publicKey: 'origin-pubkey' } as NonNullable<VaultContact>;

@@ -90,7 +90,7 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as unknown as ChatWindow;
+} as ChatWindow;
 
 describe('Chat Handlers', () => {
     const senderId = 'sender-id';

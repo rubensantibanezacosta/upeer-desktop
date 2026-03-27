@@ -108,7 +108,7 @@ describe('TransferManager - Core Orchestration', () => {
             send: vi.fn(),
             isDestroyed: vi.fn(() => false)
         }
-    } as unknown as TransferManagerWindow;
+    } as TransferManagerWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();

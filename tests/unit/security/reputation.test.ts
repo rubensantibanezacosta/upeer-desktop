@@ -11,7 +11,10 @@ import {
 type LooseStoredVouch = Omit<StoredVouch, 'type'> & { type: string };
 
 function toStoredVouches(vouches: LooseStoredVouch[]): StoredVouch[] {
-    return vouches as unknown as StoredVouch[];
+    return vouches.map((vouch) => ({
+        ...vouch,
+        type: vouch.type as StoredVouch['type'],
+    }));
 }
 
 describe('Reputation - Vouches Pure Logic', () => {

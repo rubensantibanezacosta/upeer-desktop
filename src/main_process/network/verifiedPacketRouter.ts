@@ -314,6 +314,29 @@ function toVaultAckPayload(data: VerifiedPacketData): VaultAckPayload {
     };
 }
 
+function toVaultStorePayload(data: VerifiedPacketData, senderSid: string): VaultStoreData {
+    return {
+        payloadHash: typeof data.payloadHash === 'string' ? data.payloadHash : '',
+        recipientSid: typeof data.recipientSid === 'string' ? data.recipientSid : '',
+        senderSid: typeof data.senderSid === 'string' ? data.senderSid : senderSid,
+        priority: typeof data.priority === 'number' ? data.priority : 0,
+        data: typeof data.data === 'string' ? data.data : '',
+        expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : 0,
+        powProof: typeof data.powProof === 'string' ? data.powProof : undefined,
+    };
+}
+
+function toVaultQueryPayload(data: VerifiedPacketData, requesterSid: string): VaultQueryData {
+    return {
+        requesterSid: typeof data.requesterSid === 'string' ? data.requesterSid : requesterSid,
+        timestamp: typeof data.timestamp === 'number' ? data.timestamp : 0,
+        merkleRoot: typeof data.merkleRoot === 'string' ? data.merkleRoot : undefined,
+        batchSize: typeof data.batchSize === 'number' ? data.batchSize : undefined,
+        offset: typeof data.offset === 'number' ? data.offset : undefined,
+        payloadHash: typeof data.payloadHash === 'string' ? data.payloadHash : undefined,
+    };
+}
+
 function toVaultRenewPayload(data: VerifiedPacketData): VaultRenewPayload {
     return {
         payloadHash: typeof data.payloadHash === 'string' ? data.payloadHash : '',
@@ -447,10 +470,10 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             maybeQueryVaultsForPeer(upeerId);
             break;
         case 'VAULT_STORE':
-            await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, data as unknown as VaultStoreData, rinfo.address, sendResponse);
+            await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, toVaultStorePayload(data, upeerId), rinfo.address, sendResponse);
             break;
         case 'VAULT_QUERY':
-            await (await import('./vault/protocol/handlers.js')).handleVaultQuery(upeerId, data as unknown as VaultQueryData, rinfo.address, sendResponse);
+            await (await import('./vault/protocol/handlers.js')).handleVaultQuery(upeerId, toVaultQueryPayload(data, upeerId), rinfo.address, sendResponse);
             break;
         case 'VAULT_ACK':
             await (await import('./vault/protocol/handlers.js')).handleVaultAck(upeerId, toVaultAckPayload(data));

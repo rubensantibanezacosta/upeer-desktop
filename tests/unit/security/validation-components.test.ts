@@ -193,7 +193,7 @@ describe('Validation - Advanced Components', () => {
                 fileHash: 'b'.repeat(64)
             }).valid).toBe(true);
             expect(validateMessage('FILE_ACCEPT', { fileId: 'f' }).valid).toBe(true);
-            expect(validateMessage('FILE_CHUNK', { fileId: 'f', chunkIndex: 0, data: 'd' }).valid).toBe(true);
+            expect(validateMessage('FILE_CHUNK', { fileId: 'f', chunkIndex: 0, data: 'ZA==' }).valid).toBe(true);
             expect(validateMessage('FILE_CHUNK_ACK', { fileId: 'f', chunkIndex: 0 }).valid).toBe(true);
             expect(validateMessage('FILE_ACK', { fileId: 'f', chunkIndex: 0 }).valid).toBe(true);
             expect(validateMessage('FILE_DONE_ACK', { fileId: 'f' }).valid).toBe(true);

@@ -70,7 +70,17 @@ export function getVouchesByIds(ids: string[]): StoredVouch[] {
         return db.select()
             .from(schema.reputationVouches)
             .where(inArray(schema.reputationVouches.id, ids))
-            .all() as unknown as StoredVouch[];
+            .all()
+            .map((row) => ({
+                id: row.id,
+                fromId: row.fromId,
+                toId: row.toId,
+                type: row.type,
+                positive: row.positive,
+                timestamp: row.timestamp,
+                signature: row.signature,
+                receivedAt: row.receivedAt,
+            }));
     } catch {
         return [];
     }
@@ -86,7 +96,17 @@ export function getVouchesForNode(toId: string, since = 0): StoredVouch[] {
                 eq(schema.reputationVouches.toId, toId),
                 gte(schema.reputationVouches.timestamp, since)
             ))
-            .all() as unknown as StoredVouch[];
+            .all()
+            .map((row) => ({
+                id: row.id,
+                fromId: row.fromId,
+                toId: row.toId,
+                type: row.type,
+                positive: row.positive,
+                timestamp: row.timestamp,
+                signature: row.signature,
+                receivedAt: row.receivedAt,
+            }));
     } catch {
         return [];
     }

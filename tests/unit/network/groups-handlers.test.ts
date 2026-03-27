@@ -81,7 +81,7 @@ vi.mock('../../../src/main_process/network/groupState.js', () => ({
 }));
 
 describe('Group Handlers Final Coverage', () => {
-    const mockWin = { webContents: { send: vi.fn() } } as unknown as GroupWindow;
+    const mockWin = { webContents: { send: vi.fn() } } as GroupWindow;
     const groupId = 'group-uuid-123';
     const senderId = 'sender-upeer-id';
 

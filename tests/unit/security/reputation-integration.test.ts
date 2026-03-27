@@ -47,11 +47,17 @@ function buildIncomingVouch(overrides: Partial<LooseIncomingVouch> = {}): Reputa
 }
 
 function toIncomingVouch(vouch: LooseIncomingVouch): ReputationVouch {
-    return vouch as unknown as ReputationVouch;
+    return {
+        ...vouch,
+        type: vouch.type as ReputationVouch['type'],
+    };
 }
 
 function toStoredVouches(vouches: LooseStoredVouch[]): StoredVouch[] {
-    return vouches as unknown as StoredVouch[];
+    return vouches.map((vouch) => ({
+        ...vouch,
+        type: vouch.type as StoredVouch['type'],
+    }));
 }
 
 describe('Reputation - Vouches Integration', () => {
@@ -126,7 +132,7 @@ describe('Reputation - Vouches Integration', () => {
 
         it('should fail if required fields are missing', async () => {
             vi.mocked(storage.vouchExists).mockReturnValue(false);
-            const result = await saveIncomingVouch({ fromId: 'f' } as unknown as ReputationVouch);
+            const result = await saveIncomingVouch({ fromId: 'f' } as ReputationVouch);
             expect(result).toBe(false);
         });
 
@@ -171,7 +177,7 @@ describe('Reputation - Vouches Integration', () => {
 
         it('should log error and return false if exception occurs', async () => {
             vi.mocked(storage.vouchExists).mockImplementation(() => { throw new Error('DB Error'); });
-            const result = await saveIncomingVouch({ id: 'sample-id' } as unknown as ReputationVouch);
+            const result = await saveIncomingVouch({ id: 'sample-id' } as ReputationVouch);
             expect(result).toBe(false);
         });
     });

@@ -217,5 +217,5 @@ export function getGossipIds(): string[] {
 
 /** Vouches completos para entregar, limitados a DELIVER_MAX_VOUCHES. */
 export function getVouchesForDelivery(ids: string[]): ReputationVouch[] {
-    return getVouchesByIds(ids.slice(0, DELIVER_MAX_VOUCHES)) as unknown as ReputationVouch[];
+    return getVouchesByIds(ids.slice(0, DELIVER_MAX_VOUCHES));
 }
