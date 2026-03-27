@@ -50,8 +50,8 @@ export async function cleanupLocalAttachmentFile(filePath?: string | null): Prom
 
     try {
         await fs.unlink(resolvedPath);
-    } catch (error: any) {
-        if (error?.code !== 'ENOENT') {
+    } catch (error: unknown) {
+        if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
             warn('Failed to delete local attachment file', { filePath: resolvedPath, err: String(error) }, 'file-transfer');
         }
         return;
@@ -60,8 +60,8 @@ export async function cleanupLocalAttachmentFile(filePath?: string | null): Prom
     if (isWithinDir(resolvedPath, tempDir)) {
         try {
             await fs.rmdir(path.dirname(resolvedPath));
-        } catch (error: any) {
-            if (error?.code !== 'ENOTEMPTY' && error?.code !== 'ENOENT') {
+        } catch (error: unknown) {
+            if (!(error instanceof Error) || !('code' in error) || (error.code !== 'ENOTEMPTY' && error.code !== 'ENOENT')) {
                 warn('Failed to delete local attachment temp dir', { filePath: resolvedPath, err: String(error) }, 'file-transfer');
             }
         }

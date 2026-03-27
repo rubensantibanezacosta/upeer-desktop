@@ -14,6 +14,12 @@ import { fileTransferManager } from '../../../src/main_process/network/file-tran
 import * as contactStatus from '../../../src/main_process/storage/contacts/status.js';
 import * as contactLocation from '../../../src/main_process/storage/contacts/location.js';
 
+type PacketWindow = NonNullable<Parameters<typeof handlePacket>[2]>;
+type PacketRinfo = Parameters<typeof handlePacket>[1];
+type SendResponse = Parameters<typeof handlePacket>[3];
+type StartDhtSearch = Parameters<typeof handlePacket>[4];
+type KnownContact = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
+
 // Mocks
 vi.mock('../../../src/main_process/security/identity-rate-limiter.js');
 vi.mock('../../../src/main_process/security/identity.js');
@@ -51,18 +57,20 @@ describe('network/handlers.ts - handlePacket', () => {
         webContents: {
             send: vi.fn()
         }
-    } as any;
-    const mockSendResponse = vi.fn();
-    const mockStartDhtSearch = vi.fn();
-    const mockRinfo = { address: '201:1234::1', port: 12345 };
+    } as unknown as PacketWindow;
+    const mockSendResponse = vi.fn<SendResponse>();
+    const mockStartDhtSearch = vi.fn<StartDhtSearch>();
+    const mockRinfo: PacketRinfo = { address: '201:1234::1', port: 12345 };
+    const connectedContact = {
+        publicKey: '00'.repeat(32),
+        status: 'connected'
+    } as NonNullable<KnownContact>;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        // Default: rate limiter allows everything
-        (IdentityRateLimiter.prototype.checkIp as any).mockReturnValue(true);
-        (IdentityRateLimiter.prototype.checkIdentity as any).mockReturnValue(true);
-        // Default validation: valid
-        (validation.validateMessage as any).mockReturnValue({ valid: true });
+        vi.mocked(IdentityRateLimiter.prototype.checkIp).mockReturnValue(true);
+        vi.mocked(IdentityRateLimiter.prototype.checkIdentity).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
     });
 
     it('should ignore invalid JSON', async () => {
@@ -72,7 +80,7 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle rate limiting by IP', async () => {
-        (IdentityRateLimiter.prototype.checkIp as any).mockReturnValue(false);
+        vi.mocked(IdentityRateLimiter.prototype.checkIp).mockReturnValue(false);
         const msg = Buffer.from(JSON.stringify({ type: 'PING' }));
         await handlePacket(msg, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
         expect(validation.validateMessage).not.toHaveBeenCalled();
@@ -86,11 +94,11 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should verify signature and reject if invalid', async () => {
-        (identity.verify as any).mockReturnValue(false);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+        vi.mocked(identity.verify).mockReturnValue(false);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             publicKey: '00'.repeat(32),
             status: 'connected'
-        });
+        } as NonNullable<KnownContact>);
 
         const packet = {
             type: 'CHAT',
@@ -109,9 +117,9 @@ describe('network/handlers.ts - handlePacket', () => {
         const innerPacket = { type: 'PING', senderUpeerId: 'id', signature: 'sig' };
 
         const { unsealPacket } = await import('../../../src/main_process/network/sealed.js');
-        (unsealPacket as any).mockReturnValue(innerPacket);
+        vi.mocked(unsealPacket).mockReturnValue(innerPacket);
 
-        (validation.validateMessage as any).mockReturnValue({ valid: false, error: 'stop' });
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: false, error: 'stop' });
 
         const msg = Buffer.from(JSON.stringify(sealedPacket));
         await handlePacket(msg, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -144,9 +152,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle CHAT message and delegate to handleChatMessage', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'CHAT',
@@ -161,9 +168,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle ACK and delegate to handleChatAck', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'ACK',
@@ -178,9 +184,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle GROUP_MSG and delegate to handleGroupMessage', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'GROUP_MSG',
@@ -196,9 +201,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle FILE_PROPOSAL and delegate to fileTransferManager', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'FILE_PROPOSAL',
@@ -213,9 +217,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle VAULT_DELIVERY and delegate to handleVaultDelivery', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'VAULT_DELIVERY',
@@ -230,9 +233,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle REPUTATION_GOSSIP and delegate to handleReputationGossip', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'REPUTATION_GOSSIP',
@@ -247,9 +249,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle PING and update contact name/avatar if provided', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'PING',
@@ -267,11 +268,10 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle DHT_ packet and delegate to handleDhtPacket', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
         const { handleDhtPacket } = await import('../../../src/main_process/network/dht/handlers.js');
-        (handleDhtPacket as any).mockResolvedValue(true);
+        vi.mocked(handleDhtPacket).mockResolvedValue(true);
 
         const packet = {
             type: 'DHT_PING',
@@ -286,10 +286,10 @@ describe('network/handlers.ts - handlePacket', () => {
 
     it('should handle contact roaming (location update)', async () => {
         const contact = { upeerId: 'peer1', publicKey: '00'.repeat(32), status: 'connected', address: 'old-ip' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(contact as NonNullable<KnownContact>);
 
-        const newRinfo = { address: '201:abcd::1', port: 12345 }; // Ygg address
+        const newRinfo: PacketRinfo = { address: '201:abcd::1', port: 12345 };
         const packet = {
             type: 'PONG',
             senderUpeerId: 'peer1',
@@ -303,9 +303,9 @@ describe('network/handlers.ts - handlePacket', () => {
 
     it('should handle IDENTITY_UPDATE for self', async () => {
         const myId = 'my-peer-id';
-        (identity.getMyUPeerId as any).mockReturnValue(myId);
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: '00'.repeat(32), status: 'connected' });
+        vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'IDENTITY_UPDATE',
@@ -321,9 +321,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should log unknown packet types', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'UNKNOWN_TYPE',
@@ -345,9 +344,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle VAULT_QUERY and VAULT_ACK with dynamic imports', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packetQuery = { type: 'VAULT_QUERY', senderUpeerId: 'peer1', signature: 'sig' };
         const msgQuery = Buffer.from(JSON.stringify(packetQuery));
@@ -367,9 +365,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle PING with alias/avatar and trigger operations update', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = {
             type: 'PING',
@@ -387,9 +384,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle CHAT_CONTACT and log unknown type for coverage', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const contactPacket = { type: 'CHAT_CONTACT', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(contactPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -397,9 +393,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle TYPING and CHAT_REACTION', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const typingPacket = { type: 'TYPING', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(typingPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -411,9 +406,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle CHAT_EDIT and CHAT_DELETE', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const editPacket = { type: 'CHAT_UPDATE', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(editPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -425,9 +419,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle CHAT_CLEAR_ALL with dynamic import', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const clearPacket = { type: 'CHAT_CLEAR_ALL', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(clearPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -437,9 +430,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle FILE_CHUNK and other file messages', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const chunkPacket = { type: 'FILE_CHUNK', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(chunkPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -447,9 +439,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle REPUTATION_REQUEST and REPUTATION_DELIVER', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const reqPacket = { type: 'REPUTATION_REQUEST', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(reqPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -461,9 +452,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle all GROUP cases', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const types = ['GROUP_ACK', 'GROUP_INVITE', 'GROUP_UPDATE', 'GROUP_LEAVE'];
         for (const type of types) {
@@ -477,9 +467,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle VAULT_RENEW with dynamic import', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const packet = { type: 'VAULT_RENEW', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -489,9 +478,8 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle READ and TYPING packets', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (identity.verify as any).mockReturnValue(true);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
         const readPacket = { type: 'READ', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(readPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
@@ -499,11 +487,9 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle legacy signature verification fallback', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
-        // First verify fails, second (legacy) succeeds
-        (identity.verify as any)
+        vi.mocked(identity.verify)
             .mockReturnValueOnce(false)
             .mockReturnValueOnce(true);
 
@@ -516,7 +502,7 @@ describe('network/handlers.ts - handlePacket', () => {
         const msg = Buffer.from(JSON.stringify(packet));
 
         // Rinfo must be localhost to trigger isLocalSource and set rinfo.address = senderYggAddress
-        const localRinfo = { address: '127.0.0.1', port: 12345 };
+        const localRinfo: PacketRinfo = { address: '127.0.0.1', port: 12345 };
 
         await handlePacket(msg, localRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
         expect(identity.verify).toHaveBeenCalledTimes(2);
@@ -524,10 +510,9 @@ describe('network/handlers.ts - handlePacket', () => {
     });
 
     it('should handle rate limiting by identity', async () => {
-        const contact = { publicKey: '00'.repeat(32), status: 'connected' };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
-        (identity.verify as any).mockReturnValue(true);
-        (IdentityRateLimiter.prototype.checkIdentity as any).mockReturnValue(false);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(IdentityRateLimiter.prototype.checkIdentity).mockReturnValue(false);
 
         const packet = { type: 'PING', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { FileHandle } from 'node:fs/promises';
 import { warn, debug, error } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { sign } from '../../security/identity.js';
@@ -9,6 +10,28 @@ import { saveTransferToDB } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
 import { calculateHashFromChunks } from './senderSupport.js';
 import type { TransferManager } from './transfer-manager.js';
+
+type EncryptedThumbnail = ReturnType<typeof encryptChunk>;
+
+type FileProposalPacket = {
+    type: 'FILE_PROPOSAL';
+    fileId: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    totalChunks: number;
+    chunkSize: number;
+    fileHash: string;
+    encryptedKey?: string;
+    encryptedKeyNonce?: string;
+    useRecipientEphemeral?: boolean;
+    thumbnail?: EncryptedThumbnail;
+    caption?: string;
+    isVoiceNote?: boolean;
+    messageId?: string;
+    chatUpeerId?: string;
+    signature?: string;
+};
 
 export async function startSend(
     this: TransferManager,
@@ -52,7 +75,7 @@ export async function startSend(
 
         const fileInfo = await this.validator.validateAndPrepareFile(effectivePath);
         const totalChunks = this.chunker.calculateChunks(fileInfo.size, this.config.maxChunkSize);
-        let sendHandle: any;
+        let sendHandle: FileHandle | undefined;
         let snapshotHash = fileInfo.hash;
 
         try {
@@ -118,7 +141,7 @@ export async function startSend(
             encryptedKeyNonce = sealed.nonce;
         }
 
-        let encThumb: any;
+        let encThumb: EncryptedThumbnail | undefined;
         if (thumbnail && aesKey) {
             try {
                 const thumbData = thumbnail.startsWith('data:') ? thumbnail.split(',')[1] : thumbnail;
@@ -128,7 +151,7 @@ export async function startSend(
             }
         }
 
-        const proposal: any = {
+        const proposal: FileProposalPacket = {
             type: 'FILE_PROPOSAL',
             fileId: transfer.fileId,
             fileName: transfer.fileName,
@@ -180,14 +203,14 @@ export async function startSend(
                     debug('Contact still connected, extending FILE_PROPOSAL timeout', { fileId: transfer.fileId, attempt: attempts + 1 }, 'file-transfer');
                     if (attempts >= 7) {
                         clearInterval(proposalTimer);
-                        this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: any) => {
+                        this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: unknown) => {
                             error('Vaulting failover failed', err, 'vault');
                         });
                         return;
                     }
                 } else {
                     clearInterval(proposalTimer);
-                    this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: any) => {
+                    this.startVaultingFailover(transfer.fileId, upeerId, contact?.publicKey, aesKey, encThumb).catch((err: unknown) => {
                         error('Vaulting failover failed', err, 'vault');
                     });
                     return;

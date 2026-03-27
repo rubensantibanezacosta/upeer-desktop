@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { FilePreviewOverlay } from '../../../../../src/features/chat/file-preview/FilePreviewOverlay';
 
+type FilePreviewUpeer = Pick<Window['upeer'], 'persistInternalAsset' | 'generateVideoThumbnail'>;
+type FilePreviewWindow = Window & { upeer: FilePreviewUpeer };
+const previewWindow = window as FilePreviewWindow;
+
 vi.mock('../../../../../src/features/chat/file/pdfThumbnail.js', () => ({
     generatePdfThumbnail: vi.fn().mockResolvedValue('data:image/jpeg;base64,pdf-thumb'),
 }));
@@ -21,7 +25,7 @@ vi.mock('../../../../../src/features/chat/input/EmojiPicker.js', () => ({
 
 describe('FilePreviewOverlay', () => {
     beforeEach(() => {
-        (window as any).upeer = {
+        previewWindow.upeer = {
             persistInternalAsset: vi.fn().mockResolvedValue({ success: true, path: '/tmp/manual.pdf' }),
             generateVideoThumbnail: vi.fn().mockResolvedValue({ success: false }),
         };

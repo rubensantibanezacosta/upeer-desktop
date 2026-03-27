@@ -16,15 +16,49 @@ import * as contactsOps from '../../../src/main_process/storage/contacts/operati
 import * as locationOps from '../../../src/main_process/storage/contacts/location.js';
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 import { AdaptivePow } from '../../../src/main_process/security/pow.js';
+import type { Contact } from '../../../src/types/chat.js';
+import type { KademliaContact } from '../../../src/main_process/network/dht/kademlia/types.js';
+
+type NetworkContact = Contact & {
+    dhtSeq?: number;
+    dhtSignature?: string;
+    dhtExpiresAt?: number | string;
+    renewalToken?: string;
+    knownAddresses?: string;
+};
+
+type MockKademlia = {
+    handleMessage?: ReturnType<typeof vi.fn>;
+    storeLocationBlock?: ReturnType<typeof vi.fn>;
+    findLocationBlock?: ReturnType<typeof vi.fn>;
+    findClosestContacts?: ReturnType<typeof vi.fn>;
+    getAllStoredValues?: ReturnType<typeof vi.fn>;
+    performMaintenance?: ReturnType<typeof vi.fn>;
+    upeerId?: string;
+};
+
+function createContact(overrides: Partial<NetworkContact> & Pick<NetworkContact, 'upeerId'>): NetworkContact {
+    return {
+        upeerId: overrides.upeerId,
+        name: overrides.name ?? overrides.upeerId,
+        status: overrides.status ?? 'connected',
+        address: overrides.address ?? '',
+        ...overrides,
+    };
+}
+
+function getKademliaMock(overrides: Partial<MockKademlia>): MockKademlia {
+    return overrides;
+}
 
 vi.mock('../../../src/main_process/network/dht/shared.js');
 vi.mock('../../../src/main_process/storage/contacts/operations.js');
 vi.mock('../../../src/main_process/storage/contacts/location.js');
 vi.mock('../../../src/main_process/security/secure-logger.js');
 vi.mock('../../../src/main_process/network/utils.js', async () => {
-    const actual = await vi.importActual('../../../src/main_process/network/utils.js');
+    const actual = await vi.importActual<typeof import('../../../src/main_process/network/utils.js')>('../../../src/main_process/network/utils.js');
     return {
-        ...actual as any,
+        ...actual,
         verifyLocationBlockWithDHT: vi.fn(),
         validateDhtSequence: vi.fn(),
         storeRenewalTokenInDHT: vi.fn().mockReturnValue(Promise.resolve()),
@@ -36,7 +70,7 @@ vi.mock('../../../src/main_process/network/utils.js', async () => {
 vi.mock('../../../src/main_process/security/pow.js');
 
 describe('network/dht/handlers.ts', () => {
-    const mockWin = {} as any;
+    const mockWin = null;
     const mockSendResponse = vi.fn();
     const mockSenderUpeerId = 'peer-sender';
     const mockSenderAddress = '201:1234::1';
@@ -48,31 +82,29 @@ describe('network/dht/handlers.ts', () => {
 
     describe('handleDhtPacket', () => {
         it('should return false if Kademlia instance is missing', async () => {
-            (getKademliaInstance as any).mockReturnValue(null);
+            vi.mocked(getKademliaInstance).mockReturnValue(null);
             const result = await handleDhtPacket('DHT_QUERY', {}, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
             expect(result).toBe(false);
         });
 
         it('should return true for known DHT types when instance exists', async () => {
-            const mockKademlia = {
+            const mockKademlia = getKademliaMock({
                 handleQuery: vi.fn().mockResolvedValue(true)
-            };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            // We need to mock the specific sub-handlers or verify they are called
-            // For now, let's test a simple flow that returns true
             const result = await handleDhtPacket('DHT_UNKNOWN', {}, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
             expect(result).toBe(false);
         });
 
         it('should handle DHT_UPDATE correctly', async () => {
-            const mockKademlia = { storeLocationBlock: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ storeLocationBlock: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const contact = { upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
-            (networkUtils.validateDhtSequence as any).mockReturnValue({ valid: true });
+            const contact = createContact({ upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(contact);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
 
             const data = {
                 locationBlock: {
@@ -90,18 +122,18 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should handle DHT_QUERY correctly', async () => {
-            const mockKademlia = { handleMessage: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ handleMessage: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const target = {
+            const target = createContact({
                 upeerId: 'target-id',
                 publicKey: '00'.repeat(32),
                 address: 'target-addr',
                 dhtSeq: 5,
                 dhtSignature: 'target-sig',
                 dhtExpiresAt: '2026-12-31T00:00:00Z'
-            };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(target);
+            });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(target);
 
             const data = { targetId: 'target-id' };
             const result = await handleDhtPacket('DHT_QUERY', data, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
@@ -115,12 +147,12 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should handle DHT_EXCHANGE correctly', async () => {
-            (getKademliaInstance as any).mockReturnValue({});
+            vi.mocked(getKademliaInstance).mockReturnValue({} as never);
 
-            const existingPeer = { upeerId: 'peerX', publicKey: '00'.repeat(32), dhtSeq: 1 };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(existingPeer);
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
-            (networkUtils.validateDhtSequence as any).mockReturnValue({ valid: true });
+            const existingPeer = createContact({ upeerId: 'peerX', publicKey: '00'.repeat(32), dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(existingPeer);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
 
             const data = {
                 peers: [{
@@ -141,15 +173,15 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should handle invalid signature in DHT_EXCHANGE', async () => {
-            const mockKademlia = { handleMessage: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ handleMessage: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const existingPeer = { upeerId: 'peerX', publicKey: 'pubX', dhtSeq: 1 };
-            (contactsOps.getContactByUpeerId as any).mockImplementation(async (id: string) => {
+            const existingPeer = createContact({ upeerId: 'peerX', publicKey: 'pubX', dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id: string) => {
                 if (id === 'peerX') return existingPeer;
-                return { upeerId: 'sender', publicKey: 'pubS' };
+                return createContact({ upeerId: 'sender', publicKey: 'pubS' });
             });
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(false);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(false);
 
             const data = {
                 peers: [{
@@ -165,25 +197,23 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should renew location block during DHT_EXCHANGE if possible', async () => {
-            const mockKademlia = { handleMessage: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ handleMessage: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const existingPeer = { upeerId: 'peerX', publicKey: 'pubX', dhtSeq: 1 };
-            // Mock getContactByUpeerId to return data for peerX
-            (contactsOps.getContactByUpeerId as any).mockImplementation(async (id: string) => {
-                console.log('getContactByUpeerId called for', id);
+            const existingPeer = createContact({ upeerId: 'peerX', publicKey: 'pubX', dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id: string) => {
                 if (id === 'peerX') return existingPeer;
-                return { upeerId: 'sender', publicKey: 'pubS' }; // Needed for general success
+                return createContact({ upeerId: 'sender', publicKey: 'pubS' });
             });
 
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
-            (networkUtils.validateDhtSequence as any).mockReturnValue({ valid: true });
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
 
             const originalBlock = { address: 'addrX', dhtSeq: 2, signature: 'sigX', renewalToken: { token: 'tok1' } };
             const renewedBlock = { ...originalBlock, dhtSeq: 3, signature: 'sigNew', renewalToken: { token: 'tok1', renewalsUsed: 1 } };
 
-            (networkUtils.canRenewLocationBlock as any).mockReturnValue(true);
-            (networkUtils.renewLocationBlock as any).mockReturnValue(renewedBlock);
+            vi.mocked(networkUtils.canRenewLocationBlock).mockReturnValue(true);
+            vi.mocked(networkUtils.renewLocationBlock).mockReturnValue(renewedBlock);
 
             const data = {
                 peers: [{
@@ -193,23 +223,20 @@ describe('network/dht/handlers.ts', () => {
                 }]
             };
 
-            // Ensure senderUpeerId is NOT 'peerX'
-            console.log('Calling handleDhtPacket with type DHT_EXCHANGE');
             const result = await handleDhtPacket('DHT_EXCHANGE', data, 'different-sender', mockSenderAddress, mockWin, mockSendResponse);
-            console.log('Result:', result);
             expect(result).toBe(true);
             expect(networkUtils.renewLocationBlock).toHaveBeenCalled();
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalled();
         });
 
         it('should require PoW for large sequence jump in DHT_UPDATE', async () => {
-            const mockKademlia = { storeLocationBlock: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ storeLocationBlock: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const contact = { upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
-            (networkUtils.validateDhtSequence as any).mockReturnValue({
+            const contact = createContact({ upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(contact);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({
                 valid: false,
                 requiresPoW: true,
                 reason: 'Large jump'
@@ -230,18 +257,18 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should accept DHT_UPDATE with valid PoW for large jump', async () => {
-            const mockKademlia = { storeLocationBlock: vi.fn() };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ storeLocationBlock: vi.fn() });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const contact = { upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(contact);
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
-            (networkUtils.validateDhtSequence as any).mockReturnValue({
+            const contact = createContact({ upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(contact);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({
                 valid: false,
                 requiresPoW: true,
                 reason: 'Large jump'
             });
-            (AdaptivePow.verifyLightProof as any).mockReturnValue(true);
+            vi.mocked(AdaptivePow.verifyLightProof).mockReturnValue(true);
 
             const data = {
                 locationBlock: {
@@ -258,13 +285,13 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should handle DHT_QUERY correctly searching in Kademlia if local fails', async () => {
-            const mockKademlia = {
+            const mockKademlia = getKademliaMock({
                 findLocationBlock: vi.fn(),
                 findClosestContacts: vi.fn().mockReturnValue([{ upeerId: 'near1', address: 'addr1', publicKey: 'pk1' }])
-            };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(null);
             mockKademlia.findLocationBlock.mockResolvedValue(null);
 
             const data = { targetId: 'target-99', referralContext: 'search' };
@@ -279,32 +306,31 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('should handle DHT_RESPONSE and update local location', async () => {
-            (getKademliaInstance as any).mockReturnValue({});
-            const existing = { upeerId: 't1', publicKey: 'pub1', dhtSeq: 5 };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(existing);
-            (networkUtils.verifyLocationBlockWithDHT as any).mockResolvedValue(true);
+            vi.mocked(getKademliaInstance).mockReturnValue({} as never);
+            const existing = createContact({ upeerId: 't1', publicKey: 'pub1', dhtSeq: 5 });
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(existing);
+            vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
 
             const data = {
                 targetId: 't1',
                 locationBlock: { address: 'new-ip', dhtSeq: 10, signature: 'sig10' }
             };
 
-            // Avoid renewal triggering in this test
-            (networkUtils.canRenewLocationBlock as any).mockReturnValue(false);
+            vi.mocked(networkUtils.canRenewLocationBlock).mockReturnValue(false);
 
             const result = await handleDhtPacket('DHT_RESPONSE', data, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
 
             expect(result).toBe(true);
-            const calls = (locationOps.updateContactDhtLocation as any).mock.calls;
-            const relevantCall = calls.find((c: any[]) => c[0] === 't1');
+            const calls = vi.mocked(locationOps.updateContactDhtLocation).mock.calls;
+            const relevantCall = calls.find((call) => call[0] === 't1');
             expect(relevantCall).toEqual([
                 't1', 'new-ip', 10, 'sig10', undefined, undefined
             ]);
         });
 
         it('should handle generic DHT_ messages via Kademlia instance', async () => {
-            const mockKademlia = { handleMessage: vi.fn().mockResolvedValue({ type: 'PONG' }) };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ handleMessage: vi.fn().mockResolvedValue({ type: 'PONG' }) });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
             const result = await handleDhtPacket('DHT_GOSSIP', { some: 'data' }, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
 
@@ -399,8 +425,8 @@ describe('network/dht/handlers.ts', () => {
 
     describe('Kademlia Integration exports', () => {
         it('publishLocationBlock should use kademlia instance', async () => {
-            const mockKademlia = { storeLocationBlock: vi.fn(), upeerId: 'me' };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            const mockKademlia = getKademliaMock({ storeLocationBlock: vi.fn(), upeerId: 'me' });
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
             const block = { dhtSeq: 1 };
             await publishLocationBlock(block);
@@ -420,13 +446,11 @@ describe('network/dht/handlers.ts', () => {
 
             const mockKademlia = {
                 storeLocationBlock: vi.fn(),
-                getValueStore: () => ({
-                    getAll: () => [{ publisher: 'target1', value: expiringBlock }]
-                })
+                getAllStoredValues: vi.fn(() => [{ publisher: 'target1', value: expiringBlock }])
             };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub1' });
-            (networkUtils.verifyRenewalToken as any).mockReturnValue(true);
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(createContact({ upeerId: 'target1', publicKey: 'pub1' }));
+            vi.mocked(networkUtils.verifyRenewalToken).mockReturnValue(true);
 
             await performAutoRenewal();
 
@@ -435,7 +459,7 @@ describe('network/dht/handlers.ts', () => {
         });
 
         it('findNodeLocation should return null if kademlia is missing', async () => {
-            (getKademliaInstance as any).mockReturnValue(null);
+            vi.mocked(getKademliaInstance).mockReturnValue(null);
             const res = await findNodeLocation('target');
             expect(res).toBe(null);
         });
@@ -449,7 +473,7 @@ describe('network/dht/handlers.ts', () => {
             const mockKademlia = {
                 findClosestContacts: vi.fn().mockReturnValue([{ upeerId: 'peer1', address: 'addr1', publicKey: 'pk1' }])
             };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
             const mockSendMessage = vi.fn((addr, data) => {
                 // Simulate asynchronous response after a short delay
@@ -474,7 +498,7 @@ describe('network/dht/handlers.ts', () => {
             const mockKademlia = {
                 findClosestContacts: vi.fn().mockReturnValue([{ upeerId: 'peer1', address: 'addr1', publicKey: 'pk1' }])
             };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
             // Mock randomBytes to have stable queryIds if needed, but not strictly necessary here
             // What we need is to mock the timer or use a very short timeout if iterativeFindNode allowed it
@@ -500,7 +524,7 @@ describe('network/dht/handlers.ts', () => {
             const mockKademlia = {
                 performMaintenance: vi.fn()
             };
-            (getKademliaInstance as any).mockReturnValue(mockKademlia);
+            vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
             await performDhtMaintenance();
             expect(mockKademlia.performMaintenance).toHaveBeenCalled();

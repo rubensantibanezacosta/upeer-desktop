@@ -1,9 +1,12 @@
 import crypto from 'node:crypto';
 import {
     getMyPublicKeyHex,
+    getMyPublicKey,
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
+import type { LinkPreview } from '../../types/chat.js';
+import type { Contact } from '../../types/chat.js';
 import {
     getContactByUpeerId,
 } from '../../storage/contacts/operations.js';
@@ -30,7 +33,7 @@ export async function sendGroupMessage(
     groupId: string,
     message: string,
     replyTo?: string,
-    linkPreview?: { [key: string]: any } | null
+    linkPreview?: LinkPreview | null
 ): Promise<{ id: string; timestamp: number; savedMessage: string } | undefined> {
     // Límite de tamaño para prevenir OOM y JSON bombs
     if (message.length > MAX_MESSAGE_SIZE_BYTES) {
@@ -124,8 +127,19 @@ export async function sendGroupMessage(
 
         // Añadir todas las direcciones conocidas del contacto
         try {
-            const known: string[] = JSON.parse((contact as any).knownAddresses ?? '[]');
-            for (const addr of known) {
+            const knownAddressesValue = contact.knownAddresses ?? '[]';
+            let knownAddresses: string[] = [];
+            if (Array.isArray(knownAddressesValue)) {
+                knownAddresses = knownAddressesValue;
+            } else if (typeof knownAddressesValue === 'string') {
+                try {
+                    const parsed = JSON.parse(knownAddressesValue);
+                    if (Array.isArray(parsed)) knownAddresses = parsed.filter((item): item is string => typeof item === 'string');
+                } catch {
+                    knownAddresses = [];
+                }
+            }
+            for (const addr of knownAddresses) {
                 if (!addresses.includes(addr)) addresses.push(addr);
             }
         } catch (err) {
@@ -187,7 +201,7 @@ export async function sendGroupMessage(
         const nodes = await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
 
         if (!isSelf && nodes > 0) {
-            if (await updateMessageStatus(msgId, 'vaulted' as any)) {
+            if (await updateMessageStatus(msgId, 'vaulted')) {
                 const { BrowserWindow } = await import('electron');
                 BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
             }

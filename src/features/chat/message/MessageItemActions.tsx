@@ -3,9 +3,10 @@ import { Box, IconButton, Tooltip } from '@mui/joy';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import { MessageContextMenu } from './MessageContextMenu.js';
 import { QUICK_EMOJIS, getQuickEmojiLabel } from './messageItemSupport.js';
+import type { ChatMessage } from '../../../types/chat.js';
 
 interface MessageItemActionsProps {
-    msg: any;
+    msg: ChatMessage;
     isHovered: boolean;
     emojiOpen: boolean;
     setEmojiOpen: React.Dispatch<React.SetStateAction<boolean>>;

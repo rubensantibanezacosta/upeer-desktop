@@ -3,9 +3,20 @@ import { sql } from "drizzle-orm";
 import { info, error, network, warn } from "../../security/secure-logger.js";
 import {
     generateSignedLocationBlock,
-    AUTO_RENEW_THRESHOLD_MS
+    AUTO_RENEW_THRESHOLD_MS,
+    isYggdrasilAddress,
 } from "../utils.js";
 import { publishLocationBlock } from "./handlers.js";
+
+type RenewableContact = {
+    upeerId: string;
+    deviceId?: string | null;
+    renewalToken?: string | null;
+    knownAddresses?: string | null;
+    address?: string | null;
+    dhtSeq?: number | null;
+    deviceMeta?: string | null;
+};
 
 let renewalInterval: NodeJS.Timeout | null = null;
 let renewalStarter: NodeJS.Timeout | null = null;
@@ -62,7 +73,7 @@ async function checkAndRenewBlocks() {
     }
 }
 
-async function attemptBlockRenewal(contact: any) {
+async function attemptBlockRenewal(contact: RenewableContact) {
     try {
         const token = JSON.parse(contact.renewalToken);
         if (!token || !token.signature) return;
@@ -75,7 +86,11 @@ async function attemptBlockRenewal(contact: any) {
         // Obtenemos nuestras propias direcciones para ayudar al dispositivo 
         // (En el futuro, el dispositivo podría haber enviado sus IPs en el token, 
         // pero por ahora usamos las actuales si no hay cambios)
-        const addresses = contact.knownAddresses ? JSON.parse(contact.knownAddresses) : [contact.address];
+        const rawAddresses = contact.knownAddresses ? JSON.parse(contact.knownAddresses) : [contact.address];
+        const addresses = (Array.isArray(rawAddresses) ? rawAddresses : [contact.address]).filter(isYggdrasilAddress);
+        if (addresses.length === 0) {
+            return;
+        }
         const newSeq = (contact.dhtSeq || 0) + 1;
 
         // El dispositivo de confianza nos dio permiso (token) para firmar en su nombre

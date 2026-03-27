@@ -93,7 +93,7 @@ export function registerFileTransferHandlers(): void {
 
       const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
       return { success: true, fileId };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('Error starting file transfer', { err: String(err) }, 'file-transfer');
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
@@ -103,7 +103,7 @@ export function registerFileTransferHandlers(): void {
     try {
       fileTransferManager.cancelTransfer(fileId, reason);
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('Error canceling file transfer', { err: String(err) }, 'file-transfer');
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
@@ -113,7 +113,7 @@ export function registerFileTransferHandlers(): void {
     try {
       await fileTransferManager.retryTransfer(fileId);
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('Error retrying file transfer', { err: String(err) }, 'file-transfer');
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
@@ -121,7 +121,7 @@ export function registerFileTransferHandlers(): void {
 
   ipcMain.handle('get-file-transfers', () => {
     try {
-      const transfers = fileTransferManager.getAllTransfers().map((t: any) => {
+      const transfers = fileTransferManager.getAllTransfers().map((t) => {
         const { fileBuffer: _fileBuffer, pendingChunks, timers: _timers, _retryTimer, _chunksSentTimes, ...serializableTransfer } = t;
         return {
           ...serializableTransfer,
@@ -133,7 +133,7 @@ export function registerFileTransferHandlers(): void {
         };
       });
       return { success: true, transfers };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('Error getting file transfers', { err: String(err) }, 'file-transfer');
       const errorMessage = err instanceof Error ? err.message : String(err);
       return { success: false, error: errorMessage };
@@ -170,7 +170,7 @@ export function registerFileTransferHandlers(): void {
       // Optionally delete temp file (cleanup will happen later)
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('Error saving transferred file', { err: String(err) }, 'file-transfer');
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }

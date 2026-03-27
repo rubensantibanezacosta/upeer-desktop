@@ -22,7 +22,7 @@ export interface TokenBucket {
 
 export class RateLimiter {
     private buckets: Map<string, Map<string, TokenBucket>> = new Map(); // IP -> messageType -> bucket
-    private rules: RateLimitRule;
+    protected rules: RateLimitRule;
 
     constructor(rules?: RateLimitRule) {
         this.rules = rules || this.getDefaultRules();

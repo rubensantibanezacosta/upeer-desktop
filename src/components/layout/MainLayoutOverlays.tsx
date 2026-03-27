@@ -6,22 +6,25 @@ import { CreateGroupModal } from '../ui/CreateGroupModal.js';
 import { ForwardModal } from '../../features/chat/message/ForwardModal.js';
 import { MediaViewerOverlay } from '../../features/chat/media-viewer/MediaViewerOverlay.js';
 import { YggstackSplash } from '../ui/YggstackSplash.js';
+import type { MediaItem, ChatMessage } from '../../types/chat.js';
+import type { ForwardTarget } from '../../features/chat/message/forwardMessage.js';
+import type { MainLayoutProps } from './MainLayout.js';
 
 interface MainLayoutOverlaysProps {
-    navigation: any;
-    chatStore: any;
-    appStore: any;
+    navigation: MainLayoutProps['navigation'];
+    chatStore: MainLayoutProps['chatStore'];
+    appStore: MainLayoutProps['appStore'];
     targetUpeerId: string;
     activeGroupId: string;
-    activeGroup: any;
+    activeGroup: MainLayoutProps['activeGroup'];
     isInviteGroupMembersOpen: boolean;
     setIsInviteGroupMembersOpen: (open: boolean) => void;
-    forwardingMsg: any;
-    setForwardingMsg: (message: any) => void;
-    handleForward: (targets: { id: string; isGroup: boolean }[]) => Promise<void>;
-    handleReaction: (id: string, emoji: string, isGroup: boolean) => void;
+    forwardingMsg: ChatMessage | null;
+    setForwardingMsg: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
+    handleForward: (targets: ForwardTarget[]) => Promise<void>;
+    handleReaction: (id: string, emoji: string, remove: boolean) => void;
     handleScrollToMessage: (id: string) => void;
-    setReplyToMessage: (id: string, msg: any) => void;
+    setReplyToMessage: (id: string, msg: ChatMessage | null) => void;
 }
 
 export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
@@ -51,23 +54,23 @@ export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
                 items={navigation.viewerMediaList}
                 initialIndex={navigation.viewerInitialIndex}
                 onClose={() => navigation.closeMediaViewer()}
-                onDownload={async (item: any) => {
+                onDownload={async (item: MediaItem) => {
                     const result = await window.upeer.showSaveDialog({ defaultPath: item.fileName });
                     if (!result.canceled && result.filePath) {
                         await window.upeer.saveTransferredFile(item.fileId, result.filePath);
                     }
                 }}
-                onReply={(item: any) => {
+                onReply={(item: MediaItem) => {
                     const currentHistory = activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
-                    const message = currentHistory.find((entry: any) => entry.id === item.messageId);
+                    const message = currentHistory.find((entry) => entry.id === item.messageId);
                     if (message) {
                         setReplyToMessage(activeGroupId || targetUpeerId, message);
                     }
                     navigation.closeMediaViewer();
                 }}
-                onReact={(item: any, emoji: string) => { if (item.messageId) handleReaction(item.messageId, emoji, false); }}
+                onReact={(item: MediaItem, emoji: string) => { if (item.messageId) handleReaction(item.messageId, emoji, false); }}
                 onForward={() => undefined}
-                onGoToMessage={(item: any) => {
+                onGoToMessage={(item: MediaItem) => {
                     if (item.messageId) {
                         navigation.closeMediaViewer();
                         setTimeout(() => handleScrollToMessage(item.messageId), 200);

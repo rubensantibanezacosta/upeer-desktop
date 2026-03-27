@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DEFAULT_CONFIG, FileTransfer } from './types.js';
+import type { FileStartData, FileChunkData } from '../types.js';
 
 export interface FileValidationResult {
     name: string;
@@ -55,7 +56,7 @@ export class TransferValidator {
         });
     }
 
-    validateIncomingFile(data: any): void {
+    validateIncomingFile(data: FileStartData): void {
         // Required fields check
         const requiredFields = ['fileId', 'fileName', 'fileSize', 'mimeType', 'totalChunks', 'fileHash', 'chunkSize'];
         for (const field of requiredFields) {
@@ -128,7 +129,7 @@ export class TransferValidator {
         }
     }
 
-    validateChunkData(transfer: FileTransfer, chunkData: any): void {
+    validateChunkData(transfer: FileTransfer, chunkData: FileChunkData): void {
         if (chunkData.fileId !== transfer.fileId) {
             throw new Error('File ID mismatch');
         }

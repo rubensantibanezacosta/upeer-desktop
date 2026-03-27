@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as vaultHandlers from '../../../src/main_process/network/vault/protocol/handlers.js';
 import * as vaultDb from '../../../src/main_process/storage/vault/operations.js';
 import * as vouches from '../../../src/main_process/security/reputation/vouches.js';
+import type { VaultQueryData, VaultStoreData } from '../../../src/main_process/network/types.js';
 
 vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
     saveVaultEntry: vi.fn(),
@@ -37,17 +38,17 @@ describe('Vault Protocol Handlers', () => {
 
     describe('handleVaultStore', () => {
         it('should store entry if quota and score are valid', async () => {
-            const data = {
+            const data: VaultStoreData = {
                 payloadHash: 'hash1',
                 recipientSid: 'recp1',
                 data: '00112233',
                 priority: 1,
                 expiresAt: Date.now() + 1000
             };
-            (vaultDb.getSenderUsage as any).mockResolvedValue(0);
-            (vouches.computeScore as any).mockReturnValue(70); // Trusted tier
+            vi.mocked(vaultDb.getSenderUsage).mockResolvedValue(0);
+            vi.mocked(vouches.computeScore).mockReturnValue(70);
 
-            await vaultHandlers.handleVaultStore(senderSid, data as any, '1.1.1.1', mockSendResponse);
+            await vaultHandlers.handleVaultStore(senderSid, data, '1.1.1.1', mockSendResponse);
 
             expect(vaultDb.saveVaultEntry).toHaveBeenCalledWith(
                 'hash1', 'recp1', senderSid, 1, '00112233', expect.any(Number)
@@ -56,15 +57,15 @@ describe('Vault Protocol Handlers', () => {
         });
 
         it('should refuse if score is too low', async () => {
-            (vouches.computeScore as any).mockReturnValue(20);
-            await vaultHandlers.handleVaultStore(senderSid, {} as any);
+            vi.mocked(vouches.computeScore).mockReturnValue(20);
+            await vaultHandlers.handleVaultStore(senderSid, {} as VaultStoreData);
             expect(vaultDb.saveVaultEntry).not.toHaveBeenCalled();
         });
 
         it('should refuse if quota exceeded', async () => {
-            (vouches.computeScore as any).mockReturnValue(50); // 50MB quota
-            (vaultDb.getSenderUsage as any).mockResolvedValue(60 * 1024 * 1024);
-            await vaultHandlers.handleVaultStore(senderSid, { data: 'aa', payloadHash: 'h', recipientSid: 'r' } as any);
+            vi.mocked(vouches.computeScore).mockReturnValue(50);
+            vi.mocked(vaultDb.getSenderUsage).mockResolvedValue(60 * 1024 * 1024);
+            await vaultHandlers.handleVaultStore(senderSid, { data: 'aa', payloadHash: 'h', recipientSid: 'r' });
             expect(vaultDb.saveVaultEntry).not.toHaveBeenCalled();
         });
     });
@@ -72,9 +73,9 @@ describe('Vault Protocol Handlers', () => {
     describe('handleVaultQuery', () => {
         it('should deliver entries for authorized requester', async () => {
             const entries = [{ payloadHash: 'h1' }, { payloadHash: 'h2' }];
-            (vaultDb.getVaultEntriesForRecipient as any).mockResolvedValue(entries);
+            vi.mocked(vaultDb.getVaultEntriesForRecipient).mockResolvedValue(entries);
 
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now() }, '1.1.1.1', mockSendResponse);
+            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 type: 'VAULT_DELIVERY',
@@ -83,15 +84,15 @@ describe('Vault Protocol Handlers', () => {
         });
 
         it('should refuse unauthorized query (senderSid != requesterSid)', async () => {
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: 'other', timestamp: Date.now() }, '1.1.1.1', mockSendResponse);
+            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: 'other', timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
             expect(mockSendResponse).not.toHaveBeenCalled();
         });
 
         it('should return specific entry if payloadHash requested', async () => {
             const entry = { payloadHash: 'h1', recipientSid: senderSid };
-            (vaultDb.getVaultEntryByHash as any).mockResolvedValue(entry);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);
 
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now(), payloadHash: 'h1' }, '1.1.1.1', mockSendResponse);
+            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now(), payloadHash: 'h1' } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 entries: [entry]
@@ -102,8 +103,8 @@ describe('Vault Protocol Handlers', () => {
     describe('handleVaultAck', () => {
         it('should delete entries if sender is the legitimate recipient', async () => {
             const entry = { payloadHash: 'h1', recipientSid: senderSid };
-            (vaultDb.getVaultEntryByHash as any).mockResolvedValue(entry);
-            (vaultDb.deleteVaultEntry as any).mockResolvedValue(true);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);
+            vi.mocked(vaultDb.deleteVaultEntry).mockResolvedValue(true);
 
             await vaultHandlers.handleVaultAck(senderSid, { payloadHashes: ['h1'] });
 
@@ -112,7 +113,7 @@ describe('Vault Protocol Handlers', () => {
 
         it('should ignore and issue malicious vouch if sender is not recipient', async () => {
             const entry = { payloadHash: 'h1', recipientSid: 'other' };
-            (vaultDb.getVaultEntryByHash as any).mockResolvedValue(entry);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);
 
             await vaultHandlers.handleVaultAck(senderSid, { payloadHashes: ['h1'] });
 
@@ -124,8 +125,8 @@ describe('Vault Protocol Handlers', () => {
     describe('handleVaultRenew', () => {
         it('should renew if sender is owner', async () => {
             const entry = { payloadHash: 'h1', senderSid: senderSid };
-            (vaultDb.getVaultEntryByHash as any).mockResolvedValue(entry);
-            (vouches.computeScore as any).mockReturnValue(50);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);
+            vi.mocked(vouches.computeScore).mockReturnValue(50);
 
             await vaultHandlers.handleVaultRenew(senderSid, { payloadHash: 'h1', newExpiresAt: Date.now() + 1000 });
 
@@ -134,8 +135,8 @@ describe('Vault Protocol Handlers', () => {
 
         it('should renew if sender is trusted custodian (score >= 65)', async () => {
             const entry = { payloadHash: 'h1', senderSid: 'other-owner' };
-            (vaultDb.getVaultEntryByHash as any).mockResolvedValue(entry);
-            (vouches.computeScore as any).mockReturnValue(70);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);
+            vi.mocked(vouches.computeScore).mockReturnValue(70);
 
             await vaultHandlers.handleVaultRenew(senderSid, { payloadHash: 'h1', newExpiresAt: Date.now() + 1000 });
 

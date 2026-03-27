@@ -12,7 +12,7 @@ import { resizeImageToDataUrl } from '../../ui/settings/shared.js';
 
 interface CreateGroupFormProps {
     contacts: Contact[];
-    onCreate: (name: string, memberIds: string[], avatar?: string) => Promise<any>;
+    onCreate: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
     onDone: () => void;
 }
 

@@ -19,7 +19,61 @@ import {
 import { warn } from '../../security/secure-logger.js';
 import { isValidMessageId, updateEphemeralKeyIfValid } from './chatShared.js';
 
-async function resolveEditedContent(upeerId: string, data: any): Promise<string | null> {
+type ChatEventMessageRecord = {
+    id?: string;
+    chatUpeerId: string;
+    isMine: boolean | number;
+    message?: string;
+};
+
+type StoredChatContact = {
+    publicKey?: string;
+    ephemeralPublicKey?: string;
+};
+
+type EditableChatPayload = {
+    id?: string;
+    msgId?: string;
+    content?: string;
+    newContent?: string;
+    nonce?: string;
+    ephemeralPublicKey?: string;
+    useRecipientEphemeral?: boolean;
+    chatUpeerId?: string;
+    isInternalSync?: boolean;
+    version?: number;
+};
+
+type ChatAckPayload = {
+    id?: string;
+    status?: 'sent' | 'delivered' | 'read' | 'failed' | 'vaulted';
+};
+
+type ChatClearPayload = {
+    chatUpeerId?: string;
+    clearTimestamp?: number;
+    timestamp?: number;
+};
+
+type ChatDeletePayload = {
+    id?: string;
+    msgId?: string;
+    chatUpeerId?: string;
+    isInternalSync?: boolean;
+    timestamp?: number;
+};
+
+type ChatReactionPayload = {
+    id?: string;
+    msgId?: string;
+    chatUpeerId?: string;
+    emoji?: string;
+    reaction?: string;
+    emojiToDelete?: string;
+    remove?: boolean;
+};
+
+async function resolveEditedContent(upeerId: string, data: EditableChatPayload): Promise<string | null> {
     const newContent = data.newContent;
     if (typeof newContent === 'string') {
         return newContent;
@@ -34,7 +88,7 @@ async function resolveEditedContent(upeerId: string, data: any): Promise<string 
     }
 
     try {
-        const contact = await getContactByUpeerId(upeerId);
+        const contact = (await getContactByUpeerId(upeerId)) as StoredChatContact | undefined;
         const senderEphemeralKey = updateEphemeralKeyIfValid(upeerId, data.ephemeralPublicKey);
         const decryptKeyHex = senderEphemeralKey ?? contact?.ephemeralPublicKey ?? contact?.publicKey;
         if (!decryptKeyHex) {
@@ -63,15 +117,16 @@ async function resolveEditedContent(upeerId: string, data: any): Promise<string 
 
 export async function handleChatAck(
     upeerId: string,
-    data: any,
+    data: ChatAckPayload,
     win: BrowserWindow | null
 ): Promise<void> {
     if (!isValidMessageId(data.id)) return;
-    const msg = (await getMessageById(data.id)) as any;
+    const messageId = data.id as string;
+    const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (msg && msg.chatUpeerId === upeerId && msg.isMine) {
-        updateMessageStatus(data.id, data.status || 'delivered');
+        updateMessageStatus(messageId, data.status || 'delivered');
         win?.webContents.send('message-status-updated', {
-            id: data.id,
+            id: messageId,
             status: data.status || 'delivered',
         });
     }
@@ -79,7 +134,7 @@ export async function handleChatAck(
 
 export async function handleChatClear(
     upeerId: string,
-    data: any,
+    data: ChatClearPayload,
     win: BrowserWindow | null
 ): Promise<void> {
     const chatUpeerId = data.chatUpeerId || upeerId;
@@ -89,25 +144,26 @@ export async function handleChatClear(
 
 export async function handleChatEdit(
     upeerId: string,
-    data: any,
+    data: EditableChatPayload,
     win: BrowserWindow | null,
     signature: string
 ): Promise<void> {
     const msgId = data.msgId || data.id;
     if (!isValidMessageId(msgId)) return;
+    const messageId = msgId as string;
 
     const chatUpeerId = data.chatUpeerId || upeerId;
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
-    const msg = (await getMessageById(msgId)) as any;
+    const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
     const newContent = await resolveEditedContent(upeerId, data);
     if (typeof newContent !== 'string') return;
 
-    updateMessageContent(msgId, newContent, signature, data.version);
+    updateMessageContent(messageId, newContent, signature, data.version);
     win?.webContents.send('message-updated', {
-        id: msgId,
+        id: messageId,
         upeerId,
         chatUpeerId,
         content: newContent,
@@ -117,58 +173,61 @@ export async function handleChatEdit(
 
 export async function handleReadReceipt(
     _upeerId: string,
-    data: any,
+    data: ChatAckPayload,
     win: BrowserWindow | null
 ): Promise<void> {
     if (!isValidMessageId(data.id)) return;
-    updateMessageStatus(data.id, 'read');
+    const messageId = data.id as string;
+    updateMessageStatus(messageId, 'read');
     win?.webContents.send('message-status-updated', {
-        id: data.id,
+        id: messageId,
         status: 'read',
     });
 }
 
 export async function handleChatDelete(
     upeerId: string,
-    data: any,
+    data: ChatDeletePayload,
     win: BrowserWindow | null
 ): Promise<void> {
     const msgId = data.msgId || data.id;
     if (!isValidMessageId(msgId)) return;
+    const messageId = msgId as string;
 
     const chatUpeerId = data.chatUpeerId || upeerId;
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
-    const msg = (await getMessageById(msgId)) as any;
+    const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
     const { extractLocalAttachmentInfo, cleanupLocalAttachmentFile } = await import('../../utils/localAttachmentCleanup.js');
-    const attachment = extractLocalAttachmentInfo(msg.message);
+    const attachment = typeof msg.message === 'string' ? extractLocalAttachmentInfo(msg.message) : null;
     if (attachment?.fileId) {
         const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
         fileTransferManager.cancelTransfer(attachment.fileId, 'message deleted');
     }
 
     await cleanupLocalAttachmentFile(attachment?.filePath);
-    deleteMessageLocally(msgId, data.timestamp);
-    win?.webContents.send('message-deleted', { id: msgId, upeerId, chatUpeerId });
+    deleteMessageLocally(messageId, data.timestamp);
+    win?.webContents.send('message-deleted', { id: messageId, upeerId, chatUpeerId });
 }
 
 export async function handleChatReaction(
     upeerId: string,
-    data: any,
+    data: ChatReactionPayload,
     win: BrowserWindow | null
 ): Promise<void> {
     const id = data.msgId || data.id;
     if (!isValidMessageId(id)) return;
+    const messageId = id as string;
 
     const isDelete = data.remove === true || Boolean(data.emojiToDelete);
     if (isDelete) {
         const emojiToRemove = data.emojiToDelete || data.emoji;
         if (typeof emojiToRemove !== 'string' || !emojiToRemove) return;
-        deleteReaction(id, upeerId, emojiToRemove);
+        deleteReaction(messageId, upeerId, emojiToRemove);
         win?.webContents.send('message-reaction-updated', {
-            msgId: id,
+            msgId: messageId,
             upeerId,
             chatUpeerId: data.chatUpeerId || upeerId,
             emoji: emojiToRemove,
@@ -179,9 +238,9 @@ export async function handleChatReaction(
 
     const emoji = data.emoji || data.reaction;
     if (typeof emoji !== 'string' || !emoji) return;
-    saveReaction(id, upeerId, emoji);
+    saveReaction(messageId, upeerId, emoji);
     win?.webContents.send('message-reaction-updated', {
-        msgId: id,
+        msgId: messageId,
         upeerId,
         chatUpeerId: data.chatUpeerId || upeerId,
         emoji,

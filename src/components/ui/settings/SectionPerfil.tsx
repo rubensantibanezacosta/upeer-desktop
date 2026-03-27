@@ -2,15 +2,22 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/joy';
 import type { Identity } from './types.js';
 import { resizeImageToDataUrl } from './shared.js';
+import type { ReputationData } from '../../../types/chat.js';
 import {
     DEFAULT_REPUTATION,
     type InfoKey,
-    type ReputationData,
     ProfileAddressSection,
     ProfileHeroSection,
     ProfileStatsSection,
     ProfileTechnicalSection,
 } from './profileSectionBlocks.js';
+
+const normalizeReputation = (reputation: ReputationData | null) => {
+    if (reputation && typeof reputation.vouchScore === 'number') {
+        return { vouchScore: reputation.vouchScore, connectionCount: reputation.connectionCount ?? 0 };
+    }
+    return DEFAULT_REPUTATION;
+};
 import { ProfileInfoModal, ProfileQrModal } from './profileSectionModals.js';
 
 interface Props {
@@ -56,13 +63,7 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
                 return;
             }
             window.upeer.getMyReputation()
-                .then((reputation: any) => {
-                    if (reputation && typeof reputation.vouchScore === 'number') {
-                        setMyReputation({ vouchScore: reputation.vouchScore, connectionCount: reputation.connectionCount ?? 0 });
-                    } else {
-                        setMyReputation(DEFAULT_REPUTATION);
-                    }
-                })
+                .then((reputation) => setMyReputation(normalizeReputation(reputation)))
                 .catch(() => setMyReputation(DEFAULT_REPUTATION));
         };
         fetchReputation();

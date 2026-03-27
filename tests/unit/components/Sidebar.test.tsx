@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+import type { Contact, Group } from '../../../src/types/chat.js';
 import { Sidebar } from '../../../src/components/layout/Sidebar';
 
-// Mock simple de Zustand para el store de navegación
 const mockStore = {
     sidebarView: 'list',
     sidebarFilter: 'all',
@@ -21,7 +21,6 @@ vi.mock('../../../src/store/useNavigationStore', () => ({
     useNavigationStore: () => mockStore
 }));
 
-// Mocking icons to avoid dependencies
 vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
 vi.mock('@mui/icons-material/ChatBubbleOutline', () => ({ default: () => <div data-testid="ChatIcon" /> }));
 vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => <div data-testid="MuteIcon" /> }));
@@ -33,9 +32,21 @@ vi.mock('@mui/icons-material/MoreVert', () => ({ default: () => <div data-testid
 vi.mock('@mui/icons-material/Add', () => ({ default: () => <div data-testid="PlusIcon" /> }));
 vi.mock('@mui/icons-material/Search', () => ({ default: () => <div data-testid="SearchIcon" /> }));
 
-// Mock subcomponents to focus on Sidebar logic
+type SidebarHeaderProps = {
+    onAddNew: () => void;
+};
+
+type MockContactItemProps = {
+    onSelect?: (id: string) => void;
+    contact: Contact;
+};
+
+type MockGroupItemProps = {
+    group: Group;
+};
+
 vi.mock('../../../src/components/layout/SidebarHeader.js', () => ({
-    SidebarHeader: ({ onAddNew }: any) => (
+    SidebarHeader: ({ onAddNew }: SidebarHeaderProps) => (
         <div data-testid="sidebar-header">
             <button onClick={onAddNew}>Add New</button>
         </div>
@@ -46,14 +57,14 @@ vi.mock('../../../src/components/layout/SidebarSearch.js', () => ({
     SidebarSearch: () => <div data-testid="sidebar-search" />
 }));
 vi.mock('../../../src/components/layout/ContactItem.js', () => ({
-    ContactItem: ({ onSelect, contact }: any) => (
+    ContactItem: ({ onSelect, contact }: MockContactItemProps) => (
         <div data-testid={`contact-${contact.upeerId}`} onClick={() => onSelect && onSelect(contact.upeerId)}>
             {contact.name}
         </div>
     )
 }));
 vi.mock('../../../src/components/layout/GroupItem.js', () => ({
-    GroupItem: ({ group }: any) => <div data-testid={`group-${group.id}`}>{group.name}</div>
+    GroupItem: ({ group }: MockGroupItemProps) => <div data-testid={`group-${group.groupId}`}>{group.name}</div>
 }));
 vi.mock('../../../src/components/layout/sidebar/EmptyState.js', () => ({
     EmptyState: () => <div data-testid="empty-state" />
@@ -69,18 +80,18 @@ vi.mock('../../../src/components/layout/sidebar/CreateGroupForm.js', () => ({
 }));
 
 describe('Sidebar Component', () => {
-    const mockContacts = [
-        { upeerId: 'c1', name: 'Alice', status: 'connected', lastMessageTime: 1000, address: 'addr1', publicKey: 'pk1' } as any,
-        { upeerId: 'c2', name: 'Bob', status: 'connected', lastMessageTime: 2000, address: 'addr2', publicKey: 'pk2' } as any
+    const mockContacts: Contact[] = [
+        { upeerId: 'c1', name: 'Alice', status: 'connected', lastMessageTime: new Date(1000).toISOString(), address: 'addr1', publicKey: 'pk1' },
+        { upeerId: 'c2', name: 'Bob', status: 'connected', lastMessageTime: new Date(2000).toISOString(), address: 'addr2', publicKey: 'pk2' }
     ];
 
     const defaultProps = {
         contacts: mockContacts,
         onSelectContact: vi.fn(),
-        onDeleteContact: vi.fn(),
+        onToggleFavorite: vi.fn(),
+        onToggleFavoriteGroup: vi.fn(),
         onClearChat: vi.fn(),
         onAddContact: vi.fn(),
-        onShowMyIdentity: vi.fn(),
     };
 
     beforeEach(() => {
@@ -106,7 +117,7 @@ describe('Sidebar Component', () => {
     });
 
     it('shows group items when groups are provided', () => {
-        const groups = [{ id: 'g1', name: 'Devs', lastMessageTime: 3000, members: [] } as any];
+        const groups: Group[] = [{ groupId: 'g1', name: 'Devs', adminUpeerId: 'u1', status: 'active', lastMessageTime: new Date(3000).toISOString(), members: [] }];
         render(<Sidebar {...defaultProps} groups={groups} />);
 
         const groupElement = screen.getByTestId('group-g1');
@@ -115,9 +126,9 @@ describe('Sidebar Component', () => {
     });
 
     it('filters out blocked contacts', () => {
-        const contactsWithBlocked = [
+        const contactsWithBlocked: Contact[] = [
             ...mockContacts,
-            { upeerId: 'c3', name: 'Blocked', status: 'blocked', address: 'addr3' } as any
+            { upeerId: 'c3', name: 'Blocked', status: 'blocked', address: 'addr3' }
         ];
         render(<Sidebar {...defaultProps} contacts={contactsWithBlocked} />);
 
@@ -128,7 +139,6 @@ describe('Sidebar Component', () => {
     it('delegates contact selection', () => {
         render(<Sidebar {...defaultProps} />);
 
-        // Get the list items only from the main list (first list)
         const items = screen.getAllByTestId(/contact-c/);
         const alice = items.find(i => i.textContent === 'Alice');
 
@@ -146,7 +156,7 @@ describe('Sidebar Component', () => {
             <Sidebar
                 {...defaultProps}
                 contacts={[
-                    { upeerId: 'c3', name: 'Carol', status: 'offline', address: 'addr3', publicKey: 'pk3' } as any,
+                    { upeerId: 'c3', name: 'Carol', status: 'offline', address: 'addr3', publicKey: 'pk3' },
                 ]}
             />
         );

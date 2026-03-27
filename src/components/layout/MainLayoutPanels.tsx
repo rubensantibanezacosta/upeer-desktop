@@ -2,11 +2,12 @@ import React from 'react';
 import { Box } from '@mui/joy';
 import { ContactsPanel } from './ContactsPanel.js';
 import { SettingsPanel } from '../ui/SettingsPanel.js';
+import type { MainLayoutProps } from './MainLayout.js';
 
 interface MainLayoutPanelsProps {
-    navigation: any;
-    appStore: any;
-    chatStore: any;
+    navigation: MainLayoutProps['navigation'];
+    appStore: MainLayoutProps['appStore'];
+    chatStore: MainLayoutProps['chatStore'];
     onLockSession: () => void;
 }
 
@@ -16,7 +17,7 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
                 <SettingsPanel
                     identity={chatStore.myIdentity}
-                    networkAddress={appStore.networkAddress}
+                    networkAddress={chatStore.networkAddress}
                     networkStatus={appStore.networkStatus}
                     activeSection={navigation.settingsSection}
                     onSectionChange={navigation.setSettingsSection}

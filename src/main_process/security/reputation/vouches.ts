@@ -185,8 +185,10 @@ export async function getDirectContactIds(): Promise<Set<string>> {
         const contacts = await getContacts();
         return new Set<string>(
             contacts
-                .filter((c: any) => (c.status === 'connected' || c.status === 'offline') && c.upeerId)
-                .map((c: any) => c.upeerId as string),
+                .filter((c): c is { status?: string; upeerId: string } =>
+                    (c?.status === 'connected' || c?.status === 'offline') && typeof c?.upeerId === 'string'
+                )
+                .map((c) => c.upeerId),
         );
     } catch {
         return new Set<string>();

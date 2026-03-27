@@ -5,16 +5,22 @@ import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
+import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
-import type { LinkPreview, MediaItem } from './types/chat.js';
+import type { PreviewableMedia } from './components/layout/MainLayout.js';
+import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
+
+const YGGSTACK_STATUSES: YggNetworkStatus[] = ['connecting', 'up', 'down', 'reconnecting'];
+
+const isYggNetworkStatus = (status: string): status is YggNetworkStatus => YGGSTACK_STATUSES.includes(status as YggNetworkStatus);
 
 export default function App() {
     const navigation = useNavigationStore();
     const appStore = useAppStore();
     const chatStore = useChatStore();
-    const [editingMessage, setEditingMessage] = useState<any>(null);
+    const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
     const { initListeners, refreshData, refreshGroups } = chatStore;
@@ -41,7 +47,10 @@ export default function App() {
         });
         const unsubscribeAddress = window.upeer.onYggstackAddress(setYggAddress) || (() => undefined);
         const unsubscribeStatus = window.upeer.onYggstackStatus((status: string, _addr?: string) => {
-            setNetworkStatus(status as any);
+            if (!isYggNetworkStatus(status)) {
+                return;
+            }
+            setNetworkStatus(status);
             if (status === 'up') {
                 setFirstConnect(false);
                 if (_addr) setYggAddress(_addr);
@@ -54,7 +63,7 @@ export default function App() {
         };
     }, [checkAuth, initListeners, refreshData, refreshGroups, setFirstConnect, setNetworkStatus, setYggAddress]);
 
-    const handleMediaClick = (media: any) => {
+    const handleMediaClick = (media: PreviewableMedia) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
         const transfers = fileTransfer.allTransfers.filter(t => chatStore.activeGroupId ? t.chatUpeerId === chatStore.activeGroupId : t.upeerId === chatStore.targetUpeerId);
         const activeContact = chatStore.contacts.find(c => c.upeerId === chatStore.targetUpeerId);
@@ -123,8 +132,8 @@ export default function App() {
     };
 
     const message = chatStore.activeGroupId ? (chatStore.messagesByConversation[chatStore.activeGroupId] || '') : (chatStore.messagesByConversation[chatStore.targetUpeerId] || '');
-    const activeContact = chatStore.contacts.find((c: any) => c.upeerId === chatStore.targetUpeerId);
-    const activeGroup = chatStore.groups.find((g: any) => g.groupId === chatStore.activeGroupId);
+    const activeContact = chatStore.contacts.find((contact) => contact.upeerId === chatStore.targetUpeerId);
+    const activeGroup = chatStore.groups.find((group) => group.groupId === chatStore.activeGroupId);
 
     return (
         <CssVarsProvider defaultMode="dark">

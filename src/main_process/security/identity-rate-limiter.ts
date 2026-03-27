@@ -42,7 +42,7 @@ export class IdentityRateLimiter extends RateLimiter {
             _getDirectContactIds().catch((err) => warn('Failed to get direct contact IDs', err, 'rate-limiter'));
         }
 
-        const rule = (this as any).rules[messageType];
+        const rule = this.rules[messageType];
         if (!rule) return true;
 
         const adjustedRule = this.getAdjustedRule(upeerId, messageType, rule);

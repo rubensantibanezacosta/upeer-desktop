@@ -5,17 +5,22 @@ import { useChatStore } from '../../store/useChatStore.js';
 
 interface AppLockProps {
     onUnlock: () => void;
+    onTooManyAttempts?: () => void;
 }
 
-export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
+const MAX_PIN_ATTEMPTS = 10;
+
+export const AppLock: React.FC<AppLockProps> = ({ onUnlock, onTooManyAttempts }) => {
     const [pin, setPin] = useState(['', '', '', '']);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [failedAttempts, setFailedAttempts] = useState(0);
     const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
     const myIdentity = useChatStore((state) => state.myIdentity);
+    const remainingAttempts = MAX_PIN_ATTEMPTS - failedAttempts;
+    const isLowAttemptsWarning = remainingAttempts <= 5;
 
     React.useEffect(() => {
-        // Autofocus the first input shortly after mounting
         const timer = setTimeout(() => {
             inputRefs.current[0]?.focus();
         }, 100);
@@ -34,9 +39,21 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
         try {
             const isValid = await window.upeer.verifyPin({ pin: currentPin });
             if (isValid) {
+                setFailedAttempts(0);
                 onUnlock();
             } else {
-                setError('PIN incorrecto. Inténtalo de nuevo.');
+                const nextFailedAttempts = failedAttempts + 1;
+                const updatedRemainingAttempts = MAX_PIN_ATTEMPTS - nextFailedAttempts;
+
+                if (updatedRemainingAttempts <= 0) {
+                    setError('Has agotado los intentos de PIN. Vuelve a iniciar sesión.');
+                    setPin(['', '', '', '']);
+                    onTooManyAttempts?.();
+                    return;
+                }
+
+                setFailedAttempts(nextFailedAttempts);
+                setError(`PIN incorrecto. Te quedan ${updatedRemainingAttempts} intentos.`);
                 setPin(['', '', '', '']);
                 inputRefs.current[0]?.focus();
             }
@@ -111,6 +128,14 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
                     <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
                         Introduce tu PIN de acceso para continuar
                     </Typography>
+                    <Typography level="body-xs" color={isLowAttemptsWarning ? 'warning' : 'neutral'} sx={{ mt: 1, fontWeight: isLowAttemptsWarning ? 700 : 500 }}>
+                        Intentos restantes: {remainingAttempts}
+                    </Typography>
+                    {isLowAttemptsWarning && remainingAttempts > 0 && (
+                        <Typography level="body-xs" color="warning" sx={{ mt: 0.75, fontWeight: 700 }}>
+                            Atención: te quedan 5 intentos o menos antes de volver al login.
+                        </Typography>
+                    )}
                 </Box>
 
                 <Stack gap={3}>
@@ -128,7 +153,7 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock }) => {
                                 }}
                                 type="password"
                                 variant="outlined"
-                                color={error ? 'danger' : 'primary'}
+                                color={error ? 'danger' : isLowAttemptsWarning ? 'warning' : 'primary'}
                                 sx={{ width: 56, height: 64 }}
                                 value={digit}
                                 onChange={(e) => handleChange(e.target.value, i)}

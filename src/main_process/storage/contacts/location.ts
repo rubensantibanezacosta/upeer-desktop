@@ -1,5 +1,20 @@
 import { getDb, getSchema, eq } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
+import type { RenewalToken } from '../../network/types.js';
+
+type KnownAddressesRow = {
+    knownAddresses: string;
+};
+
+type ContactLocationUpdate = {
+    address: string;
+    dhtSeq: number;
+    dhtSignature: string;
+    knownAddresses: string;
+    lastSeen: string;
+    dhtExpiresAt?: number;
+    renewalToken?: string;
+};
 
 export async function updateContactLocation(upeerId: string, address: string) {
     const db = getDb();
@@ -9,7 +24,7 @@ export async function updateContactLocation(upeerId: string, address: string) {
     const existing = db.select({ knownAddresses: schema.contacts.knownAddresses })
         .from(schema.contacts)
         .where(eq(schema.contacts.upeerId, upeerId))
-        .get() as { knownAddresses: string } | undefined;
+        .get() as KnownAddressesRow | undefined;
 
     let known: string[] = [];
     try {
@@ -37,7 +52,7 @@ export function updateContactDhtLocation(
     dhtSeq: number,
     dhtSignature: string,
     dhtExpiresAt?: number,
-    renewalToken?: any
+    renewalToken?: RenewalToken
 ) {
     const db = getDb();
     const schema = getSchema();
@@ -51,7 +66,7 @@ export function updateContactDhtLocation(
     const existing = db.select({ knownAddresses: schema.contacts.knownAddresses })
         .from(schema.contacts)
         .where(eq(schema.contacts.upeerId, upeerId))
-        .get() as { knownAddresses: string } | undefined;
+        .get() as KnownAddressesRow | undefined;
 
     let known: string[] = [];
     try {
@@ -65,7 +80,7 @@ export function updateContactDhtLocation(
     }
     if (known.length > 20) known = known.slice(0, 20);
 
-    const updateData: any = {
+    const updateData: ContactLocationUpdate = {
         address: primary,
         dhtSeq,
         dhtSignature,

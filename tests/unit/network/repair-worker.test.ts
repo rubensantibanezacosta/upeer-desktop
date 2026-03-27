@@ -76,6 +76,23 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
 
 import { RepairWorker } from '../../../src/main_process/network/vault/repair-worker.js';
 
+type DistributedShard = {
+    shardIndex: number;
+    data: string;
+    segmentIndex?: number | null;
+};
+
+type RepairWorkerInternals = {
+    runMaintenance: () => Promise<void>;
+    renewExpiring: () => Promise<void>;
+    repairAsset: (fileHash: string) => Promise<void>;
+    reconstructSegment: (fileHash: string, segIdx: number, shards: DistributedShard[]) => Promise<void>;
+    collectMissingShards: (fileHash: string, segIdx: number, missingIndices: number[]) => Promise<void>;
+    redistributeSegmentShards: (fileHash: string, segIdx: number, segmentData: Buffer) => Promise<void>;
+};
+
+const repairWorkerInternals = RepairWorker as unknown as RepairWorkerInternals;
+
 describe('RepairWorker', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -92,7 +109,7 @@ describe('RepairWorker', () => {
 
     it('starts once and stops cleanly', async () => {
         vi.useFakeTimers();
-        const maintenanceSpy = vi.spyOn(RepairWorker as any, 'runMaintenance').mockResolvedValue(undefined);
+        const maintenanceSpy = vi.spyOn(repairWorkerInternals, 'runMaintenance').mockResolvedValue(undefined);
 
         RepairWorker.start();
         RepairWorker.start();
@@ -119,7 +136,7 @@ describe('RepairWorker', () => {
             { upeerId: 'offline-peer', address: 'addr-3', status: 'disconnected' },
         ]);
 
-        await (RepairWorker as any).renewExpiring();
+        await repairWorkerInternals.renewExpiring();
 
         expect(mockRenewVaultEntry).toHaveBeenCalledWith('hash-1', now + 60 * 24 * 60 * 60 * 1000);
         expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(2);
@@ -133,10 +150,10 @@ describe('RepairWorker', () => {
                 { assetHash: 'repair-me', availableShards: 6 },
                 { assetHash: 'healthy-enough', availableShards: 7 },
             ]);
-        const repairSpy = vi.spyOn(RepairWorker as any, 'repairAsset').mockResolvedValue(undefined);
-        const renewSpy = vi.spyOn(RepairWorker as any, 'renewExpiring').mockResolvedValue(undefined);
+        const repairSpy = vi.spyOn(repairWorkerInternals, 'repairAsset').mockResolvedValue(undefined);
+        const renewSpy = vi.spyOn(repairWorkerInternals, 'renewExpiring').mockResolvedValue(undefined);
 
-        await (RepairWorker as any).runMaintenance();
+        await repairWorkerInternals.runMaintenance();
 
         expect(renewSpy).toHaveBeenCalledOnce();
         expect(repairSpy).toHaveBeenCalledTimes(1);
@@ -152,10 +169,10 @@ describe('RepairWorker', () => {
             { shardIndex: 0, data: 'ee', segmentIndex: 1 },
             { shardIndex: 1, data: 'ff', segmentIndex: 1 },
         ]);
-        const reconstructSpy = vi.spyOn(RepairWorker as any, 'reconstructSegment').mockResolvedValue(undefined);
-        const collectSpy = vi.spyOn(RepairWorker as any, 'collectMissingShards').mockResolvedValue(undefined);
+        const reconstructSpy = vi.spyOn(repairWorkerInternals, 'reconstructSegment').mockResolvedValue(undefined);
+        const collectSpy = vi.spyOn(repairWorkerInternals, 'collectMissingShards').mockResolvedValue(undefined);
 
-        await (RepairWorker as any).repairAsset('file-hash');
+        await repairWorkerInternals.repairAsset('file-hash');
 
         expect(reconstructSpy).toHaveBeenCalledWith('file-hash', 0, expect.any(Array));
         expect(collectSpy).toHaveBeenCalledWith('file-hash', 1, expect.any(Array));
@@ -169,7 +186,7 @@ describe('RepairWorker', () => {
             { upeerId: 'custodian-2', address: 'addr-2', status: 'connected' },
         ]);
 
-        const promise = (RepairWorker as any).collectMissingShards('file-hash', 2, [0, 3]);
+        const promise = repairWorkerInternals.collectMissingShards('file-hash', 2, [0, 3]);
         await vi.runAllTimersAsync();
         await promise;
 
@@ -187,7 +204,7 @@ describe('RepairWorker', () => {
             { upeerId: 'custodian-4', address: 'addr-4', status: 'connected' },
         ]);
 
-        await (RepairWorker as any).redistributeSegmentShards('file-hash', 4, Buffer.from('segment-data'));
+        await repairWorkerInternals.redistributeSegmentShards('file-hash', 4, Buffer.from('segment-data'));
         await Promise.resolve();
 
         expect(mockEncode).toHaveBeenCalledOnce();

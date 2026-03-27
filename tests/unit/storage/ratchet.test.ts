@@ -5,11 +5,24 @@ import {
     deleteRatchetSession
 } from '../../../src/main_process/storage/ratchet/operations.js';
 
-// Mocks
+type MockDb = {
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    get: typeof mockGet;
+    insert: ReturnType<typeof vi.fn>;
+    values: ReturnType<typeof vi.fn>;
+    onConflictDoUpdate: ReturnType<typeof vi.fn>;
+    run: typeof mockRun;
+    delete: ReturnType<typeof vi.fn>;
+};
+type RatchetSession = NonNullable<ReturnType<typeof getRatchetSession>>;
+type RatchetStateArg = Parameters<typeof saveRatchetSession>[1];
+
 const mockRun = vi.fn();
 const mockGet = vi.fn();
 
-const mockDb = {
+const mockDb: MockDb = {
     select: vi.fn(() => mockDb),
     from: vi.fn(() => mockDb),
     where: vi.fn(() => mockDb),
@@ -34,12 +47,12 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: any, b: any) => ({ column: a, value: b })
+    eq: (a: unknown, b: unknown) => ({ column: a, value: b })
 }));
 
 vi.mock('../../../src/main_process/security/ratchet.js', () => ({
-    serializeState: (state: any, spkIdUsed: any) => ({ ...state, spkIdUsed }),
-    deserializeState: (serialized: any) => serialized,
+    serializeState: (state: Record<string, unknown>, spkIdUsed: number | null | undefined) => ({ ...state, spkIdUsed }),
+    deserializeState: (serialized: RatchetSession) => serialized,
 }));
 
 describe('Ratchet Storage Unit Tests', () => {
@@ -72,7 +85,9 @@ describe('Ratchet Storage Unit Tests', () => {
             spkIdUsed: 99
         };
         mockGet.mockReturnValueOnce(row);
-        const result = getRatchetSession(upeerId) as any;
+        const result = getRatchetSession(upeerId);
+        expect(result).not.toBeNull();
+        if (!result) throw new Error('Missing ratchet session');
         expect(result.spkIdUsed).toBe(99);
     });
 
@@ -83,7 +98,7 @@ describe('Ratchet Storage Unit Tests', () => {
     });
 
     it('should save a ratchet session', () => {
-        saveRatchetSession(upeerId, mockState as any, 101);
+        saveRatchetSession(upeerId, mockState as RatchetStateArg, 101);
         expect(mockDb.insert).toHaveBeenCalledWith(mockSchema.ratchetSessions);
         expect(mockDb.values).toHaveBeenCalledWith(expect.objectContaining({
             upeerId,

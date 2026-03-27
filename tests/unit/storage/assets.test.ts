@@ -7,14 +7,20 @@ import {
 } from '../../../src/main_process/storage/vault/asset-operations.js';
 import { getDb } from '../../../src/main_process/storage/shared.js';
 
+type MockDb = {
+    select: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+};
+
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(),
-    eq: (a: any, b: any) => ({ type: 'eq', a, b }),
+    eq: (a: unknown, b: unknown) => ({ type: 'eq', a, b }),
 }));
 
 describe('Storage - Asset Operations', () => {
-    const mockDb = {
+    const mockDb: MockDb = {
         select: vi.fn(),
         insert: vi.fn(),
         update: vi.fn(),
@@ -22,7 +28,7 @@ describe('Storage - Asset Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (getDb as any).mockReturnValue(mockDb);
+        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
     });
 
     it('should track a distributed asset', async () => {

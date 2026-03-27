@@ -4,7 +4,12 @@ import type { DeviceMetadata } from './types.js';
 import { isYggdrasilAddress as isYggdrasilAddressRange } from '../../utils/yggdrasilAddress.js';
 
 export function isYggdrasilAddress(address: string): boolean {
-    return isYggdrasilAddressRange(address);
+    if (isYggdrasilAddressRange(address)) {
+        return true;
+    }
+
+    const candidate = address.trim().toLowerCase();
+    return candidate.includes(':') && !candidate.startsWith('fe80:') && (candidate.startsWith('2') || candidate.startsWith('3'));
 }
 
 export function validateAddress(address: string): void {
@@ -59,6 +64,10 @@ export function getNetworkAddresses(): string[] {
     }
 
     return [...new Set(addresses)];
+}
+
+export function getDhtNetworkAddresses(): string[] {
+    return getNetworkAddresses().filter(isYggdrasilAddress);
 }
 
 export function getNetworkAddress(): string | null {

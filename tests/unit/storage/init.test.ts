@@ -54,7 +54,15 @@ vi.mock('sodium-native', () => ({
 }));
 
 describe('Storage Init Unit Tests', () => {
-    let mockSqlite: any;
+    type MockSqlite = {
+        prepare: ReturnType<typeof vi.fn>;
+        pragma: ReturnType<typeof vi.fn>;
+        close: ReturnType<typeof vi.fn>;
+        transaction: ReturnType<typeof vi.fn>;
+        exec: ReturnType<typeof vi.fn>;
+    };
+
+    let mockSqlite: MockSqlite;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -68,11 +76,9 @@ describe('Storage Init Unit Tests', () => {
             transaction: vi.fn(),
             exec: vi.fn(),
         };
-        // Mock BetterSqlite3 to be a class that returns mockSqlite
-        (BetterSqlite3 as any).mockImplementation(function () {
-            return mockSqlite;
+        vi.mocked(BetterSqlite3).mockImplementation(function () {
+            return mockSqlite as never;
         });
-        // Correcting the fs mock access
         const mockedFs = vi.mocked(fs);
         mockedFs.existsSync.mockReturnValue(true);
         mockedFs.readFileSync.mockReturnValue(Buffer.alloc(32));

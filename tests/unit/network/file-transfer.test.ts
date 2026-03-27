@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
 import { TransferPhase } from '../../../src/main_process/network/file-transfer/types.js';
+import * as identity from '../../../src/main_process/security/identity.js';
+import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
+
+type TransferManagerSend = Parameters<TransferManager['initialize']>[0];
+type TransferManagerWindow = Parameters<TransferManager['initialize']>[1];
+type TransferValidatorInternals = TransferManager['validator'] & {
+    calculateFileHash(filePath: string): Promise<string>;
+};
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     info: vi.fn(),
@@ -48,14 +56,14 @@ vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
 
 describe('TransferManager - Integration', () => {
     let manager: TransferManager;
-    const mockSend = vi.fn();
+    const mockSend: TransferManagerSend = vi.fn();
     const mockWindow = {
         isDestroyed: vi.fn(() => false),
         webContents: {
             isDestroyed: vi.fn(() => false),
             send: vi.fn()
         }
-    } as any;
+    } as TransferManagerWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -64,9 +72,7 @@ describe('TransferManager - Integration', () => {
     });
 
     it('should handle a complete sending flow from proposal to completion', async () => {
-        // 1. Start sending
-        // Mock validator to return valid file info
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'test.txt',
             size: 100,
             mimeType: 'text/plain',
@@ -81,27 +87,23 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.phase).toBe(TransferPhase.PROPOSED);
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_PROPOSAL' }), 'pubkey');
 
-        // 2. Peer accepts
         await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId, signature: 'sig' });
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.phase).toBe(TransferPhase.TRANSFERRING);
 
-        // 3. Peer ACKs the chunk (we only have 1 chunk)
         await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId, chunkIndex: 0 });
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.chunksProcessed).toBe(1);
 
-        // After last chunk ACK, sender sends FILE_DONE (as per sender-logic.ts)
         expect(mockSend).toHaveBeenCalledWith('addr1', { type: 'FILE_DONE', fileId }, 'pubkey');
 
-        // 4. Peer sends FILE_DONE_ACK
         await manager.handleDoneAck(fileId);
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.state).toBe('completed');
     });
 
     it('should include isVoiceNote in FILE_PROPOSAL when sending a voice note', async () => {
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'voice.webm',
             size: 100,
             mimeType: 'audio/webm',
@@ -137,28 +139,23 @@ describe('TransferManager - Integration', () => {
             signature: 'sig'
         };
 
-        // Mock validators to return true/void
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
-        // 1. Receive proposal — now auto-accepts immediately
         await manager.handleFileProposal('peer1', 'addr1', proposal);
         let transfer = manager.getTransfer(fileId, 'receiving');
         expect(transfer).toBeDefined();
         expect(transfer?.phase).toBe(TransferPhase.TRANSFERRING);
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_ACCEPT' }), 'pubkey');
 
-        // Force tempPath for testing (acceptTransfer doesn't set it, chunks do)
         manager.store.updateTransfer(fileId, 'receiving', { tempPath: '/tmp/test-file' });
 
-        // 2. Handle chunk
-        // Mock file handle operations
         const mockHandle = {
             write: vi.fn().mockResolvedValue({ bytesWritten: 50 }),
             close: vi.fn()
         };
-        (manager as any).getFileHandle = vi.fn().mockReturnValue(mockHandle);
-        (manager.validator as any).calculateFileHash = vi.fn().mockResolvedValue('a'.repeat(64));
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
+        vi.spyOn(manager.validator as TransferValidatorInternals, 'calculateFileHash').mockResolvedValue('a'.repeat(64));
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'remote.txt',
             size: 50,
             mimeType: 'text/plain',
@@ -175,7 +172,6 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.chunksProcessed).toBe(1);
         expect(mockSend).toHaveBeenCalledWith('addr1', { type: 'FILE_ACK', fileId, chunkIndex: 0 }, undefined);
 
-        // Since it was the last chunk (totalChunks: 1), it should finalize
         expect(transfer?.state).toBe('completed');
     });
 
@@ -194,7 +190,7 @@ describe('TransferManager - Integration', () => {
             signature: 'sig'
         };
 
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
         await manager.handleFileProposal('peer1', 'addr1', proposal);
 
@@ -225,7 +221,7 @@ describe('TransferManager - Integration', () => {
             signature: 'sig'
         };
 
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
         await manager.handleFileProposal('peer1', 'addr1', proposal);
 
@@ -259,7 +255,7 @@ describe('TransferManager - Integration', () => {
             signature: 'sig'
         };
 
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
         await manager.handleFileProposal('peer1', 'addr1', proposal);
 
@@ -286,7 +282,7 @@ describe('TransferManager - Integration', () => {
     });
 
     it('should include group chat context in outgoing FILE_PROPOSAL', async () => {
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'group.txt',
             size: 100,
             mimeType: 'text/plain',
@@ -307,7 +303,7 @@ describe('TransferManager - Integration', () => {
     });
 
     it('should include shared messageId in outgoing FILE_PROPOSAL', async () => {
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'group.txt',
             size: 100,
             mimeType: 'text/plain',
@@ -367,8 +363,7 @@ describe('TransferManager - Integration', () => {
     });
 
     it('should accept vault-delivered FILE_PROPOSAL signed without sender metadata', async () => {
-        const { verify } = await import('../../../src/main_process/security/identity.js');
-        (verify as any).mockImplementation((message: Buffer) => !message.toString().includes('"senderUpeerId"'));
+        vi.mocked(identity.verify).mockImplementation((message: Buffer) => !message.toString().includes('"senderUpeerId"'));
 
         const fileId = '550e8400-e29b-41d4-a716-446655440005';
         const proposal = {
@@ -384,7 +379,7 @@ describe('TransferManager - Integration', () => {
             signature: 'sig'
         };
 
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
         await manager.handleFileProposal('peer1', 'addr1', proposal);
 
@@ -392,11 +387,11 @@ describe('TransferManager - Integration', () => {
         expect(transfer).toBeDefined();
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_ACCEPT' }), 'pubkey');
 
-        (verify as any).mockImplementation(() => true);
+        vi.mocked(identity.verify).mockImplementation(() => true);
     });
 
     it('should handle selective ACKs and retransmissions correctly', async () => {
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'retry.txt',
             size: 2048,
             mimeType: 'text/plain',
@@ -405,7 +400,6 @@ describe('TransferManager - Integration', () => {
         manager.chunker.calculateChunks = vi.fn().mockReturnValue(2);
         manager.config.maxChunkSize = 1024;
 
-        // Mock file handle para leer
         const mockHandle = {
             read: vi.fn().mockImplementation(async (buf: Buffer) => {
                 buf.fill(0);
@@ -413,15 +407,12 @@ describe('TransferManager - Integration', () => {
             }),
             close: vi.fn()
         };
-        (manager as any).getFileHandle = vi.fn().mockReturnValue(mockHandle);
+        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
 
         const createdId = await manager.startSend('peer1', 'addr1', '/path/to/retry.txt');
 
-        // Aceptar el transfer
         await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId: createdId, signature: 'sig' });
 
-        // En el flujo real, handleAccept invoca sendNextChunks vía delegate
-        // Si no lo hace, lo llamamos nosotros para el test
         const transfer = manager.getTransfer(createdId, 'sending');
         if (transfer) {
             await manager.sendNextChunks(transfer, 'addr1');
@@ -434,18 +425,12 @@ describe('TransferManager - Integration', () => {
             .map(c => c[1])
             .filter(msg => msg.fileId === createdId && msg.type === 'FILE_CHUNK');
 
-        // Debug help:
-        // console.log('MESSAGES SENT:', currentMessages.map(m => m.chunkIndex));
-
         expect(currentMessages.length).toBeGreaterThan(0);
 
-        // 4. Solo recibimos ACK para el chunk 1 (el 0 se "pierde")
         await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId: createdId, chunkIndex: 1 });
 
-        // 5. Esperamos a que expire el timer del chunk 0 (5000ms)
         await new Promise(resolve => setTimeout(resolve, 5500));
 
-        // 6. Debería haberse reenviado el chunk 0
         const retryCalls = mockSend.mock.calls
             .map(c => c[1])
             .filter(msg => msg.fileId === createdId && msg.type === 'FILE_CHUNK' && msg.chunkIndex === 0);
@@ -454,14 +439,13 @@ describe('TransferManager - Integration', () => {
     }, 25000);
 
     it('should handle transfer cancellation from user', async () => {
-        (manager.validator as any).validateAndPrepareFile = vi.fn().mockResolvedValue({
+        vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'cancel.txt',
             size: 100,
             mimeType: 'text/plain',
             hash: 'c'.repeat(64)
         });
 
-        // Forzamos el ID en el mock de creación si fuera necesario, o usamos el retornado
         const createdId = await manager.startSend('peer1', 'addr1', '/path/to/cancel.txt');
         manager.cancelTransfer(createdId, 'sending');
 
@@ -507,7 +491,7 @@ describe('TransferManager - Integration', () => {
     it('should handle peer cancellation', async () => {
         const fileId = '550e8400-e29b-41d4-a716-446655440003';
         // Simulamos que el peer nos propone algo
-        (manager.validator as any).validateIncomingFile = vi.fn().mockReturnValue(true);
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
         await manager.handleFileProposal('peer1', 'addr1', {
             fileId,
             fileName: 'test.txt',
@@ -540,9 +524,8 @@ describe('TransferManager - Integration', () => {
                 signature: 'sig'
             };
 
-            // Usamos la implementación real del validator para este test
             const realValidator = new (Object.getPrototypeOf(manager.validator).constructor)(100 * 1024 * 1024);
-            (manager as any).validator = realValidator;
+            manager.validator = realValidator;
 
             await manager.handleFileProposal('peer1', 'addr1', malpropose);
 
@@ -562,8 +545,7 @@ describe('TransferManager - Integration', () => {
                 signature: 'invalid-sig'
             };
 
-            const { verify } = await import('../../../src/main_process/security/identity.js');
-            (verify as any).mockReturnValue(false);
+            vi.mocked(identity.verify).mockReturnValue(false);
 
             await manager.handleFileProposal('peer1', 'addr1', proposal);
             expect(manager.getTransfer(proposal.fileId, 'receiving')).toBeUndefined();
@@ -572,8 +554,7 @@ describe('TransferManager - Integration', () => {
         it('should handle disk write errors gracefully during receiving', async () => {
             const fileId = '550e8400-e29b-41d4-a716-446655440005';
 
-            // Forzar que el validador mockeado no tire error
-            (manager.validator as any).validateIncomingFile = vi.fn().mockImplementation(() => { });
+            vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
 
             await manager.store.createTransfer({
                 fileId,
@@ -595,7 +576,7 @@ describe('TransferManager - Integration', () => {
                 write: vi.fn().mockRejectedValue(new Error('No space left on device')),
                 close: vi.fn()
             };
-            (manager as any).getFileHandle = vi.fn().mockReturnValue(mockHandle);
+            vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
 
             await manager.handleFileChunk('peer1', 'addr1', { fileId, chunkIndex: 0, data: 'AAAA' });
 
@@ -603,8 +584,7 @@ describe('TransferManager - Integration', () => {
         });
 
         it('should skip vaulting for large files to low-reputation recipients', async () => {
-            const { computeScore } = await import('../../../src/main_process/security/reputation/vouches.js');
-            (computeScore as any).mockReturnValue(10); // Baja reputación
+            vi.mocked(reputation.computeScore).mockReturnValue(10);
 
             const fileId = '550e8400-e29b-41d4-a716-446655440006';
             const largeFileSize = 20 * 1024 * 1024; // > 10MB
@@ -626,7 +606,6 @@ describe('TransferManager - Integration', () => {
 
             await manager.startVaultingFailover(fileId, 'peer_scammer', 'pubkey', aesKey, {});
 
-            // No debería haber mensajes de vaulting enviados
             const vaultMsgs = mockSend.mock.calls
                 .map(c => c[1])
                 .filter(msg => msg.fileId === fileId && msg.type === 'VAULT_STORE');
@@ -635,8 +614,7 @@ describe('TransferManager - Integration', () => {
         });
 
         it('should proceed with vaulting for small files regardless of reputation', async () => {
-            const { computeScore } = await import('../../../src/main_process/security/reputation/vouches.js');
-            (computeScore as any).mockReturnValue(10); // Baja reputación
+            vi.mocked(reputation.computeScore).mockReturnValue(10);
 
             const fileId = '550e8400-e29b-41d4-a716-446655440007';
             const smallFileSize = 1 * 1024 * 1024; // 1MB < 10MB
@@ -654,7 +632,6 @@ describe('TransferManager - Integration', () => {
                 direction: 'sending'
             });
 
-            // Simulamos que el transfer tiene filePath y estado activo
             manager.store.updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED, filePath: '/tmp/test' });
 
             const aesKey = Buffer.allocUnsafe(32);

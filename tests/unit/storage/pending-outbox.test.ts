@@ -7,6 +7,7 @@ import {
 } from '../../../src/main_process/storage/pending-outbox.js';
 import { getDb } from '../../../src/main_process/storage/shared.js';
 import { pendingOutbox } from '../../../src/main_process/storage/schema.js';
+import * as identity from '../../../src/main_process/security/identity.js';
 
 vi.mock('../../../src/main_process/storage/shared.js');
 vi.mock('../../../src/main_process/security/secure-logger.js');
@@ -40,7 +41,7 @@ describe('storage/pending-outbox.ts', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (getDb as any).mockReturnValue(mockDb);
+        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
     });
 
     describe('savePendingOutboxMessage', () => {
@@ -102,8 +103,7 @@ describe('storage/pending-outbox.ts', () => {
             const mockMessages = [{ id: 10, msgId: 'u1', plaintext: 'p1', recipientSid: 's1' }];
             mockDb.where.mockResolvedValueOnce(mockMessages);
 
-            const encryptMock = (await import('../../../src/main_process/security/identity.js')).encrypt as any;
-            encryptMock.mockImplementationOnce(() => { throw new Error('encryption-fail'); });
+            vi.mocked(identity.encrypt).mockImplementationOnce(() => { throw new Error('encryption-fail'); });
 
             await flushPendingOutbox('s1', '00'.repeat(32));
 

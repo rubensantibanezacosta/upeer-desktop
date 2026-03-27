@@ -2,14 +2,12 @@ import { useChatStore } from '../store/useChatStore';
 import { useNavigationStore } from '../store/useNavigationStore';
 import { getMimeType } from '../utils/fileUtils';
 import { AttachmentType } from '../features/chat/input/AttachmentButton';
+import type { PendingFile } from '../types/chat.js';
 
-export interface PendingFile {
-    path: string;
+type FileDialogFilter = {
     name: string;
-    size: number;
-    type: string;
-    lastModified: number;
-}
+    extensions: string[];
+};
 
 interface FileTransferApi {
     startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string }>;
@@ -72,7 +70,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
             }
             return;
         }
-        let filters: any[] = [];
+        let filters: FileDialogFilter[] = [];
         let title = 'Seleccionar archivo';
         switch (type) {
             case 'image': title = 'Seleccionar imagen'; filters = [{ name: 'Imágenes', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]; break;
@@ -95,7 +93,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         } catch (error) { console.error('Error opening native file dialog:', error); }
     };
 
-    const handleFileSubmit = async (files: any[], thumbnails?: (string | undefined)[], captions?: string[]) => {
+    const handleFileSubmit = async (files: PendingFile[], thumbnails?: (string | undefined)[], captions?: string[]) => {
         if (!effectiveId) return;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];

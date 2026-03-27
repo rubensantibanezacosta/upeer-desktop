@@ -12,7 +12,7 @@ export function safeBufferFromHex(hex: string, expectedLength?: number, descript
     return Buffer.from(hex, 'hex');
 }
 
-export function canonicalStringify(obj: any): string {
+export function canonicalStringify(obj: unknown): string {
     if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
         if (Array.isArray(obj)) {
             return '[' + obj.map(item => canonicalStringify(item)).join(',') + ']';
@@ -21,7 +21,7 @@ export function canonicalStringify(obj: any): string {
     }
     const allKeys = Object.keys(obj).sort();
     const parts = allKeys.map(key => {
-        const val = obj[key];
+        const val = (obj as Record<string, unknown>)[key];
         if (val === undefined) return null;
         return JSON.stringify(key) + ':' + canonicalStringify(val);
     }).filter(p => p !== null);

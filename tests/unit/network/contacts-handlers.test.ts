@@ -6,8 +6,17 @@ import * as identity from '../../../src/main_process/security/identity';
 import * as pow from '../../../src/main_process/security/pow';
 import * as reputation from '../../../src/main_process/security/reputation/vouches';
 import * as pendingOutbox from '../../../src/main_process/storage/pending-outbox';
+import * as shared from '../../../src/main_process/storage/shared';
 
-// Mock de dependencias
+type HandshakeReqData = Parameters<typeof handleHandshakeReq>[0];
+type HandshakeAcceptData = Parameters<typeof handleHandshakeAccept>[0];
+type HandshakeRinfo = Parameters<typeof handleHandshakeReq>[4];
+type HandshakeWindow = NonNullable<Parameters<typeof handleHandshakeReq>[5]>;
+type HandshakeSendResponse = Parameters<typeof handleHandshakeReq>[6];
+type KnownContact = NonNullable<Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>>;
+type AddressContact = NonNullable<Awaited<ReturnType<typeof contactsOps.getContactByAddress>>>;
+type KeyUpdateResult = ReturnType<typeof contactsKeys.updateContactPublicKey>;
+
 vi.mock('../../../src/main_process/network/handlers/sync', () => ({
     broadcastPulse: vi.fn(),
 }));
@@ -65,38 +74,39 @@ vi.mock('../../../src/main_process/security/identity-rate-limiter', () => {
     };
 });
 
-// Mock de Electron
 const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as any;
+} as unknown as HandshakeWindow;
 
 describe('Contact Handlers', () => {
-    const rinfo = { address: '1.2.3.4', port: 12345 };
+    const rinfo: HandshakeRinfo = { address: '1.2.3.4', port: 12345 };
     const validPubKey = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
     const senderUpeerId = "peer-" + validPubKey.slice(0, 8);
     const senderYggAddress = 'ygg-addr';
-    const mockSendResponse = vi.fn();
+    const mockSendResponse = vi.fn<HandshakeSendResponse>();
+    const pendingContact = { upeerId: senderUpeerId, status: 'pending' } as KnownContact;
+    const connectedContact = { upeerId: senderUpeerId, status: 'connected', publicKey: validPubKey } as KnownContact;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.spyOn(identity, 'verify').mockReturnValue(true);
-        vi.spyOn(identity, 'getUPeerIdFromPublicKey').mockImplementation((pk) => "peer-" + pk.toString('hex').slice(0, 8));
-        vi.spyOn(pow.AdaptivePow, 'verifyLightProof').mockReturnValue(true);
-        vi.spyOn(reputation, 'computeScore').mockReturnValue(100);
-        (contactsOps.isContactBlocked as any).mockReturnValue(false);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(identity.getUPeerIdFromPublicKey).mockImplementation((pk) => "peer-" + pk.toString('hex').slice(0, 8));
+        vi.mocked(pow.AdaptivePow.verifyLightProof).mockReturnValue(true);
+        vi.mocked(reputation.computeScore).mockReturnValue(100);
+        vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
     });
 
     describe('handleHandshakeReq', () => {
         it('should accept handshake from a new contact with valid PoW', async () => {
-            const data = {
+            const data: HandshakeReqData = {
                 publicKey: validPubKey,
                 powProof: 'valid-proof',
                 alias: 'Alice'
             };
 
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -116,8 +126,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should reject new contact without PoW', async () => {
-            const data = { publicKey: validPubKey, alias: 'NoPOW' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+            const data: HandshakeReqData = { publicKey: validPubKey, alias: 'NoPOW' };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -125,12 +135,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle re-handshake from already connected contact', async () => {
-            const data = { publicKey: validPubKey, alias: 'Alice (updated)' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
-                upeerId: senderUpeerId,
-                status: 'connected',
-                publicKey: validPubKey
-            });
+            const data: HandshakeReqData = { publicKey: validPubKey, alias: 'Alice (updated)' };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -149,8 +155,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should block handshake if contact is blocked', async () => {
-            const data = { publicKey: validPubKey };
-            (contactsOps.isContactBlocked as any).mockReturnValue(true);
+            const data: HandshakeReqData = { publicKey: validPubKey };
+            vi.mocked(contactsOps.isContactBlocked).mockReturnValue(true);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -158,8 +164,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should block if signature verification fails in handleHandshakeReq', async () => {
-            const data = { publicKey: validPubKey };
-            (identity.verify as any).mockReturnValue(false);
+            const data: HandshakeReqData = { publicKey: validPubKey };
+            vi.mocked(identity.verify).mockReturnValue(false);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -167,16 +173,16 @@ describe('Contact Handlers', () => {
         });
 
         it('should fail if upeerId does not match public key in handleHandshakeReq', async () => {
-            const data = { publicKey: validPubKey };
+            const data: HandshakeReqData = { publicKey: validPubKey };
             await handleHandshakeReq(data, 'sig', 'mismatch-id', senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
             expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
         });
 
         it('should alert if reputation is too low (untrustworthy)', async () => {
-            const data = { publicKey: validPubKey, alias: 'BadPeer', powProof: 'valid-proof' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
-            (reputation.computeScore as any).mockReturnValue(30);
+            const data: HandshakeReqData = { publicKey: validPubKey, alias: 'BadPeer', powProof: 'valid-proof' };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(reputation.computeScore).mockReturnValue(30);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -186,12 +192,12 @@ describe('Contact Handlers', () => {
         });
 
         it('should alert on TOFU (key change) in handleHandshakeReq', async () => {
-            const data = { publicKey: validPubKey, alias: 'Alice' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            const data: HandshakeReqData = { publicKey: validPubKey, alias: 'Alice' };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 upeerId: senderUpeerId,
                 status: 'connected',
                 publicKey: 'another-key'
-            });
+            } as KnownContact);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -203,13 +209,13 @@ describe('Contact Handlers', () => {
 
     describe('handleHandshakeAccept', () => {
         it('should upgrade pending contact to connected', async () => {
-            const data = { publicKey: validPubKey, alias: 'Bob' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            const data: HandshakeAcceptData = { publicKey: validPubKey, alias: 'Bob' };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 upeerId: senderUpeerId,
                 status: 'pending',
                 name: 'Bob Pending'
-            });
-            (contactsKeys.updateContactPublicKey as any).mockReturnValue({ changed: false });
+            } as KnownContact);
+            vi.mocked(contactsKeys.updateContactPublicKey).mockReturnValue({ changed: false } as KeyUpdateResult);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -228,10 +234,10 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle ghost pending contacts for the same address', async () => {
-            const data = { publicKey: validPubKey, alias: 'Bob' };
-            (contactsOps.getContactByAddress as any).mockResolvedValue({ upeerId: 'pending-ghost' });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: senderUpeerId, status: 'pending' });
-            (contactsKeys.updateContactPublicKey as any).mockReturnValue({ changed: false });
+            const data: HandshakeAcceptData = { publicKey: validPubKey, alias: 'Bob' };
+            vi.mocked(contactsOps.getContactByAddress).mockResolvedValue({ upeerId: 'pending-ghost' } as AddressContact);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
+            vi.mocked(contactsKeys.updateContactPublicKey).mockReturnValue({ changed: false } as KeyUpdateResult);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -239,11 +245,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should skip update if contact is not pending in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
-                upeerId: senderUpeerId,
-                status: 'connected'
-            });
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -251,8 +254,8 @@ describe('Contact Handlers', () => {
         });
 
         it('should fail if signature verification fails in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (identity.verify as any).mockReturnValue(false);
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(identity.verify).mockReturnValue(false);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -260,12 +263,13 @@ describe('Contact Handlers', () => {
         });
 
         it('should fail on missing fields in handleHandshakeAccept', async () => {
-            await handleHandshakeAccept({} as any, '', '', '', rinfo, mockWin, mockSendResponse, '1.2.3.4');
+            const data: HandshakeAcceptData = {};
+            await handleHandshakeAccept(data, '', '', '', rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
         });
 
         it('should fail on rate limit in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey, type: 'HANDSHAKE_ACCEPT' };
+            const data: HandshakeAcceptData = { publicKey: validPubKey, type: 'HANDSHAKE_ACCEPT' };
             const { IdentityRateLimiter } = await import('../../../src/main_process/security/identity-rate-limiter');
             const spy = vi.spyOn(IdentityRateLimiter.prototype, 'checkIdentity').mockReturnValueOnce(false);
 
@@ -276,7 +280,7 @@ describe('Contact Handlers', () => {
         });
 
         it('should fail on rate limit in handleHandshakeReq', async () => {
-            const data = { publicKey: validPubKey, powProof: 'valid', type: 'HANDSHAKE_REQ' };
+            const data: HandshakeReqData = { publicKey: validPubKey, powProof: 'valid', type: 'HANDSHAKE_REQ' };
             const { IdentityRateLimiter } = await import('../../../src/main_process/security/identity-rate-limiter');
             const spy = vi.spyOn(IdentityRateLimiter.prototype, 'checkIdentity').mockReturnValueOnce(false);
 
@@ -286,43 +290,43 @@ describe('Contact Handlers', () => {
         });
 
         it('should fail on upeerId mismatch in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (identity.verify as any).mockReturnValue(true);
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(identity.verify).mockReturnValue(true);
             await handleHandshakeAccept(data, 'sig', 'mismatch', senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
         });
 
         it('should handle legacy signature in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (identity.verify as any)
-                .mockReturnValueOnce(false) // Standard
-                .mockReturnValueOnce(true);  // Legacy
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(identity.verify)
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(true);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.addOrUpdateContact).toHaveBeenCalled();
         });
 
         it('should handle even more legacy signature in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (identity.verify as any)
-                .mockReturnValueOnce(false) // Standard
-                .mockReturnValueOnce(false) // Legacy
-                .mockReturnValueOnce(true);  // Even more legacy
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(identity.verify)
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(true);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.addOrUpdateContact).toHaveBeenCalled();
         });
 
         it('should alert on key-change (TOFU) during handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey, avatar: 'data:image/png;base64,123', addresses: ['ipv6'] };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            const data: HandshakeAcceptData = { publicKey: validPubKey, avatar: 'data:image/png;base64,123', addresses: ['ipv6'] };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 upeerId: senderUpeerId,
                 status: 'pending',
                 publicKey: 'OLD-pubkey'
-            });
-            (contactsKeys.updateContactPublicKey as any).mockReturnValue({ changed: true, oldKey: 'OLD-pubkey', newKey: validPubKey });
+            } as KnownContact);
+            vi.mocked(contactsKeys.updateContactPublicKey).mockReturnValue({ changed: true, oldKey: 'OLD-pubkey', newKey: validPubKey } as KeyUpdateResult);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -333,15 +337,15 @@ describe('Contact Handlers', () => {
         });
 
         it('should verify and update signed prekey in handleHandshakeAccept', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
                 signedPreKey: { spkPub: 'pub', spkSig: 'sig', spkId: 1 }
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 upeerId: senderUpeerId,
                 status: 'pending'
-            });
-            (identity.verify as any).mockReturnValue(true);
+            } as KnownContact);
+            vi.mocked(identity.verify).mockReturnValue(true);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -349,17 +353,15 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle invalid signed prekey in handleHandshakeAccept', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
                 signedPreKey: { spkPub: 'pub', spkSig: 'sig', spkId: 1 }
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 upeerId: senderUpeerId,
                 status: 'pending'
-            });
-            // El primer call es para el handshake (debe ser true)
-            // El segundo call es para el SPK (debe ser false)
-            (identity.verify as any)
+            } as KnownContact);
+            vi.mocked(identity.verify)
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
 
@@ -369,35 +371,33 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle SPK verification exception in handleHandshakeReq', async () => {
-            const data = {
+            const data: HandshakeReqData = {
                 publicKey: validPubKey,
                 powProof: 'valid-proof',
                 signedPreKey: { spkPub: 'pub', spkSig: 'sig', spkId: 1 }
             };
-            (identity.verify as any)
-                .mockReturnValueOnce(true) // Main sig
-                .mockImplementationOnce(() => { throw new Error('CRYPTO_ERROR'); }); // SPK sig throw
+            vi.mocked(identity.verify)
+                .mockReturnValueOnce(true)
+                .mockImplementationOnce(() => { throw new Error('CRYPTO_ERROR'); });
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
-            // Check coverage for catch block
         });
 
         it('should handle SPK verification exception in handleHandshakeAccept', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
                 signedPreKey: { spkPub: 'pub', spkSig: 'sig', spkId: 1 }
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
-            (identity.verify as any)
-                .mockReturnValueOnce(true) // Main sig
-                .mockImplementationOnce(() => { throw new Error('CRYPTO_ERROR_ACC'); }); // SPK sig throw
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
+            vi.mocked(identity.verify)
+                .mockReturnValueOnce(true)
+                .mockImplementationOnce(() => { throw new Error('CRYPTO_ERROR_ACC'); });
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
-            // Check coverage for catch block
         });
 
         it('should handle avatar and alias sanitization in handleHandshakeReq', async () => {
-            const data = {
+            const data: HandshakeReqData = {
                 publicKey: validPubKey,
                 powProof: 'valid-proof',
                 alias: 'A'.repeat(200),
@@ -412,12 +412,12 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle avatar and alias sanitization in handleHandshakeAccept', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
                 alias: 'B'.repeat(200),
                 avatar: 'data:image/png;base64,valid'
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending', name: 'Original' });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ status: 'pending', name: 'Original' } as KnownContact);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.updateContactName).toHaveBeenCalledWith(senderUpeerId, 'B'.repeat(100));
@@ -425,16 +425,16 @@ describe('Contact Handlers', () => {
         });
 
         it('should skip avatar if too large or invalid format', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
-                avatar: 'invalid-avatar' // No data:image/
+                avatar: 'invalid-avatar'
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsOps.updateContactAvatar).not.toHaveBeenCalled();
 
-            const dataLarge = {
+            const dataLarge: HandshakeAcceptData = {
                 publicKey: validPubKey,
                 avatar: 'data:image/png;base64,' + 'A'.repeat(2_000_001)
             };
@@ -443,60 +443,56 @@ describe('Contact Handlers', () => {
         });
 
         it('should handle invalid signed prekey in handleHandshakeReq', async () => {
-            const data = {
+            const data: HandshakeReqData = {
                 publicKey: validPubKey,
                 powProof: 'valid-proof',
                 signedPreKey: { spkPub: 'pub', spkSig: 'sig', spkId: 1 }
             };
-            (identity.verify as any)
-                .mockReturnValueOnce(true) // Main sig
-                .mockReturnValueOnce(false); // SPK sig invalid
+            vi.mocked(identity.verify)
+                .mockReturnValueOnce(true)
+                .mockReturnValueOnce(false);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
         });
 
         it('should handle missing SPK components in handleHandshakeReq', async () => {
-            const data = {
+            const data: HandshakeReqData = {
                 publicKey: validPubKey,
                 powProof: 'valid-proof',
-                signedPreKey: { spkPub: 'pub' } // Missing sig and id
+                signedPreKey: { spkPub: 'pub' }
             };
-            (identity.verify as any).mockReturnValue(true);
+            vi.mocked(identity.verify).mockReturnValue(true);
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
         });
 
         it('should handle missing SPK components in handleHandshakeAccept', async () => {
-            const data = {
+            const data: HandshakeAcceptData = {
                 publicKey: validPubKey,
-                signedPreKey: { spkId: 1 } // Missing pub and sig
+                signedPreKey: { spkId: 1 }
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
-            (identity.verify as any).mockReturnValue(true);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
+            vi.mocked(identity.verify).mockReturnValue(true);
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
             expect(contactsKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
         });
 
         it('should handle transaction error in handleHandshakeAccept', async () => {
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
-            // Mock manual de runTransaction para que falle específicamente aquí
-            const shared = await import('../../../src/main_process/storage/shared');
-            (shared.runTransaction as any).mockImplementationOnce(() => {
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
+            vi.spyOn(shared, 'runTransaction').mockImplementationOnce(() => {
                 throw new Error('TX_FAIL');
             });
 
             await handleHandshakeAccept({ publicKey: validPubKey }, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
-            // Debería capturar el error y no explotar
         });
 
         it('should handle flushPendingOutbox failure in handleHandshakeAccept', async () => {
-            const data = { publicKey: validPubKey };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ status: 'pending' });
+            const data: HandshakeAcceptData = { publicKey: validPubKey };
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(pendingContact);
             vi.spyOn(pendingOutbox, 'flushPendingOutbox').mockRejectedValueOnce(new Error('FLUSH_FAIL'));
 
             await handleHandshakeAccept(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
-            // Debería capturar el error silenciosamente según el código
             expect(pendingOutbox.flushPendingOutbox).toHaveBeenCalled();
         });
     });

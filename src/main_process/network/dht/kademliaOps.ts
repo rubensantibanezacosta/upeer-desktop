@@ -1,15 +1,58 @@
 import { randomBytes } from 'node:crypto';
 import { getContactByUpeerId } from '../../storage/contacts/operations.ts';
 import { updateContactDhtLocation } from '../../storage/contacts/location.ts';
+import { getMyUPeerId } from '../../security/identity.js';
 import { verifyRenewalToken } from '../utils.js';
 import { network, security, error } from '../../security/secure-logger.js';
 import { pendingQueries } from './pendingQueries.js';
+import type { StoredValue, KademliaContact } from './kademlia/types.js';
+import type { KademliaContactInfo, LocationBlock } from '../types.js';
 
-export async function publishLocationBlock(locationBlock: any, getKademliaInstance: () => any): Promise<void> {
+type ExpiringLocationBlock = Partial<LocationBlock> & {
+    expiresAt: number;
+    renewalToken?: LocationBlock['renewalToken'];
+};
+
+type RenewalKademlia = {
+    getAllStoredValues: () => StoredValue[];
+    storeLocationBlock: (upeerId: string, locationBlock: LocationBlock) => Promise<void>;
+    upeerId?: string;
+};
+
+type MaintenanceKademlia = RenewalKademlia & {
+    performMaintenance: () => Promise<void> | void;
+};
+
+type LookupKademlia = {
+    findLocationBlock: (upeerId: string) => Promise<LocationBlock | null>;
+};
+
+type SearchKademlia = {
+    findClosestContacts: (targetUpeerId: string, limit?: number) => KademliaContact[];
+};
+
+type DhtFindNodePacket = {
+    type: 'DHT_FIND_NODE';
+    targetId: string;
+    queryId: string;
+};
+
+function isRenewableLocationBlock(value: unknown): value is ExpiringLocationBlock {
+    if (typeof value !== 'object' || value === null) return false;
+
+    const candidate = value as Partial<ExpiringLocationBlock>;
+    return typeof candidate.expiresAt === 'number';
+}
+
+function getStoredValuesFromKademlia(kademlia: RenewalKademlia): StoredValue[] {
+    return kademlia.getAllStoredValues();
+}
+
+export async function publishLocationBlock(locationBlock: LocationBlock, getKademliaInstance: () => RenewalKademlia | null): Promise<void> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return;
 
-    await kademlia.storeLocationBlock(kademlia['upeerId'], locationBlock);
+    await kademlia.storeLocationBlock(kademlia.upeerId || getMyUPeerId(), locationBlock);
     network('Published location block to Kademlia', undefined, {
         dhtSeq: locationBlock.dhtSeq,
         hasRenewalToken: !!locationBlock.renewalToken,
@@ -17,26 +60,25 @@ export async function publishLocationBlock(locationBlock: any, getKademliaInstan
     }, 'kademlia');
 }
 
-export async function performAutoRenewal(getKademliaInstance: () => any): Promise<void> {
+export async function performAutoRenewal(getKademliaInstance: () => RenewalKademlia | null): Promise<void> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return;
 
-    const kademliaInstance = kademlia as any;
-    const store = kademliaInstance.getValueStore();
-    if (!store || !store.getAll) return;
-
-    const allValues = store.getAll();
+    const allValues = getStoredValuesFromKademlia(kademlia);
+    if (allValues.length === 0) return;
     const now = Date.now();
     const renewalThreshold = 3 * 24 * 60 * 60 * 1000;
 
     for (const storedValue of allValues) {
-        if (!storedValue.value || !storedValue.value.expiresAt) continue;
+        if (!isRenewableLocationBlock(storedValue.value)) continue;
 
-        const timeToExpire = storedValue.value.expiresAt - now;
+        const locationBlock = storedValue.value;
+
+        const timeToExpire = locationBlock.expiresAt - now;
         if (timeToExpire >= renewalThreshold || timeToExpire <= 0) continue;
-        if (!storedValue.value.renewalToken) continue;
+        if (!locationBlock.renewalToken) continue;
 
-        const token = storedValue.value.renewalToken;
+        const token = locationBlock.renewalToken;
         if (token.allowedUntil <= now || token.renewalsUsed >= token.maxRenewals) continue;
 
         const publisherContact = await getContactByUpeerId(storedValue.publisher);
@@ -46,18 +88,18 @@ export async function performAutoRenewal(getKademliaInstance: () => any): Promis
             continue;
         }
 
-        const renewedBlock = { ...storedValue.value };
+        const renewedBlock: ExpiringLocationBlock = { ...locationBlock };
         renewedBlock.expiresAt = now + (30 * 24 * 60 * 60 * 1000);
         token.renewalsUsed += 1;
 
-        await kademlia.storeLocationBlock(storedValue.publisher, renewedBlock);
+        await kademlia.storeLocationBlock(storedValue.publisher, renewedBlock as LocationBlock);
         network('Auto-renewed location block', undefined, {
             targetId: storedValue.publisher,
             renewalsUsed: token.renewalsUsed
         }, 'auto-renewal');
 
         const contact = await getContactByUpeerId(storedValue.publisher);
-        if (contact) {
+        if (contact && renewedBlock.address && typeof renewedBlock.dhtSeq === 'number' && typeof renewedBlock.signature === 'string') {
             updateContactDhtLocation(
                 storedValue.publisher,
                 renewedBlock.addresses || renewedBlock.address,
@@ -70,7 +112,7 @@ export async function performAutoRenewal(getKademliaInstance: () => any): Promis
     }
 }
 
-export async function findNodeLocation(upeerId: string, getKademliaInstance: () => any): Promise<any | null> {
+export async function findNodeLocation(upeerId: string, getKademliaInstance: () => LookupKademlia | null): Promise<LocationBlock | null> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return null;
 
@@ -78,11 +120,10 @@ export async function findNodeLocation(upeerId: string, getKademliaInstance: () 
     return locationBlock || null;
 }
 
-export async function iterativeFindNode(upeerId: string, sendMessage: (address: string, data: any) => void, getKademliaInstance: () => any): Promise<string | null> {
+export async function iterativeFindNode(upeerId: string, sendMessage: (address: string, data: DhtFindNodePacket) => void, getKademliaInstance: () => SearchKademlia | null): Promise<string | null> {
     const kademlia = getKademliaInstance();
     if (!kademlia) return null;
 
-    const kademliaInstance = kademlia as any;
     const ALPHA = 3;
     const K = 20;
     const QUERY_TIMEOUT = 5000;
@@ -93,9 +134,9 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
     let iteration = 0;
     const queriedAddresses = new Set<string>();
     const candidates: Array<{ upeerId: string, address: string, publicKey: string, nodeId: Buffer }> = [];
-    const addressToContact = new Map<string, any>();
+    const addressToContact = new Map<string, KademliaContact | KademliaContactInfo>();
 
-    const initialContacts = kademliaInstance.findClosestContacts(upeerId, K);
+    const initialContacts = kademlia.findClosestContacts(upeerId, K);
     for (const contact of initialContacts) {
         if (!contact.address || !contact.upeerId) continue;
         candidates.push({
@@ -140,7 +181,7 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
         if (toQuery.length === 0) break;
 
         const promises = toQuery.map(contact => {
-            return new Promise<{ nodes: any[], senderAddress: string }>((resolve, reject) => {
+            return new Promise<{ nodes: KademliaContactInfo[], senderAddress: string }>((resolve, reject) => {
                 const queryId = randomBytes(16).toString('hex');
                 const timeout = setTimeout(() => {
                     reject(new Error(`Query timeout for ${contact.address}`));
@@ -149,7 +190,11 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
                 pendingQueries.set(queryId, {
                     resolve: (value) => {
                         clearTimeout(timeout);
-                        resolve(value);
+                        if ('nodes' in value) {
+                            resolve(value);
+                            return;
+                        }
+                        reject(new Error('Unexpected DHT query result type'));
                     },
                     reject: (error) => {
                         clearTimeout(timeout);
@@ -162,11 +207,13 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
                     timeoutId: timeout
                 });
 
-                sendMessage(contact.address, {
+                const packet: DhtFindNodePacket = {
                     type: 'DHT_FIND_NODE',
                     targetId: upeerId,
                     queryId
-                });
+                };
+
+                sendMessage(contact.address, packet);
             });
         });
 
@@ -201,7 +248,7 @@ export async function iterativeFindNode(upeerId: string, sendMessage: (address: 
     return null;
 }
 
-export async function performDhtMaintenance(getKademliaInstance: () => any): Promise<void> {
+export async function performDhtMaintenance(getKademliaInstance: () => MaintenanceKademlia | null): Promise<void> {
     const kademlia = getKademliaInstance();
     if (kademlia) {
         kademlia.performMaintenance();

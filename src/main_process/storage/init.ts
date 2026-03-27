@@ -48,8 +48,12 @@ export async function initDB(userDataPath: string) {
     try {
         sqlite.prepare('SELECT count(*) FROM sqlite_master').get();
         isEncrypted = false;
-    } catch (err: any) {
-        if (err.message.includes('not a database') || err.code === 'SQLITE_NOTADB') {
+    } catch (err: unknown) {
+        const isSqliteError = typeof err === 'object' && err !== null;
+        const message = isSqliteError && 'message' in err ? String(err.message) : '';
+        const code = isSqliteError && 'code' in err ? String(err.code) : '';
+
+        if (message.includes('not a database') || code === 'SQLITE_NOTADB') {
             isEncrypted = true;
         } else {
             error('Unexpected error checking database encryption', err, 'db');

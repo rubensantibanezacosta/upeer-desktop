@@ -53,7 +53,7 @@ export const useVideoThumbnails = (items: MediaItem[], currentIndex: number) => 
 
                 try {
                     const filePath = item.url.replace(/\\/g, '/');
-                    const result = await (window as any).upeer.generateVideoThumbnail(filePath);
+                    const result = await window.upeer.generateVideoThumbnail(filePath);
                     if (isMounted && result.success) {
                         setThumbnails((prev) => ({ ...prev, [item.fileId]: result.dataUrl }));
                     }

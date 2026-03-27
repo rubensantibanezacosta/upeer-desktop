@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mocks de dependencias
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
     getContactByUpeerId: vi.fn(),
@@ -29,6 +28,10 @@ vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
     getKademliaInstance: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
+    saveVaultEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
     getVouchScore: vi.fn(),
 }));
@@ -40,48 +43,51 @@ import * as transport from '../../../src/main_process/network/server/transport.j
 import * as dhtShared from '../../../src/main_process/network/dht/shared.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 
+type VaultManagerInternals = typeof VaultManager & {
+    getDynamicReplicationFactor(recipientSid: string): Promise<number>;
+};
+type KnownContact = Awaited<ReturnType<typeof contactsOps.getContacts>>[number];
+type KnownRecipient = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
+type ReplicationPacket = Parameters<typeof VaultManager.replicateToVaults>[1];
+type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInstance>>;
+
 describe('VaultManager - Replication Logic', () => {
     const myId = 'my-id';
     const recipientId = 'recipient-id';
+    const vaultManagerInternals = VaultManager as VaultManagerInternals;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (identity.getMyUPeerId as any).mockReturnValue(myId);
+        vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
     });
 
     it('should calculate dynamic replication factor based on score', async () => {
-        // Accedemos al método privado mediante 'any' para testear la lógica de decisión
-
-        // 1. Muy confiable (Score 95) -> Factor 3
-        (reputation.getVouchScore as any).mockResolvedValue(95);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 100 * 24 * 3600000 });
-        const factorHigh = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(95);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ createdAt: Date.now() - 100 * 24 * 3600000 } as KnownRecipient);
+        const factorHigh = await vaultManagerInternals.getDynamicReplicationFactor(recipientId);
         expect(factorHigh).toBe(3);
 
-        // 2. Sospechoso (Score 20) -> Factor 12
-        (reputation.getVouchScore as any).mockResolvedValue(20);
-        // Reset para que no se considere "antiguo" o "estable" si no queremos
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() });
-        const factorLow = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(20);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ createdAt: Date.now() } as KnownRecipient);
+        const factorLow = await vaultManagerInternals.getDynamicReplicationFactor(recipientId);
         expect(factorLow).toBe(12);
 
-        // 3. Neutral (Score 50) -> Factor 6
-        (reputation.getVouchScore as any).mockResolvedValue(50);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ createdAt: Date.now() - 31 * 24 * 3600000 }); // "highTenure" (>30d)
-        const factorMid = await (VaultManager as any).getDynamicReplicationFactor(recipientId);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(50);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ createdAt: Date.now() - 31 * 24 * 3600000 } as KnownRecipient);
+        const factorMid = await vaultManagerInternals.getDynamicReplicationFactor(recipientId);
         expect(factorMid).toBe(6);
     });
+
     it('should only store pointers in DHT for successful replications', async () => {
-        const contact1 = { upeerId: 'peer1', address: '1.1.1.1', status: 'connected' };
-        const contact2 = { upeerId: 'peer2', address: '2.2.2.2', status: 'connected' };
+        const contact1 = { upeerId: 'peer1', address: '1.1.1.1', status: 'connected' } as KnownContact;
+        const contact2 = { upeerId: 'peer2', address: '2.2.2.2', status: 'connected' } as KnownContact;
+        const replicatedPacket: ReplicationPacket = { type: 'CHAT', data: 'hi' };
 
-        (contactsOps.getContacts as any).mockResolvedValue([contact1, contact2]);
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({});
-        (reputation.getVouchScore as any).mockResolvedValue(55); // Factor predecible para simplificar
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([contact1, contact2]);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({} as KnownRecipient);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(55);
 
-        // Mock de transporte: uno falla, otro tiene éxito
-        // Usamos una implementación que no tiene retries infinitos o que falla rápido para el test
-        (transport.sendSecureUDPMessage as any).mockImplementation((addr: string) => {
+        vi.mocked(transport.sendSecureUDPMessage).mockImplementation((addr: string) => {
             if (addr === '1.1.1.1') return Promise.resolve();
             return Promise.reject(new Error('Network error'));
         });
@@ -89,19 +95,15 @@ describe('VaultManager - Replication Logic', () => {
         const mockKademlia = {
             findClosestContacts: vi.fn().mockReturnValue([]),
             storeValue: vi.fn().mockResolvedValue(undefined),
-        };
-        (dhtShared.getKademliaInstance as any).mockReturnValue(mockKademlia);
+        } satisfies Pick<KademliaInstance, 'findClosestContacts' | 'storeValue'>;
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
 
-        // Forzamos un factor de replicación pequeño para que no intente buscar más de los que tenemos
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
+        vi.spyOn(vaultManagerInternals, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
-        await VaultManager.replicateToVaults(recipientId, { type: 'CHAT', data: 'hi' });
+        await VaultManager.replicateToVaults(recipientId, replicatedPacket);
 
-        // Verificamos que se intentó enviar (sendWithRetry usa 3 retries por defecto)
-        // Por eso antes daba 4 (1 inicial + 3 reintentos en el que falla)
         expect(transport.sendSecureUDPMessage).toHaveBeenCalled();
 
-        // Verificamos que el DHT solo recibió el ID del que tuvo éxito
         expect(mockKademlia.storeValue).toHaveBeenCalledWith(
             expect.anything(),
             expect.objectContaining({
@@ -116,15 +118,15 @@ describe('VaultManager - Replication Logic', () => {
     });
 
     it('should fallback to Kademlia nodes if no friends are connected', async () => {
-        (contactsOps.getContacts as any).mockResolvedValue([]);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([]);
 
-        const meshNode = { upeerId: 'mesh1', address: '3.3.3.3', status: 'connected' };
+        const meshNode = { upeerId: 'mesh1', address: '3.3.3.3', status: 'connected' } as KnownContact;
         const mockKademlia = {
             findClosestContacts: vi.fn().mockReturnValue([meshNode]),
             storeValue: vi.fn().mockResolvedValue(undefined),
-        };
-        (dhtShared.getKademliaInstance as any).mockReturnValue(mockKademlia);
-        (reputation.getVouchScore as any).mockResolvedValue(50);
+        } satisfies Pick<KademliaInstance, 'findClosestContacts' | 'storeValue'>;
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(50);
 
         await VaultManager.replicateToVaults(recipientId, { type: 'CHAT', data: 'hi' });
 

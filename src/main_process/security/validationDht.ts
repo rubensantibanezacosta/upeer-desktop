@@ -5,6 +5,59 @@ import {
     validateLocationBlock,
     type ValidationResult,
 } from './validationShared.js';
+import type {
+    DhtFindNode,
+    DhtFindValue,
+    DhtFoundValue,
+    DhtStore,
+    DhtStoreAck,
+    LocationBlock,
+} from '../network/types.js';
+
+type DhtQueryPayload = {
+    targetId?: unknown;
+};
+
+type DhtResponsePayload = {
+    targetId?: unknown;
+    locationBlock?: LocationBlock;
+    neighbors?: unknown;
+};
+
+type DhtUpdatePayload = {
+    locationBlock?: LocationBlock;
+};
+
+type DhtExchangePeer = {
+    upeerId?: unknown;
+    publicKey?: unknown;
+    locationBlock?: unknown;
+};
+
+type DhtExchangePayload = {
+    peers?: DhtExchangePeer[];
+};
+
+type DhtFoundNodesPayload = {
+    nodes?: unknown;
+};
+
+type DhtFoundValuePayload = Partial<DhtFoundValue> & {
+    key?: unknown;
+    value?: unknown;
+    nodes?: unknown;
+};
+
+type DhtPingPongPayload = {
+    nodeId?: unknown;
+};
+
+type SyncPulsePayload = {
+    action?: unknown;
+    deviceId?: unknown;
+    messageId?: unknown;
+    newContent?: unknown;
+};
 
 function validateDhtNodeId(value: unknown, fieldName: string): ValidationResult {
     if (value !== undefined && (typeof value !== 'string' || !/^[0-9a-f]+$/i.test(value) || value.length > 128)) {
@@ -13,14 +66,14 @@ function validateDhtNodeId(value: unknown, fieldName: string): ValidationResult 
     return { valid: true };
 }
 
-export function validateDhtQuery(data: any): ValidationResult {
+export function validateDhtQuery(data: DhtQueryPayload): ValidationResult {
     if (!isValidHexId(data.targetId)) {
         return { valid: false, error: 'Invalid targetId' };
     }
     return { valid: true };
 }
 
-export function validateDhtResponse(data: any): ValidationResult {
+export function validateDhtResponse(data: DhtResponsePayload): ValidationResult {
     if (!isValidHexId(data.targetId)) {
         return { valid: false, error: 'Invalid targetId' };
     }
@@ -34,11 +87,11 @@ export function validateDhtResponse(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateDhtUpdate(data: any): ValidationResult {
+export function validateDhtUpdate(data: DhtUpdatePayload): ValidationResult {
     return validateLocationBlock(data.locationBlock);
 }
 
-export function validateDhtExchange(data: any): ValidationResult {
+export function validateDhtExchange(data: DhtExchangePayload): ValidationResult {
     if (!Array.isArray(data.peers)) {
         return { valid: false, error: 'Invalid peers array' };
     }
@@ -73,21 +126,21 @@ export function validateDhtExchange(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateDhtFindNode(data: any): ValidationResult {
+export function validateDhtFindNode(data: Partial<DhtFindNode>): ValidationResult {
     if (!data.targetId || typeof data.targetId !== 'string' || !/^[0-9a-f]+$/i.test(data.targetId) || data.targetId.length > 128) {
         return { valid: false, error: 'Invalid targetId' };
     }
     return { valid: true };
 }
 
-export function validateDhtFindValue(data: any): ValidationResult {
+export function validateDhtFindValue(data: Partial<DhtFindValue>): ValidationResult {
     if (!validateHexKey40Or64(data.key)) {
         return { valid: false, error: 'Invalid key (expected 40 or 64 hex chars)' };
     }
     return { valid: true };
 }
 
-export function validateDhtStore(data: any): ValidationResult {
+export function validateDhtStore(data: Partial<DhtStore> & { ttl?: unknown }): ValidationResult {
     if (!validateHexKey40Or64(data.key)) {
         return { valid: false, error: 'Invalid key (expected 40 or 64 hex chars)' };
     }
@@ -99,14 +152,14 @@ export function validateDhtStore(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateDhtStoreAck(data: any): ValidationResult {
+export function validateDhtStoreAck(data: Partial<DhtStoreAck>): ValidationResult {
     if (!validateHexKey40Or64(data.key)) {
         return { valid: false, error: 'Invalid key (expected 40 or 64 hex chars)' };
     }
     return { valid: true };
 }
 
-export function validateDhtFoundNodes(data: any): ValidationResult {
+export function validateDhtFoundNodes(data: DhtFoundNodesPayload): ValidationResult {
     if (!Array.isArray(data.nodes)) {
         return { valid: false, error: 'Missing or invalid nodes array' };
     }
@@ -127,7 +180,7 @@ export function validateDhtFoundNodes(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateDhtFoundValue(data: any): ValidationResult {
+export function validateDhtFoundValue(data: DhtFoundValuePayload): ValidationResult {
     if (data.key !== undefined && !validateHexKey40Or64(data.key)) {
         return { valid: false, error: 'Invalid key' };
     }
@@ -141,15 +194,15 @@ export function validateDhtFoundValue(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateDhtPing(data: any): ValidationResult {
+export function validateDhtPing(data: DhtPingPongPayload): ValidationResult {
     return validateDhtNodeId(data.nodeId, 'nodeId');
 }
 
-export function validateDhtPong(data: any): ValidationResult {
+export function validateDhtPong(data: DhtPingPongPayload): ValidationResult {
     return validateDhtNodeId(data.nodeId, 'nodeId');
 }
 
-export function validateSyncPulse(data: any): ValidationResult {
+export function validateSyncPulse(data: SyncPulsePayload): ValidationResult {
     if (!data.action || typeof data.action !== 'string' || data.action.length > 50) {
         return { valid: false, error: 'Invalid action' };
     }

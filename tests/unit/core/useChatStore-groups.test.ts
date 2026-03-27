@@ -1,4 +1,41 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ChatStore } from '../../../src/store/chatStoreTypes.js';
+import type { ChatMessage, LinkPreview, MyIdentity } from '../../../src/types/chat.js';
+
+type MockUpeer = {
+    sendGroupMessage: ReturnType<typeof vi.fn>;
+    inviteToGroup: ReturnType<typeof vi.fn>;
+    leaveGroup: ReturnType<typeof vi.fn>;
+    clearChat: ReturnType<typeof vi.fn>;
+    getGroups: ReturnType<typeof vi.fn>;
+    sendChatUpdate?: ReturnType<typeof vi.fn>;
+};
+
+type WindowWithUpeer = Window & { upeer: MockUpeer };
+
+function getWindowWithUpeer(): WindowWithUpeer {
+    return window as WindowWithUpeer;
+}
+
+function setChatState(update: Partial<ChatStore>): void {
+    const { useChatStore } = require('../../../src/store/useChatStore.js') as { useChatStore: { setState: (state: Partial<ChatStore>) => void } };
+    useChatStore.setState(update);
+}
+
+const myIdentity: MyIdentity = { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' };
+
+function createGroupMessage(message: string): ChatMessage {
+    return {
+        id: 'msg-1',
+        upeerId: 'grp-1',
+        groupId: 'grp-1',
+        isMine: true,
+        message,
+        status: 'sent',
+        timestamp: '10:00',
+        date: 1710000000000,
+    };
+}
 
 vi.mock('../../../src/utils/notificationSound.js', () => ({
     playNotificationSound: vi.fn(),
@@ -7,7 +44,7 @@ vi.mock('../../../src/utils/notificationSound.js', () => ({
 describe('useChatStore groups integration', () => {
     beforeEach(async () => {
         vi.resetModules();
-        (window as any).upeer = {
+        getWindowWithUpeer().upeer = {
             sendGroupMessage: vi.fn().mockResolvedValue({ id: 'msg-1', timestamp: 1710000000000 }),
             inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
             leaveGroup: vi.fn().mockResolvedValue({ success: true }),
@@ -18,12 +55,12 @@ describe('useChatStore groups integration', () => {
 
     it('passes replyTo when sending a group message', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
-        const preview = { url: 'https://example.com', title: 'Example' };
-        (window as any).upeer.getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
+        const preview: LinkPreview = { url: 'https://example.com', title: 'Example' };
+        getWindowWithUpeer().upeer.getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
-            myIdentity: { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' },
+            myIdentity,
             groupChatHistory: [],
             messagesByConversation: { 'grp-1': 'hola' },
             replyByConversation: {
@@ -37,9 +74,9 @@ describe('useChatStore groups integration', () => {
                     date: 1710000000000,
                 }
             }
-        } as any);
+        });
 
-        await useChatStore.getState().handleSendGroupMessage('hola', preview as any);
+        await useChatStore.getState().handleSendGroupMessage('hola', preview);
 
         expect(window.upeer.sendGroupMessage).toHaveBeenCalledWith('grp-1', 'hola', 'parent-1', preview);
         const state = useChatStore.getState();
@@ -57,18 +94,9 @@ describe('useChatStore groups integration', () => {
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
-            groupChatHistory: [{
-                id: 'msg-1',
-                upeerId: 'grp-1',
-                groupId: 'grp-1',
-                isMine: true,
-                message: 'hola',
-                status: 'sent',
-                timestamp: '10:00',
-                date: 1710000000000,
-            }],
+            groupChatHistory: [createGroupMessage('hola')],
             isWindowedHistory: true,
-        } as any);
+        });
 
         await useChatStore.getState().handleLeaveGroup('grp-1');
 
@@ -85,18 +113,9 @@ describe('useChatStore groups integration', () => {
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
-            groupChatHistory: [{
-                id: 'msg-1',
-                upeerId: 'grp-1',
-                groupId: 'grp-1',
-                isMine: true,
-                message: 'hola',
-                status: 'sent',
-                timestamp: '10:00',
-                date: 1710000000000,
-            }],
+            groupChatHistory: [createGroupMessage('hola')],
             isWindowedHistory: true,
-        } as any);
+        });
 
         await useChatStore.getState().refreshGroups();
 
@@ -123,17 +142,8 @@ describe('useChatStore groups integration', () => {
         useChatStore.setState({
             activeGroupId: 'grp-1',
             targetUpeerId: '',
-            groupChatHistory: [{
-                id: 'msg-1',
-                upeerId: 'grp-1',
-                groupId: 'grp-1',
-                isMine: true,
-                message: 'hola',
-                status: 'sent',
-                timestamp: '10:00',
-                date: 1710000000000,
-            }],
-        } as any);
+            groupChatHistory: [createGroupMessage('hola')],
+        });
 
         useChatStore.getState().handleClearChat();
         await Promise.resolve();
@@ -144,8 +154,8 @@ describe('useChatStore groups integration', () => {
 
     it('keeps link preview payload when editing a message with preview', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
-        const preview = { url: 'https://example.com', title: 'Example' };
-        (window as any).upeer.sendChatUpdate = vi.fn().mockResolvedValue(undefined);
+        const preview: LinkPreview = { url: 'https://example.com', title: 'Example' };
+        getWindowWithUpeer().upeer.sendChatUpdate = vi.fn().mockResolvedValue(undefined);
 
         useChatStore.setState({
             targetUpeerId: 'peer-1',
@@ -160,9 +170,9 @@ describe('useChatStore groups integration', () => {
                 date: 1710000000000,
             }],
             groupChatHistory: [],
-        } as any);
+        });
 
-        useChatStore.getState().handleUpdateMessage('msg-1', 'hola https://example.com', preview as any);
+        useChatStore.getState().handleUpdateMessage('msg-1', 'hola https://example.com', preview);
 
         expect(window.upeer.sendChatUpdate).toHaveBeenCalledWith('peer-1', 'msg-1', 'hola https://example.com', preview);
         expect(useChatStore.getState().chatHistory[0].message).toBe(JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }));

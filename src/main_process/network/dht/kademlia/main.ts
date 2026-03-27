@@ -1,9 +1,8 @@
-import { toKademliaId } from './types.js';
+import { toKademliaId, type KademliaContact, type KademliaStats, type StoredValue } from './types.js';
 import { RoutingTable } from './routing.js';
 import { ValueStore } from './store.js';
 import { BootstrapManager } from './bootstrap.js';
 import { ProtocolHandler } from './protocol.js';
-import { KademliaContact, KademliaStats } from './types.js';
 import { BOOTSTRAP_RETRY_MS } from './types.js';
 import { network, info, debug, warn } from '../../../security/secure-logger.js';
 
@@ -24,8 +23,8 @@ export class KademliaDHT {
 
     constructor(
         upeerId: string,
-        sendMessage: (address: string, data: any) => void,
-        getContacts?: () => any[],
+        sendMessage: (address: string, data: unknown) => void,
+        getContacts?: () => KademliaContact[],
         userDataPath?: string
     ) {
         this.upeerId = upeerId;
@@ -102,47 +101,50 @@ export class KademliaDHT {
     // === Multi-device Support ===
 
     // Get a value from the local store
-    getLocalValue(key: Buffer): any | null {
+    getLocalValue(key: Buffer): StoredValue | null {
         return this.valueStore.get(key);
     }
 
+    getAllStoredValues(): StoredValue[] {
+        return this.valueStore.getAll();
+    }
+
     // Store a value in the DHT
-    async storeValue(key: Buffer, value: any, publisher: string, signature?: string): Promise<void> {
+    async storeValue(key: Buffer, value: unknown, publisher: string, signature?: string): Promise<void> {
         await this.protocolHandler.storeValue(key, value, publisher, signature);
         this.stats.storeOperations++;
     }
 
 
     // Find a value in the DHT
-    async findValue(key: Buffer): Promise<any | null> {
+    async findValue(key: Buffer): Promise<StoredValue | null> {
         const result = await this.protocolHandler.findValue(key);
         this.stats.findOperations++;
         return result;
     }
 
     // Store location block in DHT
-    async storeLocationBlock(upeerId: string, locationBlock: any): Promise<void> {
+    async storeLocationBlock(upeerId: string, locationBlock: unknown): Promise<void> {
         const key = toKademliaId(upeerId);
+        const signature = typeof locationBlock === 'object' && locationBlock !== null && 'signature' in locationBlock
+            ? (locationBlock as { signature?: string }).signature
+            : undefined;
+
         await this.storeValue(
             key,
             locationBlock,
             upeerId,
-            locationBlock.signature
+            signature
         );
         network('Stored location block in DHT', undefined, { upeerId }, 'kademlia');
     }
 
     // Find location block in DHT
-    async findLocationBlock(upeerId: string): Promise<any | null> {
+    async findLocationBlock(upeerId: string): Promise<unknown | null> {
         const key = toKademliaId(upeerId);
         const result = await this.findValue(key);
 
-        if (result && result.value) {
-            // BUG AU fix: el código anterior solo devolvía el valor si el contacto ya
-            // existía en la routing table Y tenía firma — un círculo vicioso, ya que el
-            // objetivo de buscar en DHT es precisamente encontrar contactos desconocidos.
-            // Ahora devolvemos el valor siempre que esté presente; la verificación de firma
-            // se hace en la capa superior (DHT_RESPONSE handler en network/handlers.ts).
+        if (result && result.value !== undefined) {
             network('Found location block in DHT', undefined, { upeerId }, 'kademlia');
             return result.value;
         }
@@ -151,7 +153,7 @@ export class KademliaDHT {
     }
 
     // Handle incoming DHT message
-    async handleMessage(senderUpeerId: string, data: any, senderAddress: string): Promise<any> {
+    async handleMessage(senderUpeerId: string, data: unknown, senderAddress: string): Promise<unknown> {
         return this.protocolHandler.handleMessage(senderUpeerId, data, senderAddress);
     }
 

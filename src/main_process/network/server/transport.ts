@@ -1,3 +1,4 @@
+import type net from 'node:net';
 import {
     getMyUPeerId,
     sign
@@ -40,9 +41,24 @@ type PendingFrame = {
     isProbeTraffic: boolean;
 };
 
+type TransportPacket = {
+    type?: string;
+    signature?: string;
+    contactCache?: unknown;
+    renewalToken?: unknown;
+    [key: string]: unknown;
+};
+
+type SignedTransportPacket = TransportPacket & {
+    senderUpeerId: string;
+    senderYggAddress: string;
+    isInternalSync: boolean;
+    signature: string;
+};
+
 type PooledConnection = {
-    socket?: any;
-    connectPromise?: Promise<any>;
+    socket?: net.Socket;
+    connectPromise?: Promise<net.Socket>;
     queue: PendingFrame[];
     flushing: boolean;
     idleTimer?: ReturnType<typeof setTimeout>;
@@ -82,7 +98,7 @@ function scheduleIdleClose(ip: string, entry: PooledConnection): void {
     }, SOCKET_IDLE_MS);
 }
 
-async function getOrCreateSocket(ip: string, entry: PooledConnection): Promise<any> {
+async function getOrCreateSocket(ip: string, entry: PooledConnection): Promise<net.Socket> {
     if (entry.socket && !entry.socket.destroyed) return entry.socket;
     if (!entry.connectPromise) {
         entry.connectPromise = socks5Connect(ip, YGG_PORT)
@@ -131,10 +147,10 @@ async function flushConnection(ip: string): Promise<void> {
             entry.queue.shift();
             if (!item.isFileTransfer) recordIPSuccess(ip);
         }
-    } catch (_err: any) {
+    } catch (_err: unknown) {
         const failed = entry.queue.shift();
         destroyConnection(ip);
-        error(`TCP send error to ${ip}: ${_err.message}`, undefined, 'network');
+        error(`TCP send error to ${ip}: ${_err instanceof Error ? _err.message : String(_err)}`, undefined, 'network');
         if (failed && !failed.isFileTransfer) recordIPFailure(ip);
     } finally {
         const current = connectionPool.get(ip);
@@ -180,7 +196,7 @@ onYggstackAddress(() => {
     drainSendQueue();
 });
 
-export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?: string, isInternalSync = false) {
+export function sendSecureUDPMessage(ip: string, data: TransportPacket, recipientPubKeyHex?: string, isInternalSync = false): void {
     if (!getTcpServer()) return;
     if (!isYggdrasilAddress(ip)) return;
 
@@ -207,7 +223,7 @@ export function sendSecureUDPMessage(ip: string, data: any, recipientPubKeyHex?:
         signature: signature.toString('hex')
     };
 
-    let packetToSend: any;
+    let packetToSend: TransportPacket | SignedTransportPacket;
     if (recipientPubKeyHex && SEALED_TYPES.has(data.type)) {
         packetToSend = sealPacket(signedInner, recipientPubKeyHex);
     } else {

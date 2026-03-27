@@ -20,9 +20,9 @@ interface SidebarProps {
     onLeaveGroup?: (groupId: string) => void;
     selectedId?: string;
     selectedGroupId?: string;
-    typingStatus?: Record<string, any>;
+    typingStatus?: Record<string, NodeJS.Timeout>;
     onAddContact: (idAtAddress: string, name: string) => void;
-    onCreateGroup?: (name: string, memberIds: string[], avatar?: string) => Promise<any>;
+    onCreateGroup?: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({

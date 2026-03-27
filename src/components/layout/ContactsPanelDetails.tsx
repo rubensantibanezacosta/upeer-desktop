@@ -104,7 +104,7 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                                 ) : null}
                             </Box>
                             {(() => {
-                                const trust = getTrustMeta((activeContact as any).vouchScore);
+                                const trust = getTrustMeta(activeContact.vouchScore);
                                 if (!trust) {
                                     return null;
                                 }

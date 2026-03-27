@@ -12,6 +12,13 @@ import {
 } from '../../../src/main_process/storage/vault/operations.js';
 import { getDb } from '../../../src/main_process/storage/shared.js';
 
+type MockDb = {
+    select: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+};
+
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(() => ({
@@ -24,17 +31,17 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
             expiresAt: 'expiresAt'
         }
     })),
-    eq: (a: any, b: any) => ({ type: 'eq', a, b }),
-    lt: (a: any, b: any) => ({ type: 'lt', a, b }),
-    gt: (a: any, b: any) => ({ type: 'gt', a, b }),
-    and: (...args: any[]) => ({ type: 'and', args }),
+    eq: (a: unknown, b: unknown) => ({ type: 'eq', a, b }),
+    lt: (a: unknown, b: unknown) => ({ type: 'lt', a, b }),
+    gt: (a: unknown, b: unknown) => ({ type: 'gt', a, b }),
+    and: (...args: unknown[]) => ({ type: 'and', args }),
     sql: {
         raw: (s: string) => s
     }
 }));
 
 describe('Storage - Vault Operations', () => {
-    const mockDb = {
+    const mockDb: MockDb = {
         select: vi.fn(),
         insert: vi.fn(),
         delete: vi.fn(),
@@ -43,7 +50,7 @@ describe('Storage - Vault Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (getDb as any).mockReturnValue(mockDb);
+        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
     });
 
     it('should retrieve vault stats correctly', async () => {
@@ -54,7 +61,7 @@ describe('Storage - Vault Operations', () => {
         const stats = await getVaultStats();
 
         expect(stats.count).toBe(10);
-        expect(stats.sizeBytes).toBe(1024); // 2048 / 2
+        expect(stats.sizeBytes).toBe(1024);
         expect(mockDb.select).toHaveBeenCalled();
     });
 

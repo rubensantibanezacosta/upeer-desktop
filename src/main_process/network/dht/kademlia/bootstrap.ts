@@ -6,6 +6,18 @@ import { KademliaContact, SeedNode, SEED_NODES, BOOTSTRAP_MIN_NODES, BOOTSTRAP_R
 import { toKademliaId } from './types.js';
 import { warn, info } from '../../../security/secure-logger.js';
 
+type KademliaContactInput = {
+    upeerId: string;
+    address: string;
+    publicKey: string;
+    status?: string;
+    dhtSeq?: number;
+    dhtSignature?: string;
+};
+
+type SeedRecordMap = Record<string, string>;
+
+
 const SEED_DNS_DOMAIN = 'dht-seeds.upeer.chat';
 const LOCAL_SEEDS_FILE = 'seednodes.json';
 
@@ -20,8 +32,8 @@ export class BootstrapManager {
 
     constructor(
         private readonly routingTable: RoutingTable,
-        private readonly sendMessage: (address: string, data: any) => void,
-        private readonly getContacts?: () => any[],
+        private readonly sendMessage: (address: string, data: { type: string;[key: string]: unknown }) => void,
+        private readonly getContacts?: () => KademliaContactInput[],
         private readonly userDataPath?: string
     ) { }
 
@@ -73,7 +85,7 @@ export class BootstrapManager {
                 for (const entry of record) {
                     try {
                         const parts = entry.split(';');
-                        const seed: any = {};
+                        const seed: SeedRecordMap = {};
                         for (const part of parts) {
                             const [key, value] = part.split('=');
                             if (key && value) {

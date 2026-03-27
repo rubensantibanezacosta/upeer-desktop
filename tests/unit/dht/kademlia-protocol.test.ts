@@ -4,11 +4,13 @@ import { RoutingTable } from '../../../src/main_process/network/dht/kademlia/rou
 import { ValueStore } from '../../../src/main_process/network/dht/kademlia/store.js';
 import { toKademliaId } from '../../../src/main_process/network/dht/kademlia/types.js';
 
+type SendMessage = ConstructorParameters<typeof ProtocolHandler>[4];
+
 describe('Kademlia ProtocolHandler', () => {
     let handler: ProtocolHandler;
     let routingTable: RoutingTable;
     let valueStore: ValueStore;
-    let mockSendMessage: any;
+    let mockSendMessage: SendMessage;
     const nodeId = Buffer.alloc(20, 1);
     const upeerId = '0123456789abcdef0123456789abcdef';
 

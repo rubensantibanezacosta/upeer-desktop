@@ -87,10 +87,11 @@ describe('thumbnail roundtrip – emisor → receptor', () => {
     let manager: TransferManager;
     const safeSendCalls: Array<{ channel: string; data: unknown }> = [];
     const realAesKey = crypto.randomBytes(32);
+    type TransferWindow = Parameters<TransferManager['initialize']>[1];
     const mockWindow = {
         isDestroyed: vi.fn(() => false),
         webContents: { send: vi.fn() },
-    } as any;
+    } as unknown as TransferWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();

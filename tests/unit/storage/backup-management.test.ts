@@ -26,11 +26,11 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: any, b: any) => ({ type: 'eq', column: a, value: b })
+    eq: (a: unknown, b: unknown) => ({ type: 'eq', column: a, value: b })
 }));
 
 vi.mock('drizzle-orm', () => ({
-    lt: (a: any, b: any) => ({ type: 'lt', column: a, value: b })
+    lt: (a: unknown, b: unknown) => ({ type: 'lt', column: a, value: b })
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -44,6 +44,8 @@ import {
     cleanupExpiredPulseSyncs
 } from '../../../src/main_process/storage/backup/management.js';
 import { error } from '../../../src/main_process/security/secure-logger.js';
+
+type PulseSyncData = Parameters<typeof updatePulseSync>[1];
 
 describe('storage/backup/management.ts', () => {
     beforeEach(() => {
@@ -74,7 +76,7 @@ describe('storage/backup/management.ts', () => {
 
     describe('updatePulseSync', () => {
         it('should update a kit and return true', () => {
-            const data = { version: 1, encrypted: 'data' } as any;
+            const data = { version: 1, encrypted: 'data' } as PulseSyncData;
             const res = updatePulseSync('k1', data);
 
             expect(res).toBe(true);
@@ -86,7 +88,7 @@ describe('storage/backup/management.ts', () => {
 
         it('should log error and return false on failure', () => {
             mockDb.run.mockImplementationOnce(() => { throw new Error('db-err'); });
-            const res = updatePulseSync('k1', {} as any);
+            const res = updatePulseSync('k1', {} as PulseSyncData);
             expect(res).toBe(false);
             expect(error).toHaveBeenCalled();
         });

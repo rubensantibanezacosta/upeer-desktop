@@ -40,6 +40,7 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
         chunksTransferred = 0,
         totalChunks = 0
     } = transfer;
+    const phase = transfer.phase;
 
     const formatFileSize = (bytes?: number): string => {
         const num = bytes || 0;
@@ -56,7 +57,6 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
             case 'failed': return 'danger';
             case 'cancelled': return 'neutral';
             case 'active': {
-                const phase = (transfer as any).phase;
                 if (phase === 3) return 'warning'; // Replicating
                 if (phase === 4) return 'primary'; // Vaulted
                 return 'primary';
@@ -75,7 +75,6 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
             case 'cancelled':
                 return <CloseIcon sx={{ color: 'neutral.500', fontSize: '1.2rem' }} />;
             case 'active': {
-                const phase = (transfer as any).phase;
                 if (phase === 3) return <CloudUploadIcon sx={{ color: 'warning.500', fontSize: '1.2rem', animation: 'pulse 1s infinite' }} />;
                 if (phase === 4) return <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
                 return direction === 'sending'
@@ -91,7 +90,6 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
 
     const getStatusText = () => {
         // Support for new social mesh phases (numeric values from TransferPhase enum)
-        const phase = (transfer as any).phase;
         if (phase === 3 || phase === 4) {
             return direction === 'sending' ? 'Enviando...' : 'Recibiendo...';
         }

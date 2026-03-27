@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb, getSchema, eq } from '../shared.js';
 import { SurvivalKitData as PulseSyncData } from './types.js';
 import { error } from '../../security/secure-logger.js';
+import type { RenewalToken } from '../../network/types.js';
 
 /**
  * PulseSync (antes Survival Kit)
@@ -11,20 +12,20 @@ import { error } from '../../security/secure-logger.js';
 export function createPulseSync(name: string, description?: string): string {
     const db = getDb();
     const schema = getSchema();
-    
+
     const kitId = crypto.randomUUID();
     const now = Date.now();
     const expires = now + (60 * 24 * 60 * 60 * 1000); // 60 days
-    
+
     // Get all active contacts with location blocks
     const allContacts = db.select().from(schema.contacts).all();
-    const activeContacts = allContacts.filter(c => 
-        c.status === 'connected' && 
-        c.dhtSignature && 
-        c.dhtExpiresAt && 
+    const activeContacts = allContacts.filter(c =>
+        c.status === 'connected' &&
+        c.dhtSignature &&
+        c.dhtExpiresAt &&
         c.dhtExpiresAt > now
     );
-    
+
     // Get top contacts
     const topContacts = activeContacts
         .sort((a, b) => {
@@ -45,9 +46,9 @@ export function createPulseSync(name: string, description?: string): string {
             },
             lastSeen: c.lastSeen ? new Date(c.lastSeen).getTime() : now
         }));
-    
-    const renewalTokens: Array<{ targetId: string, token: any }> = [];
-    
+
+    const renewalTokens: Array<{ targetId: string; token: RenewalToken }> = [];
+
     const pulseData: PulseSyncData = {
         version: '1.0',
         myUpeerId: '', // Will be filled by caller
@@ -56,7 +57,7 @@ export function createPulseSync(name: string, description?: string): string {
         contacts: topContacts,
         renewalTokens
     };
-    
+
     db.insert(schema.backupPulseSync).values({
         kitId,
         name,
@@ -65,21 +66,21 @@ export function createPulseSync(name: string, description?: string): string {
         expires,
         isActive: true
     }).run();
-    
+
     return kitId;
 }
 
 export function getPulseSync(pulseId: string): PulseSyncData | null {
     const db = getDb();
     const schema = getSchema();
-    
+
     const result = db.select()
         .from(schema.backupPulseSync)
         .where(eq(schema.backupPulseSync.kitId, pulseId))
         .get();
-    
+
     if (!result) return null;
-    
+
     try {
         return JSON.parse(result.data);
     } catch (err) {

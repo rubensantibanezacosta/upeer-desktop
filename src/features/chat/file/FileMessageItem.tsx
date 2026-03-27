@@ -16,6 +16,7 @@ export interface FileMessageData {
     direction?: 'sending' | 'receiving';
     progress?: number;
     tempPath?: string;
+    filePath?: string;
     savedPath?: string;
     timestamp?: string;
     isVaulting?: boolean;
@@ -55,7 +56,7 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     const isTransferInProgress = transferState === 'pending' || transferState === 'active';
     const isTransferFailed = transferState === 'failed';
 
-    const fullPath = data.savedPath || (direction === 'sending' ? (data as any).filePath : undefined);
+    const fullPath = data.savedPath || (direction === 'sending' ? data.filePath : undefined);
 
     // Improved safeProgress logic: default to 0 during transfer, 100 when done
     const safeProgress = progress != null && !isNaN(progress)

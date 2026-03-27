@@ -162,8 +162,7 @@ describe('Security Validation - Comprehensive Tests', () => {
             const valid = { key: 'a'.repeat(40), value: { data: 'val' } };
             expect(validateDhtStore(valid).valid).toBe(true);
 
-            // Error path (try-catch) - JSON stringify failure (circular reference)
-            const circular: any = {};
+            const circular: { self?: unknown } = {};
             circular.self = circular;
             expect(validateDhtStore({ ...valid, value: circular }).valid).toBe(false);
 

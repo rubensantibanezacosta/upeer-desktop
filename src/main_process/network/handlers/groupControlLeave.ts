@@ -4,12 +4,13 @@ import { deleteGroup, getGroupById, updateGroupMembers } from '../../storage/gro
 import { deleteMessagesByChatId, saveMessage } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getMyPublicKeyHex, getMyUPeerId, verify } from '../../security/identity.js';
+import { GroupControlPacket } from './groupControlShared.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 
 export async function handleGroupLeave(
     upeerId: string,
-    data: any,
+    data: GroupControlPacket,
     win: BrowserWindow | null
 ): Promise<void> {
     const { groupId, signature: leaveSig, ...leaveData } = data;

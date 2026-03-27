@@ -6,55 +6,58 @@ import { IncomingRequestChat } from '../../features/chat/IncomingRequestChat.js'
 import { TopHeader } from './TopHeader.js';
 import { InputArea } from '../../features/chat/input/InputArea.js';
 import type { LinkPreview } from '../../types/chat.js';
+import type { ChatMessage, PendingFile } from '../../types/chat.js';
+import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { NavigationRail } from './NavigationRail.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
 import { MainLayoutPanels } from './MainLayoutPanels.js';
+import type { MainLayoutProps, PreviewableMedia } from './MainLayout.js';
 
 interface MainLayoutContentProps {
-    navigation: any;
-    appStore: any;
-    chatStore: any;
+    navigation: MainLayoutProps['navigation'];
+    appStore: MainLayoutProps['appStore'];
+    chatStore: MainLayoutProps['chatStore'];
     isDragging: boolean;
     handleDragOver: (e: React.DragEvent) => void;
     handleDragLeave: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
-    activeContact: any;
-    activeGroup: any;
+    activeContact: MainLayoutProps['activeContact'];
+    activeGroup: MainLayoutProps['activeGroup'];
     isIncomingRequest: boolean;
     targetUpeerId: string;
     activeGroupId: string;
     message: string;
     setMessage: (val: string) => void;
-    handleSend: (linkPreview?: LinkPreview | null) => void;
-    handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void;
-    handleAttachFile: (type: any) => void;
+    handleSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
+    handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
+    handleAttachFile: MainLayoutProps['handleAttachFile'];
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
-    currentReplyToMessage: any;
-    setReplyToMessage: (id: string, msg: any) => void;
-    handleAcceptContact: (id: string) => void;
+    currentReplyToMessage: ChatMessage | null;
+    setReplyToMessage: (id: string, msg: ChatMessage | null) => void;
+    handleAcceptContact: () => void;
     handleDeleteContact: (id: string) => void;
     handleToggleFavorite: (id: string) => Promise<void>;
     handleClearChat: (id: string) => void;
     handleBlockContact: () => void;
-    handleReaction: (id: string, emoji: string, isGroup: boolean) => void;
+    handleReaction: (id: string, emoji: string, remove: boolean) => void;
     handleUpdateMessage: (id: string, msg: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (id: string) => void;
-    handleMediaClick: (media: any) => void;
-    setForwardingMsg: (message: any) => void;
+    handleMediaClick: (media: PreviewableMedia) => void;
+    setForwardingMsg: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
     onLockSession: () => void;
     isFilePickerOpen: boolean;
     isPreparingAttachments: boolean;
     setFilePickerOpen: (open: boolean) => void;
-    pendingFiles: any[];
-    setPendingFiles: (files: any[]) => void;
-    handleFileSubmit: (files: any[], thumbnails?: any[], captions?: any[]) => void;
+    pendingFiles: PendingFile[];
+    setPendingFiles: (files: PendingFile[]) => void;
+    handleFileSubmit: (files: PendingFile[], thumbnails?: (string | undefined)[], captions?: string[]) => void | Promise<void>;
     handleSendVoiceNote: (file: File) => Promise<void>;
-    fileTransfer: any;
-    editingMessage: any;
-    setEditingMessage: (msg: any) => void;
+    fileTransfer: MainLayoutProps['fileTransfer'];
+    editingMessage: ChatMessage | null;
+    setEditingMessage: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
     setIsContactInfoOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isContactInfoOpen: boolean;
     setIsInviteGroupMembersOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -116,7 +119,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
         <Box sx={{ display: 'flex', flexGrow: 1, minWidth: 0, width: '100%', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
             <DragOverlay isDragging={isDragging} />
             <NavigationRail
-                myIp={appStore.networkAddress}
+                myIp={chatStore.networkAddress}
                 myAvatar={chatStore.myIdentity?.avatar}
                 myInitial={(chatStore.myIdentity?.alias || chatStore.myIdentity?.upeerId || '?').charAt(0).toUpperCase()}
                 activeView={navigation.appView}
@@ -195,21 +198,21 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     key={activeGroupId || targetUpeerId}
                                                     chatHistory={activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory}
                                                     isGroup={!!activeGroupId}
-                                                    myIp={appStore.networkAddress || ''}
-                                                    contacts={chatStore.contacts.map((contact: any) => ({ address: contact.address, name: contact.name, upeerId: contact.upeerId }))}
-                                                    onReply={(msg: any) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
+                                                    myIp={chatStore.networkAddress || ''}
+                                                    contacts={chatStore.contacts.map((contact) => ({ address: contact.address, name: contact.name, upeerId: contact.upeerId }))}
+                                                    onReply={(msg: ChatMessage) => setReplyToMessage(activeGroupId || targetUpeerId, msg)}
                                                     onReact={handleReaction}
-                                                    onEdit={(msg: any) => {
+                                                    onEdit={(msg: ChatMessage) => {
                                                         setEditingMessage(msg);
                                                         setMessage(getEditableMessageText(msg.message));
                                                     }}
                                                     onDelete={handleDeleteMessage}
-                                                    onForward={(msg: any) => setForwardingMsg(msg)}
+                                                    onForward={(msg: ChatMessage) => setForwardingMsg(msg)}
                                                     onRetryMessage={(msgId: string) => { void chatStore.handleRetryMessage(msgId); }}
                                                     onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
                                                     onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
                                                     onMediaClick={handleMediaClick}
-                                                    activeTransfers={fileTransfer.allTransfers.filter((transfer: any) => activeGroupId ? transfer.chatUpeerId === activeGroupId : transfer.upeerId === targetUpeerId)}
+                                                    activeTransfers={fileTransfer.allTransfers.filter((transfer: FileTransfer) => activeGroupId ? transfer.chatUpeerId === activeGroupId : transfer.upeerId === targetUpeerId)}
                                                     onTransferStateChange={chatStore.updateFileTransferMessage}
                                                 />
                                             </Box>
@@ -244,7 +247,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     onDragOver={handleDragOver}
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={handleDrop}
-                                                    onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setPreparingAttachments(false); navigation.setIsDragging(false); }}
+                                                    onClose={() => { setPendingFiles([]); setFilePickerOpen(false); navigation.setPreparingAttachments(false); chatStore.setIsDragging(false); }}
                                                     onSend={handleFileSubmit}
                                                     onAddMore={() => handleAttachFile('any')}
                                                     onRemove={(index: number) => {
@@ -265,7 +268,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                     <ContactInfoPanel
                                         contact={activeContact}
                                         chatHistory={chatStore.chatHistory}
-                                        activeTransfers={fileTransfer.allTransfers.filter((transfer: any) => transfer.upeerId === targetUpeerId)}
+                                        activeTransfers={fileTransfer.allTransfers.filter((transfer: FileTransfer) => transfer.upeerId === targetUpeerId)}
                                         onClose={() => setIsContactInfoOpen(false)}
                                         onShare={() => navigation.setShareModalOpen(true)}
                                         onFavorite={() => handleToggleFavorite(targetUpeerId)}

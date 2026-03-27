@@ -14,7 +14,7 @@ interface MessageReactionsProps {
 }
 
 export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, isMe, onRemoveReact }) => {
-    const myUpeerId = useChatStore((state: any) => state.myIdentity?.upeerId);
+    const myUpeerId = useChatStore((state) => state.myIdentity?.upeerId);
 
     if (!reactions || reactions.length === 0) return null;
 

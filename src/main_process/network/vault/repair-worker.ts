@@ -7,6 +7,12 @@ import {
     repairVaultAsset,
 } from './repairWorkerRepair.js';
 
+type DistributedShard = {
+    shardIndex: number;
+    data: string;
+    segmentIndex?: number | null;
+};
+
 /**
  * RepairWorker ensures the long-term health of distributed files.
  * It uses "Lazy Sync" to avoid unnecessary network traffic.
@@ -71,7 +77,7 @@ export class RepairWorker {
     /**
      * Reconstructs original file segment from shards.
      */
-    private static async reconstructSegment(fileHash: string, segIdx: number, shards: any[]): Promise<void> {
+    private static async reconstructSegment(fileHash: string, segIdx: number, shards: DistributedShard[]): Promise<void> {
         await reconstructVaultSegment(fileHash, segIdx, shards, (assetHash, segmentIndex, segmentData) => this.redistributeSegmentShards(assetHash, segmentIndex, segmentData));
     }
 

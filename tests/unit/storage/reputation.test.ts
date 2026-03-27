@@ -9,6 +9,11 @@ import {
 } from '../../../src/main_process/storage/reputation/operations.js';
 import { getDb, getSchema } from '../../../src/main_process/storage/shared.js';
 
+type MockDb = {
+    insert: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+};
+
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(() => ({
@@ -23,14 +28,14 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
             receivedAt: 'receivedAt'
         }
     })),
-    eq: (a: any, b: any) => ({ type: 'eq', a, b }),
-    and: (...args: any[]) => ({ type: 'and', args }),
-    gte: (a: any, b: any) => ({ type: 'gte', a, b }),
-    inArray: (a: any, b: any) => ({ type: 'inArray', a, b }),
+    eq: (a: unknown, b: unknown) => ({ type: 'eq', a, b }),
+    and: (...args: unknown[]) => ({ type: 'and', args }),
+    gte: (a: unknown, b: unknown) => ({ type: 'gte', a, b }),
+    inArray: (a: unknown, b: unknown) => ({ type: 'inArray', a, b }),
 }));
 
 describe('Storage - Reputation Operations', () => {
-    const mockDb = {
+    const mockDb: MockDb = {
         insert: vi.fn(),
         select: vi.fn(),
     };
@@ -48,7 +53,7 @@ describe('Storage - Reputation Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (getDb as any).mockReturnValue(mockDb);
+        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
     });
 
     it('should insert a vouch', () => {

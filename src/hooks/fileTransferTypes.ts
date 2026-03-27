@@ -26,6 +26,8 @@ export interface FileTransfer {
     lastActivity: number;
     tempPath?: string;
     filePath?: string;
+    savedPath?: string;
+    isVoiceNote?: boolean;
 }
 
 export interface TransferProgress {

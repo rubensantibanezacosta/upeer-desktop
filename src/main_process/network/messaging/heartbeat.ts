@@ -7,16 +7,50 @@ import {
 } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
-import { getNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
+import { getDhtNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
 import { sendContactRequest } from './contacts.js';
 
+type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
+
+type HeartbeatContact = {
+    upeerId: string;
+    status: ContactStatus;
+    address?: string;
+    knownAddresses?: string | string[] | null;
+    publicKey?: string;
+    dhtSignature?: string | null;
+    dhtExpiresAt?: number | null;
+    dhtSeq?: number | null;
+    renewalToken?: string | null;
+    lastSeen?: string | Date | null;
+};
+
+type HeartbeatPeer = {
+    upeerId: string;
+    publicKey: string;
+    address: string;
+    lastSeen: number;
+};
+
+type RenewableBlock = {
+    upeerId: string;
+    publicKey: string;
+    locationBlock: {
+        address: string;
+        dhtSeq: number;
+        signature: string;
+        expiresAt?: number;
+        renewalToken?: unknown;
+    };
+};
+
 /**
  * Helper to get all verified addresses for a contact (primary + known)
  */
-function getFanOutAddresses(contact: any): string[] {
+function getFanOutAddresses(contact: HeartbeatContact): string[] {
     const addresses = new Set<string>();
     if (contact.address && isYggdrasilAddress(contact.address)) addresses.add(contact.address);
     if (contact.knownAddresses) {
@@ -34,7 +68,7 @@ function getFanOutAddresses(contact: any): string[] {
     return Array.from(addresses);
 }
 
-export function checkHeartbeat(contacts: any[]) {
+export function checkHeartbeat(contacts: HeartbeatContact[]) {
     for (const contact of contacts) {
         if (contact.status === 'pending' && contact.address && isYggdrasilAddress(contact.address) && !isIPBlocked(contact.address)) {
             sendContactRequest(contact.address).catch(err => {
@@ -67,7 +101,7 @@ export function checkHeartbeat(contacts: any[]) {
 // Distributed Heartbeat Protocol for Extreme Resilience
 // ========================
 
-export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
+export async function distributedHeartbeat(contact: HeartbeatContact, sendSecureUDPMessage: (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void) {
     // 1. Exchange location blocks
     await exchangeLocationBlocks(contact, sendSecureUDPMessage);
 
@@ -86,8 +120,8 @@ export async function distributedHeartbeat(contact: any, sendSecureUDPMessage: (
 }
 
 async function exchangeReputationGossip(
-    contact: any,
-    send: (ip: string, data: any, pubKey?: string, internal?: boolean) => void,
+    contact: HeartbeatContact,
+    send: (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void,
 ): Promise<void> {
     try {
         const { getGossipIds } = await import('../../security/reputation/vouches.js');
@@ -102,15 +136,13 @@ async function exchangeReputationGossip(
     }
 }
 
-async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
-    // Send our current location blocks for all available channels
-    const currentAddresses = getNetworkAddresses();
+async function exchangeLocationBlocks(contact: HeartbeatContact, sendSecureUDPMessage: (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void) {
+    const currentAddresses = getDhtNetworkAddresses();
     if (currentAddresses.length === 0) return;
 
     const currentSeq = getMyDhtSeq();
     const deviceMeta = getDeviceMetadata();
 
-    // generateSignedLocationBlock now accepts string[] and handles plural 'addresses'
     const locBlock = generateSignedLocationBlock(currentAddresses, currentSeq, undefined, undefined, deviceMeta);
 
     const addresses = getFanOutAddresses(contact);
@@ -122,12 +154,8 @@ async function exchangeLocationBlocks(contact: any, sendSecureUDPMessage: (ip: s
     }
 }
 
-function getContactsSeenLast24h(): Array<{
-    upeerId: string;
-    lastSeen: number;
-    address: string;
-}> {
-    const allContacts = getContacts() as any[];
+function getContactsSeenLast24h(): HeartbeatPeer[] {
+    const allContacts = getContacts() as HeartbeatContact[];
     const cutoff = Date.now() - (24 * 60 * 60 * 1000);
 
     return allContacts
@@ -139,12 +167,12 @@ function getContactsSeenLast24h(): Array<{
         .map(c => ({
             upeerId: c.upeerId,
             lastSeen: new Date(c.lastSeen).getTime(),
-            address: c.address,
-            publicKey: c.publicKey // Ensure publicKey is passed
+            address: c.address || '',
+            publicKey: c.publicKey || ''
         }));
 }
 
-async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
+async function sendContactList(contact: HeartbeatContact, aliveContacts: HeartbeatPeer[], sendSecureUDPMessage: (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void) {
     if (aliveContacts.length === 0) return;
 
     const packet = {
@@ -165,11 +193,8 @@ async function sendContactList(contact: any, aliveContacts: any[], sendSecureUDP
     }
 }
 
-function getLocationBlocksForRenewal(): Array<{
-    upeerId: string;
-    locationBlock: any;
-}> {
-    const allContacts = getContacts() as any[];
+function getLocationBlocksForRenewal(): RenewableBlock[] {
+    const allContacts = getContacts() as HeartbeatContact[];
     const now = Date.now();
     const renewalThreshold = 3 * 24 * 60 * 60 * 1000; // 3 days
 
@@ -182,16 +207,12 @@ function getLocationBlocksForRenewal(): Array<{
         })
         .map(c => ({
             upeerId: c.upeerId,
-            // BUG AY fix: publicKey es obligatoria en validateDhtExchange — sin ella
-            // el receptor rechaza el paquete y shareBlocks no servía de nada.
-            publicKey: c.publicKey,
+            publicKey: c.publicKey || '',
             locationBlock: {
-                address: c.address,
-                dhtSeq: c.dhtSeq,
+                address: c.address || '',
+                dhtSeq: c.dhtSeq || 0,
                 signature: c.dhtSignature,
                 expiresAt: c.dhtExpiresAt,
-                // BUG CI fix: incluir renewalToken para que el receptor pueda auto-renovar
-                // el bloque cuando expira. Sin el token, la propagación era inefectiva.
                 renewalToken: c.renewalToken
                     ? (() => { try { return JSON.parse(c.renewalToken); } catch { return undefined; } })()
                     : undefined
@@ -199,7 +220,7 @@ function getLocationBlocksForRenewal(): Array<{
         }));
 }
 
-async function shareBlocks(contact: any, blocksToShare: any[], sendSecureUDPMessage: (ip: string, data: any, pubKey?: string, internal?: boolean) => void) {
+async function shareBlocks(contact: HeartbeatContact, blocksToShare: RenewableBlock[], sendSecureUDPMessage: (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void) {
     if (blocksToShare.length === 0) return;
 
     // Share blocks that need renewal

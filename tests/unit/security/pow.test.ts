@@ -23,7 +23,6 @@ describe('Adaptive Proof-of-Work (PoW) - Unit Tests', () => {
         });
 
         it('should reject an expired proof', () => {
-            // Un proof de hace 10 minutos (límite 5 min)
             const oldTimestamp = Math.floor(Date.now() / 1000) - 600;
             const proof = JSON.stringify({ s: 'a'.repeat(sodium.crypto_pwhash_SALTBYTES * 2), t: oldTimestamp });
 
@@ -32,7 +31,7 @@ describe('Adaptive Proof-of-Work (PoW) - Unit Tests', () => {
         });
 
         it('should reject malformed JSON proof', () => {
-            const malformed = '{"s": "invalid"}'; // falta campo 't' o formato incorrecto
+            const malformed = '{"s": "invalid"}';
             expect(AdaptivePow.verifyLightProof(malformed, testUpeerId)).toBe(false);
 
             const notJson = '{not-json';
@@ -42,7 +41,6 @@ describe('Adaptive Proof-of-Work (PoW) - Unit Tests', () => {
 
     describe('SHA-256 PoW (Legacy Format)', () => {
         it('should verify a valid legacy SHA-256 proof', () => {
-            // Encontrar un nonce manual para el test (primer caracter del hash SHA256 sea '0')
             let nonceValue = 0;
             let foundValid = false;
             while (!foundValid && nonceValue < 1000) {
@@ -59,15 +57,13 @@ describe('Adaptive Proof-of-Work (PoW) - Unit Tests', () => {
         });
 
         it('should reject invalid legacy proof', () => {
-            // Muy difícil que 'invalid-nonce' justo produzca un hash que empiece por '0'
             const result = AdaptivePow.verifyLightProof('not-a-valid-nonce-ever-123', testUpeerId);
-            // Si por casualidad diera '0' (1/16 prob), este test fallaría, pero es improbable
             expect(result).toBe(false);
         });
     });
 
     it('should return false for empty or non-string proofs', () => {
         expect(AdaptivePow.verifyLightProof('', testUpeerId)).toBe(false);
-        expect(AdaptivePow.verifyLightProof(null as any, testUpeerId)).toBe(false);
+        expect(AdaptivePow.verifyLightProof(null as unknown as string, testUpeerId)).toBe(false);
     });
 });

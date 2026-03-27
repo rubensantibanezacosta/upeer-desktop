@@ -1,18 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+import type { Contact } from '../../../src/types/chat.js';
 
-// COMPLETELY MOCK AWAY @mui/icons-material so it never gets loaded
 vi.mock('@mui/icons-material', () => ({}));
 vi.mock('@mui/icons-material/esm/utils/createSvgIcon.js', () => ({
     default: () => null
 }));
-// También mockear la subruta que lanza el error si se accede directamente
+type CallbackFunction = (...args: unknown[]) => unknown;
+
 vi.mock('@mui/material/utils', () => ({
     createSvgIcon: () => null,
     capitalize: (s: string) => s,
-    useIsomorphicLayoutEffect: (f: any) => f(),
-    debounce: (f: any) => f,
+    useIsomorphicLayoutEffect: (callback: CallbackFunction) => callback(),
+    debounce: (callback: CallbackFunction) => callback,
 }));
 
 vi.mock('@mui/icons-material/HourglassEmpty', () => ({ default: () => <div data-testid="HourglassEmptyIcon" /> }));
@@ -38,21 +39,22 @@ vi.mock('@mui/icons-material/NewReleases', () => ({ default: () => <div data-tes
 import { ContactItem } from '../../../src/components/layout/ContactItem.js';
 
 describe('ContactItem Component', () => {
-    const mockContact = {
+    const mockContact: Contact = {
         upeerId: 'c1',
+        address: 'addr-1',
         name: 'Alice',
         status: 'connected',
+        publicKey: 'pk-1',
         lastMessage: 'Hello!',
         lastMessageTime: new Date().toISOString(),
-        unreadCount: 2,
         vouchScore: 85,
-    } as any;
+    };
 
     const defaultProps = {
         contact: mockContact,
         isSelected: false,
         onSelect: vi.fn(),
-        onDelete: vi.fn(),
+        onToggleFavorite: vi.fn(),
         onClear: vi.fn(),
         isTyping: false,
     };
@@ -93,10 +95,10 @@ describe('ContactItem Component', () => {
     });
 
     it('shows online indicator when lastSeen is recent', () => {
-        const onlineContact = {
+        const onlineContact: Contact = {
             ...mockContact,
             lastSeen: new Date().toISOString()
-        } as any;
+        };
         render(<ContactItem {...defaultProps} contact={onlineContact} />);
         expect(screen.getByTestId('VerifiedUserIcon')).toBeDefined();
     });

@@ -4,6 +4,27 @@ import { RoutingTable } from '../../../src/main_process/network/dht/kademlia/rou
 import { ValueStore } from '../../../src/main_process/network/dht/kademlia/store.js';
 import { BootstrapManager } from '../../../src/main_process/network/dht/kademlia/bootstrap.js';
 import { ProtocolHandler } from '../../../src/main_process/network/dht/kademlia/protocol.js';
+import { toKademliaId, type KademliaContact, type StoredValue } from '../../../src/main_process/network/dht/kademlia/types.js';
+
+function createContact(upeerId: string, address = 'addr', publicKey = 'pk'): KademliaContact {
+    return {
+        upeerId,
+        nodeId: toKademliaId(upeerId),
+        address,
+        publicKey,
+        lastSeen: Date.now(),
+    };
+}
+
+function createStoredValue(value: unknown): StoredValue {
+    return {
+        key: Buffer.from('key'),
+        value,
+        publisher: 'pub',
+        timestamp: Date.now(),
+        signature: 'sig',
+    };
+}
 
 // Mocks
 vi.mock('../../../src/main_process/network/dht/kademlia/routing.js');
@@ -23,13 +44,12 @@ describe('KademliaDHT Unit Tests', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
-        // Setup default behaviors for mocks
         vi.mocked(BootstrapManager.prototype.bootstrapFromContacts).mockReturnValue(5);
         vi.mocked(BootstrapManager.prototype.isBootstrapped).mockReturnValue(true);
         vi.mocked(BootstrapManager.prototype.getContactCount).mockReturnValue(5);
-        vi.mocked(BootstrapManager.prototype.getStats).mockReturnValue({} as any);
+        vi.mocked(BootstrapManager.prototype.getStats).mockReturnValue({ bootstrapAttempts: 0, bootstrapSuccesses: 0 });
 
-        vi.mocked(ProtocolHandler.prototype.getStats).mockReturnValue({} as any);
+        vi.mocked(ProtocolHandler.prototype.getStats).mockReturnValue({ messagesReceived: 0, messagesSent: 0 });
         vi.mocked(RoutingTable.prototype.getBucketCount).mockReturnValue(10);
         vi.mocked(ValueStore.prototype.size).mockReturnValue(0);
 
@@ -60,7 +80,7 @@ describe('KademliaDHT Unit Tests', () => {
     });
 
     it('should add contact and update bootstrap status', () => {
-        const contact = { upeerId: upeerId, address: 'addr' } as any;
+        const contact = createContact(upeerId);
         dht.addContact(contact);
         expect(RoutingTable.prototype.addContact).toHaveBeenCalledWith(contact);
         expect(BootstrapManager.prototype.updateBootstrapStatus).toHaveBeenCalled();
@@ -73,13 +93,13 @@ describe('KademliaDHT Unit Tests', () => {
     });
 
     it('should find contact', () => {
-        const contact = { upeerId: upeerId } as any;
+        const contact = createContact(upeerId);
         vi.mocked(RoutingTable.prototype.findContact).mockReturnValue(contact);
         expect(dht.findContact(upeerId)).toBe(contact);
     });
 
     it('should find closest contacts', () => {
-        const contacts = [{ upeerId: 'c1' }] as any;
+        const contacts = [createContact('c1')];
         vi.mocked(RoutingTable.prototype.findClosestContacts).mockReturnValue(contacts);
         expect(dht.findClosestContacts(upeerId, 10)).toBe(contacts);
         expect(RoutingTable.prototype.findClosestContacts).toHaveBeenCalledWith(upeerId, 10);
@@ -97,9 +117,10 @@ describe('KademliaDHT Unit Tests', () => {
 
     it('should find value via protocol handler', async () => {
         const key = Buffer.from('key');
-        vi.mocked(ProtocolHandler.prototype.findValue).mockResolvedValue('result' as any);
+        const expected = createStoredValue('result');
+        vi.mocked(ProtocolHandler.prototype.findValue).mockResolvedValue(expected);
         const res = await dht.findValue(key);
-        expect(res).toBe('result');
+        expect(res).toEqual(expected);
         expect(ProtocolHandler.prototype.findValue).toHaveBeenCalledWith(key);
 
         const stats = dht.getStats();
@@ -111,7 +132,7 @@ describe('KademliaDHT Unit Tests', () => {
         await dht.storeLocationBlock(upeerId, loc);
         expect(ProtocolHandler.prototype.storeValue).toHaveBeenCalled();
 
-        vi.mocked(ProtocolHandler.prototype.findValue).mockResolvedValue({ value: 'found-data' } as any);
+        vi.mocked(ProtocolHandler.prototype.findValue).mockResolvedValue(createStoredValue('found-data'));
         const found = await dht.findLocationBlock(upeerId);
         expect(found).toBe('found-data');
     });
@@ -154,13 +175,15 @@ describe('KademliaDHT Unit Tests', () => {
     });
 
     it('should collect stats from all components', () => {
-        vi.mocked(ProtocolHandler.prototype.getStats).mockReturnValue({ proto: 'stat' } as any);
-        vi.mocked(BootstrapManager.prototype.getStats).mockReturnValue({ boot: 'stat' } as any);
+        vi.mocked(ProtocolHandler.prototype.getStats).mockReturnValue({ messagesReceived: 1, messagesSent: 2 });
+        vi.mocked(BootstrapManager.prototype.getStats).mockReturnValue({ bootstrapAttempts: 3, bootstrapSuccesses: 4 });
 
         const stats = dht.getStats();
         expect(stats).toMatchObject({
-            proto: 'stat',
-            boot: 'stat',
+            messagesReceived: 1,
+            messagesSent: 2,
+            bootstrapAttempts: 3,
+            bootstrapSuccesses: 4,
             totalContacts: 5,
             totalBuckets: 10,
             storedValues: 0

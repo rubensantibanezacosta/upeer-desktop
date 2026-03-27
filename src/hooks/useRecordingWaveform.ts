@@ -4,6 +4,10 @@ const BAR_WIDTH = 3;
 const BAR_GAP = 2;
 const SAMPLE_INTERVAL_MS = 50;
 
+type RoundRectContext = CanvasRenderingContext2D & {
+    roundRect?: (x: number, y: number, width: number, height: number, radii?: number) => void;
+};
+
 export const useRecordingWaveform = (isRecording: boolean, stream: MediaStream | null) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -46,7 +50,7 @@ export const useRecordingWaveform = (isRecording: boolean, stream: MediaStream |
                 if (history.length > maxBars) history.shift();
             }
 
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d') as RoundRectContext | null;
             if (!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -61,8 +65,8 @@ export const useRecordingWaveform = (isRecording: boolean, stream: MediaStream |
                 const alpha = 0.35 + amplitude * 0.65;
                 ctx.fillStyle = `rgba(11, 107, 203, ${alpha.toFixed(2)})`;
                 ctx.beginPath();
-                if ((ctx as any).roundRect) {
-                    (ctx as any).roundRect(x, y, BAR_WIDTH, barHeight, 1.5);
+                if (ctx.roundRect) {
+                    ctx.roundRect(x, y, BAR_WIDTH, barHeight, 1.5);
                 } else {
                     ctx.rect(x, y, BAR_WIDTH, barHeight);
                 }

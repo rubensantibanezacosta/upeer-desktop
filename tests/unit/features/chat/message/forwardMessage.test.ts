@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { forwardMessageToTargets, parseForwardPayload } from '../../../../../src/features/chat/message/forwardMessage.js';
 
+type ForwardMessageUpeer = Pick<Window['upeer'], 'sendMessage' | 'sendGroupMessage' | 'persistInternalAsset' | 'startFileTransfer'>;
+type ForwardMessageWindow = Window & { upeer: ForwardMessageUpeer };
+const forwardWindow = window as ForwardMessageWindow;
+
 describe('forwardMessage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        (window as any).upeer = {
+        forwardWindow.upeer = {
             sendMessage: vi.fn(),
             sendGroupMessage: vi.fn(),
             persistInternalAsset: vi.fn(),
@@ -44,8 +48,8 @@ describe('forwardMessage', () => {
 
     it('forwards text messages to direct chats and groups preserving preview', async () => {
         const preview = { url: 'https://example.com', title: 'Example' };
-        (window as any).upeer.sendMessage.mockResolvedValue({ id: 'm1', savedMessage: 'hola', timestamp: 1 });
-        (window as any).upeer.sendGroupMessage.mockResolvedValue({ id: 'g1', savedMessage: 'hola', timestamp: 1 });
+        vi.mocked(forwardWindow.upeer.sendMessage).mockResolvedValue({ id: 'm1', savedMessage: 'hola', timestamp: 1 });
+        vi.mocked(forwardWindow.upeer.sendGroupMessage).mockResolvedValue({ id: 'g1', savedMessage: 'hola', timestamp: 1 });
 
         const result = await forwardMessageToTargets(
             JSON.stringify({ text: 'hola', linkPreview: preview }),
@@ -61,8 +65,8 @@ describe('forwardMessage', () => {
     });
 
     it('copies the local file and starts a fresh transfer for each target', async () => {
-        (window as any).upeer.persistInternalAsset.mockResolvedValue({ success: true, path: '/assets/copied.png' });
-        (window as any).upeer.startFileTransfer.mockResolvedValue({ success: true, fileId: 'file-1' });
+        vi.mocked(forwardWindow.upeer.persistInternalAsset).mockResolvedValue({ success: true, path: '/assets/copied.png' });
+        vi.mocked(forwardWindow.upeer.startFileTransfer).mockResolvedValue({ success: true, fileId: 'file-1' });
 
         const result = await forwardMessageToTargets(
             JSON.stringify({

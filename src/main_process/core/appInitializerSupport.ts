@@ -52,16 +52,20 @@ const buildMediaResponse = async (filePath: string, range: string | null) => {
     const chunksize = (end - start) + 1;
     const stream = fs.createReadStream(filePath, { start, end });
     const webStream = Readable.toWeb(stream);
+    const headers: Record<string, string> = {
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize.toString(),
+    };
+
+    if (responseStatus === 206) {
+        headers['Content-Range'] = `bytes ${start}-${end}/${stats.size}`;
+    }
 
     return new Response(webStream as unknown as ReadableStream, {
         status: responseStatus,
         statusText: responseStatus === 206 ? 'Partial Content' : 'OK',
-        headers: {
-            'Content-Type': contentType,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunksize.toString(),
-            'Content-Range': responseStatus === 206 ? `bytes ${start}-${end}/${stats.size}` : undefined as any,
-        }
+        headers
     });
 };
 

@@ -5,42 +5,33 @@ import { MessageItem } from './message/MessageItem.js';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
+import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
+import type { ChatMessage, Contact, TransferMessageUpdates } from '../../types/chat.js';
 import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
 
-interface ChatMessage {
-    id?: string;
-    upeerId: string;
-    isMine: boolean;
-    message: string;
-    status: string;
-    timestamp: string;
-    replyTo?: string;
-    isDeleted?: boolean;
-    isEdited?: boolean;
-    reactions?: Array<{ upeerId: string; emoji: string }>;
-    senderName?: string;
-    senderUpeerId?: string;
-    senderAvatar?: string;
-    isSystem?: boolean;
-    date: number;
+interface MediaClickPayload {
+    url: string;
+    name: string;
+    mimeType: string;
+    fileId: string;
 }
 
 interface ChatAreaProps {
     chatHistory: ChatMessage[];
     myIp: string;
-    contacts: { address: string, name: string, upeerId?: string }[];
+    contacts: Pick<Contact, 'address' | 'name' | 'upeerId'>[];
     onReply: (msg: ChatMessage) => void;
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
     onEdit: (msg: ChatMessage) => void;
     onDelete: (msgId: string) => void;
     onForward?: (msg: ChatMessage) => void;
-    activeTransfers?: any[];
+    activeTransfers?: FileTransfer[];
     onRetryMessage?: (msgId: string) => void;
     onRetryTransfer?: (fileId: string) => void;
     onCancelTransfer?: (fileId: string) => void;
-    onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
+    onMediaClick?: (media: MediaClickPayload) => void;
     isGroup?: boolean;
-    onTransferStateChange?: (fileId: string, updates: any) => void;
+    onTransferStateChange?: (fileId: string, updates: TransferMessageUpdates) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {

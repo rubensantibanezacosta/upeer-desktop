@@ -6,6 +6,10 @@ import { fileTransferManager } from '../../../src/main_process/network/file-tran
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as validation from '../../../src/main_process/security/validation.js';
 
+type VaultWindow = NonNullable<Parameters<typeof handleVaultDelivery>[2]>;
+type VaultSendResponse = Parameters<typeof handleVaultDelivery>[3];
+type VaultContact = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
+
 // Mocks
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
@@ -61,9 +65,11 @@ vi.mock('../../../src/main_process/network/handlers/groups.js', () => ({
 }));
 
 describe('Vault Delivery Handler', () => {
-    const mockSendResponse = vi.fn();
-    const mockWin = {} as any;
+    const mockSendResponse = vi.fn<VaultSendResponse>();
+    const mockWin = {} as unknown as VaultWindow;
     const custodianSid = 'custodian-id';
+    const publicContact = { publicKey: 'pub' } as NonNullable<VaultContact>;
+    const originContact = { publicKey: 'origin-pubkey' } as NonNullable<VaultContact>;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -80,11 +86,10 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex')
         });
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pubkey' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pubkey' } as NonNullable<VaultContact>);
 
         await handleVaultDelivery(custodianSid, { entries: manyEntries }, mockWin, mockSendResponse, '1.2.3.4');
 
-        // Solo debería procesar los primeros 50
         expect(contactsOps.getContactByUpeerId).toHaveBeenCalledTimes(50);
     });
 
@@ -95,13 +100,12 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
-        (identity.verify as any).mockReturnValue(false); // Simular fallo de firma
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(identity.verify).mockReturnValue(false);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
         expect(identity.verify).toHaveBeenCalled();
-        // No debería llamar a handleChatMessage si la firma falla
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
     });
@@ -113,9 +117,9 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'origin-pubkey' });
-        (identity.verify as any).mockReturnValue(true);
-        (validation.validateMessage as any).mockReturnValue({ valid: false, error: 'invalid-structure' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: false, error: 'invalid-structure' });
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -132,9 +136,9 @@ describe('Vault Delivery Handler', () => {
         };
 
         const mockContact = { upeerId: 'origin-id', publicKey: 'origin-pubkey' };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(mockContact);
-        (identity.verify as any).mockReturnValue(true);
-        (validation.validateMessage as any).mockReturnValue({ valid: true });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(mockContact as NonNullable<VaultContact>);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -157,9 +161,9 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
-        (identity.verify as any).mockReturnValue(true);
-        (validation.validateMessage as any).mockReturnValue({ valid: true });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -178,7 +182,7 @@ describe('Vault Delivery Handler', () => {
     it('should process CHAT_DELETE entries', async () => {
         const innerPacket = { type: 'CHAT_DELETE', msgId: 'uuid', signature: 'sig' };
         const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -189,7 +193,7 @@ describe('Vault Delivery Handler', () => {
     it('should process CHAT_REACTION entries', async () => {
         const innerPacket = { type: 'CHAT_REACTION', msgId: '12345678-1234-1234-1234-123456789012', emoji: '👍', remove: false, signature: 'sig' };
         const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -206,13 +210,12 @@ describe('Vault Delivery Handler', () => {
             { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(readPacket)).toString('hex') }
         ];
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: entries }, mockWin, mockSendResponse, '1.2.3.4');
 
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatAck).toHaveBeenCalledTimes(2);
-        // READ se convierte en ACK con status: 'read'
         expect(chatModule.handleChatAck).toHaveBeenLastCalledWith('origin-id', expect.objectContaining({ status: 'read' }), mockWin);
     });
 
@@ -226,7 +229,7 @@ describe('Vault Delivery Handler', () => {
             signature: 'sig'
         };
         const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -246,7 +249,7 @@ describe('Vault Delivery Handler', () => {
     it('should delegate FILE_ prefixed types to fileTransferManager', async () => {
         const innerPacket = { type: 'FILE_OFFER', fileHash: 'hash', signature: 'sig' };
         const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -266,7 +269,7 @@ describe('Vault Delivery Handler', () => {
             { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(leavePacket)).toString('hex') }
         ];
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: entries }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -283,9 +286,9 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify({ type: 'GROUP_LEAVE', groupId: 'g1', senderUpeerId: 'my-id', signature: 'sig' })).toString('hex')
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
-        (identity.verify as any).mockReturnValue(true);
-        (validation.validateMessage as any).mockReturnValue({ valid: true });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -305,7 +308,7 @@ describe('Vault Delivery Handler', () => {
             signature: null // No suele tener firma el outer entry si es raw shard (o se ignora)
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -329,7 +332,7 @@ describe('Vault Delivery Handler', () => {
             payloadHash: 'h1'
         };
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry], hasMore: true, nextOffset: 50 }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -345,18 +348,17 @@ describe('Vault Delivery Handler', () => {
             { senderSid: 'origin-id', data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'), payloadHash: 'h2' }
         ];
 
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries }, mockWin, mockSendResponse, '1.2.3.4');
 
-        // El segundo debería procesarse aunque el primero falle
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatMessage).toHaveBeenCalled();
     });
 
     it('should ignore unknown original sender', async () => {
         const entry = { senderSid: 'unknown-id', data: 'data' };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -365,11 +367,10 @@ describe('Vault Delivery Handler', () => {
 
     it('should handle non-JSON data gracefully', async () => {
         const entry = { senderSid: 'origin-id', data: Buffer.from('not-json').toString('hex'), payloadHash: 'h1' };
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
-        // No debería haber crash, simplemente se considera procesado (aunque sin innerPacket)
         expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
             type: 'VAULT_ACK',
             payloadHashes: ['h1']

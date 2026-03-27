@@ -7,9 +7,29 @@ import { debug } from '../../security/secure-logger.js';
  * Permite que un dispositivo informe a sus gemelos sobre cambios de estado (lecturas, borrados, ediciones).
  */
 
+type SyncAction = 'MESSAGE_READ' | 'MESSAGE_DELETE' | 'MESSAGE_EDIT';
+
+type SyncPulsePayload = {
+    deviceId?: string;
+    action?: SyncAction | string;
+    messageId?: string;
+    newContent?: string;
+};
+
+type BroadcastPulsePayload = Record<string, unknown>;
+
+type KademliaTwinNode = {
+    upeerId?: string;
+    address: string;
+};
+
+type KademliaContactLookup = {
+    findClosestContacts(targetId: string, count: number): KademliaTwinNode[];
+};
+
 export async function handleSyncPulse(
     senderUpeerId: string,
-    data: any,
+    data: SyncPulsePayload,
     win: BrowserWindow | null
 ) {
     const myId = getMyUPeerId();
@@ -52,14 +72,14 @@ export async function handleSyncPulse(
 /**
  * Difunde un pulso de sincronización a todos los dispositivos gemelos activos.
  */
-export async function broadcastPulse(action: string, payload: any) {
+export async function broadcastPulse(action: string, payload: BroadcastPulsePayload) {
     const myId = getMyUPeerId();
     const myDeviceId = getMyDeviceId();
     const { getKademliaInstance } = await import('../dht/shared.js');
     const { sendSecureUDPMessage } = await import('../server/transport.js');
     const { getYggstackAddress } = await import('../../sidecars/yggstack.js');
 
-    const kademlia = getKademliaInstance();
+    const kademlia = getKademliaInstance() as KademliaContactLookup | null;
     if (!kademlia) return;
 
     const myYgg = getYggstackAddress();

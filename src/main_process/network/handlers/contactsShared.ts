@@ -6,9 +6,25 @@ import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
 
 export const rateLimiter = new IdentityRateLimiter();
 
-export function verifyHandshakeRequestSignature(data: any, signature: string, senderUpeerId: string, senderYggAddress: string): boolean {
+type SignedPreKeyPayload = {
+    spkPub?: unknown;
+    spkSig?: unknown;
+    spkId?: unknown;
+};
+
+type HandshakePayload = {
+    publicKey: string;
+    type?: string;
+    signedPreKey?: SignedPreKeyPayload | unknown;
+    avatar?: unknown;
+    alias?: unknown;
+    contactCache?: unknown;
+    renewalToken?: unknown;
+};
+
+export function verifyHandshakeRequestSignature(data: HandshakePayload, signature: string, senderUpeerId: string, senderYggAddress: string): boolean {
     const fieldsToExclude = ['contactCache', 'renewalToken'];
-    const dataForVerification = { ...data };
+    const dataForVerification: Record<string, unknown> = { ...data };
     for (const field of fieldsToExclude) {
         if (field in dataForVerification) {
             delete dataForVerification[field];
@@ -31,8 +47,8 @@ export function verifyHandshakeRequestSignature(data: any, signature: string, se
     );
 }
 
-export function verifyHandshakeAcceptSignature(data: any, signature: string, senderUpeerId: string, senderYggAddress: string): boolean {
-    const acceptPayload = { ...data, senderUpeerId, senderYggAddress };
+export function verifyHandshakeAcceptSignature(data: HandshakePayload, signature: string, senderUpeerId: string, senderYggAddress: string): boolean {
+    const acceptPayload: Record<string, unknown> = { ...data, senderUpeerId, senderYggAddress };
     let isValidSignature = verify(
         Buffer.from(canonicalStringify(acceptPayload)),
         Buffer.from(signature, 'hex'),
@@ -40,7 +56,7 @@ export function verifyHandshakeAcceptSignature(data: any, signature: string, sen
     );
     if (isValidSignature) return true;
 
-    const legacyAcceptPayload = { ...data, senderUpeerId };
+    const legacyAcceptPayload: Record<string, unknown> = { ...data, senderUpeerId };
     isValidSignature = verify(
         Buffer.from(canonicalStringify(legacyAcceptPayload)),
         Buffer.from(signature, 'hex'),
@@ -55,7 +71,7 @@ export function verifyHandshakeAcceptSignature(data: any, signature: string, sen
     );
 }
 
-export function hasValidHandshakeIdentity(data: any, senderUpeerId: string, ip: string, type: string): boolean {
+export function hasValidHandshakeIdentity(data: HandshakePayload, senderUpeerId: string, ip: string, type: string): boolean {
     const derivedId = getUPeerIdFromPublicKey(Buffer.from(data.publicKey, 'hex'));
     if (derivedId === senderUpeerId) {
         return true;

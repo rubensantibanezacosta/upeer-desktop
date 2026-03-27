@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import crypto from 'node:crypto';
+import type { FileHandle } from 'node:fs/promises';
 import { debug, error } from '../../security/secure-logger.js';
 import { FileTransfer, TransferPhase, DEFAULT_CONFIG, TransferConfig } from './types.js';
 import { FileTransferStore } from './transfer-store.js';
@@ -12,7 +13,22 @@ import { ITransferManager } from './interfaces.js';
 import * as sender from './sender-logic.js';
 import * as receiver from './receiver-logic.js';
 
-async function readChunkFully(handle: any, length: number, position: number): Promise<Buffer> {
+type FileTransferPacket = {
+    type: string;
+    fileId?: string;
+    chunkIndex?: number;
+    chunkHash?: string;
+    data?: string;
+    iv?: string;
+    tag?: string;
+    reason?: string;
+    [key: string]: unknown;
+};
+
+type RetryTimer = ReturnType<typeof setTimeout>;
+type DoneRetryTimer = ReturnType<typeof setInterval>;
+
+async function readChunkFully(handle: FileHandle, length: number, position: number): Promise<Buffer> {
     const buffer = Buffer.alloc(length);
     let offset = 0;
 
@@ -36,12 +52,12 @@ export class TransferManager implements ITransferManager {
     public config: TransferConfig;
     public ui: UINotifier;
 
-    private sendFunction?: (address: string, data: any, publicKey?: string) => void;
-    private fileHandles = new Map<string, any>(); // fileId -> fs.FileHandle
+    private sendFunction?: (address: string, data: FileTransferPacket, publicKey?: string) => void;
+    private fileHandles = new Map<string, FileHandle>();
     public transferKeys = new Map<string, Buffer>(); // fileId -> AES key
-    private retryTimers = new Map<string, any>(); // fileId_chunkIndex -> timer
+    private retryTimers = new Map<string, RetryTimer>();
     private finalizingTransfers = new Set<string>(); // fileId_direction in-flight finalization guard
-    private donePendingTimers = new Map<string, any>(); // fileId -> interval for FILE_DONE retry
+    private donePendingTimers = new Map<string, DoneRetryTimer>();
     private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
     public transferLocks = new Map<string, Promise<void>>(); // fileId -> active lock promise
     private activeSendBatches = new Set<string>();
@@ -54,7 +70,7 @@ export class TransferManager implements ITransferManager {
         this.ui = new UINotifier(null);
     }
 
-    initialize(sendFunction: (address: string, data: any, publicKey?: string) => void, window: BrowserWindow) {
+    initialize(sendFunction: (address: string, data: FileTransferPacket, publicKey?: string) => void, window: BrowserWindow) {
         this.sendFunction = sendFunction;
         this.ui.setWindow(window);
     }
@@ -84,7 +100,7 @@ export class TransferManager implements ITransferManager {
 
     public findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving') {
         return this.store.getAllTransfers().filter((transfer) => {
-            const currentMessageId = (transfer as any).messageId || transfer.fileId;
+            const currentMessageId = transfer.messageId || transfer.fileId;
             if (currentMessageId !== messageId) return false;
             return direction ? transfer.direction === direction : true;
         }) as FileTransfer[];
@@ -111,43 +127,76 @@ export class TransferManager implements ITransferManager {
 
     // --- MESSAGE DISPATCHER ---
 
-    public async handleMessage(upeerId: string, address: string, data: any) {
+    public async handleMessage(upeerId: string, address: string, data: FileTransferPacket) {
         if (!data.type) return;
 
         switch (data.type) {
             case 'FILE_PROPOSAL':
             case 'FILE_START':
-                await this.handleFileProposal(upeerId, address, data);
+                if (typeof data.fileId !== 'string' || typeof data.fileName !== 'string') return;
+                await this.handleFileProposal(upeerId, address, {
+                    fileId: data.fileId,
+                    fileName: data.fileName,
+                    fileSize: typeof data.fileSize === 'number' ? data.fileSize : 1,
+                    mimeType: typeof data.mimeType === 'string' ? data.mimeType : 'application/octet-stream',
+                    totalChunks: typeof data.totalChunks === 'number' ? data.totalChunks : 1,
+                    chunkSize: typeof data.chunkSize === 'number' ? data.chunkSize : this.config.maxChunkSize,
+                    fileHash: typeof data.fileHash === 'string' ? data.fileHash : '0'.repeat(64),
+                    signature: typeof data.signature === 'string' ? data.signature : undefined,
+                    encryptedKey: typeof data.encryptedKey === 'string' ? data.encryptedKey : undefined,
+                    encryptedKeyNonce: typeof data.encryptedKeyNonce === 'string' ? data.encryptedKeyNonce : undefined,
+                    thumbnail: typeof data.thumbnail === 'string' || (typeof data.thumbnail === 'object' && data.thumbnail !== null)
+                        ? data.thumbnail as string | { data: string; iv: string; tag: string }
+                        : undefined,
+                    caption: typeof data.caption === 'string' ? data.caption : undefined,
+                    isVoiceNote: data.isVoiceNote === true,
+                    messageId: typeof data.messageId === 'string' ? data.messageId : undefined,
+                    chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
+                });
                 break;
             case 'FILE_ACCEPT':
-                await this.handleAccept(upeerId, address, data);
+                if (typeof data.fileId !== 'string') return;
+                await this.handleAccept(upeerId, address, { fileId: data.fileId, signature: typeof data.signature === 'string' ? data.signature : undefined });
                 break;
             case 'FILE_CHUNK':
-                await this.handleFileChunk(upeerId, address, data);
+                if (typeof data.fileId !== 'string' || typeof data.chunkIndex !== 'number' || typeof data.data !== 'string') return;
+                await this.handleFileChunk(upeerId, address, {
+                    fileId: data.fileId,
+                    chunkIndex: data.chunkIndex,
+                    data: data.data,
+                    chunkHash: typeof data.chunkHash === 'string' ? data.chunkHash : undefined,
+                    iv: typeof data.iv === 'string' ? data.iv : undefined,
+                    tag: typeof data.tag === 'string' ? data.tag : undefined,
+                });
                 break;
             case 'FILE_CHUNK_ACK':
             case 'FILE_ACK':
-                await this.handleAck(upeerId, address, data);
+                if (typeof data.fileId !== 'string' || typeof data.chunkIndex !== 'number') return;
+                await this.handleAck(upeerId, address, { fileId: data.fileId, chunkIndex: data.chunkIndex });
                 break;
             case 'FILE_DONE':
-                await this.handleFileDone(upeerId, address, data);
+                if (typeof data.fileId !== 'string') return;
+                await this.handleFileDone(upeerId, address, { fileId: data.fileId });
                 break;
             case 'FILE_DONE_ACK':
+                if (typeof data.fileId !== 'string') return;
                 await this.handleDoneAck(data.fileId);
                 break;
             case 'FILE_CANCEL':
             case 'FILE_END':
-                await this.handleFileCancel(upeerId, address, data);
+                if (typeof data.fileId !== 'string') return;
+                await this.handleFileCancel(upeerId, address, { fileId: data.fileId, reason: typeof data.reason === 'string' ? data.reason : undefined });
                 break;
             case 'FILE_HEARTBEAT':
-                this.handleHeartbeat(upeerId, address, data);
+                if (typeof data.fileId !== 'string') return;
+                this.handleHeartbeat(upeerId, address, { fileId: data.fileId, t: data.t });
                 break;
         }
     }
 
     // --- CORE SHARED LOGIC ---
 
-    public send(address: string, data: any, publicKey?: string) {
+    public send(address: string, data: FileTransferPacket, publicKey?: string) {
         if (this.sendFunction) {
             this.sendFunction(address, data, publicKey);
         } else {
@@ -159,7 +208,7 @@ export class TransferManager implements ITransferManager {
         return this.fileHandles.get(fileId);
     }
 
-    public setFileHandle(fileId: string, handle: any) {
+    public setFileHandle(fileId: string, handle: FileHandle) {
         this.fileHandles.set(fileId, handle);
     }
 
@@ -183,7 +232,7 @@ export class TransferManager implements ITransferManager {
             this.retryTimers.delete(key);
             const current = this.store.getTransfer(fileId, 'sending');
             if (current && current.state === 'active') {
-                const ackedChunks = (current as any)._ackedChunks as Set<number> | undefined;
+                const ackedChunks = current._ackedChunks;
                 if (!ackedChunks?.has(chunkIndex)) {
                     const currentWindow = Math.max(1, Math.floor(current.windowSize || this.config.initialWindowSize || 40));
                     const reducedSsthresh = Math.max(4, Math.floor(currentWindow / 2));
@@ -200,7 +249,7 @@ export class TransferManager implements ITransferManager {
                     if (Date.now() - lastSearch > 10000) {
                         this.dhtSearchTimestamps.set(current.upeerId, Date.now());
                         import('../dht/core.js').then(({ startDhtSearch }) => {
-                            startDhtSearch(current.upeerId, (ip: string, data: any) => this.send(ip, data));
+                            startDhtSearch(current.upeerId, (ip: string, data: FileTransferPacket) => this.send(ip, data));
                         });
                     }
                     this.resendSingleChunk(throttled, chunkIndex);
@@ -234,7 +283,7 @@ export class TransferManager implements ITransferManager {
             const fileOffset = chunkIndex * chunkSize;
             const finalBuffer = await readChunkFully(handle, chunkSize, fileOffset);
 
-            const chunkMsg: any = {
+            const chunkMsg: FileTransferPacket = {
                 type: 'FILE_CHUNK',
                 fileId: transfer.fileId,
                 chunkIndex,
@@ -387,7 +436,7 @@ export class TransferManager implements ITransferManager {
         await this.finalizeTransfer(fileId, 'sending');
     }
 
-    public startDoneRetry(fileId: string, upeerId: string, msg: any) {
+    public startDoneRetry(fileId: string, upeerId: string, msg: FileTransferPacket) {
         this.clearDoneRetry(fileId);
         const timer = setInterval(async () => {
             const transfer = this.store.getTransfer(fileId, 'sending');

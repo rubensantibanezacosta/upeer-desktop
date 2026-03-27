@@ -56,7 +56,7 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
           return {
             ...transfer,
             state: newState as FileTransfer['state'],
-            phase: progress.phase !== undefined ? progress.phase : (transfer as any).phase,
+            phase: progress.phase !== undefined ? progress.phase : transfer.phase,
             progress: progress.progress,
             bytesTransferred: progress.bytesTransferred,
             totalBytes: progress.totalBytes || transfer.fileSize,
@@ -173,3 +173,5 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
     loadTransfers
   };
 }
+
+export type FileTransferController = ReturnType<typeof useFileTransfer>;

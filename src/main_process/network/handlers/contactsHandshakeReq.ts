@@ -19,14 +19,53 @@ import {
     verifyHandshakeRequestSignature,
 } from './contactsShared.js';
 
+type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
+
+type ExistingContact = {
+    upeerId: string;
+    status?: ContactStatus;
+    publicKey?: string;
+    name?: string;
+};
+
+type HandshakeSignedPreKey = {
+    spkPub?: unknown;
+    spkSig?: unknown;
+    spkId?: unknown;
+};
+
+type HandshakeRequestPayload = {
+    publicKey?: string;
+    type?: string;
+    powProof?: unknown;
+    alias?: unknown;
+    avatar?: unknown;
+    ephemeralPublicKey?: unknown;
+    signedPreKey?: HandshakeSignedPreKey | unknown;
+    addresses?: string[];
+};
+
+type ContactListItem = {
+    upeerId?: string;
+    status?: ContactStatus | string;
+};
+
+type HandshakeSendResponse = (ip: string, data: Record<string, unknown>) => void;
+
+async function getContactsSafeList(): Promise<ContactListItem[]> {
+    const contactsModule = await import('../../storage/contacts/operations.js').catch(() => ({ getContacts: () => [] as ContactListItem[] }));
+    const contacts = contactsModule.getContacts();
+    return Array.isArray(contacts) ? contacts as ContactListItem[] : [];
+}
+
 export async function handleHandshakeReq(
-    data: any,
+    data: HandshakeRequestPayload,
     signature: string,
     senderUpeerId: string,
     senderYggAddress: string,
     rinfo: { address: string; port: number },
     win: BrowserWindow | null,
-    _sendResponse: (ip: string, data: any) => void,
+    _sendResponse: HandshakeSendResponse,
     _tcpSourceAddress: string
 ): Promise<void> {
     if (!signature || !senderUpeerId || !data.publicKey) {
@@ -34,12 +73,16 @@ export async function handleHandshakeReq(
         return;
     }
 
-    if (!verifyHandshakeRequestSignature(data, signature, senderUpeerId, senderYggAddress)) {
+    const publicKey = data.publicKey;
+    const packetType = typeof data.type === 'string' ? data.type : 'HANDSHAKE_REQ';
+    const verifiedData = { ...data, publicKey };
+
+    if (!verifyHandshakeRequestSignature(verifiedData, signature, senderUpeerId, senderYggAddress)) {
         security('Invalid HANDSHAKE_REQ signature', { ip: rinfo.address }, 'network');
         return;
     }
 
-    if (!hasValidHandshakeIdentity(data, senderUpeerId, rinfo.address, 'HANDSHAKE_REQ')) {
+    if (!hasValidHandshakeIdentity(verifiedData, senderUpeerId, rinfo.address, 'HANDSHAKE_REQ')) {
         return;
     }
 
@@ -50,18 +93,19 @@ export async function handleHandshakeReq(
         return;
     }
 
-    if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, data.type)) {
+    if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, packetType)) {
         return;
     }
 
-    const existingContact = await getContactByUpeerId(senderUpeerId);
+    const existingContact = await getContactByUpeerId(senderUpeerId) as ExistingContact | undefined;
     const isNewContact = !existingContact;
     if (isNewContact) {
-        if (!data.powProof) {
+        const powProof = data.powProof;
+        if (typeof powProof !== 'string' || !powProof) {
             security('New contact requires PoW proof', { upeerId: senderUpeerId, ip: rinfo.address }, 'pow');
             return;
         }
-        if (!AdaptivePow.verifyLightProof(data.powProof, senderUpeerId)) {
+        if (!AdaptivePow.verifyLightProof(powProof, senderUpeerId)) {
             security('Invalid PoW proof from new contact', { upeerId: senderUpeerId, ip: rinfo.address }, 'pow');
             return;
         }
@@ -70,9 +114,12 @@ export async function handleHandshakeReq(
 
     issueVouch(senderUpeerId, VouchType.HANDSHAKE).catch((err) => warn('Failed to issue vouch for handshake', err, 'reputation'));
 
-    const { getContacts: getContactsSafe } = await import('../../storage/contacts/operations.js').catch(() => ({ getContacts: () => [] })) as any;
-    const contacts = getContactsSafe() as any[];
-    const directIds = new Set<string>(contacts.filter((contact: any) => (contact.status === 'connected' || contact.status === 'offline') && contact.upeerId).map((contact: any) => contact.upeerId as string));
+    const contacts = await getContactsSafeList();
+    const directIds = new Set<string>(
+        contacts
+            .filter((contact) => (contact.status === 'connected' || contact.status === 'offline') && typeof contact.upeerId === 'string')
+            .map((contact) => contact.upeerId as string)
+    );
     const vouchScore = computeScore(senderUpeerId, directIds);
     if (vouchScore < 40) {
         security('Low vouch score contact detected', { upeerId: senderUpeerId, score: vouchScore, ip: rinfo.address }, 'reputation');
@@ -95,11 +142,11 @@ export async function handleHandshakeReq(
     const rawAlias = typeof data.alias === 'string' ? data.alias.slice(0, 100) : null;
     const alias = rawAlias || existingContact?.name || `Peer ${senderUpeerId.slice(0, 4)}`;
 
-    if (isAlreadyConnected && existingContact?.publicKey && existingContact.publicKey !== data.publicKey) {
+    if (isAlreadyConnected && existingContact?.publicKey && existingContact.publicKey !== publicKey) {
         win?.webContents.send('key-change-alert', {
             upeerId: senderUpeerId,
             oldFingerprint: computeKeyFingerprint(existingContact.publicKey),
-            newFingerprint: computeKeyFingerprint(data.publicKey),
+            newFingerprint: computeKeyFingerprint(publicKey),
             alias,
         });
         security('TOFU: static public key changed on re-handshake!', { upeerId: senderUpeerId, ip: rinfo.address }, 'security');
@@ -109,8 +156,8 @@ export async function handleHandshakeReq(
 
     try {
         runTransaction(() => {
-            addOrUpdateContact(senderUpeerId, rinfo.address, alias, data.publicKey, newStatus, safeEphKey, undefined, undefined, undefined, data.addresses);
-            maybeUpdateSignedPreKey(senderUpeerId, data.publicKey, data.signedPreKey, 'HANDSHAKE_REQ');
+            addOrUpdateContact(senderUpeerId, rinfo.address, alias, publicKey, newStatus, safeEphKey, undefined, undefined, undefined, data.addresses);
+            maybeUpdateSignedPreKey(senderUpeerId, publicKey, data.signedPreKey, 'HANDSHAKE_REQ');
             maybeSendAvatarUpdate(senderUpeerId, data.avatar, updateContactAvatar);
         });
     } catch (err) {
@@ -121,7 +168,7 @@ export async function handleHandshakeReq(
     if (isAlreadyConnected || isPendingByUs) {
         win?.webContents.send('contact-presence', { upeerId: senderUpeerId, lastSeen: new Date().toISOString() });
         import('../messaging/contacts.js').then(({ acceptContactRequest }) => {
-            acceptContactRequest(senderUpeerId, data.publicKey);
+            acceptContactRequest(senderUpeerId, publicKey);
         }).catch(err => error('Failed to auto-accept known contact', err, 'network'));
         return;
     }
@@ -131,7 +178,7 @@ export async function handleHandshakeReq(
         address: rinfo.address,
         alias: data.alias,
         avatar: data.avatar || undefined,
-        publicKey: data.publicKey,
+        publicKey,
         ephemeralPublicKey: data.ephemeralPublicKey,
         vouchScore,
     });

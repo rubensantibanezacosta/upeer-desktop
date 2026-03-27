@@ -1,5 +1,6 @@
 import { applyReactionUpdate, formatMessageTimestamp } from './chatStoreSupport.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
+import type { LinkPreview } from '../types/chat.js';
 
 export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
     handleTyping: () => {
@@ -48,7 +49,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         }
     },
 
-    handleSend: async (linkPreview?: any) => {
+    handleSend: async (linkPreview?: LinkPreview | null) => {
         const { targetUpeerId, activeGroupId, messagesByConversation, replyByConversation, myIdentity } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) {
@@ -98,7 +99,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         await get().refreshContacts();
     },
 
-    handleSendGroupMessage: async (message: string, linkPreview?: any) => {
+    handleSendGroupMessage: async (message: string, linkPreview?: LinkPreview | null) => {
         const { activeGroupId, myIdentity, replyByConversation } = get();
         if (!activeGroupId || !message) {
             return;
@@ -137,12 +138,12 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         window.upeer.sendChatReaction(effectiveId, msgId, emoji, remove);
         const myId = myIdentity?.upeerId || 'me';
         set((state) => ({
-            chatHistory: state.chatHistory.map((message: any) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
-            groupChatHistory: state.groupChatHistory.map((message: any) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
+            chatHistory: state.chatHistory.map((message) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
+            groupChatHistory: state.groupChatHistory.map((message) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
         }));
     },
 
-    handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: any) => {
+    handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: LinkPreview | null) => {
         const { targetUpeerId, activeGroupId, chatHistory, groupChatHistory } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) {
@@ -171,8 +172,8 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         }
         window.upeer.sendChatUpdate(effectiveId, msgId, newContent, linkPreview ?? undefined);
         set((state) => ({
-            chatHistory: state.chatHistory.map((message: any) => message.id === msgId ? { ...message, message: savedContent, isEdited: true } : message),
-            groupChatHistory: state.groupChatHistory.map((message: any) => message.id === msgId ? { ...message, message: savedContent, isEdited: true } : message),
+            chatHistory: state.chatHistory.map((message) => message.id === msgId ? { ...message, message: savedContent, isEdited: true } : message),
+            groupChatHistory: state.groupChatHistory.map((message) => message.id === msgId ? { ...message, message: savedContent, isEdited: true } : message),
         }));
     },
 
@@ -184,13 +185,13 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         }
         window.upeer.sendChatDelete(effectiveId, msgId);
         set((state) => ({
-            chatHistory: state.chatHistory.map((message: any) => message.id === msgId ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message),
-            groupChatHistory: state.groupChatHistory.map((message: any) => message.id === msgId ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message),
+            chatHistory: state.chatHistory.map((message) => message.id === msgId ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message),
+            groupChatHistory: state.groupChatHistory.map((message) => message.id === msgId ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message),
         }));
     },
 
     handleAddContact: (idAtAddress: string, name: string) => {
-        window.upeer.addContact(idAtAddress, name).then((result: any) => {
+        window.upeer.addContact(idAtAddress, name).then((result) => {
             get().refreshContacts();
             if (result.upeerId) {
                 get().setTargetUpeerId(result.upeerId);

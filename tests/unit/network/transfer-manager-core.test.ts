@@ -3,6 +3,13 @@ import { TransferManager } from '../../../src/main_process/network/file-transfer
 import { TransferPhase } from '../../../src/main_process/network/file-transfer/types.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 
+type TransferManagerWindow = Parameters<TransferManager['initialize']>[1];
+type TransferManagerSend = Parameters<TransferManager['initialize']>[0];
+type KnownContact = NonNullable<Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>>;
+type TransferRecord = NonNullable<ReturnType<TransferManager['getTransfer']>>;
+type TransferRecordWithChunkTimes = TransferRecord & { _chunksSentTimes?: Map<number, number> };
+type TransferManagerTestInstance = TransferManager & { fileHandles: Map<string, unknown> };
+
 // Mock node:fs y node:path antes de los otros mocks que puedan importarlos
 vi.mock('node:fs/promises', () => ({
     open: vi.fn().mockResolvedValue({
@@ -93,7 +100,7 @@ vi.mock('../../../src/main_process/network/file-transfer/chunker.js', () => ({
 }));
 
 describe('TransferManager - Core Orchestration', () => {
-    let manager: any;
+    let manager: TransferManagerTestInstance;
     const mockSend = vi.fn();
     const mockWin = {
         isDestroyed: vi.fn(() => false),
@@ -101,20 +108,20 @@ describe('TransferManager - Core Orchestration', () => {
             send: vi.fn(),
             isDestroyed: vi.fn(() => false)
         }
-    } as any;
+    } as unknown as TransferManagerWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        manager = new TransferManager();
-        manager.initialize((...args: any[]) => mockSend(...args), mockWin);
+        manager = new TransferManager() as TransferManagerTestInstance;
+        manager.initialize(((address, data, publicKey) => mockSend(address, data, publicKey)) as TransferManagerSend, mockWin);
     });
 
     it('should orchestrate a new file proposal (startSend)', async () => {
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-1',
             publicKey: 'a'.repeat(64),
             status: 'connected'
-        });
+        } as KnownContact);
 
         const fileId = await manager.startSend('peer-1', 'ygg-address', '/test/file.jpg');
 
@@ -134,7 +141,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should retry proposal if no acceptance is received', async () => {
         vi.useFakeTimers();
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'peer-1', status: 'connected' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'peer-1', status: 'connected' } as KnownContact);
 
         await manager.startSend('peer-1', 'ygg-addr', '/path');
         expect(mockSend).toHaveBeenCalledTimes(1);
@@ -146,7 +153,7 @@ describe('TransferManager - Core Orchestration', () => {
     });
 
     it('should handle cancelation and clean up', async () => {
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p1' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p1' } as KnownContact);
         const fileId = await manager.startSend('p1', 'addr', '/path');
 
         await manager.cancelTransfer(fileId, 'user-canceled');
@@ -156,7 +163,7 @@ describe('TransferManager - Core Orchestration', () => {
     });
 
     it('should handle incoming FILE_PROPOSAL and respond with ACCEPT', async () => {
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'sender', publicKey: 'b'.repeat(64) });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'sender', publicKey: 'b'.repeat(64) } as KnownContact);
         const proposal = { type: 'FILE_PROPOSAL', fileId: 'id1', fileName: 'f.txt', signature: 'sig' };
 
         await manager.handleMessage('sender', 'addr', proposal);
@@ -167,7 +174,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle FILE_CHUNK and send ACK', async () => {
         const fileId = 'id-chunk';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p2' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p2' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -182,9 +189,8 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should complete receiver when all chunks arrive', async () => {
         const fileId = 'id-done';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p3' });
-        // Mock simple de la validación de hash
-        manager['validator'].verifyFileHash = vi.fn().mockResolvedValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p3' } as KnownContact);
+        vi.spyOn(manager.validator, 'verifyFileHash').mockResolvedValue(true);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -204,9 +210,9 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle hash mismatch and cancel transfer', async () => {
         const fileId = 'id-fail';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p4', publicKey: 'k' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p4', publicKey: 'k' } as KnownContact);
 
-        (manager['validator'].verifyFileHash as any).mockRejectedValue(new Error('bad hash'));
+        vi.spyOn(manager.validator, 'verifyFileHash').mockRejectedValue(new Error('bad hash'));
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -232,10 +238,10 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle FILE_ACCEPT and start sending chunks', async () => {
         const fileId = 'id-send';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'p5',
             publicKey: 'kp5'
-        });
+        } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -271,7 +277,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should update window size on FILE_CHUNK_ACK', async () => {
         const fileId = 'id-ack';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p6' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p6' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -288,7 +294,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should complete sender on FILE_DONE_ACK', async () => {
         const fileId = 'id-done-ack';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p7' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p7' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -305,7 +311,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle vault accept and start sending chunks', async () => {
         const fileId = 'id-vault-accept';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p8', publicKey: 'kp8' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p8', publicKey: 'kp8' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -333,7 +339,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should ignore duplicate sequence (chunks already processed)', async () => {
         const fileId = 'id-dupe';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p9' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p9' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -358,7 +364,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle invalid chunk index', async () => {
         const fileId = 'id-invalid';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p10' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p10' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -377,7 +383,7 @@ describe('TransferManager - Core Orchestration', () => {
     it('should handle packet loss and trigger retransmission', async () => {
         vi.useFakeTimers();
         const fileId = 'id-loss';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p11', publicKey: 'kp11' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p11', publicKey: 'kp11' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -415,7 +421,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should adjust RTO based on smoothed RTT', async () => {
         const fileId = 'id-rtt';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p12' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p12' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -427,12 +433,11 @@ describe('TransferManager - Core Orchestration', () => {
         const chunksSentTimes = new Map<number, number>();
         chunksSentTimes.set(0, Date.now() - 100); // Enviado hace 100ms
 
-        // Mockeamos getTransfer con tipos correctos
-        const originalGet = manager['store'].getTransfer.bind(manager['store']);
-        vi.spyOn(manager['store'], 'getTransfer').mockImplementation((id: any, dir: any) => {
+        const originalGet = manager.store.getTransfer.bind(manager.store);
+        vi.spyOn(manager.store, 'getTransfer').mockImplementation((id, dir) => {
             const t = originalGet(id, dir);
             if (t && id === fileId) {
-                (t as any)._chunksSentTimes = chunksSentTimes;
+                (t as TransferRecordWithChunkTimes)._chunksSentTimes = chunksSentTimes;
             }
             return t;
         });
@@ -449,7 +454,7 @@ describe('TransferManager - Core Orchestration', () => {
     it('should back off window and RTO after a chunk timeout', async () => {
         vi.useFakeTimers();
         const fileId = 'id-timeout-backoff';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-timeout', publicKey: 'kp-timeout' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-timeout', publicKey: 'kp-timeout' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -492,7 +497,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should ignore late chunk ACKs for completed transfers', async () => {
         const fileId = 'id-late';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p13' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p13' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -515,7 +520,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle cancel by sender', async () => {
         const fileId = 'id-remote-cancel';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p14', publicKey: 'kp14' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p14', publicKey: 'kp14' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -537,7 +542,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should handle out-of-order chunks via sliding window', async () => {
         const fileId = 'id-window';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p15' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p15' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -561,7 +566,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should calculate window size growth correctly', async () => {
         const fileId = 'id-window-growth';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p16' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p16' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -569,7 +574,6 @@ describe('TransferManager - Core Orchestration', () => {
             fileName: 'f.txt', fileSize: 1000, mimeType: 'text/plain',
             totalChunks: 20, direction: 'sending', chunkSize: 50
         });
-        // Inyectamos manualmente los valores para el inicio del test
         manager['store'].updateTransfer(fileId, 'sending', {
             state: 'active',
             phase: TransferPhase.TRANSFERRING,
@@ -583,22 +587,15 @@ describe('TransferManager - Core Orchestration', () => {
         chunksSentTimes.set(1, Date.now() - 50);
 
         const originalGet = manager['store'].getTransfer.bind(manager['store']);
-        vi.spyOn(manager['store'], 'getTransfer').mockImplementation((id: any, dir: any) => {
+        vi.spyOn(manager['store'], 'getTransfer').mockImplementation((id, dir) => {
             const t = originalGet(id, dir);
-            if (t && id === fileId) (t as any)._chunksSentTimes = chunksSentTimes;
+            if (t && id === fileId) (t as TransferRecordWithChunkTimes)._chunksSentTimes = chunksSentTimes;
             return t;
         });
 
-        // Recibimos ACK en slow start (windowSize < ssthresh)
         await manager.handleMessage('p16', 'addr16', { type: 'FILE_ACK', fileId, chunkIndex: 1 });
 
         const updated = manager['store'].getTransfer(fileId, 'sending');
-        // El RTT es 50ms, SRTT anterior 100ms.
-        // SRTT_new = 0.9 * 100 + 0.1 * 50 = 90 + 5 = 95ms.
-        // Como SRTT_new < 150ms, growthFactor = 2.0.
-        // windowSize crecía en handleAck original de transfer-manager.ts.
-        // Pero en sender-logic.ts la lógica de crecimiento de ventana NO se migró.
-        // Vamos a implementarla.
         expect(updated?.windowSize).toBe(12);
     });
 
@@ -624,7 +621,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should not oversend when the inflight window is full', async () => {
         const fileId = 'id-window-full';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-window', publicKey: 'kp-window' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-window', publicKey: 'kp-window' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -664,7 +661,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should send only new chunks after a partial ACK', async () => {
         const fileId = 'id-no-duplicate-inflight';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-new', publicKey: 'kp-new' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-new', publicKey: 'kp-new' } as KnownContact);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
@@ -734,7 +731,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should process all chunks regardless of arrival order (high-index first)', async () => {
         const fileId = 'id-order-regression';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-order' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-order' } as KnownContact);
 
         manager['store'].createTransfer({
             fileId, upeerId: 'p-order', peerAddress: 'addr-order',
@@ -744,8 +741,6 @@ describe('TransferManager - Core Orchestration', () => {
         });
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
-        // Llegan en orden inverso: 4, 3, 2, 1, 0
-        // Con el bug antiguo (chunkIndex < chunksProcessed), chunks 0,1,2 habrían sido descartados
         for (const idx of [4, 3, 2, 1, 0]) {
             await manager.handleMessage('p-order', 'addr-order', {
                 type: 'FILE_CHUNK', fileId, chunkIndex: idx, data: 'AAAA'
@@ -759,7 +754,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should finalize receiver when FILE_DONE arrives after all chunks processed', async () => {
         const fileId = 'id-filedone-finalize';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fd', publicKey: 'kfd' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-fd', publicKey: 'kfd' } as KnownContact);
 
         manager['store'].createTransfer({
             fileId, upeerId: 'p-fd', peerAddress: 'addr-fd',
@@ -771,12 +766,9 @@ describe('TransferManager - Core Orchestration', () => {
             state: 'active', phase: TransferPhase.TRANSFERRING, tempPath: '/tmp/fd.tmp'
         });
 
-        // Procesamos ambos chunks
         await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_CHUNK', fileId, chunkIndex: 0, data: 'AAAA' });
         await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_CHUNK', fileId, chunkIndex: 1, data: 'BBBB' });
 
-        // Aunque finalizeTransfer ya se llamó desde handleFileChunk (totalChunks=2),
-        // FILE_DONE no debe explotar ni llamar dos veces (guard de reentrancia)
         await manager.handleMessage('p-fd', 'addr-fd', { type: 'FILE_DONE', fileId });
 
         const transfer = manager['store'].getTransfer(fileId, 'receiving');
@@ -786,7 +778,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should acknowledge FILE_DONE without finalizing receiver state', async () => {
         const fileId = 'id-filedone-trigger';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fdt', publicKey: 'kfdt' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-fdt', publicKey: 'kfdt' } as KnownContact);
 
         manager['store'].createTransfer({
             fileId, upeerId: 'p-fdt', peerAddress: 'addr-fdt',
@@ -794,8 +786,6 @@ describe('TransferManager - Core Orchestration', () => {
             totalChunks: 3, chunkSize: 34, fileHash: 'h',
             direction: 'receiving'
         });
-        // Simulamos que el receptor ya procesó los 3 chunks pero por algún motivo
-        // finalizeTransfer no fue llamado (el estado sigue 'active')
         manager['store'].updateTransfer(fileId, 'receiving', {
             state: 'active', phase: TransferPhase.TRANSFERRING,
             chunksProcessed: 3, tempPath: '/tmp/fdt.tmp'
@@ -810,7 +800,7 @@ describe('TransferManager - Core Orchestration', () => {
 
     it('should not double-finalize on concurrent finalizeTransfer calls', async () => {
         const fileId = 'id-double-finalize';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-df' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-df' } as KnownContact);
 
         manager['store'].createTransfer({
             fileId, upeerId: 'p-df', peerAddress: 'addr-df',
@@ -822,21 +812,19 @@ describe('TransferManager - Core Orchestration', () => {
             state: 'active', phase: TransferPhase.TRANSFERRING
         });
 
-        // Dos llamadas concurrentes simultáneas
         await Promise.all([
             manager.finalizeTransfer(fileId, 'receiving'),
             manager.finalizeTransfer(fileId, 'receiving'),
         ]);
 
-        // notifyCompleted solo debe haberse emitido una vez
         const completedEvents = mockWin.webContents.send.mock.calls
-            .filter((c: any[]) => c[0] === 'file-transfer-completed');
+            .filter((c) => c[0] === 'file-transfer-completed');
         expect(completedEvents.length).toBe(1);
     });
 
     it('should not process FILE_DONE if chunksProcessed < totalChunks', async () => {
         const fileId = 'id-filedone-partial';
-        (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: 'p-fdp', publicKey: 'kfdp' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p-fdp', publicKey: 'kfdp' } as KnownContact);
 
         manager['store'].createTransfer({
             fileId, upeerId: 'p-fdp', peerAddress: 'addr-fdp',
@@ -848,12 +836,10 @@ describe('TransferManager - Core Orchestration', () => {
             state: 'active', phase: TransferPhase.TRANSFERRING, chunksProcessed: 3
         });
 
-        // FILE_DONE llega pero solo tenemos 3/5 chunks — no debe finalizar
         await manager.handleMessage('p-fdp', 'addr-fdp', { type: 'FILE_DONE', fileId });
 
         const transfer = manager['store'].getTransfer(fileId, 'receiving');
         expect(transfer?.state).toBe('active');
-        // FILE_DONE_ACK sí debe enviarse
         expect(mockSend).toHaveBeenCalledWith('addr-fdp', { type: 'FILE_DONE_ACK', fileId }, 'kfdp');
     });
 });

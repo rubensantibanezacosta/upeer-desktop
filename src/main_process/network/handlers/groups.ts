@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
+import type { GroupMessagePayload, GroupAckPayload } from '../types.js';
 import { getMainWindow } from '../../core/windowManager.js';
 import { showDesktopNotification } from '../../utils/desktopNotification.js';
 import { focusWindow } from '../../utils/windowFocus.js';
@@ -17,13 +18,19 @@ import { security, warn, info } from '../../security/secure-logger.js';
 import { getMyUPeerId } from '../../security/identity.js';
 export { handleGroupInvite, handleGroupLeave, handleGroupUpdate } from './groupControl.js';
 
+interface MinimalContact {
+    name?: string;
+    alias?: string;
+    address?: string;
+}
+
 // Patrón UUID reutilizado en varios handlers para validar msgId/fileId de red.
 const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function handleGroupMessage(
     upeerId: string,
-    contact: any,
-    data: any,
+    contact: MinimalContact,
+    data: GroupMessagePayload,
     win: BrowserWindow | null,
     senderAddress?: string
 ) {
@@ -73,7 +80,8 @@ export async function handleGroupMessage(
     }
 
     // BUG AB fix: igual que BUG P (ya corregido para CHAT), los mensajes de grupo\n    // entregados por múltiples custodios simultáneamente llegaban aquí dos veces\n    // con el mismo msgId. saveMessage usa onConflictDoNothing → changes=0 en la segunda\n    // llamada, pero la emit 'receive-group-message' se hacía igualmente → duplicados en UI.
-    const savedGroup = await saveMessage(
+    type SaveMessageResult = { changes?: number };
+    const savedGroup = (await saveMessage(
         msgId,
         groupId,
         isInternalSync,
@@ -83,8 +91,8 @@ export async function handleGroupMessage(
         isInternalSync ? 'read' : 'delivered',
         isInternalSync ? myId : upeerId,
         timestamp
-    );
-    const isNewGroupMsg = (savedGroup as any)?.changes > 0;
+    )) as SaveMessageResult;
+    const isNewGroupMsg = (savedGroup?.changes ?? 0) > 0;
 
     // Notify sender that we received the message
     const ackAddress = senderAddress || contact?.address;
@@ -128,7 +136,7 @@ export async function handleGroupMessage(
     }
 }
 
-export async function handleGroupAck(upeerId: string, data: any, win: BrowserWindow | null) {
+export async function handleGroupAck(upeerId: string, data: GroupAckPayload, win: BrowserWindow | null) {
     const { id: msgId, groupId } = data;
     // Bug FE fix: misma protección UUID aplicada a los ACKs de grupo.
     if (!msgId || !_UUID_RE.test(String(msgId))) return;

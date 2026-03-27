@@ -19,6 +19,54 @@ vi.mock('node:os', () => ({
     networkInterfaces: vi.fn()
 }));
 
+type VerifiableLocationBlock = Parameters<typeof utils.verifyLocationBlock>[1];
+type NetworkInterfacesMap = ReturnType<typeof os.networkInterfaces>;
+type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInstance>>;
+
+function createNetworkInterface(address: string, family: 'IPv4' | 'IPv6', internal = false): os.NetworkInterfaceInfo {
+    return {
+        address,
+        family,
+        internal,
+        netmask: family === 'IPv4' ? '255.255.255.0' : 'ffff:ffff:ffff:ffff::',
+        mac: '00:00:00:00:00:00',
+        scopeid: 0,
+        cidr: internal ? undefined : `${address}/${family === 'IPv4' ? '24' : '64'}`
+    };
+}
+
+function createDhtMock(includeStoreValue = false) {
+    const mock = {
+        findValue: vi.fn()
+    };
+
+    if (includeStoreValue) {
+        return {
+            ...mock,
+            storeValue: vi.fn().mockResolvedValue(true)
+        } satisfies Pick<KademliaInstance, 'findValue' | 'storeValue'>;
+    }
+
+    return mock satisfies Pick<KademliaInstance, 'findValue'>;
+}
+
+const scannedNetworkInterfaces: NetworkInterfacesMap = {
+    eth0: [
+        createNetworkInterface('192.168.1.10', 'IPv4'),
+        createNetworkInterface('fe80::1', 'IPv6'),
+        createNetworkInterface('201:test::2', 'IPv6')
+    ],
+    lo: [createNetworkInterface('127.0.0.1', 'IPv4', true)]
+};
+
+const dhtNetworkInterfaces: NetworkInterfacesMap = {
+    eth0: [
+        createNetworkInterface('192.168.1.10', 'IPv4'),
+        createNetworkInterface('fe80::1', 'IPv6'),
+        createNetworkInterface('201:test::2', 'IPv6')
+    ]
+};
+
 describe('Network Utils', () => {
     const myId = 'my-upeer-id';
     const myPk = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
@@ -91,7 +139,6 @@ describe('Network Utils', () => {
 
         it('should fail verification if token is tampered', () => {
             const token = utils.generateRenewalToken('target-id', 5);
-            // Tamper with a SIGNED field (maxRenewals)
             token.maxRenewals = 10;
             const isValid = utils.verifyRenewalToken(token, myPkHex);
             expect(isValid).toBe(false);
@@ -99,10 +146,8 @@ describe('Network Utils', () => {
 
         it('should NOT fail verification if renewalsUsed is incremented (BUG AF fix)', () => {
             const token = utils.generateRenewalToken('target-id', 5);
-            // Simulate a network peer incrementing the counter
             token.renewalsUsed = 1;
             const isValid = utils.verifyRenewalToken(token, myPkHex);
-            // This MUST be true because renewalsUsed is excluded from signature (it's mutable)
             expect(isValid).toBe(true);
         });
     });
@@ -115,7 +160,6 @@ describe('Network Utils', () => {
         });
 
         it('should require PoW for large sequence jumps', () => {
-            // MAX_DHT_SEQ_JUMP is 24h (86400000)
             const result = utils.validateDhtSequence(100, 100 + 86400000 + 1);
             expect(result.valid).toBe(false);
             expect(result.requiresPoW).toBe(true);
@@ -134,8 +178,8 @@ describe('Network Utils', () => {
                 expect(renewed.address).toBe('1.1.1.1');
                 expect(renewed.renewalToken.renewalsUsed).toBe(1);
 
-                // Un bloque expirado ya no es válido para verifyLocationBlock (ATAJO DE RENEWAL ELIMINADO POR SEGURIDAD)
-                const isValid = utils.verifyLocationBlock(myId, renewed as any, myPkHex);
+                const renewedBlock: VerifiableLocationBlock = renewed;
+                const isValid = utils.verifyLocationBlock(myId, renewedBlock, myPkHex);
                 expect(isValid).toBe(false);
             }
         });
@@ -151,7 +195,7 @@ describe('Network Utils', () => {
 
     describe('Location Block Signing and Verification', () => {
         it('should generate and verify a signed location block without renewal token', () => {
-            const block = utils.generateSignedLocationBlock('200:1::1', 1, undefined, null as any);
+            const block = utils.generateSignedLocationBlock('200:1::1', 1);
             const isValid = utils.verifyLocationBlock(myId, block, myPkHex);
             expect(isValid).toBe(true);
         });
@@ -164,7 +208,7 @@ describe('Network Utils', () => {
         });
 
         it('should reject expired block even if signature is valid', () => {
-            const block = utils.generateSignedLocationBlock('200:1::1', 1, -1000, null as any);
+            const block = utils.generateSignedLocationBlock('200:1::1', 1, -1000);
             const isValid = utils.verifyLocationBlock(myId, block, myPkHex);
             expect(isValid).toBe(false);
         });
@@ -203,16 +247,7 @@ describe('Network Utils', () => {
         });
 
         it('should scan network interfaces', () => {
-            vi.mocked(os.networkInterfaces).mockReturnValue({
-                eth0: [
-                    { address: '192.168.1.10', family: 'IPv4', internal: false, netmask: '255.255.255.0', mac: '00:00:00:00:00:00', scopeid: 0 },
-                    { address: 'fe80::1', family: 'IPv6', internal: false, netmask: 'ffff:ffff:ffff:ffff::', mac: '00:00:00:00:00:00', scopeid: 0 },
-                    { address: '201:test::2', family: 'IPv6', internal: false, netmask: 'ffff:ffff:ffff:ffff::', mac: '00:00:00:00:00:00', scopeid: 0 }
-                ],
-                lo: [
-                    { address: '127.0.0.1', family: 'IPv4', internal: true, netmask: '255.0.0.0', mac: '00:00:00:00:00:00', scopeid: 0 }
-                ]
-            } as any);
+            vi.mocked(os.networkInterfaces).mockReturnValue(scannedNetworkInterfaces);
 
             const addresses = utils.getNetworkAddresses();
             expect(addresses).toContain('192.168.1.10');
@@ -222,14 +257,21 @@ describe('Network Utils', () => {
         });
     });
 
+    describe('getDhtNetworkAddresses', () => {
+        it('should only return Yggdrasil addresses for DHT publication', () => {
+            vi.mocked(yggstack.getYggstackAddress).mockReturnValue('201:test::1');
+            vi.mocked(os.networkInterfaces).mockReturnValue(dhtNetworkInterfaces);
+
+            const addresses = utils.getDhtNetworkAddresses();
+            expect(addresses).toEqual(['201:test::1', '201:test::2']);
+        });
+    });
+
     describe('DHT Renewal Token store/find', () => {
-        const mockKademlia = {
-            storeValue: vi.fn().mockResolvedValue(true),
-            findValue: vi.fn()
-        };
+        const mockKademlia = createDhtMock(true);
 
         beforeEach(() => {
-            (dhtShared.getKademliaInstance as any).mockReturnValue(mockKademlia as any);
+            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
         });
 
         it('should store renewal token in DHT', async () => {
@@ -255,12 +297,10 @@ describe('Network Utils', () => {
     });
 
     describe('Enhanced Renewal with DHT', () => {
-        const mockKademlia = {
-            findValue: vi.fn()
-        };
+        const mockKademlia = createDhtMock();
 
         beforeEach(() => {
-            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as any);
+            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
         });
 
         it('should canRenewLocationBlockWithDHT with local token', async () => {

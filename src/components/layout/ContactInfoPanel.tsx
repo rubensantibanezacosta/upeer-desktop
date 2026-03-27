@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/joy';
 
 import { Contact, ChatMessage } from '../../types/chat.js';
+import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { getTrustMeta, formatSeen } from './contactInfoHelpers.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactInfoCipherView } from './ContactInfoCipherView.js';
@@ -9,17 +10,24 @@ import { ContactInfoDeleteDialog } from './ContactInfoDeleteDialog.js';
 import { ContactInfoPanelMainView } from './ContactInfoPanelMainView.js';
 import { buildContactInfoActions, SlidingPanelView, useSharedMediaItems } from './contactInfoPanelSupport.js';
 
+interface MediaClickPayload {
+    url: string;
+    name: string;
+    mimeType: string;
+    fileId: string;
+}
+
 interface ContactInfoPanelProps {
     contact: Contact;
     chatHistory: ChatMessage[];
-    activeTransfers: any[];
+    activeTransfers: FileTransfer[];
     onClose: () => void;
     onShare: () => void;
     onShowSecurity?: () => void;
     onClearChat: () => void;
     onBlockContact: () => void;
     onDeleteContact: () => void;
-    onOpenMedia: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
+    onOpenMedia: (media: MediaClickPayload) => void;
     onArchive?: () => void;
     onMute?: () => void;
     onFavorite?: () => void;
@@ -51,7 +59,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     const isOnline = !!contact.lastSeen && (now - new Date(contact.lastSeen).getTime()) < 65000;
     const lastSeenText = formatSeen(contact.lastSeen);
-    const trust = getTrustMeta((contact as any).vouchScore);
+    const trust = getTrustMeta(contact.vouchScore);
     const sharedMedia = useSharedMediaItems(chatHistory, activeTransfers);
     const { utilityActions, dangerActions } = buildContactInfoActions({
         contact,

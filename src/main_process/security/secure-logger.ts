@@ -14,9 +14,11 @@ interface LogEntry {
     timestamp: string;
     level: LogLevel;
     message: string;
-    data?: any;
+    data?: unknown;
     source?: string;
 }
+
+type RedactableRecord = Record<string, unknown>;
 
 export class SecureLogger {
     private static instance: SecureLogger;
@@ -49,7 +51,7 @@ export class SecureLogger {
         return level >= this.level;
     }
 
-    private redactSensitiveData(data: any): any {
+    private redactSensitiveData(data: unknown): unknown {
         if (!data || typeof data !== 'object') {
             return data;
         }
@@ -62,13 +64,14 @@ export class SecureLogger {
             };
         }
 
-        const redacted = Array.isArray(data) ? [...data] : { ...data };
+        const redacted: unknown[] | RedactableRecord = Array.isArray(data) ? [...data] : { ...(data as RedactableRecord) };
 
         for (const key in redacted) {
             if (this.redactedFields.has(key)) {
-                if (typeof redacted[key] === 'string' && redacted[key].length > 0) {
-                    redacted[key] = `[REDACTED:${key} (${redacted[key].length} chars)]`;
-                } else if (redacted[key] !== null && redacted[key] !== undefined) {
+                const currentValue = redacted[key];
+                if (typeof currentValue === 'string' && currentValue.length > 0) {
+                    redacted[key] = `[REDACTED:${key} (${currentValue.length} chars)]`;
+                } else if (currentValue !== null && currentValue !== undefined) {
                     redacted[key] = `[REDACTED:${key}]`;
                 }
             } else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
@@ -79,7 +82,7 @@ export class SecureLogger {
         return redacted;
     }
 
-    private formatMessage(level: LogLevel, message: string, data?: any, source?: string): LogEntry {
+    private formatMessage(level: LogLevel, message: string, data?: unknown, source?: string): LogEntry {
         const redactedData = data ? this.redactSensitiveData(data) : undefined;
         return {
             timestamp: new Date().toISOString(),
@@ -115,25 +118,25 @@ export class SecureLogger {
         }
     }
 
-    public debug(message: string, data?: any, source?: string): void {
+    public debug(message: string, data?: unknown, source?: string): void {
         if (!this.shouldLog(LogLevel.DEBUG)) return;
         const entry = this.formatMessage(LogLevel.DEBUG, message, data, source);
         this.logToConsole(entry);
     }
 
-    public info(message: string, data?: any, source?: string): void {
+    public info(message: string, data?: unknown, source?: string): void {
         if (!this.shouldLog(LogLevel.INFO)) return;
         const entry = this.formatMessage(LogLevel.INFO, message, data, source);
         this.logToConsole(entry);
     }
 
-    public warn(message: string, data?: any, source?: string): void {
+    public warn(message: string, data?: unknown, source?: string): void {
         if (!this.shouldLog(LogLevel.WARN)) return;
         const entry = this.formatMessage(LogLevel.WARN, message, data, source);
         this.logToConsole(entry);
     }
 
-    public error(message: string, data?: any, source?: string): void {
+    public error(message: string, data?: unknown, source?: string): void {
         if (!this.shouldLog(LogLevel.ERROR)) return;
         const entry = this.formatMessage(LogLevel.ERROR, message, data, source);
         this.logToConsole(entry);
@@ -148,11 +151,11 @@ export class SecureLogger {
      * redactedFields). Ahora se redacta primero el `data` genérico y sólo
      * después se añade la IP procesada, evitando la doble redacción.
      */
-    public network(message: string, ip?: string, data?: any, source?: string): void {
+    public network(message: string, ip?: string, data?: unknown, source?: string): void {
         if (!this.shouldLog(LogLevel.INFO)) return;
 
-        // 1. Redactar primero los datos arbitrarios
-        const safeData: any = data ? this.redactSensitiveData({ ...data }) : {};
+        const baseData = typeof data === 'object' && data !== null ? { ...(data as RedactableRecord) } : {};
+        const safeData = (this.redactSensitiveData(baseData) as RedactableRecord | undefined) ?? {};
 
         // 2. Añadir la IP DESPUÉS de la redacción general
         if (ip) {
@@ -168,7 +171,7 @@ export class SecureLogger {
     /**
      * Log security events (always logged regardless of level)
      */
-    public security(message: string, data?: any, source?: string): void {
+    public security(message: string, data?: unknown, source?: string): void {
         const entry = this.formatMessage(LogLevel.WARN, `[SECURITY] ${message}`, data, source);
         this.logToConsole(entry);
     }
@@ -186,26 +189,26 @@ export class SecureLogger {
 // Convenience functions for global use
 export const logger = SecureLogger.getInstance();
 
-export function debug(message: string, data?: any, source?: string) {
+export function debug(message: string, data?: unknown, source?: string) {
     logger.debug(message, data, source);
 }
 
-export function info(message: string, data?: any, source?: string) {
+export function info(message: string, data?: unknown, source?: string) {
     logger.info(message, data, source);
 }
 
-export function warn(message: string, data?: any, source?: string) {
+export function warn(message: string, data?: unknown, source?: string) {
     logger.warn(message, data, source);
 }
 
-export function error(message: string, data?: any, source?: string) {
+export function error(message: string, data?: unknown, source?: string) {
     logger.error(message, data, source);
 }
 
-export function network(message: string, ip?: string, data?: any, source?: string) {
+export function network(message: string, ip?: string, data?: unknown, source?: string) {
     logger.network(message, ip, data, source);
 }
 
-export function security(message: string, data?: any, source?: string) {
+export function security(message: string, data?: unknown, source?: string) {
     logger.security(message, data, source);
 }

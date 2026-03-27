@@ -30,6 +30,93 @@ export interface ChatMessage {
     date: number;
 }
 
+export interface MessageReaction {
+    upeerId: string;
+    emoji: string;
+}
+
+export interface RawChatMessage {
+    id?: string;
+    chatUpeerId: string;
+    isMine: boolean | number;
+    message: string;
+    status: string;
+    timestamp: number;
+    replyTo?: string;
+    reactions?: MessageReaction[];
+    isEdited?: boolean | number;
+    isDeleted?: boolean | number;
+    senderUpeerId?: string;
+    senderName?: string;
+}
+
+export interface MyIdentity {
+    address: string | null;
+    upeerId: string;
+    publicKey: string;
+    alias?: string | null;
+    name?: string | null;
+    avatar?: string | null;
+}
+
+export interface UntrustworthyInfo {
+    reason?: string;
+    details?: string;
+    scoreImpact?: number;
+    [key: string]: unknown;
+}
+
+export interface IncomingRequest {
+    publicKey: string;
+    avatar?: string;
+    receivedAt?: number;
+    untrustworthy?: UntrustworthyInfo | null;
+    vouchScore?: number;
+}
+
+export interface IncomingContactRequestEvent {
+    upeerId: string;
+    address: string;
+    alias?: string;
+    publicKey: string;
+    avatar?: string;
+    vouchScore?: number;
+}
+
+export interface IncomingDirectMessageEvent extends RawChatMessage {
+    upeerId: string;
+    timestamp?: number;
+}
+
+export interface IncomingGroupMessageEvent extends RawChatMessage {
+    groupId: string;
+    isSystem?: boolean;
+    timestamp?: number;
+}
+
+export interface PendingFile {
+    path: string;
+    name: string;
+    size: number;
+    type: string;
+    lastModified: number;
+}
+
+export interface TransferMessageUpdates {
+    filePath?: string;
+    savedPath?: string;
+    tempPath?: string;
+    status?: string;
+    progress?: number;
+    phase?: number;
+    error?: string;
+    [key: string]: unknown;
+}
+
+export interface GroupRecord extends Omit<Group, 'members'> {
+    members: string[] | string;
+}
+
 export interface ReputationData {
     vouchScore: number;
     connectionCount: number;

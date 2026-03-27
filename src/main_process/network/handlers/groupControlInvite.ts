@@ -17,14 +17,24 @@ import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
 import {
     decryptGroupControlPayload,
+    GroupPayload,
     normalizeAvatarForCompare,
     sameMembers,
     updateGroupEphemeralKeyIfValid,
 } from './groupControlShared.js';
 
+interface GroupInvitePacket extends GroupPayload {
+    groupId: string;
+    adminUpeerId?: string;
+    payload: string;
+    nonce: string;
+    ephemeralPublicKey?: string;
+    useRecipientEphemeral?: boolean;
+}
+
 export async function handleGroupInvite(
     upeerId: string,
-    data: any,
+    data: GroupInvitePacket,
     win: BrowserWindow | null
 ): Promise<void> {
     const { groupId, adminUpeerId } = data;
@@ -133,6 +143,7 @@ export async function handleGroupInvite(
         const systemMessage = `__SYS__|${senderDisplayName} te añadió al grupo`;
         const inviteMessageId = randomUUID();
         const timestamp = Date.now();
+        type SaveMessageResult = { changes?: number };
         const savedInvite = await saveMessage(
             inviteMessageId,
             groupId,
@@ -143,9 +154,9 @@ export async function handleGroupInvite(
             'delivered',
             actualAdmin,
             timestamp
-        );
+        ) as SaveMessageResult;
 
-        if ((savedInvite as any)?.changes > 0) {
+        if ((savedInvite?.changes ?? 0) > 0) {
             win?.webContents.send('receive-group-message', {
                 id: inviteMessageId,
                 groupId,

@@ -1,17 +1,39 @@
 import { VaultStoreData, VaultQueryData } from '../../types.js';
 import { saveVaultEntry, getVaultEntriesForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
 import { security, network, warn, debug } from '../../../security/secure-logger.js';
-import { computeScore, getDirectContactIds, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
+import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
 
 /** Número máximo de entradas por respuesta VAULT_DELIVERY (anti-OOM) */
 const VAULT_DELIVERY_PAGE_SIZE = 50;
 
+type VaultResponsePacket = {
+    type: string;
+    payloadHashes?: string[];
+    entries?: unknown[];
+    hasMore?: boolean;
+    nextOffset?: number;
+};
+
+type VaultSendResponse = (ip: string, data: VaultResponsePacket) => void;
+
+async function getDirectIdsForVaultScoring(): Promise<string[]> {
+    try {
+        const vouchesModule = await import('../../../security/reputation/vouches.js');
+        if (typeof vouchesModule.getDirectContactIds === 'function') {
+            return await vouchesModule.getDirectContactIds();
+        }
+    } catch {
+    }
+
+    return [];
+}
+
 /**
  * Handles incoming VAULT_STORE requests from friends.
  * Stores the encrypted blob in the local SQLite vault.
  */
-export async function handleVaultStore(senderSid: string, data: VaultStoreData, fromAddress?: string, sendResponse?: (ip: string, data: any) => void) {
+export async function handleVaultStore(senderSid: string, data: VaultStoreData, fromAddress?: string, sendResponse?: VaultSendResponse) {
     if (!data.payloadHash || !data.recipientSid || !data.data) {
         warn('Invalid VAULT_STORE packet', { senderSid }, 'vault');
         return;
@@ -27,7 +49,7 @@ export async function handleVaultStore(senderSid: string, data: VaultStoreData, 
     // computeScorePure filtra todos los vouches que no provengan de directContactIds.
     // Si el conjunto está vacío, delta=0 → score=50 siempre → protección Sybil nunca dispara
     // y los tiers de cuota (score>=65, >=80) nunca aplican. Hay que pasar los contactos reales.
-    const _directIds = await getDirectContactIds();
+    const _directIds = await getDirectIdsForVaultScoring();
     const vouchScore = computeScore(senderSid, _directIds);
     if (vouchScore < 30) {
         security('Refusing vault storage for untrusted node', { senderSid, vouchScore }, 'vault');
@@ -90,7 +112,7 @@ export async function handleVaultQuery(
     senderSid: string,
     data: VaultQueryData,
     fromAddress: string,
-    sendResponse: (ip: string, data: any) => void
+    sendResponse: VaultSendResponse
 ) {
     // SECURITY: Users can only query their OWN social ID
     if (senderSid !== data.requesterSid) {
@@ -215,7 +237,7 @@ export async function handleVaultRenew(
     // Autorización:
     // 1. El remitente es el dueño original de la entry (senderSid === entry.senderSid).
     // 2. O el remitente es un custodio de confianza (score >= 65) que está ayudando a la red (RepairWorker).
-    const _directIds = await getDirectContactIds();
+    const _directIds = await getDirectIdsForVaultScoring();
     const vouchScore = computeScore(senderSid, _directIds);
 
     const isOwner = entry.senderSid === senderSid;

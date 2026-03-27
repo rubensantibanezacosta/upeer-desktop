@@ -25,7 +25,7 @@ const parseJsonMessage = (message: string) => {
 };
 
 export const getTrustIndicator = (contact: Contact, showTooltip = true) => {
-    const score: number | undefined = (contact as any).vouchScore;
+    const score: number | undefined = contact.vouchScore;
     if (score === undefined) {
         return null;
     }

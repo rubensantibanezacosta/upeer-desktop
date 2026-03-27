@@ -1,5 +1,33 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
+import type { Contact } from '../../../types/chat.js';
+
+type StoredContact = Omit<Contact, 'knownAddresses'> & {
+    knownAddresses?: string | null;
+    dhtSeq?: number | null;
+    dhtSignature?: string | null;
+    dhtExpiresAt?: number | null;
+    ephemeralPublicKey?: string | null;
+    ephemeralPublicKeyUpdatedAt?: string | null;
+    deviceId?: string | null;
+    deviceMeta?: string | null;
+    renewalToken?: string | null;
+};
+
+type MessageSummaryRow = {
+    chatUpeerId?: string | null;
+    message?: string | null;
+    timestamp?: number | string | null;
+    isMine?: boolean | null;
+    status?: string | null;
+};
+
+type ContactWithLastMessage = StoredContact & {
+    lastMessage?: string | null;
+    lastMessageTime?: number | string | null;
+    lastMessageIsMine?: boolean | null;
+    lastMessageStatus?: string | null;
+};
 
 export function getContactByUpeerId(upeerId: string) {
     const db = getDb();
@@ -7,7 +35,7 @@ export function getContactByUpeerId(upeerId: string) {
 
     return db.select().from(schema.contacts)
         .where(eq(schema.contacts.upeerId, upeerId))
-        .get() as any;
+        .get() as StoredContact | undefined;
 }
 
 export function getContactByAddress(address: string) {
@@ -16,25 +44,25 @@ export function getContactByAddress(address: string) {
 
     return db.select().from(schema.contacts)
         .where(eq(schema.contacts.address, address))
-        .get() as any;
+        .get() as StoredContact | undefined;
 }
 
 export function getContacts() {
     const db = getDb();
     const schema = getSchema();
 
-    const contactsList = db.select().from(schema.contacts).all();
+    const contactsList = db.select().from(schema.contacts).all() as StoredContact[];
     const messageRows = db.select().from(schema.messages)
         .orderBy(desc(schema.messages.timestamp))
-        .all() as any[];
+        .all() as MessageSummaryRow[];
 
-    const lastMessageByChat = new Map<string, any>();
+    const lastMessageByChat = new Map<string, MessageSummaryRow>();
     for (const message of messageRows) {
         if (!message?.chatUpeerId || lastMessageByChat.has(message.chatUpeerId)) continue;
         lastMessageByChat.set(message.chatUpeerId, message);
     }
 
-    const result = contactsList.map(c => {
+    const result: ContactWithLastMessage[] = contactsList.map(c => {
         const lastMsgObj = lastMessageByChat.get(c.upeerId || '');
 
         return {
@@ -173,15 +201,15 @@ export function updateContactAvatar(upeerId: string, avatar: string) {
         .run();
 }
 
-    export function setContactFavorite(upeerId: string, isFavorite: boolean) {
-        const db = getDb();
-        const schema = getSchema();
+export function setContactFavorite(upeerId: string, isFavorite: boolean) {
+    const db = getDb();
+    const schema = getSchema();
 
-        return db.update(schema.contacts)
+    return db.update(schema.contacts)
         .set({ isFavorite })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
-    }
+}
 
 export function blockContact(upeerId: string) {
     const db = getDb();

@@ -1,3 +1,4 @@
+import type { FileHandle } from 'node:fs/promises';
 import { warn, error, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { sign } from '../../security/identity.js';
@@ -8,7 +9,60 @@ import { saveTransferToDB } from './db-helper.js';
 import { verifyFileTransferPacketSignature } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
-async function writeAll(handle: any, buffer: Buffer, position: number): Promise<void> {
+type EncryptedThumbnail = {
+    data: string;
+    iv: string;
+    tag: string;
+};
+
+type FileAcceptPacket = {
+    type: 'FILE_ACCEPT';
+    fileId: string;
+    signature?: string;
+};
+
+type FileProposalPacket = {
+    fileId: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    totalChunks: number;
+    chunkSize: number;
+    fileHash: string;
+    signature?: string;
+    encryptedKey?: string;
+    encryptedKeyNonce?: string;
+    thumbnail?: string | EncryptedThumbnail;
+    caption?: string;
+    isVoiceNote?: boolean;
+    messageId?: string;
+    chatUpeerId?: string;
+};
+
+type FileChunkPacket = {
+    fileId: string;
+    chunkIndex: number;
+    chunkHash?: string;
+    data: string;
+    iv?: string;
+    tag?: string;
+};
+
+type FileDonePacket = {
+    fileId: string;
+};
+
+type FileCancelPacket = {
+    fileId: string;
+    reason?: string;
+};
+
+type FileHeartbeatPacket = {
+    fileId: string;
+    t?: unknown;
+};
+
+async function writeAll(handle: FileHandle, buffer: Buffer, position: number): Promise<void> {
     let offset = 0;
     while (offset < buffer.length) {
         const { bytesWritten } = await handle.write(buffer, offset, buffer.length - offset, position + offset);
@@ -19,14 +73,14 @@ async function writeAll(handle: any, buffer: Buffer, position: number): Promise<
     }
 }
 
-export async function handleFileProposal(this: TransferManager, upeerId: string, address: string, data: any) {
+export async function handleFileProposal(this: TransferManager, upeerId: string, address: string, data: FileProposalPacket) {
     try {
         const existing = this.store.getTransfer(data.fileId, 'receiving');
         if (existing) {
             if (existing.state === 'active' &&
                 (existing.phase === TransferPhase.PROPOSED || existing.phase === TransferPhase.TRANSFERRING)) {
                 const contact = await getContactByUpeerId(upeerId);
-                const acceptMsg: any = { type: 'FILE_ACCEPT', fileId: data.fileId };
+                const acceptMsg: FileAcceptPacket = { type: 'FILE_ACCEPT', fileId: data.fileId };
                 const sig = sign(Buffer.from(canonicalStringify(acceptMsg)));
                 acceptMsg.signature = sig.toString('hex');
                 this.send(address, acceptMsg, contact?.publicKey);
@@ -36,8 +90,8 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
 
         try {
             this.validator.validateIncomingFile(data);
-        } catch (e: any) {
-            warn('Invalid file proposal received', { upeerId, fileId: data.fileId, error: e.message }, 'file-transfer');
+        } catch (e: unknown) {
+            warn('Invalid file proposal received', { upeerId, fileId: data.fileId, error: e instanceof Error ? e.message : String(e) }, 'file-transfer');
             return;
         }
 
@@ -112,7 +166,7 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
     if (transfer.phase !== TransferPhase.PROPOSED && transfer.phase !== TransferPhase.TRANSFERRING) return;
 
     try {
-        const acceptMsg: any = { type: 'FILE_ACCEPT', fileId };
+        const acceptMsg: FileAcceptPacket = { type: 'FILE_ACCEPT', fileId };
         const sig = sign(Buffer.from(canonicalStringify(acceptMsg)));
         acceptMsg.signature = sig.toString('hex');
 
@@ -129,7 +183,7 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
     }
 }
 
-export async function handleFileChunk(this: TransferManager, upeerId: string, address: string, data: any) {
+export async function handleFileChunk(this: TransferManager, _upeerId: string, address: string, data: FileChunkPacket) {
     await this.withTransferLock(data.fileId, async () => {
         try {
             debug('handleFileChunk entered', {
@@ -228,7 +282,7 @@ export async function handleFileChunk(this: TransferManager, upeerId: string, ad
     });
 }
 
-export async function handleFileDone(this: TransferManager, upeerId: string, address: string, data: any) {
+export async function handleFileDone(this: TransferManager, upeerId: string, address: string, data: FileDonePacket) {
     try {
         const contact = await getContactByUpeerId(upeerId);
         this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId }, contact?.publicKey);
@@ -245,13 +299,13 @@ export async function handleFileDone(this: TransferManager, upeerId: string, add
     }
 }
 
-export async function handleFileCancel(this: TransferManager, upeerId: string, address: string, data: any) {
+export async function handleFileCancel(this: TransferManager, upeerId: string, _address: string, data: FileCancelPacket) {
     warn('File transfer cancelled by peer', { fileId: data.fileId, upeerId, reason: data.reason }, 'file-transfer');
     this.cancelTransfer(data.fileId, 'sending', 'peer_cancelled');
     this.cancelTransfer(data.fileId, 'receiving', 'peer_cancelled');
 }
 
-export function handleHeartbeat(this: TransferManager, upeerId: string, address: string, data: any) {
+export function handleHeartbeat(this: TransferManager, _upeerId: string, address: string, data: FileHeartbeatPacket) {
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (transfer && transfer.state === 'active') {
         this.send(address, { type: 'FILE_HEARTBEAT_ACK', fileId: data.fileId, t: data.t });

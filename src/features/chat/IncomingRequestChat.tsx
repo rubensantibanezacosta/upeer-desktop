@@ -5,6 +5,7 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import WarningIcon from '@mui/icons-material/Warning';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import BlockIcon from '@mui/icons-material/Block';
+import type { UntrustworthyInfo } from '../../types/chat.js';
 
 interface IncomingRequestChatProps {
     contactName?: string;
@@ -12,7 +13,7 @@ interface IncomingRequestChatProps {
     receivedAt?: number;
     onAccept: () => void;
     onReject: () => void;
-    untrustworthyInfo?: any;
+    untrustworthyInfo?: UntrustworthyInfo | null;
     /** Score G-Set CRDT (0-100, neutral=50). undefined si no hay datos aún. */
     vouchScore?: number;
 }

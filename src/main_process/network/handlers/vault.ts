@@ -12,11 +12,51 @@ import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { debug, security, warn, error } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 
+type VaultSendResponse = (ip: string, data: Record<string, unknown>) => void;
+
+type VaultEntry = {
+    senderSid: string;
+    payloadHash?: string;
+    data: string;
+};
+
+type VaultDeliveryPayload = {
+    entries?: unknown;
+    hasMore?: unknown;
+    nextOffset?: unknown;
+};
+
+type VaultOriginContact = {
+    upeerId: string;
+    publicKey: string;
+};
+
+type VaultInnerPacket = {
+    type?: string;
+    signature?: string;
+    senderUpeerId?: string;
+    isInternalSync?: boolean;
+    fileHash?: string;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    payloadHash?: string;
+    [key: string]: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function isVaultEntry(value: unknown): value is VaultEntry {
+    return isRecord(value) && typeof value.senderSid === 'string' && typeof value.data === 'string';
+}
+
 export async function handleVaultDelivery(
     senderSid: string,
-    data: any,
+    data: VaultDeliveryPayload,
     win: BrowserWindow | null,
-    sendResponse: (ip: string, data: any) => void,
+    sendResponse: VaultSendResponse,
     fromAddress: string
 ) {
     // BUG AJ fix: custodio malicioso podría enviar data.entries = null o un array
@@ -27,7 +67,7 @@ export async function handleVaultDelivery(
         return;
     }
     const MAX_DELIVERY_ENTRIES = 50; // igual que la paginación del custodio
-    const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES);
+    const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES).filter(isVaultEntry);
 
     debug('Handling vault delivery', { count: entries.length, from: senderSid }, 'vault');
 
@@ -42,7 +82,7 @@ export async function handleVaultDelivery(
         for (const entry of entries) {
             try {
                 const isOwnVaultEntry = entry.senderSid === getMyUPeerId();
-                const originalContact = await getContactByUpeerId(entry.senderSid) || (isOwnVaultEntry
+                const originalContact = (await getContactByUpeerId(entry.senderSid) as VaultOriginContact | null) || (isOwnVaultEntry
                     ? { upeerId: entry.senderSid, publicKey: getMyPublicKeyHex() }
                     : null);
                 if (!originalContact) {
@@ -50,22 +90,23 @@ export async function handleVaultDelivery(
                     continue;
                 }
 
-                let innerPacket: any = null;
+                let innerPacket: VaultInnerPacket | null = null;
                 try {
-                    innerPacket = JSON.parse(Buffer.from(entry.data, 'hex').toString());
+                    const parsed = JSON.parse(Buffer.from(entry.data, 'hex').toString());
+                    innerPacket = isRecord(parsed) ? parsed as VaultInnerPacket : null;
                 } catch (e) {
                     // Not a JSON packet, likely a raw shard
                 }
 
                 // If it's a signed inner packet (CHAT, FILE_DATA_SMALL, etc.)
-                if (innerPacket && innerPacket.signature) {
+                if (innerPacket && typeof innerPacket.signature === 'string') {
                     if (isOwnVaultEntry) {
                         innerPacket.isInternalSync = true;
                     }
                     const { signature: innerSig, senderUpeerId: _senderUpeerId, ...innerData } = innerPacket;
 
                     // End-to-End Integrity Verification
-                    const isInnerValid = originalContact.publicKey && verify(
+                    const isInnerValid = verify(
                         Buffer.from(canonicalStringify(innerData)),
                         Buffer.from(innerSig, 'hex'),
                         Buffer.from(originalContact.publicKey, 'hex')
@@ -85,7 +126,7 @@ export async function handleVaultDelivery(
                     // Se valida aquí para los tipos que tienen validador; FILE_* y FILE_DATA_SMALL
                     // gestionan su propia validación en sus respectivos handlers.
                     const _vaultTypes = ['CHAT', 'GROUP_MSG', 'CHAT_UPDATE', 'CHAT_DELETE', 'CHAT_CLEAR_ALL', 'GROUP_INVITE', 'GROUP_UPDATE', 'GROUP_LEAVE', 'ACK', 'READ', 'CHAT_REACTION'];
-                    if (_vaultTypes.includes(innerPacket.type)) {
+                    if (typeof innerPacket.type === 'string' && _vaultTypes.includes(innerPacket.type)) {
                         const _innerValidation = validateMessage(innerPacket.type, innerPacket);
                         if (!_innerValidation.valid) {
                             security('Vault inner packet failed structural validation', { type: innerPacket.type, error: _innerValidation.error, sender: entry.senderSid }, 'vault');
@@ -119,9 +160,9 @@ export async function handleVaultDelivery(
                             undefined,
                             'delivered'
                         );
-                    } else if (innerPacket?.type?.startsWith('FILE_')) {
+                    } else if (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_')) {
                         fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket);
-                    } else if (innerPacket?.type === 'GROUP_MSG') {
+                    } else if (innerPacket.type === 'GROUP_MSG') {
                         const { handleGroupMessage } = await import('./groups.js');
                         await handleGroupMessage(entry.senderSid, originalContact, innerPacket, win);
                     } else if (innerPacket.type === 'CHAT_DELETE') {
@@ -148,7 +189,7 @@ export async function handleVaultDelivery(
                     }
                 } else {
                     // Raw Data / Shards
-                    if (entry.payloadHash.startsWith('shard:')) {
+                    if (typeof entry.payloadHash === 'string' && entry.payloadHash.startsWith('shard:')) {
                         debug('Received file shard from vault', { cid: entry.payloadHash }, 'vault');
                         issueVouch(senderSid, VouchType.VAULT_CHUNK).catch((err) => {
                             warn('Failed to issue vault chunk vouch', { senderSid, err: String(err) }, 'reputation');
@@ -182,7 +223,9 @@ export async function handleVaultDelivery(
                     }
                 }
                 // Llegamos aquí sin 'continue' ni excepción → entrada procesada correctamente.
-                validatedHashes.push(entry.payloadHash);
+                if (typeof entry.payloadHash === 'string') {
+                    validatedHashes.push(entry.payloadHash);
+                }
             } catch (err) {
                 error('Failed to process delivered vault entry', err, 'vault');
             }

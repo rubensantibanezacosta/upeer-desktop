@@ -1,6 +1,7 @@
 import { useNavigationStore } from './useNavigationStore.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { buildSearchResults, mapContactMessage, mapGroupMessage } from './chatStoreSupport.js';
+import type { ChatMessage, GroupRecord, RawChatMessage } from '../types/chat.js';
 
 let navGeneration = 0;
 
@@ -16,14 +17,16 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             ? window.upeer.getMessagesAround(id, pendingScrollMsgId)
             : window.upeer.getMessages(id);
 
-        loadMessages.then((messages: any[]) => {
+        loadMessages.then((messages: RawChatMessage[]) => {
             if (navGeneration !== generation) {
                 return;
             }
             const history = pendingScrollMsgId ? messages : messages.reverse();
-            history.forEach((message: any) => {
+            history.forEach((message) => {
                 if (!message.isMine && message.status !== 'read') {
-                    window.upeer.sendReadReceipt(id, message.id);
+                    if (message.id) {
+                        window.upeer.sendReadReceipt(id, message.id);
+                    }
                     message.status = 'read';
                 }
             });
@@ -45,20 +48,22 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             ? window.upeer.getMessagesAround(id, pendingScrollMsgId)
             : window.upeer.getMessages(id);
 
-        loadMessages.then((messages: any[]) => {
+        loadMessages.then((messages: RawChatMessage[]) => {
             if (navGeneration !== generation) {
                 return;
             }
             const history = pendingScrollMsgId ? messages : messages.reverse();
-            history.forEach((message: any) => {
+            history.forEach((message) => {
                 if (!message.isMine && message.status !== 'read') {
-                    window.upeer.sendReadReceipt(id, message.id);
+                    if (message.id) {
+                        window.upeer.sendReadReceipt(id, message.id);
+                    }
                     message.status = 'read';
                 }
             });
             const { contacts, myIdentity } = get();
             set({
-                groupChatHistory: history.map((message: any) => mapGroupMessage(id, message, contacts, myIdentity)),
+                groupChatHistory: history.map((message) => mapGroupMessage(id, message, contacts, myIdentity)),
                 isWindowedHistory: !!pendingScrollMsgId,
             });
         });
@@ -68,12 +73,12 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         messagesByConversation: { ...state.messagesByConversation, [id]: value },
     })),
 
-    setReplyToMessage: (id: string, value: any) => set((state) => ({
+    setReplyToMessage: (id: string, value: ChatMessage | null) => set((state) => ({
         replyByConversation: { ...state.replyByConversation, [id]: value },
     })),
 
-    setChatHistory: (history: any[]) => set({ chatHistory: history }),
-    setGroupChatHistory: (history: any[]) => set({ groupChatHistory: history }),
+    setChatHistory: (history: ChatMessage[]) => set({ chatHistory: history }),
+    setGroupChatHistory: (history: ChatMessage[]) => set({ groupChatHistory: history }),
 
     handleSearchGlobal: async (query: string) => {
         if (!query.trim()) {
@@ -94,7 +99,7 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         const raw = await window.upeer.getMessagesAround(chatId, targetMsgId);
         if (activeGroupId) {
             set({
-                groupChatHistory: raw.map((message: any) => mapGroupMessage(chatId, message, contacts, myIdentity)),
+                groupChatHistory: raw.map((message) => mapGroupMessage(chatId, message, contacts, myIdentity)),
                 isWindowedHistory: true,
             });
             return;
@@ -115,7 +120,7 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         const history = raw.reverse();
         if (activeGroupId) {
             set({
-                groupChatHistory: history.map((message: any) => mapGroupMessage(chatId, message, contacts, myIdentity)),
+                groupChatHistory: history.map((message) => mapGroupMessage(chatId, message, contacts, myIdentity)),
                 isWindowedHistory: false,
             });
             return;
@@ -133,13 +138,13 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
 
     refreshGroups: async () => {
         const rawGroups = await window.upeer.getGroups();
-        const groups = rawGroups.map((group: any) => ({
+        const groups = rawGroups.map((group: GroupRecord) => ({
             ...group,
             avatar: group.avatar || undefined,
             members: Array.isArray(group.members) ? group.members : JSON.parse(group.members || '[]'),
         }));
         const { activeGroupId } = get();
-        const shouldClearActiveGroup = Boolean(activeGroupId) && !groups.some((group: any) => group.groupId === activeGroupId);
+        const shouldClearActiveGroup = Boolean(activeGroupId) && !groups.some((group) => group.groupId === activeGroupId);
         set({
             groups,
             ...(shouldClearActiveGroup ? { activeGroupId: '', groupChatHistory: [], isWindowedHistory: false } : {}),

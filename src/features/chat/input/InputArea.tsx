@@ -15,6 +15,8 @@ import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
 import type { LinkPreview } from '../../../types/chat.js';
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al enviar la nota de voz';
+
 interface InputAreaProps {
     message: string;
     setMessage: (msg: string) => void;
@@ -61,8 +63,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 setVoiceError(null);
                 try {
                     await onSendVoiceNote(file);
-                } catch (err: any) {
-                    setVoiceError(err?.message || 'Error al enviar la nota de voz');
+                } catch (error: unknown) {
+                    setVoiceError(getErrorMessage(error));
                 } finally {
                     setIsSending(false);
                 }

@@ -49,8 +49,8 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: any, b: any) => ({ column: a, value: b }),
-    desc: (a: any) => ({ column: a, order: 'desc' })
+    eq: (a: unknown, b: unknown) => ({ column: a, value: b }),
+    desc: (a: unknown) => ({ column: a, order: 'desc' })
 }));
 
 vi.mock('../../../src/main_process/network/utils.js', () => ({
@@ -171,7 +171,7 @@ describe('Contacts Operations', () => {
         contactsOps.addOrUpdateContact('peer1', 'new-addr', 'Alice');
 
         expect(mockDb.insert).toHaveBeenCalled();
-        const callArgs = (mockDb.values as any).mock.calls[0][0];
+        const callArgs = vi.mocked(mockDb.values).mock.calls[0][0] as { knownAddresses: string };
         const known = JSON.parse(callArgs.knownAddresses);
         expect(known[0]).toBe('new-addr');
 

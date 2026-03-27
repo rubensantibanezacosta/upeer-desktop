@@ -72,7 +72,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
 
     useEffect(() => {
         window.upeer.identityStatus()
-            .then((status: any) => {
+            .then((status) => {
                 if (!status.isLocked) {
                     onUnlocked();
                     return;

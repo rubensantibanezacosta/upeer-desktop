@@ -3,6 +3,14 @@ import { ipcMain } from 'electron';
 import { registerDeviceHandlers } from '../../../../src/main_process/core/ipcHandlers/devices.js';
 import * as deviceOps from '../../../../src/main_process/storage/devices-operations.js';
 
+type IpcHandler = (event?: unknown, payload?: { deviceId: string; isTrusted: boolean }) => unknown;
+
+function getRegisteredHandler(channel: string): IpcHandler {
+    const call = vi.mocked(ipcMain.handle).mock.calls.find(([registeredChannel]) => registeredChannel === channel);
+    if (!call) throw new Error(`Missing handler for ${channel}`);
+    return call[1] as IpcHandler;
+}
+
 vi.mock('electron', () => ({
     ipcMain: {
         handle: vi.fn(),
@@ -30,9 +38,9 @@ describe('Devices IPC Handlers', () => {
     });
 
     it('get-devices handler should call getDevicesByUPeerId', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'get-devices')[1];
+        const handler = getRegisteredHandler('get-devices');
         const mockDevices = [{ deviceId: 'dev-1', clientName: 'Android' }];
-        (deviceOps.getDevicesByUPeerId as any).mockResolvedValue(mockDevices);
+        vi.mocked(deviceOps.getDevicesByUPeerId).mockResolvedValue(mockDevices);
 
         const result = await handler();
         expect(deviceOps.getDevicesByUPeerId).toHaveBeenCalledWith('my-upeer-id');
@@ -44,7 +52,7 @@ describe('Devices IPC Handlers', () => {
     });
 
     it('set-device-trust handler should call setDeviceTrust', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'set-device-trust')[1];
+        const handler = getRegisteredHandler('set-device-trust');
         await handler(null, { deviceId: 'dev-1', isTrusted: true });
         expect(deviceOps.setDeviceTrust).toHaveBeenCalledWith('my-upeer-id', 'dev-1', true);
     });

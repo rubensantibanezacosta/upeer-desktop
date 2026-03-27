@@ -22,7 +22,7 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: any, b: any) => ({ column: a, value: b })
+    eq: (a: unknown, b: unknown) => ({ column: a, value: b })
 }));
 
 vi.mock('../../../src/main_process/network/utils.js', () => ({

@@ -1,11 +1,21 @@
 import { warn, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
-import { TransferPhase } from './types.js';
+import { FileTransfer, TransferPhase } from './types.js';
 import { updateTransferMessageStatus } from './db-helper.js';
 import { verifyFileTransferPacketSignature } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
-export async function handleAccept(this: TransferManager, upeerId: string, address: string, data: any) {
+type FileAcceptPayload = {
+    fileId: string;
+    signature?: string;
+};
+
+type FileAckPayload = {
+    fileId: string;
+    chunkIndex: number;
+};
+
+export async function handleAccept(this: TransferManager, upeerId: string, _address: string, data: FileAcceptPayload) {
     const contact = await getContactByUpeerId(upeerId);
     if (!contact?.publicKey) return;
 
@@ -33,7 +43,7 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
     }
 }
 
-export async function handleAck(this: TransferManager, upeerId: string, address: string, data: any) {
+export async function handleAck(this: TransferManager, upeerId: string, address: string, data: FileAckPayload) {
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (!transfer || (transfer.state !== 'active' && transfer.state !== 'completed')) return;
 
@@ -46,12 +56,12 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
 
     this.clearRetryTimer(data.fileId, data.chunkIndex);
 
-    if (!(transfer as any)._ackedChunks) (transfer as any)._ackedChunks = new Set<number>();
-    const ackedChunks = (transfer as any)._ackedChunks as Set<number>;
+    const ackedChunks = transfer._ackedChunks ?? new Set<number>();
+    transfer._ackedChunks = ackedChunks;
     ackedChunks.add(data.chunkIndex);
 
-    const sentTime = (transfer as any)._chunksSentTimes?.get(data.chunkIndex);
-    const updates: any = {
+    const sentTime = transfer._chunksSentTimes?.get(data.chunkIndex);
+    const updates: Partial<FileTransfer> = {
         chunksProcessed: ackedChunks.size
     };
 
@@ -74,7 +84,7 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
         }
 
         updates.windowSize = Math.min(this.config.maxWindowSize, Math.floor(windowSize));
-        (transfer as any)._chunksSentTimes.delete(data.chunkIndex);
+        transfer._chunksSentTimes?.delete(data.chunkIndex);
     }
 
     const updated = this.store.updateTransfer(data.fileId, 'sending', updates);

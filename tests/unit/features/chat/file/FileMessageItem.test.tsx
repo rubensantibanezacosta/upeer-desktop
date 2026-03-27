@@ -7,8 +7,12 @@ vi.mock('../../../../../src/features/chat/file/MediaFileMessage.js', () => ({
     MediaFileMessage: () => <div data-testid="media-file-message" />,
 }));
 
+type DocumentFileMessageProps = {
+    onOpen?: () => void;
+};
+
 vi.mock('../../../../../src/features/chat/file/DocumentFileMessage.js', () => ({
-    DocumentFileMessage: (props: any) => <button data-testid="document-file-message" onClick={props.onOpen} />,
+    DocumentFileMessage: ({ onOpen }: DocumentFileMessageProps) => <button data-testid="document-file-message" onClick={onOpen} />,
 }));
 
 vi.mock('../../../../../src/features/chat/file/AudioPlayer.js', () => ({

@@ -1,24 +1,23 @@
 import { useState } from 'react';
 import { AttachmentType } from '../features/chat/input/AttachmentButton.js';
+import type { Contact, PendingFile, TransferMessageUpdates } from '../types/chat.js';
+
+type FileDialogFilter = {
+    name: string;
+    extensions: string[];
+};
+
 type FileTransferType = {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
     cancelTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
 };
 
-interface PendingFile {
-    path: string;
-    name: string;
-    size: number;
-    type: string;
-    lastModified: number;
-}
-
 interface UseFileTransferHandlersProps {
     targetUpeerId: string | undefined;
-    activeContact: any;
+    activeContact?: Contact;
     fileTransfer: FileTransferType;
     addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, fileType: string, tempHash: string, thumbnail: string, caption: string, isOutgoing: boolean, filePath?: string) => void;
-    updateFileTransferMessage: (fileId: string, updates: any) => void;
+    updateFileTransferMessage: (fileId: string, updates: TransferMessageUpdates) => void;
 }
 
 export const useFileTransferHandlers = ({
@@ -36,8 +35,7 @@ export const useFileTransferHandlers = ({
     const handleAttachFile = async (type: AttachmentType) => {
         if (!targetUpeerId) return;
 
-        // Map internal attachment types to filters
-        let filters: any[] = [];
+        let filters: FileDialogFilter[] = [];
         let title = 'Seleccionar archivo';
 
         switch (type) {
@@ -131,7 +129,6 @@ export const useFileTransferHandlers = ({
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        // Only trigger dragleave if we are actually leaving the container, not just hovering over a child element
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsDragging(false);
         }
@@ -144,8 +141,6 @@ export const useFileTransferHandlers = ({
 
         if (!targetUpeerId || activeContact?.status !== 'connected') return;
 
-        // In Electron 30+, File objects hide the path property. 
-        // We use the webUtils.getPathForFile helper exposed in preload.ts
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
 
         const mappedFiles = (await Promise.all(droppedFilesRaw.map(async (f: File & { path?: string }) => {
@@ -161,12 +156,10 @@ export const useFileTransferHandlers = ({
                 size: f.size,
                 type: f.type || 'application/octet-stream',
                 lastModified: f.lastModified
-            } as PendingFile;
-        }))).filter((f: any) => !!f.path);
+            };
+        }))).filter((file): file is PendingFile => Boolean(file.path));
 
         if (mappedFiles.length > 0) {
-
-            // We append dropped files to pendingFiles to support dropping multiple times
             setPendingFiles(prev => {
                 const newFiles = [...prev];
                 mappedFiles.forEach(mf => {

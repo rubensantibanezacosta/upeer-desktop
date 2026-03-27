@@ -4,6 +4,16 @@ import { registerContactHandlers } from '../../../../src/main_process/core/ipcHa
 import * as contactsOps from '../../../../src/main_process/storage/contacts/operations.js';
 import * as contactsMessaging from '../../../../src/main_process/network/messaging/contacts.js';
 
+type AddContactPayload = { address: string; name: string };
+type AddContactResult = { success: boolean; upeerId?: string; error?: string };
+type AddContactHandler = (event: unknown, payload: AddContactPayload) => Promise<AddContactResult>;
+
+function getAddContactHandler(): AddContactHandler {
+    const call = vi.mocked(ipcMain.handle).mock.calls.find(([channel]) => channel === 'add-contact');
+    if (!call) throw new Error('Missing add-contact handler');
+    return call[1] as AddContactHandler;
+}
+
 vi.mock('electron', () => ({
     ipcMain: {
         handle: vi.fn(),
@@ -59,7 +69,7 @@ describe('Contacts IPC Handlers', () => {
     });
 
     it('accepts a valid Yggdrasil address in 300::/8', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'add-contact')[1];
+        const handler = getAddContactHandler();
 
         const result = await handler({}, { address: 'peer-123@301:5884:ec67:1c3e:d713:8b32:ed5e:9de3', name: 'Alice' });
 
@@ -75,7 +85,7 @@ describe('Contacts IPC Handlers', () => {
     });
 
     it('accepts compressed Yggdrasil addresses', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'add-contact')[1];
+        const handler = getAddContactHandler();
 
         const result = await handler({}, { address: 'peer-123@300::1', name: 'Alice' });
 
@@ -90,7 +100,7 @@ describe('Contacts IPC Handlers', () => {
     });
 
     it('rejects valid IPv6 addresses outside Yggdrasil ranges', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'add-contact')[1];
+        const handler = getAddContactHandler();
 
         const result = await handler({}, { address: 'peer-123@fe80::1', name: 'Alice' });
 
@@ -99,7 +109,7 @@ describe('Contacts IPC Handlers', () => {
     });
 
     it('rejects malformed IPv6 addresses even if they start with a 2xx prefix', async () => {
-        const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'add-contact')[1];
+        const handler = getAddContactHandler();
 
         const result = await handler({}, { address: 'peer-123@201:zzzz::1', name: 'Alice' });
 

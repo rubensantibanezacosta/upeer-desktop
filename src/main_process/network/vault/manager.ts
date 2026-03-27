@@ -7,6 +7,30 @@ import { getKademliaInstance } from '../dht/shared.js';
 import { createVaultPointerKey } from '../dht/kademlia/store.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 
+type VaultReplicatedPacket = {
+    type?: string;
+    [key: string]: unknown;
+};
+
+type VaultCandidate = {
+    upeerId?: string;
+    address: string;
+    status: string;
+    lastSeen?: string | number | Date;
+};
+
+type VaultPointerValue = {
+    custodians: string[];
+    updatedAt: number;
+};
+
+type KademliaLike = {
+    findClosestContacts(targetId: string, count: number): Array<{ upeerId: string; address: string }>;
+    storeValue(key: string, value: VaultPointerValue, publisher: string): Promise<void>;
+    findValue(key: string): Promise<{ value?: { custodians?: string[] } } | null>;
+    findLocationBlock(targetId: string): Promise<{ address?: string } | null>;
+};
+
 export const VAULT_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 export const SHARD_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 export const VAULT_RENEW_MS = 45 * 24 * 60 * 60 * 1000;
@@ -44,7 +68,7 @@ export class VaultManager {
         }
     }
 
-    private static async sendWithRetry(address: string, packet: any, maxRetries = 3, initialDelay = 1000): Promise<void> {
+    private static async sendWithRetry(address: string, packet: VaultReplicatedPacket, maxRetries = 3, initialDelay = 1000): Promise<void> {
         let attempt = 0;
         while (attempt < maxRetries) {
             try {
@@ -62,10 +86,10 @@ export class VaultManager {
         }
     }
 
-    static async replicateToVaults(recipientSid: string, packet: any, ttlMs?: number, payloadHashOverride?: string): Promise<number> {
+    static async replicateToVaults(recipientSid: string, packet: VaultReplicatedPacket, ttlMs?: number, payloadHashOverride?: string): Promise<number> {
         const allContacts = await getContacts();
         const myId = getMyUPeerId();
-        const kademlia = getKademliaInstance();
+        const kademlia = getKademliaInstance() as KademliaLike | null;
         const replicationFactor = await this.getDynamicReplicationFactor(recipientSid);
         const packetJson = JSON.stringify(packet);
         const payloadHash = payloadHashOverride ?? crypto.createHash('sha256').update(packetJson).digest('hex');
@@ -82,7 +106,7 @@ export class VaultManager {
             hash: payloadHash.slice(0, 8)
         }, 'vault');
 
-        let candidates = allContacts
+        let candidates: VaultCandidate[] = allContacts
             .filter(c => c.status === 'connected' && c.upeerId !== myId && c.upeerId !== recipientSid)
             .sort((a, b) => {
                 const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
@@ -99,7 +123,7 @@ export class VaultManager {
                     upeerId: node.upeerId,
                     address: node.address,
                     status: 'connected'
-                })) as any[];
+                }));
         }
 
         const vaultPacket = {
@@ -156,7 +180,7 @@ export class VaultManager {
             timestamp: Date.now()
         };
 
-        const kademlia = getKademliaInstance();
+        const kademlia = getKademliaInstance() as KademliaLike | null;
         if (kademlia) {
             const ptrKey = createVaultPointerKey(myId);
 

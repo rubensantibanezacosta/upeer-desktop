@@ -76,8 +76,10 @@ interface NavigationActions {
     setPendingScrollMsgId: (id: string | null) => void;
 }
 
+export type NavigationStore = NavigationState & NavigationActions;
+
 // ── Store ─────────────────────────────────────────────────────────────────────
-export const useNavigationStore = create<NavigationState & NavigationActions>((set, get) => ({
+export const useNavigationStore = create<NavigationStore>((set, get) => ({
     // Estado inicial
     appView: 'chat',
     settingsSection: null,

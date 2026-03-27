@@ -60,7 +60,7 @@ import {
 } from './validationVaultGroups.js';
 import type { ValidationResult } from './validationShared.js';
 
-const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
+const VALIDATORS: Record<string, (data: unknown) => ValidationResult> = {
     HANDSHAKE_REQ: validateHandshakeReq,
     HANDSHAKE_ACCEPT: validateHandshakeAccept,
     CHAT: validateChat,
@@ -114,7 +114,7 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     DR_RESET: validateDrReset,
 };
 
-export function validateMessage(type: string, data: any): ValidationResult {
+export function validateMessage(type: string, data: unknown): ValidationResult {
     const validator = VALIDATORS[type];
     if (!validator) {
         return { valid: false, error: `Unknown message type: ${type}` };

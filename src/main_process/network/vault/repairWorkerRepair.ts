@@ -5,9 +5,15 @@ import { getDb } from '../../storage/shared.js';
 import { VAULT_TTL_MS } from './manager.js';
 import { ErasureCoder } from './redundancy/erasure.js';
 
+type DistributedShard = {
+    shardIndex: number;
+    data: string;
+    segmentIndex?: number | null;
+};
+
 export async function repairVaultAsset(
     fileHash: string,
-    reconstructSegment: (fileHash: string, segIdx: number, shards: any[]) => Promise<void>,
+    reconstructSegment: (fileHash: string, segIdx: number, shards: DistributedShard[]) => Promise<void>,
     collectMissingShards: (fileHash: string, segIdx: number, missingIndices: number[]) => Promise<void>
 ): Promise<void> {
     info('Repairing degraded asset (segment-aware)', { fileHash }, 'vault');
@@ -16,15 +22,15 @@ export async function repairVaultAsset(
         const db = getDb();
         const shards = await db.select()
             .from(distributedAssets)
-            .where(eq(distributedAssets.fileHash, fileHash));
+            .where(eq(distributedAssets.fileHash, fileHash)) as DistributedShard[];
 
         if (shards.length === 0) {
             return;
         }
 
-        const segments = new Map<number, any[]>();
+        const segments = new Map<number, DistributedShard[]>();
         for (const shard of shards) {
-            const segmentIndex = (shard as any).segmentIndex || 0;
+            const segmentIndex = typeof shard.segmentIndex === 'number' ? shard.segmentIndex : 0;
             let segmentShards = segments.get(segmentIndex);
             if (!segmentShards) {
                 segmentShards = [];
@@ -47,7 +53,7 @@ export async function repairVaultAsset(
                 await collectMissingShards(fileHash, segIdx, missingIndices);
             }
         }
-    } catch (err) {
+    } catch (err: unknown) {
         warn('Repair failed for asset', { fileHash, error: err }, 'vault');
     }
 }
@@ -55,7 +61,7 @@ export async function repairVaultAsset(
 export async function reconstructVaultSegment(
     fileHash: string,
     segIdx: number,
-    shards: any[],
+    shards: DistributedShard[],
     redistributeSegmentShards: (fileHash: string, segIdx: number, segmentData: Buffer) => Promise<void>
 ): Promise<void> {
     info('Reconstructing segment from shards', { fileHash, segIdx, shardCount: shards.length }, 'vault');
@@ -78,7 +84,7 @@ export async function reconstructVaultSegment(
 
         debug('Segment reconstructed successfully', { fileHash, segIdx, size: reconstructed.length }, 'vault');
         await redistributeSegmentShards(fileHash, segIdx, reconstructed);
-    } catch (err) {
+    } catch (err: unknown) {
         warn('File reconstruction failed', { fileHash, error: err }, 'vault');
     }
 }
@@ -112,7 +118,7 @@ export async function collectMissingVaultShards(fileHash: string, segIdx: number
                         requesterSid: myId,
                         payloadHash,
                     });
-                } catch (err: any) {
+                } catch (err: unknown) {
                     debug('Failed to send VAULT_QUERY', { custodian: custodian.upeerId, error: err }, 'vault');
                 }
             })());
@@ -160,7 +166,7 @@ export async function redistributeVaultSegmentShards(fileHash: string, segIdx: n
                     data: shard.toString('hex'),
                     expiresAt: Date.now() + VAULT_TTL_MS,
                 });
-            } catch (err: any) {
+            } catch (err: unknown) {
                 debug('Failed to redistribute shard', { custodian: custodian.upeerId, error: err }, 'vault');
             }
         })();

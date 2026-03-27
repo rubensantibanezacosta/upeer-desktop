@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as contactOpsModule from '../../../src/main_process/storage/contacts/operations.js';
+import * as groupsOpsModule from '../../../src/main_process/storage/groups/operations.js';
+import * as messagesOpsModule from '../../../src/main_process/storage/messages/operations.js';
+
+type GroupRecord = NonNullable<ReturnType<typeof groupsOpsModule.getGroupById>>;
+type ContactRecord = NonNullable<Awaited<ReturnType<typeof contactOpsModule.getContactByUpeerId>>>;
+type SaveMessageResult = Awaited<ReturnType<typeof messagesOpsModule.saveMessage>>;
+type KademliaNode = { upeerId: string; address: string };
+type KademliaInstance = { findClosestContacts: (upeerId: string, limit: number) => KademliaNode[] };
+
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
 }));
@@ -77,7 +87,7 @@ describe('network/messaging/groups.ts', () => {
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { createGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null as any);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-new',
             name: 'Grupo nuevo',
@@ -86,7 +96,7 @@ describe('network/messaging/groups.ts', () => {
             epoch: 1,
             senderKey: 'cc'.repeat(32),
             status: 'active'
-        } as any);
+        } as GroupRecord);
 
         await createGroup('Grupo nuevo', ['peer-a']);
 
@@ -114,14 +124,14 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id', 'peer-offline'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-offline',
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
             ephemeralPublicKey: 'bb'.repeat(32),
             ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
-        } as any);
+        } as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
@@ -154,12 +164,12 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any).mockReturnValueOnce({
+        } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
             status: 'connected',
@@ -168,7 +178,7 @@ describe('network/messaging/groups.ts', () => {
             ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
             address: '200::10',
             knownAddresses: '[]'
-        } as any);
+        } as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
@@ -208,7 +218,7 @@ describe('network/messaging/groups.ts', () => {
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
             members: ['self-id', 'peer-online', 'peer-offline'],
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
             if (upeerId === 'peer-online') {
                 return {
@@ -217,16 +227,16 @@ describe('network/messaging/groups.ts', () => {
                     publicKey: 'aa'.repeat(32),
                     address: '200::10',
                     knownAddresses: '[]'
-                } as any;
+                } as ContactRecord;
             }
             if (upeerId === 'peer-offline') {
                 return {
                     upeerId,
                     status: 'disconnected',
                     publicKey: 'bb'.repeat(32)
-                } as any;
+                } as ContactRecord;
             }
-            return null as any;
+            return null;
         });
 
         await leaveGroup('grp-1');
@@ -278,7 +288,7 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
             status: 'connected',
@@ -287,8 +297,8 @@ describe('network/messaging/groups.ts', () => {
             ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
             address: '200::10',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
 
         const preview = {
             url: 'https://example.com',
@@ -331,21 +341,21 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any).mockReturnValueOnce({
+        } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
             members: ['self-id', 'peer-online'],
             epoch: 2,
             senderKey: 'dd'.repeat(32),
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
             address: '200::10',
             knownAddresses: '[]'
-        } as any);
+        } as ContactRecord);
 
         await inviteToGroup('grp-1', 'peer-online');
 
@@ -393,14 +403,14 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any);
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null as any);
-        (getKademliaInstance as any).mockReturnValue({
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as any);
+        } as KademliaInstance);
 
         await sendGroupMessage('grp-1', 'hola grupo sync');
 
@@ -423,12 +433,12 @@ describe('network/messaging/groups.ts', () => {
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any).mockReturnValueOnce({
+        } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
-        } as any);
+        } as GroupRecord);
 
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
@@ -436,7 +446,7 @@ describe('network/messaging/groups.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::10',
             knownAddresses: 'not-json'
-        } as any);
+        } as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nombre' });
 

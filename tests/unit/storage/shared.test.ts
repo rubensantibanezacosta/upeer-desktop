@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getDb, getSqlite, getSchema, setDatabase, closeDatabase, clearUserData, runTransaction } from '../../../src/main_process/storage/shared.js';
+import { getDb, getSqlite, getSchema, setDatabase, closeDatabase, clearUserData, runTransaction, type SqliteLike } from '../../../src/main_process/storage/shared.js';
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
@@ -7,8 +7,13 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 describe('Storage Shared Unit Tests', () => {
-    let mockDb: any;
-    let mockSqlite: any;
+    type MockDb = {
+        select: ReturnType<typeof vi.fn>;
+        insert: ReturnType<typeof vi.fn>;
+    };
+
+    let mockDb: MockDb;
+    let mockSqlite: SqliteLike;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -19,9 +24,7 @@ describe('Storage Shared Unit Tests', () => {
         mockSqlite = {
             close: vi.fn(),
             exec: vi.fn(),
-            transaction: vi.fn((fn) => {
-                return () => fn();
-            })
+            transaction: vi.fn(<T>(fn: () => T) => () => fn())
         };
     });
 
@@ -31,21 +34,21 @@ describe('Storage Shared Unit Tests', () => {
     });
 
     it('should set and get database instances', () => {
-        setDatabase(mockDb, mockSqlite);
-        expect(getDb()).toBe(mockDb);
+        setDatabase(mockDb as ReturnType<typeof getDb>, mockSqlite);
+        expect(getDb()).toBe(mockDb as ReturnType<typeof getDb>);
         expect(getSqlite()).toBe(mockSqlite);
         expect(getSchema()).toBeDefined();
     });
 
     it('should close database', () => {
-        setDatabase(mockDb, mockSqlite);
+        setDatabase(mockDb as ReturnType<typeof getDb>, mockSqlite);
         closeDatabase();
         expect(mockSqlite.close).toHaveBeenCalled();
         expect(() => getDb()).toThrow();
     });
 
     it('should clear user data', () => {
-        setDatabase(mockDb, mockSqlite);
+        setDatabase(mockDb as ReturnType<typeof getDb>, mockSqlite);
         clearUserData();
         expect(mockSqlite.exec).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM messages'));
         expect(mockSqlite.exec).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM ratchet_sessions'));
@@ -57,7 +60,7 @@ describe('Storage Shared Unit Tests', () => {
     });
 
     it('should run transaction successfully', () => {
-        setDatabase(mockDb, mockSqlite);
+        setDatabase(mockDb as ReturnType<typeof getDb>, mockSqlite);
         const task = vi.fn().mockReturnValue('result');
         const result = runTransaction(task);
 
@@ -72,11 +75,10 @@ describe('Storage Shared Unit Tests', () => {
     });
 
     it('should re-throw and log error if transaction fails', async () => {
-        setDatabase(mockDb, mockSqlite);
+        setDatabase(mockDb as ReturnType<typeof getDb>, mockSqlite);
         const error = new Error('Transaction Crash');
         const failingTask = vi.fn().mockImplementation(() => { throw error; });
 
-        // Mock transaction to call the failing task
         mockSqlite.transaction.mockReturnValue(() => failingTask());
 
         expect(() => runTransaction(failingTask)).toThrow('Transaction Crash');

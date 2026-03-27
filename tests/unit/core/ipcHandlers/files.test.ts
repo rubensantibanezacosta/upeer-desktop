@@ -4,6 +4,19 @@ import { registerFileHandlers } from '../../../../src/main_process/core/ipcHandl
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+type EventWithSender = { sender: { id: number } };
+type OpenFilePayload = { filePath: string };
+type PersistPayload = { filePath: string; fileName: string };
+type SaveBufferPayload = { base64: string; fileName: string };
+type HandlerResult = { success: boolean; path?: string; error?: string };
+type IpcHandler<TPayload> = (event: unknown, payload: TPayload) => Promise<HandlerResult>;
+
+function getHandler<TPayload>(channel: string): IpcHandler<TPayload> {
+    const call = vi.mocked(ipcMain.handle).mock.calls.find(([registeredChannel]) => registeredChannel === channel);
+    if (!call) throw new Error(`Missing handler for ${channel}`);
+    return call[1] as IpcHandler<TPayload>;
+}
+
 vi.mock('electron', () => {
     return {
         ipcMain: {
@@ -56,14 +69,14 @@ describe('files IPC handlers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         registerFileHandlers();
-        (fs.stat as any).mockResolvedValue({
+        vi.mocked(fs.stat).mockResolvedValue({
             size: 1024,
             mtimeMs: 123,
             isFile: () => true,
-        });
-        (fs.mkdir as any).mockResolvedValue(undefined);
-        (fs.writeFile as any).mockResolvedValue(undefined);
-        (fs.copyFile as any).mockResolvedValue(undefined);
+        } as Awaited<ReturnType<typeof fs.stat>>);
+        vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+        vi.mocked(fs.copyFile).mockResolvedValue(undefined);
     });
 
     it('should register open-file handler', () => {
@@ -72,10 +85,10 @@ describe('files IPC handlers', () => {
 
     describe('open-file handler', () => {
         it('should return error if file does not exist', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
+            const handler = getHandler<OpenFilePayload>('open-file');
 
             const filePath = '/home/user/Downloads/missing.txt';
-            (fs.access as any).mockRejectedValueOnce(new Error('ENOENT'));
+            vi.mocked(fs.access).mockRejectedValueOnce(new Error('ENOENT'));
 
             const result = await handler({}, { filePath });
 
@@ -85,11 +98,11 @@ describe('files IPC handlers', () => {
         });
 
         it('should call shell.openPath if file exists', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
+            const handler = getHandler<OpenFilePayload>('open-file');
 
             const filePath = '/home/user/Downloads/exists.txt';
-            (fs.access as any).mockResolvedValueOnce(undefined);
-            (shell.openPath as any).mockResolvedValueOnce('');
+            vi.mocked(fs.access).mockResolvedValueOnce(undefined);
+            vi.mocked(shell.openPath).mockResolvedValueOnce('');
 
             const result = await handler({}, { filePath });
 
@@ -98,7 +111,7 @@ describe('files IPC handlers', () => {
         });
 
         it('should return error if path is outside restricted directories', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'open-file')[1];
+            const handler = getHandler<OpenFilePayload>('open-file');
 
             const filePath = '/etc/passwd';
             const result = await handler({}, { filePath });
@@ -111,7 +124,7 @@ describe('files IPC handlers', () => {
 
     describe('persist-internal-asset handler', () => {
         it('rejects arbitrary renderer-provided paths that were not user selected', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-internal-asset')[1];
+            const handler = getHandler<PersistPayload>('persist-internal-asset');
 
             const result = await handler({ sender: { id: 7 } }, { filePath: '/etc/passwd', fileName: 'passwd' });
 
@@ -121,7 +134,7 @@ describe('files IPC handlers', () => {
         });
 
         it('allows persisting app-managed temp files', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-internal-asset')[1];
+            const handler = getHandler<PersistPayload>('persist-internal-asset');
 
             const result = await handler(
                 { sender: { id: 11 } },
@@ -133,7 +146,7 @@ describe('files IPC handlers', () => {
         });
 
         it('returns the same path when the source is already inside internal assets', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-internal-asset')[1];
+            const handler = getHandler<PersistPayload>('persist-internal-asset');
 
             const result = await handler(
                 { sender: { id: 12 } },
@@ -147,7 +160,7 @@ describe('files IPC handlers', () => {
 
     describe('persist-selected-file handler', () => {
         it('rejects arbitrary renderer-provided paths if they were not explicitly trusted', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-selected-file')[1];
+            const handler = getHandler<PersistPayload>('persist-selected-file');
 
             const result = await handler({ sender: { id: 13 } }, { filePath: '/mnt/data/video.mp4', fileName: 'video.mp4' });
 
@@ -157,8 +170,8 @@ describe('files IPC handlers', () => {
         });
 
         it('persists a file selected via preload/webUtils path resolution', async () => {
-            const registerHandler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'register-trusted-selected-file')[1];
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'persist-selected-file')[1];
+            const registerHandler = getHandler<OpenFilePayload>('register-trusted-selected-file');
+            const handler = getHandler<PersistPayload>('persist-selected-file');
 
             const registration = await registerHandler({ sender: { id: 14 } }, { filePath: '/mnt/data/video.mp4' });
             expect(registration).toEqual({ success: true });
@@ -175,7 +188,7 @@ describe('files IPC handlers', () => {
 
     describe('save-buffer-to-temp handler', () => {
         it('sanitizes file names so they cannot escape the dedicated temp folder', async () => {
-            const handler = (ipcMain.handle as any).mock.calls.find((call: any) => call[0] === 'save-buffer-to-temp')[1];
+            const handler = getHandler<SaveBufferPayload>('save-buffer-to-temp');
 
             const result = await handler({ sender: { id: 14 } }, { base64: Buffer.from('hola').toString('base64'), fileName: '../../escape.txt' });
 

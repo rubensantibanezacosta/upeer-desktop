@@ -7,7 +7,12 @@ import { sealTransferKey } from './crypto.js';
 import { updateTransferMessageStatus } from './db-helper.js';
 import type { TransferManager } from './transfer-manager.js';
 
-export async function startVaultingFailover(this: TransferManager, fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: any) {
+type VaultingContact = {
+    upeerId?: string;
+    status: string;
+};
+
+export async function startVaultingFailover(this: TransferManager, fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: string | undefined) {
     const currentTransfer = this.store.getTransfer(fileId, 'sending');
     if (!currentTransfer || currentTransfer.state !== 'active') return;
     if (currentTransfer.phase === TransferPhase.TRANSFERRING || currentTransfer.state === 'completed') return;
@@ -17,8 +22,8 @@ export async function startVaultingFailover(this: TransferManager, fileId: strin
             const { computeScore } = await import('../../security/reputation/vouches.js');
             const contactsForScore = await _getContacts();
             const directIds = new Set<string>(contactsForScore
-                .filter((c: any) => c.status === 'connected' && c.upeerId)
-                .map((c: any) => c.upeerId as string));
+                .filter((contact: VaultingContact) => contact.status === 'connected' && typeof contact.upeerId === 'string')
+                .map((contact: VaultingContact) => contact.upeerId as string));
 
             const score = computeScore(upeerId, directIds);
             if (score < 30) {

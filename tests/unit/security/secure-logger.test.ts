@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SecureLogger, LogLevel, info, warn, error, debug, network, security } from '../../../src/main_process/security/secure-logger.js';
 
+type ConsoleSpies = {
+    info: ReturnType<typeof vi.spyOn>;
+    warn: ReturnType<typeof vi.spyOn>;
+    error: ReturnType<typeof vi.spyOn>;
+    debug: ReturnType<typeof vi.spyOn>;
+};
+
 describe('SecureLogger Unit Tests', () => {
-    let consoleSpy: any;
+    let consoleSpy: ConsoleSpies;
 
     beforeEach(() => {
         vi.clearAllMocks();

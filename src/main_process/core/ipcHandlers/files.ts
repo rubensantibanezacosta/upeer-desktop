@@ -118,7 +118,7 @@ export function registerFileHandlers(): void {
       }
       await shell.openExternal(url);
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError('open-external failed', { err: String(err) }, 'security');
       return { success: false, error: String(err) };
     }

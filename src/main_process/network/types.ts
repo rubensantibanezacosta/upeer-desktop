@@ -102,7 +102,7 @@ export interface DhtFindValue {
 
 export interface DhtFoundValue {
     key: string;
-    value: any;
+    value: unknown;
     publisher: string;
     timestamp: number;
     signature?: string;
@@ -110,7 +110,7 @@ export interface DhtFoundValue {
 
 export interface DhtStore {
     key: string;
-    value: any;
+    value: unknown;
     publisher: string;
     timestamp: number;
     signature?: string;
@@ -187,9 +187,25 @@ export interface FileCancelData {
     reason: string;
 }
 
+export interface GroupMessagePayload {
+    id?: string;
+    groupId: string;
+    content: string;
+    nonce: string;
+    replyTo?: string;
+    timestamp?: number;
+    epoch: number;
+    isInternalSync?: boolean;
+}
+
+export interface GroupAckPayload {
+    id: string;
+    groupId: string;
+}
+
 export interface NetworkPacket {
     type: MessageType;
     senderUpeerId?: string;
     signature?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }

@@ -8,7 +8,23 @@ import {
     restoreFromBackup
 } from '../../../src/main_process/storage/backup.js';
 
-vi.mock('node:fs');
+type PathLike = Parameters<typeof fs.existsSync>[0];
+type MockStats = Pick<fs.Stats, 'size' | 'mtime'>;
+
+function createStats(size: number, mtime = new Date()): MockStats {
+    return { size, mtime };
+}
+
+vi.mock('node:fs', () => ({
+    default: {
+        existsSync: vi.fn(),
+        readdirSync: vi.fn(),
+        statSync: vi.fn(),
+        copyFileSync: vi.fn(),
+        chmodSync: vi.fn(),
+        unlinkSync: vi.fn(),
+    }
+}));
 vi.mock('../../../src/main_process/security/secure-logger.js');
 
 describe('Database Backup Unit Tests', () => {
@@ -22,13 +38,12 @@ describe('Database Backup Unit Tests', () => {
         vi.resetAllMocks();
         vi.useFakeTimers();
 
-        // Setup default mocks for path-related fs functions
-        (fs.existsSync as any) = vi.fn().mockReturnValue(false);
-        (fs.readdirSync as any) = vi.fn().mockReturnValue([]);
-        (fs.statSync as any) = vi.fn().mockReturnValue({ size: 0, mtime: new Date() });
-        (fs.copyFileSync as any) = vi.fn();
-        (fs.chmodSync as any) = vi.fn();
-        (fs.unlinkSync as any) = vi.fn();
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+        vi.mocked(fs.readdirSync).mockReturnValue([]);
+        vi.mocked(fs.statSync).mockReturnValue(createStats(0) as fs.Stats);
+        vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+        vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+        vi.mocked(fs.unlinkSync).mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -36,14 +51,14 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should skip backup if database file does not exist', () => {
-        (fs.existsSync as any).mockReturnValue(false);
+        vi.mocked(fs.existsSync).mockReturnValue(false);
         const result = performDatabaseBackup(userDataPath);
         expect(result).toBeUndefined();
         expect(fs.existsSync).toHaveBeenCalledWith(dbPath);
     });
 
     it('should skip backup if it already exists for today', () => {
-        (fs.existsSync as any).mockImplementation((p: any) => {
+        vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => {
             if (p === dbPath) return true;
             if (p === backupPath) return true;
             return false;
@@ -55,8 +70,8 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should create a new backup if it does not exist for today', () => {
-        (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
-        (fs.statSync as any).mockReturnValue({ size: 1024 });
+        vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
+        vi.mocked(fs.statSync).mockReturnValue(createStats(1024) as fs.Stats);
 
         const result = performDatabaseBackup(userDataPath);
 
@@ -66,8 +81,8 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should handle errors during backup creation', () => {
-        (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
-        (fs.copyFileSync as any).mockImplementation(() => {
+        vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
+        vi.mocked(fs.copyFileSync).mockImplementation(() => {
             throw new Error('Disk full');
         });
 
@@ -76,7 +91,7 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should cleanup old backups (> 7 days)', () => {
-        (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
+        vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
 
         const oldDate = new Date();
         oldDate.setDate(oldDate.getDate() - 10);
@@ -88,7 +103,7 @@ describe('Database Backup Unit Tests', () => {
         const recentDateStr = recentDate.toISOString().split('T')[0];
         const recentBackupFile = `p2p-chat.db.backup-${recentDateStr}`;
 
-        (fs.readdirSync as any).mockReturnValue([
+        vi.mocked(fs.readdirSync).mockReturnValue([
             oldBackupFile,
             recentBackupFile,
             'other-file.txt'
@@ -102,7 +117,7 @@ describe('Database Backup Unit Tests', () => {
 
     it('should schedule periodic backups', () => {
         const stop = scheduleBackups(userDataPath, 1);
-        (fs.existsSync as any).mockReturnValue(true);
+        vi.mocked(fs.existsSync).mockReturnValue(true);
 
         vi.advanceTimersByTime(60 * 60 * 1000 + 100);
         expect(fs.existsSync).toHaveBeenCalled();
@@ -111,11 +126,11 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should list available backups', () => {
-        (fs.readdirSync as any).mockReturnValue([
+        vi.mocked(fs.readdirSync).mockReturnValue([
             `p2p-chat.db.backup-${today}`,
             'random.txt'
         ]);
-        (fs.statSync as any).mockReturnValue({ size: 1234, mtime: new Date() });
+        vi.mocked(fs.statSync).mockReturnValue(createStats(1234) as fs.Stats);
 
         const list = listBackups(userDataPath);
         expect(list.length).toBe(1);
@@ -123,8 +138,8 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should restore from backup', () => {
-        (fs.existsSync as any).mockReturnValue(true);
-        (fs.statSync as any).mockReturnValue({ size: 5000 });
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.statSync).mockReturnValue(createStats(5000) as fs.Stats);
 
         const success = restoreFromBackup(backupPath, userDataPath);
         expect(success).toBe(true);
@@ -132,55 +147,53 @@ describe('Database Backup Unit Tests', () => {
     });
 
     it('should fail restore if backup file missing', () => {
-        (fs.existsSync as any).mockReturnValue(false);
+        vi.mocked(fs.existsSync).mockReturnValue(false);
         const success = restoreFromBackup(backupPath, userDataPath);
         expect(success).toBe(false);
     });
 
     it('should fail restore if backup file too small', () => {
-        (fs.existsSync as any).mockReturnValue(true);
-        (fs.statSync as any).mockReturnValue({ size: 100 });
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.statSync).mockReturnValue(createStats(100) as fs.Stats);
         const success = restoreFromBackup(backupPath, userDataPath);
         expect(success).toBe(false);
     });
 
     describe('Edge Cases and Error Handling', () => {
         it('should handle readdirSync errors in cleanupOldBackups', () => {
-            (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
-            (fs.readdirSync as any).mockImplementation(() => {
+            vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
+            vi.mocked(fs.readdirSync).mockImplementation(() => {
                 throw new Error('Read error');
             });
 
-            // Should not throw
             const result = performDatabaseBackup(userDataPath);
             expect(result).toBeDefined();
         });
 
         it('should handle unlinkSync errors in cleanupOldBackups', () => {
-            (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
+            vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
             const oldDateStr = '2000-01-01';
             const oldFile = `p2p-chat.db.backup-${oldDateStr}`;
 
-            (fs.readdirSync as any).mockReturnValue([oldFile]);
-            (fs.unlinkSync as any).mockImplementation(() => {
+            vi.mocked(fs.readdirSync).mockReturnValue([oldFile]);
+            vi.mocked(fs.unlinkSync).mockImplementation(() => {
                 throw new Error('Permission denied');
             });
 
-            // Should not throw, should log error
             performDatabaseBackup(userDataPath, 1);
             expect(fs.unlinkSync).toHaveBeenCalled();
         });
 
         it('should handle invalid date strings in backup files', () => {
-            (fs.existsSync as any).mockImplementation((p: any) => p === dbPath);
-            (fs.readdirSync as any).mockReturnValue(['p2p-chat.db.backup-not-a-date']);
+            vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
+            vi.mocked(fs.readdirSync).mockReturnValue(['p2p-chat.db.backup-not-a-date']);
 
             performDatabaseBackup(userDataPath, 1);
             expect(fs.unlinkSync).not.toHaveBeenCalled();
         });
 
         it('should handle readdirSync failure in listBackups', () => {
-            (fs.readdirSync as any).mockImplementation(() => {
+            vi.mocked(fs.readdirSync).mockImplementation(() => {
                 throw new Error('List error');
             });
             const list = listBackups(userDataPath);
@@ -188,16 +201,15 @@ describe('Database Backup Unit Tests', () => {
         });
 
         it('should create a pre-restore backup if db exists during restore', () => {
-            (fs.existsSync as any).mockImplementation((p: any) => {
+            vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => {
                 if (p === backupPath) return true;
                 if (p === dbPath) return true;
                 return false;
             });
-            (fs.statSync as any).mockReturnValue({ size: 5000 });
+            vi.mocked(fs.statSync).mockReturnValue(createStats(5000) as fs.Stats);
 
             const success = restoreFromBackup(backupPath, userDataPath);
             expect(success).toBe(true);
-            // One for pre-restore, one for the actual restore
             expect(fs.copyFileSync).toHaveBeenCalledTimes(2);
         });
     });

@@ -47,8 +47,8 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: any, b: any) => ({ column: a, value: b }),
-    desc: (a: any) => ({ column: a, order: 'desc' })
+    eq: (a: unknown, b: unknown) => ({ column: a, value: b }),
+    desc: (a: unknown) => ({ column: a, order: 'desc' })
 }));
 
 describe('Groups Operations', () => {

@@ -1,7 +1,37 @@
 import { DEFAULT_CONFIG } from '../network/file-transfer/types.js';
 import type { ValidationResult } from './validationShared.js';
 
-export function validateFileProposal(data: any): ValidationResult {
+type FileProposalPayload = {
+    fileId?: unknown;
+    fileName?: unknown;
+    fileSize?: unknown;
+    totalChunks?: unknown;
+    chunkSize?: unknown;
+    encryptedKey?: unknown;
+    encryptedKeyNonce?: unknown;
+    chatUpeerId?: unknown;
+    messageId?: unknown;
+};
+
+type FileAcceptPayload = {
+    fileId?: unknown;
+};
+
+type FileChunkPayload = {
+    fileId?: unknown;
+    chunkIndex?: unknown;
+    data?: unknown;
+    chunkHash?: unknown;
+    iv?: unknown;
+    tag?: unknown;
+};
+
+type FileChunkAckPayload = {
+    fileId?: unknown;
+    chunkIndex?: unknown;
+};
+
+export function validateFileProposal(data: FileProposalPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (!data.fileName || typeof data.fileName !== 'string') return { valid: false, error: 'Invalid fileName' };
     if (typeof data.fileSize !== 'number' || data.fileSize < 0) return { valid: false, error: 'Invalid fileSize' };
@@ -31,12 +61,12 @@ export function validateFileProposal(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateFileAccept(data: any): ValidationResult {
+export function validateFileAccept(data: FileAcceptPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     return { valid: true };
 }
 
-export function validateFileChunk(data: any): ValidationResult {
+export function validateFileChunk(data: FileChunkPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (typeof data.chunkIndex !== 'number' || data.chunkIndex < 0) return { valid: false, error: 'Invalid chunkIndex' };
     if (!data.data || typeof data.data !== 'string') return { valid: false, error: 'Invalid chunk data' };
@@ -66,18 +96,18 @@ export function validateFileChunk(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateFileChunkAck(data: any): ValidationResult {
+export function validateFileChunkAck(data: FileChunkAckPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (typeof data.chunkIndex !== 'number') return { valid: false, error: 'Invalid chunkIndex' };
     return { valid: true };
 }
 
-export function validateFileDoneAck(data: any): ValidationResult {
+export function validateFileDoneAck(data: FileAcceptPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     return { valid: true };
 }
 
-export function validateFileCancel(data: any): ValidationResult {
+export function validateFileCancel(data: FileAcceptPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') {
         return { valid: false, error: 'Invalid fileId' };
     }

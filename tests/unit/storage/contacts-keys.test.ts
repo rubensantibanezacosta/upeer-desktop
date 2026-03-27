@@ -7,6 +7,28 @@ import {
 } from '../../../src/main_process/storage/contacts/keys.js';
 import * as shared from '../../../src/main_process/storage/shared.js';
 
+type MockDb = {
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    run: ReturnType<typeof vi.fn>;
+};
+type MockSchema = {
+    contacts: {
+        upeerId: string;
+        publicKey: string;
+        ephemeralPublicKey: string;
+        ephemeralPublicKeyUpdatedAt: string;
+        signedPreKey: string;
+        signedPreKeySignature: string;
+        signedPreKeyId: string;
+        status: string;
+    };
+};
+
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(),
@@ -14,8 +36,8 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 }));
 
 describe('Contacts Storage Keys', () => {
-    let mockDb: any;
-    let mockSchema: any;
+    let mockDb: MockDb;
+    let mockSchema: MockSchema;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -40,15 +62,14 @@ describe('Contacts Storage Keys', () => {
                 status: 'status'
             }
         };
-        (shared.getDb as any).mockReturnValue(mockDb);
-        (shared.getSchema as any).mockReturnValue(mockSchema);
+        vi.mocked(shared.getDb).mockReturnValue(mockDb as ReturnType<typeof shared.getDb>);
+        vi.mocked(shared.getSchema).mockReturnValue(mockSchema as ReturnType<typeof shared.getSchema>);
     });
 
     describe('computeKeyFingerprint', () => {
         it('should compute and format fingerprint correctly', () => {
             const pubKey = '0'.repeat(64);
             const fingerprint = computeKeyFingerprint(pubKey);
-            // BLAKE2b(0...0) short = 16 bytes = 32 hex = 8 groups of 4
             expect(fingerprint).toMatch(/^([0-9A-F]{4} ){7}[0-9A-F]{4}$/);
         });
     });

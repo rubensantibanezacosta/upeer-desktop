@@ -3,6 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MediaViewerOverlay } from '../../../../../src/features/chat/media-viewer/MediaViewerOverlay';
 
+type MediaViewerUpeer = Pick<Window['upeer'], 'openFile' | 'generateVideoThumbnail'>;
+type MediaViewerWindow = Window & { upeer: MediaViewerUpeer };
+const mediaWindow = window as MediaViewerWindow;
+
 vi.mock('../../../../../src/components/ui/UnsupportedVideoFallback.js', () => ({
     UnsupportedVideoFallback: () => <div data-testid="unsupported-video" />,
 }));
@@ -15,7 +19,7 @@ vi.mock('../../../../../src/utils/videoPlayback.js', () => ({
 
 describe('MediaViewerOverlay', () => {
     beforeEach(() => {
-        (window as any).upeer = {
+        mediaWindow.upeer = {
             openFile: vi.fn().mockResolvedValue({ success: true }),
             generateVideoThumbnail: vi.fn().mockResolvedValue({ success: false }),
         };

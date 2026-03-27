@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+import type { Group } from '../../../src/types/chat.js';
 
-// Mock de iconos de MUI para evitar dependencias de @mui/material
 vi.mock('@mui/icons-material', () => ({}));
 vi.mock('@mui/icons-material/esm/utils/createSvgIcon.js', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
@@ -23,19 +23,22 @@ vi.mock('../../../src/utils/fileIcons.js', () => ({ getFileIcon: () => <div data
 import { GroupItem } from '../../../src/components/layout/GroupItem.js';
 
 describe('GroupItem Component', () => {
-    const mockGroup = {
+    const mockGroup: Group = {
         groupId: 'g1',
         name: 'Dev Team',
+        adminUpeerId: 'u1',
         members: ['u1', 'u2', 'u3'],
+        status: 'active',
         lastMessage: 'Meeting at 5',
         lastMessageTime: new Date().toISOString(),
         avatar: null
-    } as any;
+    };
 
     const defaultProps = {
         group: mockGroup,
         isSelected: false,
         onSelect: vi.fn(),
+        onToggleFavorite: vi.fn(),
         onLeaveGroup: vi.fn(),
     };
 
@@ -85,16 +88,13 @@ describe('GroupItem Component', () => {
     it('opens leave group modal', async () => {
         render(<GroupItem {...defaultProps} />);
 
-        // El botón tiene el data-testid del icono KeyboardArrowDownIcon dentro
         const icon = screen.getByTestId('KeyboardArrowDownIcon');
         const optionsBtn = icon.parentElement as HTMLElement;
         fireEvent.click(optionsBtn);
 
-        // Buscar el ítem del menú de eliminar
         const leaveItem = screen.getByText('Eliminar grupo');
         fireEvent.click(leaveItem);
 
-        // Verificar que aparece el diálogo de confirmación
         expect(screen.getByText(/¿Estás seguro de que quieres eliminar el grupo/i)).toBeDefined();
     });
 });

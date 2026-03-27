@@ -7,6 +7,16 @@ import * as identity from '../../../src/main_process/security/identity.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 import * as ratchet from '../../../src/main_process/security/ratchet.js';
 
+type ChatWindow = NonNullable<Parameters<typeof handleChatMessage>[3]>;
+type ChatContact = Parameters<typeof handleChatMessage>[1];
+type ChatMessageData = Parameters<typeof handleChatMessage>[2];
+type ChatAckData = Parameters<typeof handleChatAck>[1];
+type ChatEditData = Parameters<typeof handleChatEdit>[1];
+type ChatDeleteData = Parameters<typeof handleChatDelete>[1];
+type ChatReactionData = Parameters<typeof handleChatReaction>[1];
+type ChatClearData = Parameters<typeof handleChatClear>[1];
+type ReadReceiptData = Parameters<typeof handleReadReceipt>[1];
+
 // Mock de dependencias
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveMessage: vi.fn(),
@@ -51,7 +61,7 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
 vi.mock('../../../src/main_process/security/ratchet.js', async () => {
     const actual = await vi.importActual('../../../src/main_process/security/ratchet.js');
     return {
-        ...actual as any,
+        ...(actual as object),
         x3dhResponder: vi.fn(),
         ratchetInitBob: vi.fn(),
         ratchetDecrypt: vi.fn(),
@@ -80,11 +90,11 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as any;
+} as unknown as ChatWindow;
 
 describe('Chat Handlers', () => {
     const senderId = 'sender-id';
-    const mockContact = { upeerId: senderId, publicKey: 'sender-pubkey' };
+    const mockContact: ChatContact = { upeerId: senderId, publicKey: 'sender-pubkey' };
     const mockSendResponse = vi.fn();
 
     beforeEach(() => {
@@ -97,14 +107,14 @@ describe('Chat Handlers', () => {
 
     describe('handleChatMessage', () => {
         it('should process a simple unencrypted message', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'hola p2p',
                 timestamp: Date.now()
             };
 
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
-            (messagesOps.getMessageById as any).mockResolvedValue(null);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -136,14 +146,14 @@ describe('Chat Handlers', () => {
         });
 
         it('should decrypt a message if nonce is provided', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'encrypted-hex',
                 nonce: 'nonce-hex'
             };
 
-            (identity.decrypt as any).mockReturnValue(Buffer.from('mensaje descifrado'));
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje descifrado'));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -162,7 +172,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should prefer sender ephemeral public key when decrypting crypto_box messages', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
                 nonce: 'bb',
@@ -170,8 +180,8 @@ describe('Chat Handlers', () => {
                 useRecipientEphemeral: false,
             };
 
-            (identity.decrypt as any).mockReturnValue(Buffer.from('mensaje vault'));
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje vault'));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -194,7 +204,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should fall back to identity-key decryption for vaulted static-recipient messages', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '33333333-3333-3333-3333-333333333333',
                 content: 'aa',
                 nonce: 'bb',
@@ -202,9 +212,9 @@ describe('Chat Handlers', () => {
                 useRecipientEphemeral: false,
             };
 
-            (identity.decrypt as any).mockReturnValue(null);
-            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from('mensaje vaulted recuperado'));
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from('mensaje vaulted recuperado'));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -227,14 +237,14 @@ describe('Chat Handlers', () => {
         });
 
         it('should handle decryption failure gracefully', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'bad-data',
                 nonce: 'nonce'
             };
 
-            (identity.decrypt as any).mockReturnValue(null);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -252,12 +262,12 @@ describe('Chat Handlers', () => {
         });
 
         it('should skip processing if message ID already exists (deduplication)', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'repetido'
             };
 
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id });
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -270,14 +280,14 @@ describe('Chat Handlers', () => {
 
         it('should handle internal sync messages without saving if they already exist', async () => {
             const myId = 'my-peer-id';
-            const data = {
+            const data: ChatMessageData = {
                 id: '11111111-1111-1111-1111-111111111111',
                 content: 'sync-msg',
                 isInternalSync: true
             };
 
-            (identity.getMyUPeerId as any).mockReturnValue(myId);
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id });
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id } as never);
 
             await handleChatMessage(myId, mockContact, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
 
@@ -288,7 +298,7 @@ describe('Chat Handlers', () => {
 
         it('should decrypt and save vaulted self-sync messages as mine', async () => {
             const myId = 'my-peer-id';
-            const data = {
+            const data: ChatMessageData = {
                 id: '22222222-2222-2222-2222-222222222222',
                 content: 'aa',
                 nonce: 'bb',
@@ -297,12 +307,12 @@ describe('Chat Handlers', () => {
                 timestamp: Date.now()
             };
 
-            (identity.getMyUPeerId as any).mockReturnValue(myId);
-            (messagesOps.getMessageById as any).mockResolvedValue(null);
-            (identity.decrypt as any).mockReturnValue(Buffer.from('mensaje propio vaulted'));
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje propio vaulted'));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
-            await handleChatMessage(myId, { upeerId: myId, publicKey: 'b'.repeat(64) }, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
+            await handleChatMessage(myId, { upeerId: myId, publicKey: 'b'.repeat(64) } as ChatContact, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
 
             expect(messagesOps.saveMessage).toHaveBeenCalledWith(
                 data.id,
@@ -323,14 +333,14 @@ describe('Chat Handlers', () => {
         });
 
         it('should update contact ephemeral public key if provided in message data', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'hello',
                 ephemeralPublicKey: 'a'.repeat(64)
             };
 
-            (messagesOps.getMessageById as any).mockResolvedValue(null);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
             const keysOps = await import('../../../src/main_process/storage/contacts/keys.js');
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
@@ -339,7 +349,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should handle X3DH and Double Ratchet initialization from Bob perspective', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'encrypted-dr-payload',
                 nonce: 'nonce-dr',
@@ -351,13 +361,13 @@ describe('Chat Handlers', () => {
                 }
             };
 
-            (ratchet.x3dhResponder as any).mockReturnValue(Buffer.alloc(32));
-            (ratchet.ratchetInitBob as any).mockReturnValue({});
-            (ratchet.ratchetDecrypt as any).mockReturnValue(Buffer.from('dr-decrypted-content'));
+            vi.mocked(ratchet.x3dhResponder).mockReturnValue(Buffer.alloc(32));
+            vi.mocked(ratchet.ratchetInitBob).mockReturnValue({} as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from('dr-decrypted-content'));
 
-            (identity.getSpkBySpkId as any).mockReturnValue({ spkPk: Buffer.alloc(32), spkSk: Buffer.alloc(32) });
-            (identity.getMyIdentitySkBuffer as any).mockReturnValue(Buffer.alloc(64));
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.getSpkBySpkId).mockReturnValue({ spkPk: Buffer.alloc(32), spkSk: Buffer.alloc(32) } as never);
+            vi.mocked(identity.getMyIdentitySkBuffer).mockReturnValue(Buffer.alloc(64));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -375,15 +385,15 @@ describe('Chat Handlers', () => {
         });
 
         it('should handle X3DH error when SPK is missing', async () => {
-            const data = {
+            const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'bad-dr',
                 ratchetHeader: {},
                 x3dhInit: { spkId: 404 }
             };
 
-            (identity.getSpkBySpkId as any).mockReturnValue(null);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.getSpkBySpkId).mockReturnValue(null);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -403,8 +413,8 @@ describe('Chat Handlers', () => {
 
     describe('handleChatAck', () => {
         it('should update message status if it is mine', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012', status: 'read' };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 1 });
+            const data: ChatAckData = { id: '12345678-1234-1234-1234-123456789012', status: 'read' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 1 } as never);
 
             await handleChatAck(senderId, data, mockWin);
 
@@ -416,8 +426,8 @@ describe('Chat Handlers', () => {
         });
 
         it('should not update if message is not mine', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012', status: 'read' };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 });
+            const data: ChatAckData = { id: '12345678-1234-1234-1234-123456789012', status: 'read' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 } as never);
 
             await handleChatAck(senderId, data, mockWin);
 
@@ -427,17 +437,17 @@ describe('Chat Handlers', () => {
 
     describe('handleChatEdit', () => {
         it('should decrypt and update content if message is from the peer', async () => {
-            const data = {
+            const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64),
                 version: 2,
             };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
             const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(Buffer.from('editado'));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('editado'));
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig');
 
@@ -453,19 +463,19 @@ describe('Chat Handlers', () => {
         });
 
         it('should fallback to stored ephemeral key when packet key is missing', async () => {
-            const data = {
+            const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
                 nonce: 'bb',
                 version: 3,
             };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
             const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
                 publicKey: 'b'.repeat(64),
                 ephemeralPublicKey: 'c'.repeat(64)
-            });
-            (identity.decrypt as any).mockReturnValue(Buffer.from('editado 2'));
+            } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('editado 2'));
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig-2');
 
@@ -478,7 +488,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should fallback to identity-key decryption for vaulted static chat updates', async () => {
-            const data = {
+            const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
                 nonce: 'bb',
@@ -486,11 +496,11 @@ describe('Chat Handlers', () => {
                 ephemeralPublicKey: 'a'.repeat(64),
                 useRecipientEphemeral: false,
             };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
             const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(null);
-            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from('edit vaulted'));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from('edit vaulted'));
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig-3');
 
@@ -504,15 +514,15 @@ describe('Chat Handlers', () => {
 
         it('should apply self-synced edits to own messages', async () => {
             const myId = 'my-peer-id';
-            const data = {
+            const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'edit local sync',
                 chatUpeerId: 'peer-chat',
                 version: 5,
                 isInternalSync: true,
             };
-            (identity.getMyUPeerId as any).mockReturnValue(myId);
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1 });
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1 } as never);
 
             await handleChatEdit(myId, data, mockWin, 'edit-self-sig');
 
@@ -527,8 +537,8 @@ describe('Chat Handlers', () => {
 
     describe('handleChatDelete', () => {
         it('should delete locally if message is from the peer', async () => {
-            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 });
+            const data: ChatDeleteData = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
 
             await handleChatDelete(senderId, data, mockWin);
 
@@ -539,14 +549,14 @@ describe('Chat Handlers', () => {
         it('should cleanup local attachment data for deleted file messages', async () => {
             const cleanup = await import('../../../src/main_process/utils/localAttachmentCleanup.js');
             const { fileTransferManager } = await import('../../../src/main_process/network/file-transfer/transfer-manager.js');
-            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
-            (messagesOps.getMessageById as any).mockResolvedValue({
+            const data: ChatDeleteData = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({
                 id: data.msgId,
                 chatUpeerId: senderId,
                 isMine: 0,
                 message: JSON.stringify({ type: 'file', fileId: 'file-1', savedPath: '/tmp/upeer/file-1.bin' })
-            });
-            (cleanup.extractLocalAttachmentInfo as any).mockReturnValue({ fileId: 'file-1', filePath: '/tmp/upeer/file-1.bin' });
+            } as never);
+            vi.mocked(cleanup.extractLocalAttachmentInfo).mockReturnValue({ fileId: 'file-1', filePath: '/tmp/upeer/file-1.bin' });
 
             await handleChatDelete(senderId, data, mockWin);
 
@@ -556,9 +566,9 @@ describe('Chat Handlers', () => {
 
         it('should apply self-synced deletes to own messages', async () => {
             const myId = 'my-peer-id';
-            const data = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 5555, chatUpeerId: 'peer-chat', isInternalSync: true };
-            (identity.getMyUPeerId as any).mockReturnValue(myId);
-            (messagesOps.getMessageById as any).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1, message: 'hola' });
+            const data: ChatDeleteData = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 5555, chatUpeerId: 'peer-chat', isInternalSync: true };
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: 'peer-chat', isMine: 1, message: 'hola' } as never);
 
             await handleChatDelete(myId, data, mockWin);
 
@@ -569,7 +579,7 @@ describe('Chat Handlers', () => {
 
     describe('handleChatClear', () => {
         it('should clear the explicit chat context for self-sync packets', async () => {
-            const data = { chatUpeerId: 'peer-chat', timestamp: 9999 };
+            const data: ChatClearData = { chatUpeerId: 'peer-chat', timestamp: 9999 };
 
             await handleChatClear('my-peer-id', data, mockWin);
 
@@ -580,7 +590,7 @@ describe('Chat Handlers', () => {
 
     describe('handleChatReaction', () => {
         it('should save reaction and notify UI', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012', reaction: '👍' };
+            const data: ChatReactionData = { id: '12345678-1234-1234-1234-123456789012', reaction: '👍' };
 
             await handleChatReaction(senderId, data, mockWin);
 
@@ -595,7 +605,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should delete reaction if emojiToDelete is provided', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012', emojiToDelete: '👍' };
+            const data: ChatReactionData = { id: '12345678-1234-1234-1234-123456789012', emojiToDelete: '👍' };
 
             await handleChatReaction(senderId, data, mockWin);
 
@@ -610,7 +620,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should preserve group chat context when processing a group reaction', async () => {
-            const data = {
+            const data: ChatReactionData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 reaction: '🔥',
                 chatUpeerId: 'grp-1'
@@ -631,7 +641,7 @@ describe('Chat Handlers', () => {
 
     describe('handleChatClear', () => {
         it('should clear messages for a chat ID', async () => {
-            const data = { clearTimestamp: 1000 };
+            const data: ChatClearData = { clearTimestamp: 1000 };
             await handleChatClear(senderId, data, mockWin);
 
             // En chat.ts se usa un import dinámico. Como tenemos mockeado el módulo,
@@ -641,7 +651,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should accept timestamp payloads for chat clear sync', async () => {
-            const data = { timestamp: 2000 };
+            const data: ChatClearData = { timestamp: 2000 };
             await handleChatClear(senderId, data, mockWin);
 
             expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(senderId, 2000);
@@ -651,7 +661,7 @@ describe('Chat Handlers', () => {
 
     describe('handleReadReceipt', () => {
         it('should update message status to read', async () => {
-            const data = { id: '12345678-1234-1234-1234-123456789012' };
+            const data: ReadReceiptData = { id: '12345678-1234-1234-1234-123456789012' };
             await handleReadReceipt(senderId, data, mockWin);
 
             expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(data.id, 'read');

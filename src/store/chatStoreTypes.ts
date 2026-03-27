@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand';
-import type { ChatMessage, Contact, Group, LinkPreview } from '../types/chat.js';
+import type { ChatMessage, Contact, Group, IncomingRequest, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
 
 export interface ChatState {
-    myIdentity: { address: string | null, upeerId: string, publicKey: string, alias?: string | null, name?: string | null, avatar?: string | null } | null;
+    myIdentity: MyIdentity | null;
     networkAddress: string;
     contacts: Contact[];
     groups: Group[];
@@ -15,15 +15,15 @@ export interface ChatState {
     messagesByConversation: Record<string, string>;
     replyByConversation: Record<string, ChatMessage | null>;
     typingStatus: Record<string, NodeJS.Timeout>;
-    incomingRequests: Record<string, { publicKey: string, avatar?: string, receivedAt?: number, untrustworthy?: any, vouchScore?: number }>;
-    untrustworthyAlert: any | null;
-    untrustworthyAlerts: Record<string, any>;
-    pendingFiles: { path: string; name: string; size: number; type: string; lastModified: number }[];
+    incomingRequests: Record<string, IncomingRequest>;
+    untrustworthyAlert: UntrustworthyInfo | null;
+    untrustworthyAlerts: Record<string, UntrustworthyInfo>;
+    pendingFiles: PendingFile[];
     isDragging: boolean;
 }
 
 export interface ChatActions {
-    setMyIdentity: (identity: any) => void;
+    setMyIdentity: (identity: MyIdentity | null) => void;
     setNetworkAddress: (addr: string) => void;
     setTargetUpeerId: (id: string) => void;
     setActiveGroupId: (id: string) => void;
@@ -57,11 +57,11 @@ export interface ChatActions {
     handleBlockContact: (id?: string) => void;
     handleUnblockContact: (id: string) => void;
     clearUntrustworthyAlert: () => void;
-    setPendingFiles: (files: any[]) => void;
+    setPendingFiles: (files: PendingFile[]) => void;
     setIsDragging: (dragging: boolean) => void;
     handleRetryMessage: (msgId: string) => Promise<void>;
     addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string, isVoiceNote?: boolean) => void;
-    updateFileTransferMessage: (fileId: string, updates: any) => void;
+    updateFileTransferMessage: (fileId: string, updates: TransferMessageUpdates) => void;
     initListeners: () => void;
 }
 

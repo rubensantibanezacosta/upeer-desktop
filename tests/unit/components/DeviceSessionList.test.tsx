@@ -8,28 +8,30 @@ vi.mock('../../../src/store/useDeviceStore.js', () => ({
     useDeviceStore: vi.fn(),
 }));
 
-describe('DeviceSessionList Component', () => {
-    const mockFetchDevices = vi.fn();
-    const mockSetTrust = vi.fn();
-    const mockRemoveDevice = vi.fn();
+const mockFetchDevices = vi.fn();
+const mockSetTrust = vi.fn();
+const mockRemoveDevice = vi.fn();
 
+type DeviceStoreSnapshot = ReturnType<typeof useDeviceStore>;
+
+const createDeviceStoreSnapshot = (overrides: Partial<DeviceStoreSnapshot> = {}): DeviceStoreSnapshot => ({
+    devices: [],
+    isLoading: false,
+    error: null,
+    fetchDevices: mockFetchDevices,
+    setTrust: mockSetTrust,
+    removeDevice: mockRemoveDevice,
+    ...overrides,
+});
+
+describe('DeviceSessionList Component', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        (useDeviceStore as any).mockReturnValue({
-            devices: [],
-            isLoading: false,
-            fetchDevices: mockFetchDevices,
-            setTrust: mockSetTrust,
-            removeDevice: mockRemoveDevice,
-        });
+        vi.mocked(useDeviceStore).mockReturnValue(createDeviceStoreSnapshot());
     });
 
     it('should show loading state', () => {
-        (useDeviceStore as any).mockReturnValue({
-            devices: [],
-            isLoading: true,
-            fetchDevices: mockFetchDevices,
-        });
+        vi.mocked(useDeviceStore).mockReturnValue(createDeviceStoreSnapshot({ isLoading: true }));
 
         render(<DeviceSessionList />);
         expect(screen.getByRole('progressbar')).toBeDefined();
@@ -41,11 +43,7 @@ describe('DeviceSessionList Component', () => {
             { deviceId: 'dev-2', clientName: 'Work PC', platform: 'linux', isTrusted: false, lastSeen: Date.now() },
         ];
 
-        (useDeviceStore as any).mockReturnValue({
-            devices: mockDevices,
-            isLoading: false,
-            fetchDevices: mockFetchDevices,
-        });
+        vi.mocked(useDeviceStore).mockReturnValue(createDeviceStoreSnapshot({ devices: mockDevices }));
 
         render(<DeviceSessionList />);
 
@@ -58,12 +56,7 @@ describe('DeviceSessionList Component', () => {
             { deviceId: 'dev-1', clientName: 'New Device', platform: 'android', isTrusted: false, lastSeen: Date.now() },
         ];
 
-        (useDeviceStore as any).mockReturnValue({
-            devices: mockDevices,
-            isLoading: false,
-            fetchDevices: mockFetchDevices,
-            setTrust: mockSetTrust,
-        });
+        vi.mocked(useDeviceStore).mockReturnValue(createDeviceStoreSnapshot({ devices: mockDevices }));
 
         render(<DeviceSessionList />);
 

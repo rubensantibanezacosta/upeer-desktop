@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+type MockCanvasElement = Pick<HTMLCanvasElement, 'width' | 'height' | 'getContext' | 'toDataURL'>;
+
 const getPage = vi.fn();
 const destroy = vi.fn().mockResolvedValue(undefined);
 const getDocument = vi.fn(() => ({
@@ -17,17 +19,18 @@ describe('generatePdfThumbnail', () => {
     beforeEach(() => {
         getPage.mockReset();
         destroy.mockClear();
-        vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+        vi.spyOn(document, 'createElement').mockImplementation((tagName: string): HTMLElement => {
             if (tagName === 'canvas') {
-                return {
+                const canvas: MockCanvasElement = {
                     width: 0,
                     height: 0,
                     getContext: vi.fn(() => ({})),
                     toDataURL: vi.fn(() => 'data:image/jpeg;base64,pdf-thumb'),
-                } as any;
+                };
+                return canvas as unknown as HTMLElement;
             }
             return document.createElementNS('http://www.w3.org/1999/xhtml', tagName);
-        }) as any);
+        });
     });
 
     it('renders the first pdf page to a jpeg thumbnail', async () => {

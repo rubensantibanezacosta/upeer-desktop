@@ -48,6 +48,6 @@ export function getMessageStatus(id: string) {
     const msg = db.select({ status: schema.messages.status })
         .from(schema.messages)
         .where(eq(schema.messages.id, id))
-        .get();
-    return msg ? (msg as any).status : null;
+        .get() as { status: MessageDeliveryStatus } | undefined;
+    return msg ? msg.status : null;
 }

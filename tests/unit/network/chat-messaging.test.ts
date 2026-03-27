@@ -1,5 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as contactsOpsModule from '../../../src/main_process/storage/contacts/operations.js';
+import * as groupsOpsModule from '../../../src/main_process/storage/groups/operations.js';
+import * as messagesOpsModule from '../../../src/main_process/storage/messages/operations.js';
+import * as messageStatusModule from '../../../src/main_process/storage/messages/status.js';
+import * as identityModule from '../../../src/main_process/security/identity.js';
+
+type ContactRecord = NonNullable<Awaited<ReturnType<typeof contactsOpsModule.getContactByUpeerId>>>;
+type GroupRecord = NonNullable<ReturnType<typeof groupsOpsModule.getGroupById>>;
+type SaveMessageResult = Awaited<ReturnType<typeof messagesOpsModule.saveMessage>>;
+type MessageRecord = Awaited<ReturnType<typeof messagesOpsModule.getMessageById>>;
+type EncryptResult = ReturnType<typeof identityModule.encrypt>;
+type MessageStatus = ReturnType<typeof messageStatusModule.getMessageStatus>;
+type KademliaNode = { upeerId: string; address: string };
+type KademliaInstance = { findClosestContacts: (upeerId: string, limit: number) => KademliaNode[] };
+
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
     getContacts: vi.fn(() => []),
@@ -107,10 +122,10 @@ describe('network/messaging/chat.ts', () => {
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
             address: '200::2',
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
-        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1 as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
 
         const result = await sendUDPMessage('peer-offline', 'hola offline', 'reply-1');
 
@@ -155,10 +170,10 @@ describe('network/messaging/chat.ts', () => {
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
             address: '200::2',
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
-        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1 as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
 
         const preview = { url: 'https://example.com', title: 'Example' };
         const expectedPayload = JSON.stringify({ text: 'hola https://example.com', linkPreview: preview });
@@ -203,10 +218,10 @@ describe('network/messaging/chat.ts', () => {
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
             address: '200::2',
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
-        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0 as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0);
 
         const result = await sendUDPMessage('peer-offline', 'sin custodios');
 
@@ -229,9 +244,9 @@ describe('network/messaging/chat.ts', () => {
             ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
             address: '200::9',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         await sendUDPMessage('peer-online', 'hola legacy');
 
@@ -263,9 +278,9 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::9',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         const preview = {
             url: 'https://example.com',
@@ -318,10 +333,10 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             ephemeralPublicKey: 'bb'.repeat(32),
             address: '200::9',
-        } as any);
-        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
 
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
 
@@ -367,9 +382,9 @@ describe('network/messaging/chat.ts', () => {
             ephemeralPublicKey: 'bb'.repeat(32),
             address: '200::9',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.getMessageById).mockResolvedValue({ version: 0 } as any);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue({ version: 0 } as NonNullable<MessageRecord>);
+        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         const preview = { url: 'https://example.com', title: 'Example' };
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'hola https://example.com', preview);
@@ -399,8 +414,8 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::9',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
 
         const preview = {
             url: 'https://example.com',
@@ -444,14 +459,14 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::10',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as any);
+        } as KademliaInstance);
 
         await sendUDPMessage('peer-online', 'hola sync');
 
@@ -492,11 +507,11 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::10',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [])
-        } as any);
+        } as KademliaInstance);
 
         await sendUDPMessage('peer-online', 'hola vault sync');
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -527,11 +542,11 @@ describe('network/messaging/chat.ts', () => {
             publicKey: 'aa'.repeat(32),
             address: '200::9',
             knownAddresses: '[]'
-        } as any);
-        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as any);
-        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true as any);
-        vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as any);
-        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0 as any);
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as MessageStatus);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0);
 
         const result = await sendUDPMessage('peer-online', 'sin ack');
 
@@ -550,7 +565,7 @@ describe('network/messaging/chat.ts', () => {
         vi.mocked(messagesOps.getMessageById).mockResolvedValue({
             id: 'file-1',
             message: JSON.stringify({ type: 'file', fileId: 'file-1', filePath: '/tmp/upeer/file-1.bin' })
-        } as any);
+        } as NonNullable<MessageRecord>);
         vi.mocked(cleanup.extractLocalAttachmentInfo).mockReturnValue({
             fileId: 'file-1',
             filePath: '/tmp/upeer/file-1.bin'
@@ -576,7 +591,7 @@ describe('network/messaging/chat.ts', () => {
             groupId: 'grp-1',
             status: 'active',
             members: ['self-id', 'peer-online', 'peer-offline']
-        } as any);
+        } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
             if (upeerId === 'peer-online') {
                 return {
@@ -585,7 +600,7 @@ describe('network/messaging/chat.ts', () => {
                     publicKey: 'aa'.repeat(32),
                     address: '200::10',
                     knownAddresses: '[]'
-                } as any;
+                } as ContactRecord;
             }
 
             if (upeerId === 'peer-offline') {
@@ -595,17 +610,17 @@ describe('network/messaging/chat.ts', () => {
                     publicKey: 'bb'.repeat(32),
                     address: '200::20',
                     knownAddresses: '[]'
-                } as any;
+                } as ContactRecord;
             }
 
-            return null as any;
+            return null;
         });
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as any);
+        } as KademliaInstance);
 
         await sendChatReaction('grp-1', '12345678-1234-1234-1234-123456789012', '🔥', false);
 

@@ -27,7 +27,7 @@ interface CreateGroupModalProps {
     open: boolean;
     onClose: () => void;
     contacts: Contact[];
-    onCreate: (name: string, memberIds: string[]) => Promise<any>;
+    onCreate: (name: string, memberIds: string[]) => Promise<{ success: boolean; groupId: string }>;
 }
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({

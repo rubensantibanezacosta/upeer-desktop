@@ -9,40 +9,35 @@ import { RichText } from '../../../components/ui/RichText.js';
 import { LinkPreviewCard } from './LinkPreviewCard.js';
 import { MessageItemActions } from './MessageItemActions.js';
 import { parseMessage } from './messageItemSupport.js';
+import type { FileTransfer } from '../../../hooks/fileTransferTypes.js';
+import type { ChatMessage, TransferMessageUpdates } from '../../../types/chat.js';
+
+interface MediaClickPayload {
+    url: string;
+    name: string;
+    mimeType: string;
+    fileId: string;
+}
 
 interface MessageItemProps {
-    msg: {
-        id?: string;
-        upeerId: string;
-        isMine: boolean;
-        message: string;
-        status: string;
-        timestamp: string;
-        replyTo?: string;
-        isDeleted?: boolean;
-        isEdited?: boolean;
-        reactions?: Array<{ upeerId: string; emoji: string }>;
-        senderName?: string;
-        senderUpeerId?: string;
-        senderAvatar?: string;
-    };
-    onReply: (msg: any) => void;
+    msg: ChatMessage;
+    onReply: (msg: ChatMessage) => void;
     onReact: (msgId: string, emoji: string, remove: boolean) => void;
-    onEdit: (msg: any) => void;
+    onEdit: (msg: ChatMessage) => void;
     onDelete: (msgId: string) => void;
-    onForward?: (msg: any) => void;
+    onForward?: (msg: ChatMessage) => void;
     originalMessage?: string;
-    activeTransfers?: any[];
+    activeTransfers?: FileTransfer[];
     onScrollToMessage?: (msgId: string) => void;
     onRetryMessage?: (msgId: string) => void;
     onRetryTransfer?: (fileId: string) => void;
     onCancelTransfer?: (fileId: string) => void;
-    onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
+    onMediaClick?: (media: MediaClickPayload) => void;
     originalSenderName?: string;
     isGroup?: boolean;
     isFirstInGroupChain?: boolean;
     isLastInGroupChain?: boolean;
-    onTransferStateChange?: (fileId: string, updates: any) => void;
+    onTransferStateChange?: (fileId: string, updates: TransferMessageUpdates) => void;
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -160,7 +155,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
 
                                 {isFile && fileData && !msg.isDeleted ? (
                                     <FileMessageItem
-                                        data={{ ...fileData, timestamp: msg.timestamp } as any}
+                                        data={{ ...fileData, timestamp: msg.timestamp }}
                                         isMe={isMe}
                                         status={msg.status}
                                         onRetry={onRetryTransfer}

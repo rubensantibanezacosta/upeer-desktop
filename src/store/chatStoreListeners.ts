@@ -3,15 +3,17 @@ import { useNotificationStore } from './useNotificationStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { applyReactionUpdate, formatMessageTimestamp } from './chatStoreSupport.js';
+import type { ChatMessage, IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent } from '../types/chat.js';
 
 export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
     initListeners: () => {
-        if ((window as any).__chat_listeners_initialized) {
+        const bridgeWindow = window as Window & { __chat_listeners_initialized?: boolean };
+        if (bridgeWindow.__chat_listeners_initialized) {
             return;
         }
-        (window as any).__chat_listeners_initialized = true;
+        bridgeWindow.__chat_listeners_initialized = true;
 
-        window.upeer.onReceive((data: any) => {
+        window.upeer.onReceive((data: IncomingDirectMessageEvent) => {
             get().refreshContacts();
             const { targetUpeerId } = get();
             if (data.upeerId === targetUpeerId) {
@@ -22,13 +24,23 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     if (data.id) {
                         window.upeer.sendReadReceipt(targetUpeerId, data.id);
                     }
+                    const nextMessage: ChatMessage = {
+                        id: data.id,
+                        upeerId: data.upeerId,
+                        isMine: !!data.isMine,
+                        message: data.message,
+                        status: 'read',
+                        timestamp: formatMessageTimestamp(data.timestamp),
+                        replyTo: data.replyTo,
+                        reactions: data.reactions,
+                        isEdited: !!data.isEdited,
+                        isDeleted: !!data.isDeleted,
+                        senderUpeerId: data.senderUpeerId,
+                        senderName: data.senderName,
+                        date: data.timestamp || Date.now(),
+                    };
                     return {
-                        chatHistory: [...state.chatHistory, {
-                            ...data,
-                            status: 'read',
-                            timestamp: formatMessageTimestamp(data.timestamp),
-                            date: data.timestamp || Date.now(),
-                        }],
+                        chatHistory: [...state.chatHistory, nextMessage],
                     };
                 });
                 return;
@@ -39,9 +51,9 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             }
         });
 
-        window.upeer.onContactRequest(async (data: any) => {
+        window.upeer.onContactRequest(async (data: IncomingContactRequestEvent) => {
             const currentContacts = await window.upeer.getContacts();
-            const existingContact = currentContacts.find((contact: any) => contact.upeerId === data.upeerId);
+            const existingContact = currentContacts.find((contact) => contact.upeerId === data.upeerId);
             if (!existingContact || existingContact.status !== 'connected') {
                 set((state) => ({
                     incomingRequests: {
@@ -63,14 +75,14 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             get().refreshContacts();
         });
 
-        window.upeer.onHandshakeFinished((data: any) => {
+        window.upeer.onHandshakeFinished((data) => {
             get().refreshContacts();
             if (get().targetUpeerId.startsWith('pending-')) {
                 get().setTargetUpeerId(data.upeerId);
             }
         });
 
-        window.upeer.onTyping((data: any) => {
+        window.upeer.onTyping((data) => {
             const { upeerId } = data;
             set((state) => {
                 if (state.typingStatus[upeerId]) {
@@ -87,7 +99,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             });
         });
 
-        window.upeer.onGroupMessage((data: any) => {
+        window.upeer.onGroupMessage((data: IncomingGroupMessageEvent) => {
             get().refreshGroups();
             const { activeGroupId, contacts, myIdentity } = get();
             if (data.groupId !== activeGroupId) {
@@ -101,7 +113,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     if (data.id && state.groupChatHistory.some((message) => message.id === data.id)) {
                         return state;
                     }
-                    const sender = data.isMine ? myIdentity : contacts.find((contact: any) => contact.upeerId === data.senderUpeerId);
+                    const sender = data.isMine ? myIdentity : contacts.find((contact) => contact.upeerId === data.senderUpeerId);
                     return {
                         groupChatHistory: [...state.groupChatHistory, {
                             id: data.id,
@@ -114,7 +126,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                             timestamp: formatMessageTimestamp(data.timestamp),
                             replyTo: data.replyTo,
                             senderUpeerId: data.senderUpeerId,
-                            senderName: (sender as any)?.name || (sender as any)?.alias || data.senderName || 'Usuario desconocido',
+                            senderName: sender?.name || sender?.alias || data.senderName || 'Usuario desconocido',
                             senderAvatar: sender?.avatar ?? undefined,
                             date: data.timestamp || Date.now(),
                         }],
@@ -126,14 +138,14 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
         window.upeer.onGroupInvite(() => get().refreshGroups());
         window.upeer.onGroupUpdated(() => get().refreshGroups());
 
-        window.upeer.onMessageDelivered((data: any) => {
+        window.upeer.onMessageDelivered((data) => {
             get().refreshContacts();
             set((state) => ({
                 chatHistory: state.chatHistory.map((message) => message.id === data.id && message.status !== 'read' ? { ...message, status: 'delivered' } : message),
             }));
         });
 
-        window.upeer.onMessageRead((data: any) => {
+        window.upeer.onMessageRead((data) => {
             get().refreshContacts();
             set((state) => ({
                 chatHistory: state.chatHistory.map((message) => message.id === data.id ? { ...message, status: 'read' } : message),
@@ -148,7 +160,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             get().refreshContacts();
         });
 
-        window.upeer.onGroupMessageDelivered((data: any) => {
+        window.upeer.onGroupMessageDelivered((data) => {
             if (data.groupId === get().activeGroupId) {
                 set((state) => ({
                     groupChatHistory: state.groupChatHistory.map((message) => message.id === data.id ? { ...message, status: 'read' } : message),
@@ -159,7 +171,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
         if (window.upeer.onMessageDeleted) {
             window.upeer.onMessageDeleted((data: { id: string; chatUpeerId: string }) => {
                 const { targetUpeerId, activeGroupId } = get();
-                const updateDeletedMessage = (message: any) => message.id === data.id ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message;
+                const updateDeletedMessage = (message: ChatMessage) => message.id === data.id ? { ...message, message: 'Mensaje eliminado', isDeleted: true } : message;
                 if (data.chatUpeerId === targetUpeerId) {
                     set((state) => ({ chatHistory: state.chatHistory.map(updateDeletedMessage) }));
                 }
@@ -186,8 +198,8 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             const { targetUpeerId, activeGroupId } = get();
             if (data.chatUpeerId === targetUpeerId || data.chatUpeerId === activeGroupId) {
                 set((state) => ({
-                    chatHistory: state.chatHistory.map((message: any) => message.id === data.msgId ? applyReactionUpdate(message, data.upeerId, data.emoji, data.remove) : message),
-                    groupChatHistory: state.groupChatHistory.map((message: any) => message.id === data.msgId ? applyReactionUpdate(message, data.upeerId, data.emoji, data.remove) : message),
+                    chatHistory: state.chatHistory.map((message) => message.id === data.msgId ? applyReactionUpdate(message, data.upeerId, data.emoji, data.remove) : message),
+                    groupChatHistory: state.groupChatHistory.map((message) => message.id === data.msgId ? applyReactionUpdate(message, data.upeerId, data.emoji, data.remove) : message),
                 }));
             }
         });
@@ -196,8 +208,8 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             const { targetUpeerId, activeGroupId } = get();
             if (data.chatUpeerId === targetUpeerId || data.chatUpeerId === activeGroupId) {
                 set((state) => ({
-                    chatHistory: state.chatHistory.map((message: any) => message.id === data.id ? { ...message, message: data.content, isEdited: true } : message),
-                    groupChatHistory: state.groupChatHistory.map((message: any) => message.id === data.id ? { ...message, message: data.content, isEdited: true } : message),
+                    chatHistory: state.chatHistory.map((message) => message.id === data.id ? { ...message, message: data.content, isEdited: true } : message),
+                    groupChatHistory: state.groupChatHistory.map((message) => message.id === data.id ? { ...message, message: data.content, isEdited: true } : message),
                 }));
             }
         });

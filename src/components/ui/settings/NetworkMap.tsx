@@ -28,6 +28,9 @@ interface NetworkMapProps {
     selfLon: number | null;
 }
 
+type GeographyValue = React.ComponentProps<typeof Geography>['geography'];
+type GeographyRenderProps = { geographies: GeographyValue[] };
+
 // ─── Fallback por nombre de país ──────────────────────────────────────────────
 
 const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
@@ -145,8 +148,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
                 <ZoomableGroup center={[10, 48]} zoom={1.6} minZoom={0.8} maxZoom={8}>
                     {/* Continentes */}
                     <Geographies geography={worldAtlas}>
-                        {({ geographies }: { geographies: any[] }) =>
-                            geographies.map((geo: any) => (
+                        {({ geographies }: GeographyRenderProps) =>
+                            geographies.map((geo) => (
                                 <Geography
                                     key={geo.rsmKey}
                                     geography={geo}
@@ -181,13 +184,13 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
                             <Marker
                                 key={`peer-${peer.host}`}
                                 coordinates={peer.coords}
-                                onMouseEnter={(e: any) => {
+                                onMouseEnter={(e: React.MouseEvent<SVGGElement>) => {
                                     const svgEl = (e.target as Element).closest('svg');
                                     const svgRect = svgEl?.getBoundingClientRect();
                                     setTooltip({
                                         peer,
-                                        x: (e as MouseEvent).clientX - (svgRect?.left ?? 0),
-                                        y: (e as MouseEvent).clientY - (svgRect?.top ?? 0),
+                                        x: e.clientX - (svgRect?.left ?? 0),
+                                        y: e.clientY - (svgRect?.top ?? 0),
                                     });
                                 }}
                                 onMouseLeave={() => setTooltip(null)}
@@ -255,15 +258,15 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
                     { color: '#ef4444', label: '> 250 ms' },
                     { color: '#4b5563', label: 'Sin respuesta' },
                 ].map(({ color, label }) => (
-                        <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: color, flexShrink: 0 }} />
-                            <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>{label}</Typography>
-                        </Box>
-                ))}
-                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: 'white', opacity: 0.85, flexShrink: 0 }} />
-                        <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>Tu posición</Typography>
+                    <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: color, flexShrink: 0 }} />
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>{label}</Typography>
                     </Box>
+                ))}
+                <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: 'sm', backgroundColor: 'white', opacity: 0.85, flexShrink: 0 }} />
+                    <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.62rem' }}>Tu posición</Typography>
+                </Box>
             </Box>
         </Box>
     );

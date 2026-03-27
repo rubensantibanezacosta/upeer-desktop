@@ -4,6 +4,16 @@ import * as sharedStorage from '../../../src/main_process/storage/shared.js';
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 import * as handlers from '../../../src/main_process/network/dht/handlers.js';
 
+type MockRenewalDb = {
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    all: ReturnType<typeof vi.fn>;
+    run: ReturnType<typeof vi.fn>;
+};
+
 // Mock de la base de datos y utilidades
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
@@ -41,7 +51,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 describe('DHT Renewal Service', () => {
-    let mockDb: any;
+    let mockDb: MockRenewalDb;
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -54,7 +64,7 @@ describe('DHT Renewal Service', () => {
             all: vi.fn().mockReturnValue([]),
             run: vi.fn()
         };
-        (sharedStorage.getDb as any).mockReturnValue(mockDb);
+        vi.mocked(sharedStorage.getDb).mockReturnValue(mockDb as never);
     });
 
     afterEach(() => {
@@ -80,10 +90,10 @@ describe('DHT Renewal Service', () => {
             dhtSeq: 5
         };
         mockDb.all.mockReturnValue([mockContact]);
-        (networkUtils.generateSignedLocationBlock as any).mockReturnValue({
+        vi.mocked(networkUtils.generateSignedLocationBlock).mockReturnValue({
             expiresAt: 200000,
             signature: 'new-sig'
-        });
+        } as ReturnType<typeof networkUtils.generateSignedLocationBlock>);
 
         startRenewalService();
         await vi.advanceTimersByTimeAsync(11000);

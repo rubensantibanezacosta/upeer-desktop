@@ -1,10 +1,21 @@
+import type { FileHandle } from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { encryptChunk } from './crypto.js';
 import { FileTransfer } from './types.js';
 
 export const CHUNK_PREPARE_CONCURRENCY = 4;
 
-export async function readChunkFully(handle: any, length: number, position: number): Promise<Buffer> {
+type FileChunkPacket = {
+    type: 'FILE_CHUNK';
+    fileId: string;
+    chunkIndex: number;
+    chunkHash: string;
+    data?: string;
+    iv?: string;
+    tag?: string;
+};
+
+export async function readChunkFully(handle: FileHandle, length: number, position: number): Promise<Buffer> {
     const buffer = Buffer.alloc(length);
     let offset = 0;
 
@@ -21,7 +32,7 @@ export async function readChunkFully(handle: any, length: number, position: numb
     return offset < length ? buffer.slice(0, offset) : buffer;
 }
 
-export async function calculateHashFromChunks(handle: any, fileSize: number, chunkSize: number): Promise<string> {
+export async function calculateHashFromChunks(handle: FileHandle, fileSize: number, chunkSize: number): Promise<string> {
     const { createHash } = await import('node:crypto');
     const hash = createHash('sha256');
     let position = 0;
@@ -36,12 +47,12 @@ export async function calculateHashFromChunks(handle: any, fileSize: number, chu
     return hash.digest('hex');
 }
 
-export async function prepareChunkPayload(handle: any, transfer: FileTransfer, chunkIndex: number, aesKey?: Buffer) {
+export async function prepareChunkPayload(handle: FileHandle, transfer: FileTransfer, chunkIndex: number, aesKey?: Buffer) {
     const chunkSize = transfer.chunkSize || 16384;
     const offset = chunkIndex * chunkSize;
     const finalBuffer = await readChunkFully(handle, chunkSize, offset);
 
-    const chunkMsg: any = {
+    const chunkMsg: FileChunkPacket = {
         type: 'FILE_CHUNK',
         fileId: transfer.fileId,
         chunkIndex,

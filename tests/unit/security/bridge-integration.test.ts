@@ -3,7 +3,8 @@ import { ipcMain } from 'electron';
 import { registerSecurityHandlers } from '../../../src/main_process/core/ipcHandlers/security.js';
 import * as pinLogic from '../../../src/main_process/security/pin.js';
 
-// Mock de Electron y la lógica de PIN
+type RegisteredHandler = (event: unknown, payload?: unknown) => unknown;
+
 vi.mock('electron', () => ({
     ipcMain: {
         handle: vi.fn(),
@@ -18,13 +19,12 @@ vi.mock('../../../src/main_process/security/pin.js', () => ({
 }));
 
 describe('IPC Security Handlers (Bridge Layer Integration)', () => {
-    let handlers: Record<string, (event: any, ...args: any[]) => any> = {};
+    let handlers: Record<string, RegisteredHandler> = {};
 
     beforeEach(() => {
         vi.clearAllMocks();
         handlers = {};
-        // Capturar los handlers que se registran
-        (ipcMain.handle as any).mockImplementation((channel: string, callback: (event: any, ...args: any[]) => any) => {
+        vi.mocked(ipcMain.handle).mockImplementation((channel: string, callback: RegisteredHandler) => {
             handlers[channel] = callback;
         });
         registerSecurityHandlers();
@@ -33,8 +33,6 @@ describe('IPC Security Handlers (Bridge Layer Integration)', () => {
     it('should correctly extract pin from object in verify-pin (Frontend Integration Fix)', async () => {
         const verifySpy = vi.spyOn(pinLogic, 'verifyAccessPin');
 
-        // Simular lo que envía el bridge cuando el frontend manda un objeto
-        // Este es el escenario que fallaba con "Received an instance of Object"
         await handlers['verify-pin']({}, { pin: '1234' });
 
         expect(verifySpy).toHaveBeenCalledWith('1234');

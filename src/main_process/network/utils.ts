@@ -3,6 +3,7 @@ export {
     validateAddress,
     prioritizeYggdrasil,
     getNetworkAddresses,
+    getDhtNetworkAddresses,
     getNetworkAddress,
     getDeviceMetadata,
 } from './addressing.js';

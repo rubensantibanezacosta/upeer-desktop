@@ -61,6 +61,8 @@ export interface FileTransfer {
     rto?: number;
     consecutiveAcks?: number;
     nextChunkIndex?: number;
+    _ackedChunks?: Set<number>;
+    _chunksSentTimes?: Map<number, number>;
 }
 
 export interface TransferProgress {

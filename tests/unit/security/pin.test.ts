@@ -2,25 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setAccessPin, verifyAccessPin, disableAccessPin, isPinEnabled } from '../../../src/main_process/security/pin.js';
 import * as settingsOps from '../../../src/main_process/storage/settings-operations.js';
 
-// Mock de las operaciones de settings para evitar tocar la DB real
 vi.mock('../../../src/main_process/storage/settings-operations.js', () => ({
     getAppSetting: vi.fn(),
     setAppSetting: vi.fn(),
 }));
 
 describe('PIN Security System', () => {
-    const mockStore: Record<string, any> = {};
+    const mockStore: Record<string, unknown> = {};
 
     beforeEach(() => {
         vi.clearAllMocks();
-        // Limpiar el almacén simulado
         Object.keys(mockStore).forEach(key => delete mockStore[key]);
 
-        // Simular comportamiento de settings
-        (settingsOps.setAppSetting as any).mockImplementation((key: string, value: any) => {
+        vi.mocked(settingsOps.setAppSetting).mockImplementation((key: string, value: unknown) => {
             mockStore[key] = value;
         });
-        (settingsOps.getAppSetting as any).mockImplementation((key: string, defaultValue: any) => {
+        vi.mocked(settingsOps.getAppSetting).mockImplementation((key: string, defaultValue: unknown) => {
             return mockStore[key] !== undefined ? mockStore[key] : defaultValue;
         });
     });
@@ -58,7 +55,7 @@ describe('PIN Security System', () => {
     });
 
     it('should handle non-string values gracefully (regression test)', () => {
-        const invalidPin: any = { pin: '1234' };
+        const invalidPin = { pin: '1234' };
         expect(() => disableAccessPin(invalidPin)).toThrow('PIN must be a string');
     });
 });

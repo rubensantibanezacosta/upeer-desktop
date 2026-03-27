@@ -3,10 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { RichText } from '../../../../src/components/ui/RichText.js';
 
 const mockOpenExternal = vi.fn();
+type RichTextUpeer = Pick<Window['upeer'], 'openExternal'>;
+type RichTextWindow = Window & { upeer?: RichTextUpeer };
+const richTextWindow = window as RichTextWindow;
 
 beforeEach(() => {
     vi.clearAllMocks();
-    window.upeer = { openExternal: mockOpenExternal } as any;
+    richTextWindow.upeer = { openExternal: mockOpenExternal };
 });
 
 describe('RichText', () => {
@@ -77,7 +80,7 @@ describe('RichText', () => {
     });
 
     it('no llama a openExternal si window.upeer no existe', () => {
-        (window as any).upeer = undefined;
+        richTextWindow.upeer = undefined;
         render(<RichText>{'https://example.com'}</RichText>);
         const anchor = document.querySelector('a');
         if (anchor) expect(() => fireEvent.click(anchor)).not.toThrow();

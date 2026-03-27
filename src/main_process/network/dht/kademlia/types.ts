@@ -46,7 +46,7 @@ export interface KademliaContact {
 // Stored value in DHT
 export interface StoredValue {
     key: Buffer;              // Key (hash of the value or upeerId)
-    value: any;               // The stored data (LocationBlock, etc.)
+    value: unknown;           // The stored data (LocationBlock, etc.)
     publisher: string;        // upeer ID of publisher
     timestamp: number;        // Publication time
     signature?: string;       // Optional signature for verification

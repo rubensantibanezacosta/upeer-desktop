@@ -24,7 +24,7 @@ export function getAppSetting<T>(key: string, defaultValue: T): T {
 /**
  * Guarda o actualiza una configuración.
  */
-export function setAppSetting(key: string, value: any): void {
+export function setAppSetting(key: string, value: unknown): void {
     try {
         const db = getDb();
         const valueStr = JSON.stringify(value);

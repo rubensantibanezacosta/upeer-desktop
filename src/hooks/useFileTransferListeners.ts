@@ -18,11 +18,11 @@ export const registerFileTransferListeners = ({
         void loadTransfers();
     }) || (() => undefined);
 
-    const unsubscribeProgress = window.upeer.onFileTransferProgress((data: any) => {
+    const unsubscribeProgress = window.upeer.onFileTransferProgress((data) => {
         updateTransferProgress(data);
     }) || (() => undefined);
 
-    const unsubscribeCompleted = window.upeer.onFileTransferCompleted((data: any) => {
+    const unsubscribeCompleted = window.upeer.onFileTransferCompleted((data) => {
         setTransfers((prev) => prev.map((transfer) =>
             transfer.fileId === data.fileId ? { ...transfer, state: 'completed', progress: 100 } : transfer,
         ));
@@ -34,12 +34,12 @@ export const registerFileTransferListeners = ({
         });
     }) || (() => undefined);
 
-    const unsubscribeCancelled = window.upeer.onFileTransferCancelled((data: any) => {
+    const unsubscribeCancelled = window.upeer.onFileTransferCancelled((data) => {
         void loadTransfers();
         onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'cancelled' });
     }) || (() => undefined);
 
-    const unsubscribeFailed = window.upeer.onFileTransferFailed((data: any) => {
+    const unsubscribeFailed = window.upeer.onFileTransferFailed((data) => {
         void loadTransfers();
         onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'failed' });
     }) || (() => undefined);

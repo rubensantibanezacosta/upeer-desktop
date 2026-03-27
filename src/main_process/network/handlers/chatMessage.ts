@@ -15,11 +15,59 @@ import {
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { error, warn, info } from '../../security/secure-logger.js';
 import { isValidMessageId, updateEphemeralKeyIfValid } from './chatShared.js';
+import type { RatchetHeader } from '../../security/ratchetShared.js';
+
+type ChatSignedPreKeyBundle = {
+    spkPub: string;
+    spkSig: string;
+    spkId: number;
+};
+
+type ChatX3dhInit = {
+    ikPub: string;
+    ekPub: string;
+    spkId: number;
+};
+
+type ChatIncomingPayload = {
+    id?: string;
+    content: string;
+    nonce?: string;
+    ephemeralPublicKey?: string;
+    replyTo?: string;
+    x3dhInit?: ChatX3dhInit;
+    ratchetHeader?: RatchetHeader;
+    isInternalSync?: boolean;
+    timestamp?: number;
+    useRecipientEphemeral?: boolean;
+};
+
+type ChatContactRecord = {
+    upeerId: string;
+    publicKey?: string;
+    name?: string;
+    alias?: string;
+};
+
+type SaveMessageResult = {
+    changes?: number;
+} | undefined;
+
+type AckPacket = {
+    type: 'ACK';
+    id?: string;
+    status: 'delivered';
+};
+
+type DrResetPacket = {
+    type: 'DR_RESET';
+    signedPreKey: ChatSignedPreKeyBundle;
+};
 
 async function decryptDoubleRatchetContent(
     upeerId: string,
-    data: any,
-    sendResponse: (ip: string, data: any) => void,
+    data: ChatIncomingPayload,
+    sendResponse: (ip: string, data: AckPacket | DrResetPacket) => void,
     fromAddress: string
 ): Promise<string> {
     const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
@@ -35,10 +83,10 @@ async function decryptDoubleRatchetContent(
 
         if (!session && data.x3dhInit) {
             const { ekPub, ikPub, spkId: x3dhSpkId } = data.x3dhInit;
-            const aliceIkPk = Buffer.from(ikPub as string, 'hex');
-            const aliceEkPk = Buffer.from(ekPub as string, 'hex');
+            const aliceIkPk = Buffer.from(ikPub, 'hex');
+            const aliceEkPk = Buffer.from(ekPub, 'hex');
             const bobIkSk = getMyIdentitySkBuffer();
-            const spkEntry = getSpkBySpkId(x3dhSpkId as number);
+            const spkEntry = getSpkBySpkId(x3dhSpkId);
 
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { x3dhSpkId, upeerId }, 'security');
@@ -47,7 +95,7 @@ async function decryptDoubleRatchetContent(
 
             const sharedSecret = x3dhResponder(bobIkSk, spkEntry.spkSk, aliceIkPk, aliceEkPk);
             session = ratchetInitBob(sharedSecret, spkEntry.spkPk, spkEntry.spkSk);
-            usedSpkId = x3dhSpkId as number;
+            usedSpkId = x3dhSpkId;
             sharedSecret.fill(0);
         }
 
@@ -57,7 +105,16 @@ async function decryptDoubleRatchetContent(
             return '🔒 [Sin sesión Double Ratchet]';
         }
 
-        const plaintext = ratchetDecrypt(session, data.ratchetHeader, data.content, data.nonce);
+        const ratchetHeader = data.ratchetHeader;
+        if (!ratchetHeader) {
+            throw new Error('ratchet-header-missing');
+        }
+        const nonce = data.nonce;
+        if (!nonce) {
+            throw new Error('nonce-missing');
+        }
+
+        const plaintext = ratchetDecrypt(session, ratchetHeader, data.content, nonce);
         if (plaintext) {
             saveRatchetSession(upeerId, session, usedSpkId);
             return plaintext.toString('utf-8');
@@ -65,17 +122,17 @@ async function decryptDoubleRatchetContent(
 
         if (data.x3dhInit) {
             const { ekPub, ikPub, spkId: x3dhSpkId } = data.x3dhInit;
-            const spkEntry = getSpkBySpkId(x3dhSpkId as number);
+            const spkEntry = getSpkBySpkId(x3dhSpkId);
             if (spkEntry) {
                 const bobIkSk = getMyIdentitySkBuffer();
-                const aliceIkPk = Buffer.from(ikPub as string, 'hex');
-                const aliceEkPk = Buffer.from(ekPub as string, 'hex');
+                const aliceIkPk = Buffer.from(ikPub, 'hex');
+                const aliceEkPk = Buffer.from(ekPub, 'hex');
                 const sharedSecret = x3dhResponder(bobIkSk, spkEntry.spkSk, aliceIkPk, aliceEkPk);
                 const freshSession = ratchetInitBob(sharedSecret, spkEntry.spkPk, spkEntry.spkSk);
                 sharedSecret.fill(0);
-                const retry = ratchetDecrypt(freshSession, data.ratchetHeader, data.content, data.nonce);
+                const retry = ratchetDecrypt(freshSession, ratchetHeader, data.content, nonce);
                 if (retry) {
-                    saveRatchetSession(upeerId, freshSession, x3dhSpkId as number);
+                    saveRatchetSession(upeerId, freshSession, x3dhSpkId);
                     info('DR race resolved: replaced stale Alice session with Bob session', { upeerId }, 'security');
                     return retry.toString('utf-8');
                 }
@@ -99,7 +156,12 @@ async function decryptDoubleRatchetContent(
     }
 }
 
-function decryptLegacyContent(data: any, contact: any): string {
+function decryptLegacyContent(data: ChatIncomingPayload, contact: ChatContactRecord): string {
+    const nonce = data.nonce;
+    if (!nonce) {
+        throw new Error('nonce-missing');
+    }
+
     const senderEphemeralKey = updateEphemeralKeyIfValid(contact.upeerId, data.ephemeralPublicKey);
     const senderKeyHex = senderEphemeralKey ?? contact.publicKey;
     if (!senderKeyHex) {
@@ -107,13 +169,13 @@ function decryptLegacyContent(data: any, contact: any): string {
     }
 
     const decrypted = decrypt(
-        Buffer.from(data.nonce, 'hex'),
+        Buffer.from(nonce, 'hex'),
         Buffer.from(data.content, 'hex'),
         Buffer.from(senderKeyHex, 'hex')
     );
     const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
         ? decryptWithIdentityKey(
-            Buffer.from(data.nonce, 'hex'),
+            Buffer.from(nonce, 'hex'),
             Buffer.from(data.content, 'hex'),
             Buffer.from(senderKeyHex, 'hex')
         )
@@ -124,26 +186,28 @@ function decryptLegacyContent(data: any, contact: any): string {
 
 export async function handleChatMessage(
     upeerId: string,
-    contact: any,
-    data: any,
+    contact: ChatContactRecord,
+    data: ChatIncomingPayload,
     win: BrowserWindow | null,
-    signature: any,
+    signature: string,
     fromAddress: string,
-    sendResponse: (ip: string, data: any) => void
+    sendResponse: (ip: string, data: AckPacket | DrResetPacket) => void
 ): Promise<void> {
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
-    if (isInternalSync) {
-        const existing = await getMessageById(data.id);
+    const incomingId = isValidMessageId(data.id) ? data.id : undefined;
+
+    if (isInternalSync && incomingId) {
+        const existing = await getMessageById(incomingId);
         if (existing) return;
     }
 
-    const msgId = isValidMessageId(data.id) ? data.id : randomUUID();
+    const msgId = incomingId ?? randomUUID();
 
-    if (isValidMessageId(data.id)) {
-        const collision = await getMessageById(data.id);
+    if (incomingId) {
+        const collision = await getMessageById(incomingId);
         if (collision) {
-            sendResponse(fromAddress, { type: 'ACK', id: data.id, status: 'delivered' });
+            sendResponse(fromAddress, { type: 'ACK', id: incomingId, status: 'delivered' });
             return;
         }
     }
@@ -173,7 +237,8 @@ export async function handleChatMessage(
         isInternalSync ? myId : upeerId,
         data.timestamp
     );
-    const isNew = (saved as any)?.changes > 0;
+    const saveResult = saved as SaveMessageResult;
+    const isNew = typeof saveResult?.changes === 'number' && saveResult.changes > 0;
 
     if (isNew) {
         win?.webContents.send('receive-p2p-message', {
@@ -209,7 +274,7 @@ export async function handleChatMessage(
 
     sendResponse(fromAddress, {
         type: 'ACK',
-        id: data.id,
+        id: incomingId,
         status: 'delivered',
     });
 

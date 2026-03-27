@@ -10,6 +10,17 @@ export type GroupPayload = {
     senderKey?: string;
 };
 
+export interface GroupControlPacket extends GroupPayload {
+    groupId: string;
+    payload?: string;
+    nonce?: string;
+    adminUpeerId?: string;
+    ephemeralPublicKey?: string;
+    useRecipientEphemeral?: boolean;
+    signature?: string;
+    isInternalSync?: boolean;
+}
+
 export function sameMembers(left: string[], right: string[]): boolean {
     if (left.length !== right.length) return false;
     const leftSorted = [...left].sort();
@@ -30,13 +41,13 @@ export function updateGroupEphemeralKeyIfValid(upeerId: string, ephemeralPublicK
     return ephemeralPublicKey;
 }
 
-export async function decryptGroupControlPayload(upeerId: string, data: any): Promise<GroupPayload | null> {
+export async function decryptGroupControlPayload(upeerId: string, data: GroupControlPacket): Promise<GroupPayload | null> {
     const contact = await getContactByUpeerId(upeerId);
     const senderKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
         ? data.ephemeralPublicKey
         : contact?.publicKey;
 
-    if (!senderKey) return null;
+    if (!senderKey || typeof data.nonce !== 'string' || typeof data.payload !== 'string') return null;
 
     const decrypted = decrypt(
         Buffer.from(data.nonce, 'hex'),

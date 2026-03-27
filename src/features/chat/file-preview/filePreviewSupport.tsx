@@ -119,7 +119,7 @@ export const useFilesPreview = (files: FileInfo[]) => {
             for (const file of unprocessed) {
                 let assetPath = file.path;
                 try {
-                    const result = await (window as any).upeer?.persistInternalAsset({ filePath: file.path, fileName: file.name });
+                    const result = await window.upeer.persistInternalAsset({ filePath: file.path, fileName: file.name });
                     if (result?.success && result.path) {
                         assetPath = result.path;
                     }
@@ -143,7 +143,7 @@ export const useFilesPreview = (files: FileInfo[]) => {
                 } else if (effectiveType.startsWith('video/')) {
                     previewUrl = toMediaUrl(assetPath);
                     try {
-                        const result = await (window as any).upeer.generateVideoThumbnail(assetPath);
+                        const result = await window.upeer.generateVideoThumbnail(assetPath);
                         thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(previewUrl);
                     } catch {
                         thumbnail = await generateVideoThumbnail(previewUrl);

@@ -1,8 +1,10 @@
 import { getContacts, getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getMyUPeerId, incrementMyDhtSeq } from '../../security/identity.js';
+import type { KademliaContact } from './kademlia/types.js';
+import type { LocationBlock, RenewalToken } from '../types.js';
 import {
     generateSignedLocationBlock,
-    getNetworkAddresses,
+    getDhtNetworkAddresses,
     getDeviceMetadata,
     isYggdrasilAddress,
 } from '../utils.js';
@@ -10,6 +12,46 @@ import { getKademliaInstance, publishLocationBlock, findNodeLocation, iterativeF
 import { network, warn } from '../../security/secure-logger.js';
 
 let lastKnownAddresses: string[] = [];
+
+type NetworkContactRecord = {
+    upeerId: string;
+    status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
+    address?: string;
+    knownAddresses?: string | null;
+    publicKey?: string;
+    dhtSignature?: string | null;
+    dhtSeq?: number | null;
+    dhtExpiresAt?: number | null;
+    renewalToken?: string | null;
+    expiresAt?: number | null;
+};
+
+type DhtExchangePeer = {
+    upeerId: string;
+    publicKey: string;
+    locationBlock: LocationBlock;
+};
+
+type DhtQueryPacket = {
+    type: 'DHT_QUERY';
+    targetId: string;
+    referralContext: {
+        requester: string;
+        timestamp: number;
+    };
+};
+
+type DhtUpdatePacket = {
+    type: 'DHT_UPDATE';
+    locationBlock: LocationBlock;
+};
+
+type DhtExchangePacket = {
+    type: 'DHT_EXCHANGE';
+    peers: DhtExchangePeer[];
+};
+
+type SendDhtPacket = (ip: string, data: DhtQueryPacket | DhtUpdatePacket | DhtExchangePacket) => void;
 
 function distanceXor(idA: string, idB: string): bigint {
     try {
@@ -31,8 +73,8 @@ function parseJsonValue<T>(value: string | null | undefined, fallback?: T): T | 
     }
 }
 
-export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any) => void) {
-    const addresses = getNetworkAddresses();
+export function broadcastDhtUpdate(sendSecureUDPMessage: SendDhtPacket) {
+    const addresses = getDhtNetworkAddresses();
     if (addresses.length === 0) {
         return;
     }
@@ -71,7 +113,7 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: (ip: string, data: any)
     network('Multi-channel update propagated', undefined, { intimateContacts: connectedContacts.length }, 'dht');
 }
 
-export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessage: (ip: string, data: any) => void) {
+export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessage: SendDhtPacket) {
     const targetContact = await getContactByUpeerId(targetUpeerId);
     if (!targetContact || targetContact.status !== 'connected') {
         return;
@@ -79,15 +121,15 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
 
     const kademlia = getKademliaInstance();
     if (kademlia) {
-        const closestContacts = (kademlia as any)
+        const closestContacts = kademlia
             .findClosestContacts(targetUpeerId, 5)
-            .filter((contact: any) => contact.upeerId !== targetUpeerId && contact.dhtSignature);
+            .filter((contact: KademliaContact) => contact.upeerId !== targetUpeerId && !!contact.dhtSignature);
 
-        const payload = await Promise.all(
-            closestContacts.map(async (contact: any) => {
-                const dbContact = await getContactByUpeerId(contact.upeerId);
+        const payload: DhtExchangePeer[] = await Promise.all(
+            closestContacts.map(async (contact: KademliaContact) => {
+                const dbContact = await getContactByUpeerId(contact.upeerId) as NetworkContactRecord | null;
                 const knownAddresses = parseJsonValue<string[]>(dbContact?.knownAddresses, [contact.address]);
-                const renewalToken = parseJsonValue(dbContact?.renewalToken);
+                const renewalToken = parseJsonValue<RenewalToken>(dbContact?.renewalToken);
 
                 return {
                     upeerId: contact.upeerId,
@@ -110,17 +152,17 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
         return;
     }
 
-    const payload = (getContacts() as any[])
+    const payload: DhtExchangePeer[] = (getContacts() as NetworkContactRecord[])
         .filter(contact => contact.status === 'connected' && contact.dhtSignature && contact.upeerId !== targetUpeerId)
         .map(contact => ({
             upeerId: contact.upeerId,
-            publicKey: contact.publicKey,
+            publicKey: contact.publicKey || '',
             locationBlock: {
-                address: contact.address,
-                dhtSeq: contact.dhtSeq,
+                address: contact.address || '',
+                dhtSeq: contact.dhtSeq || 0,
                 signature: contact.dhtSignature,
-                expiresAt: contact.dhtExpiresAt,
-                renewalToken: parseJsonValue(contact.renewalToken),
+                expiresAt: contact.dhtExpiresAt ?? undefined,
+                renewalToken: parseJsonValue<RenewalToken>(contact.renewalToken),
             },
             dist: distanceXor(contact.upeerId, targetUpeerId),
         }))
@@ -133,7 +175,7 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
     }
 }
 
-export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: (ip: string, data: any) => void) {
+export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: SendDhtPacket) {
     network('Starting active DHT search', undefined, { upeerId }, 'dht-search');
 
     const location = await findNodeLocation(upeerId);
@@ -151,11 +193,11 @@ export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: (ip:
         return;
     }
 
-    const queryTargets = (getContacts() as any[])
+    const queryTargets = (getContacts() as NetworkContactRecord[])
         .filter(contact => contact.status === 'connected' && contact.upeerId !== upeerId)
         .map(contact => ({
             upeerId: contact.upeerId,
-            address: contact.address,
+            address: contact.address || '',
             dist: distanceXor(contact.upeerId, upeerId),
             hasRenewalToken: !!contact.renewalToken,
             expiresAt: contact.expiresAt,
@@ -172,13 +214,14 @@ export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: (ip:
         .slice(0, 5);
 
     for (const target of queryTargets) {
-        sendSecureUDPMessage(target.address, {
+        const packet: DhtQueryPacket = {
             type: 'DHT_QUERY',
             targetId: upeerId,
             referralContext: {
                 requester: getMyUPeerId(),
                 timestamp: Date.now(),
             },
-        });
+        };
+        sendSecureUDPMessage(target.address, packet);
     }
 }

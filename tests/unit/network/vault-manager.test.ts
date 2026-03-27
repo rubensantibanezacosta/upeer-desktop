@@ -1,14 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VaultManager } from '../../../src/main_process/network/vault/manager.js';
+import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
+import * as vaultOps from '../../../src/main_process/storage/vault/operations.js';
+import * as transport from '../../../src/main_process/network/server/transport.js';
+import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
+import * as dhtShared from '../../../src/main_process/network/dht/shared.js';
 
 type VaultManagerPrivate = typeof VaultManager & {
     getDynamicReplicationFactor: (targetUpeerId: string) => Promise<number>;
     sendWithRetry: (address: string, packet: Record<string, unknown>, maxRetries: number, baseDelayMs: number) => Promise<void>;
 };
+type KnownContact = Awaited<ReturnType<typeof contactsOps.getContacts>>[number];
+type KnownRecipient = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
+type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInstance>>;
 
 const vaultManagerPrivate = VaultManager as unknown as VaultManagerPrivate;
 
-// Mocks
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
     getContactByUpeerId: vi.fn(),
@@ -50,95 +57,78 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
     });
 
     it('should return MIN_REPLICATION_FACTOR for very high reputation (score >= 90)', async () => {
-        const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
-        vi.mocked(getVouchScore).mockResolvedValue(95);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(95);
 
         const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
-        expect(factor).toBe(3); // MIN_REPLICATION_FACTOR
+        expect(factor).toBe(3);
     });
 
     it('should return MAX_REPLICATION_FACTOR for low reputation (score <= 30)', async () => {
-        const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
-        vi.mocked(getVouchScore).mockResolvedValue(20);
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(20);
 
         const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
-        expect(factor).toBe(12); // MAX_REPLICATION_FACTOR
+        expect(factor).toBe(12);
     });
 
     it('should return higher replication if the contact is new or unstable', async () => {
-        const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
-        vi.mocked(getVouchScore).mockResolvedValue(50);
-
-        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
-        vi.mocked(getContactByUpeerId).mockResolvedValue({
+        vi.mocked(reputation.getVouchScore).mockResolvedValue(50);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'target-id',
-            createdAt: new Date().toISOString(), // New
+            createdAt: new Date().toISOString(),
             lastSeen: new Date().toISOString(),
             status: 'connected'
-        } as any);
+        } as KnownRecipient);
 
         const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
-        expect(factor).toBeGreaterThanOrEqual(6); // DEFAULT_REPLICATION_FACTOR o más
+        expect(factor).toBeGreaterThanOrEqual(6);
     });
 
     it('should correctly select candidates for replication and send messages', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-
         const mockContacts = [
             { upeerId: 'friend-1', address: '127.0.0.1:1', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'friend-2', address: '127.0.0.1:2', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'friend-3', address: '127.0.0.1:3', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'friend-4', address: '127.0.0.1:4', status: 'connected', lastSeen: new Date().toISOString() }
-        ];
-        vi.mocked(getContacts).mockReturnValue(mockContacts as never);
-        vi.mocked(sendSecureUDPMessage).mockResolvedValue(undefined);
+        ] as KnownContact[];
+        vi.mocked(contactsOps.getContacts).mockResolvedValue(mockContacts);
+        vi.mocked(transport.sendSecureUDPMessage).mockResolvedValue(undefined);
 
         const packet = { type: 'CHAT', content: 'test msg' };
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
         const nodesCount = await VaultManager.replicateToVaults('recipient-id', packet);
 
         expect(nodesCount).toBe(3);
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(saveVaultEntry).toHaveBeenCalledOnce();
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('should handle retries when sending fails initially', async () => {
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-
-        // Simular fallo inicial y luego éxito
-        vi.mocked(sendSecureUDPMessage)
+        vi.mocked(transport.sendSecureUDPMessage)
             .mockRejectedValueOnce(new Error('UDP Timeout'))
             .mockResolvedValueOnce(undefined);
 
         await vaultManagerPrivate.sendWithRetry('127.0.0.1:999', { type: 'TEST' }, 3, 10);
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
     });
 
     it('should only include successful custodians in DHT pointer', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
         const mockContacts = [
             { upeerId: 'friend-success', address: '127.0.0.1:1', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'friend-fail', address: '127.0.0.1:2', status: 'connected', lastSeen: new Date().toISOString() }
-        ];
-        vi.mocked(getContacts).mockResolvedValue(mockContacts as any);
+        ] as KnownContact[];
+        vi.mocked(contactsOps.getContacts).mockResolvedValue(mockContacts);
 
-        // Uno tiene éxito, el otro falla 3 veces
-        vi.mocked(sendSecureUDPMessage)
-            .mockResolvedValueOnce(undefined) // Success por node 1
-            .mockRejectedValue(new Error('Fail')); // Fail por node 2 (todas las veces)
+        vi.mocked(transport.sendSecureUDPMessage)
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValue(new Error('Fail'));
 
         const mockKademlia = {
             storeValue: vi.fn().mockResolvedValue(undefined)
-        };
-        vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as any);
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
+        } satisfies Pick<KademliaInstance, 'storeValue'>;
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
         await VaultManager.replicateToVaults('recipient-id', { type: 'CHAT' });
 
@@ -155,29 +145,21 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
     });
 
     it('stores message locally when only 2 peers and recipient is offline', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
-        vi.mocked(getKademliaInstance).mockReturnValue(null);
-
-        // Escenario real: getContacts() no incluye al propio nodo — solo el contacto offline.
-        // Sin terceros disponibles ni kademlia → ningún candidato → saveVaultEntry como self-custodian.
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'recipient-offline', address: '200::2', status: 'disconnected', lastSeen: new Date().toISOString() }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
         const packet = { type: 'CHAT', content: 'hola que pasa' };
         const result = await VaultManager.replicateToVaults('recipient-offline', packet);
 
         expect(result).toBe(1);
-        expect(sendSecureUDPMessage).not.toHaveBeenCalled();
-        expect(saveVaultEntry).toHaveBeenCalledOnce();
+        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
 
-        const [hash, recipientSid, senderSid, priority, data, expiresAt] = vi.mocked(saveVaultEntry).mock.calls[0];
+        const [hash, recipientSid, senderSid, priority, data, expiresAt] = vi.mocked(vaultOps.saveVaultEntry).mock.calls[0];
         expect(typeof hash).toBe('string');
         expect(hash).toHaveLength(64);
         expect(recipientSid).toBe('recipient-offline');
@@ -188,111 +170,87 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
     });
 
     it('stores message locally when kademlia returns no extra nodes and all candidates are filtered', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
         const mockKademlia = { findClosestContacts: vi.fn().mockReturnValue([]) };
-        vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as any);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
 
-        // Solo el recipient offline — kademlia devuelve array vacío → ningún candidato
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'target-peer', address: '200::2', status: 'disconnected' }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(6);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(6);
 
         const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT', content: 'msg' });
 
         expect(result).toBe(1);
-        expect(saveVaultEntry).toHaveBeenCalledOnce();
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('stores message locally when the only other peer is the recipient still marked connected', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
-        vi.mocked(getKademliaInstance).mockReturnValue(null);
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'recipient-stale', address: '200::2', status: 'connected', lastSeen: new Date().toISOString() }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
         const result = await VaultManager.replicateToVaults('recipient-stale', { type: 'CHAT', content: 'msg' });
 
         expect(result).toBe(1);
-        expect(sendSecureUDPMessage).not.toHaveBeenCalled();
-        expect(saveVaultEntry).toHaveBeenCalledOnce();
+        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('uses self-custodian and third-party custodians when available', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(transport.sendSecureUDPMessage).mockResolvedValue(undefined);
 
-        vi.mocked(getKademliaInstance).mockReturnValue(null);
-        vi.mocked(sendSecureUDPMessage).mockResolvedValue(undefined);
-
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'my-peer-id', address: '200::1', status: 'connected' },
             { upeerId: 'target-peer', address: '200::2', status: 'disconnected' },
             { upeerId: 'third-party-1', address: '200::3', status: 'connected', lastSeen: new Date().toISOString() },
             { upeerId: 'third-party-2', address: '200::4', status: 'connected', lastSeen: new Date().toISOString() }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(2);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
         const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT' });
 
         expect(result).toBe(3);
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(saveVaultEntry).toHaveBeenCalledOnce();
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('self-custodian stores data with TTL that does not exceed VAULT_TTL_MS', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
-        vi.mocked(getKademliaInstance).mockReturnValue(null);
-        // Sin self en la lista → ningún candidato → saveVaultEntry
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'offline-peer', address: '200::2', status: 'disconnected' }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
         const beforeCall = Date.now();
         await VaultManager.replicateToVaults('offline-peer', { type: 'CHAT' });
         const afterCall = Date.now();
 
         const { VAULT_TTL_MS } = await import('../../../src/main_process/network/vault/manager.js');
-        const [, , , , , expiresAt] = vi.mocked(saveVaultEntry).mock.calls[0];
+        const [, , , , , expiresAt] = vi.mocked(vaultOps.saveVaultEntry).mock.calls[0];
 
         expect(expiresAt).toBeGreaterThanOrEqual(beforeCall + VAULT_TTL_MS - 100);
         expect(expiresAt).toBeLessThanOrEqual(afterCall + VAULT_TTL_MS + 100);
     });
 
     it('uses payloadHashOverride when provided in self-custodian path', async () => {
-        const { getContacts } = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { saveVaultEntry } = await import('../../../src/main_process/storage/vault/operations.js');
-        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/shared.js');
-
-        vi.mocked(getKademliaInstance).mockReturnValue(null);
-        vi.mocked(getContacts).mockResolvedValue([
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'offline', status: 'disconnected' }
-        ] as any);
+        ] as KnownContact[]);
 
-        vi.spyOn(VaultManager as any, 'getDynamicReplicationFactor').mockResolvedValue(3);
+        vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
         const fixedHash = 'a'.repeat(64);
         await VaultManager.replicateToVaults('offline', { type: 'CHAT' }, undefined, fixedHash);
 
-        const [storedHash] = vi.mocked(saveVaultEntry).mock.calls[0];
+        const [storedHash] = vi.mocked(vaultOps.saveVaultEntry).mock.calls[0];
         expect(storedHash).toBe(fixedHash);
     });
 });

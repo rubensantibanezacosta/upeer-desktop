@@ -30,7 +30,67 @@ import {
 
 const CHAT_ACK_TIMEOUT_MS = 2500;
 
-async function buildPayload(content: string, providedLinkPreview: { [key: string]: any } | null): Promise<string> {
+type LinkPreviewPayload = Record<string, unknown>;
+
+type ChatOutboundMessage = {
+    content: string;
+    linkPreview?: LinkPreviewPayload | null;
+};
+
+type ChatContactRecord = {
+    upeerId: string;
+    publicKey?: string | null;
+    address?: string | null;
+    knownAddresses?: string | string[] | null;
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
+    signedPreKey?: string | null;
+    signedPreKeyId?: number | null;
+};
+
+type RatchetEncryptHeader = {
+    dh: string;
+    pn: number;
+    n: number;
+};
+
+type RatchetEncryptResult = {
+    header: RatchetEncryptHeader;
+    ciphertext: string;
+    nonce: string;
+};
+
+type EncryptedChatPayload = {
+    content: string;
+    nonce: string;
+    ratchetHeader?: RatchetEncryptHeader;
+    x3dhInit?: {
+        ekPub: string;
+        spkId: number | null | undefined;
+        ikPub: string;
+    };
+    ephemeralPublicKey?: string;
+    useRecipientEphemeral?: boolean;
+};
+
+type GroupRecordLike = {
+    status: 'active' | 'invited';
+    members: string[];
+};
+
+function parseKnownAddresses(value: ChatContactRecord['knownAddresses'], upeerId: string, context: string): string[] {
+    if (!value) return [];
+
+    try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((address): address is string => typeof address === 'string');
+    } catch (err) {
+        warn(context, { upeerId, err: String(err) }, 'network');
+        return [];
+    }
+}
+
+async function buildPayload(content: string, providedLinkPreview: LinkPreviewPayload | null): Promise<string> {
     const urlFirstRegex = /(https?:\/\/[^\s<>"']+)/i;
     const urlMatch = urlFirstRegex.exec(content);
     let payload = content;
@@ -44,15 +104,19 @@ async function buildPayload(content: string, providedLinkPreview: { [key: string
     return payload;
 }
 
-async function encryptChatPayload(upeerId: string, payload: string, contact: any): Promise<Record<string, unknown>> {
-    let ratchetHeader: Record<string, unknown> | undefined;
-    let x3dhInit: Record<string, unknown> | undefined;
+async function encryptChatPayload(upeerId: string, payload: string, contact: ChatContactRecord): Promise<EncryptedChatPayload> {
+    let ratchetHeader: RatchetEncryptHeader | undefined;
+    let x3dhInit: EncryptedChatPayload['x3dhInit'];
     let contentHex: string;
     let nonceHex: string;
     let ephemeralPublicKey: string | undefined;
     let useRecipientEphemeral: boolean | undefined;
 
     try {
+        const contactPublicKey = contact.publicKey;
+        if (!contactPublicKey) {
+            throw new Error('missing-public-key');
+        }
         const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
         const { x3dhInitiator, ratchetEncrypt, ratchetInitAlice } = await import('../../security/ratchet.js');
         const sessionResult = getRatchetSession(upeerId);
@@ -62,8 +126,8 @@ async function encryptChatPayload(upeerId: string, payload: string, contact: any
         if (!session && contact.signedPreKey) {
             const myIdentitySecretKey = getMyIdentitySkBuffer();
             const myIdentityPublicKey = Buffer.from(getMyPublicKeyHex(), 'hex');
-            const bobIdentityPublicKey = Buffer.from(contact.publicKey, 'hex');
-            const bobSignedPreKey = Buffer.from(contact.signedPreKey as string, 'hex');
+            const bobIdentityPublicKey = Buffer.from(contactPublicKey, 'hex');
+            const bobSignedPreKey = Buffer.from(contact.signedPreKey, 'hex');
             const { ekPub, sharedSecret } = x3dhInitiator(myIdentitySecretKey, myIdentityPublicKey, bobIdentityPublicKey, bobSignedPreKey);
             session = ratchetInitAlice(sharedSecret, bobSignedPreKey);
             sharedSecret.fill(0);
@@ -79,17 +143,21 @@ async function encryptChatPayload(upeerId: string, payload: string, contact: any
             throw new Error('no-session');
         }
 
-        const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8'));
+        const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8')) as RatchetEncryptResult;
         saveRatchetSession(upeerId, session, usedSpkId);
-        ratchetHeader = encrypted.header as unknown as Record<string, unknown>;
+        ratchetHeader = encrypted.header;
         contentHex = encrypted.ciphertext;
         nonceHex = encrypted.nonce;
     } catch (err) {
         if (!(err instanceof Error && err.message === 'no-session')) {
             warn('Double Ratchet unavailable, falling back to legacy crypto_box', { upeerId, err: String(err) }, 'network');
         }
+        const contactPublicKey = contact.publicKey;
+        if (!contactPublicKey) {
+            throw new Error('missing-public-key');
+        }
         ephemeralPublicKey = getMyEphemeralPublicKeyHex();
-        const encrypted = encrypt(Buffer.from(payload, 'utf-8'), Buffer.from(contact.publicKey, 'hex'));
+        const encrypted = encrypt(Buffer.from(payload, 'utf-8'), Buffer.from(contactPublicKey, 'hex'));
         useRecipientEphemeral = false;
         contentHex = encrypted.ciphertext;
         nonceHex = encrypted.nonce;
@@ -107,7 +175,7 @@ async function encryptChatPayload(upeerId: string, payload: string, contact: any
 
 export async function sendUDPMessage(
     upeerId: string,
-    message: string | { [key: string]: any },
+    message: string | ChatOutboundMessage,
     replyTo?: string,
     messageId?: string,
 ): Promise<{ id: string; savedMessage: string; timestamp: number } | undefined> {
@@ -127,7 +195,7 @@ export async function sendUDPMessage(
         return undefined;
     }
 
-    const contact = await getContactByUpeerId(upeerId);
+    const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
     if (!contact || !contact.publicKey) {
         if (contact && !contact.publicKey) {
             await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
@@ -145,7 +213,7 @@ export async function sendUDPMessage(
         let vaulted = false;
         try {
             const nodes = await vaultChatForOfflineDelivery(upeerId, contact.publicKey, msgId, payload, replyTo, selfId, timestamp);
-            if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted' as any)) {
+            if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted')) {
                 vaulted = true;
                 setTimeout(() => { void emitMessageStatusUpdated(msgId, 'vaulted'); }, 0);
             }
@@ -176,13 +244,9 @@ export async function sendUDPMessage(
     for (const address of selfAddresses) {
         if (!chatAddresses.includes(address)) chatAddresses.push(address);
     }
-    try {
-        const knownAddresses: string[] = JSON.parse((contact as any).knownAddresses ?? '[]');
-        for (const address of knownAddresses) {
-            if (!chatAddresses.includes(address)) chatAddresses.push(address);
-        }
-    } catch (err) {
-        warn('Failed to parse knownAddresses for message send', { upeerId, err: String(err) }, 'network');
+    const knownAddresses = parseKnownAddresses(contact.knownAddresses, upeerId, 'Failed to parse knownAddresses for message send');
+    for (const address of knownAddresses) {
+        if (!chatAddresses.includes(address)) chatAddresses.push(address);
     }
 
     const myPublicKey = getMyPublicKey().toString('hex');
@@ -221,11 +285,11 @@ export async function sendUDPMessage(
             const status = getMessageStatus(msgId);
             if (status === 'sent') {
                 warn('Message not delivered, starting vault replication', { msgId, upeerId }, 'vault');
-                const freshContact = await getContactByUpeerId(upeerId);
+                const freshContact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
                 if (!freshContact?.publicKey) return;
                 const nodes = await vaultChatForOfflineDelivery(upeerId, freshContact.publicKey, msgId, payload, replyTo, selfId, timestamp);
                 if (nodes > 0) {
-                    if (await updateMessageStatus(msgId, 'vaulted' as any)) {
+                    if (await updateMessageStatus(msgId, 'vaulted')) {
                         await emitMessageStatusUpdated(msgId, 'vaulted');
                     }
                 } else {
@@ -244,14 +308,14 @@ export async function sendUDPMessage(
 
 export async function sendTypingIndicator(upeerId: string): Promise<void> {
     if (upeerId.startsWith('grp-')) {
-        const group = getGroupById(upeerId);
+        const group = getGroupById(upeerId) as GroupRecordLike | null;
         if (!group || group.status !== 'active') return;
         const myId = getMyUPeerId();
         const data = { type: 'TYPING', groupId: upeerId };
         for (const memberId of group.members) {
             if (memberId === myId) continue;
-            const contact = await getContactByUpeerId(memberId);
-            if (contact?.status === 'connected') {
+            const contact = await getContactByUpeerId(memberId) as ChatContactRecord | undefined;
+            if (contact?.status === 'connected' && contact.publicKey) {
                 for (const address of getFanOutAddresses(contact)) {
                     sendSecureUDPMessage(address, data, contact.publicKey);
                 }
@@ -260,8 +324,8 @@ export async function sendTypingIndicator(upeerId: string): Promise<void> {
         return;
     }
 
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact || contact.status !== 'connected') return;
+    const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
+    if (!contact || contact.status !== 'connected' || !contact.publicKey) return;
     for (const address of getFanOutAddresses(contact)) {
         sendSecureUDPMessage(address, { type: 'TYPING' }, contact.publicKey);
     }

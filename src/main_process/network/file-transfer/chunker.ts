@@ -30,7 +30,7 @@ export class FileChunker {
         }
     }
 
-    async writeChunk(transfer: FileTransfer, chunkData: any): Promise<void> {
+    async writeChunk(transfer: FileTransfer, chunkData: FileChunkData): Promise<void> {
         if (!transfer.tempPath) {
             throw new Error('No temp path for receiving transfer');
         }

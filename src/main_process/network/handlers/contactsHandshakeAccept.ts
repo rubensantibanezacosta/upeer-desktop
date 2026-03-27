@@ -24,6 +24,37 @@ import {
     verifyHandshakeAcceptSignature,
 } from './contactsShared.js';
 
+type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
+
+type ExistingContact = {
+    upeerId: string;
+    status?: ContactStatus;
+    publicKey?: string;
+    name: string;
+};
+
+type GhostContact = {
+    upeerId: string;
+};
+
+type HandshakeSignedPreKey = {
+    spkPub?: unknown;
+    spkSig?: unknown;
+    spkId?: unknown;
+};
+
+type HandshakeAcceptPayload = {
+    publicKey?: string;
+    type?: string;
+    alias?: unknown;
+    avatar?: unknown;
+    ephemeralPublicKey?: unknown;
+    signedPreKey?: HandshakeSignedPreKey | unknown;
+    addresses?: string[];
+};
+
+type HandshakeSendResponse = (ip: string, data: Record<string, unknown>) => void;
+
 function queryOwnVaultsAfterHandshake(senderUpeerId: string, label: string): void {
     import('../vault/manager.js').then(({ VaultManager }) => {
         VaultManager.queryOwnVaults();
@@ -33,13 +64,13 @@ function queryOwnVaultsAfterHandshake(senderUpeerId: string, label: string): voi
 }
 
 export async function handleHandshakeAccept(
-    data: any,
+    data: HandshakeAcceptPayload,
     signature: string,
     senderUpeerId: string,
     senderYggAddress: string,
     rinfo: { address: string; port: number },
     win: BrowserWindow | null,
-    _sendResponse: (ip: string, data: any) => void,
+    _sendResponse: HandshakeSendResponse,
     _tcpSourceAddress: string
 ): Promise<void> {
     if (!signature || !senderUpeerId || !data.publicKey) {
@@ -47,32 +78,36 @@ export async function handleHandshakeAccept(
         return;
     }
 
-    if (!verifyHandshakeAcceptSignature(data, signature, senderUpeerId, senderYggAddress)) {
+    const publicKey = data.publicKey;
+    const packetType = typeof data.type === 'string' ? data.type : 'HANDSHAKE_ACCEPT';
+    const safeEphKey = getSafeEphemeralPublicKey(data.ephemeralPublicKey);
+    const verifiedData = { ...data, publicKey };
+
+    if (!verifyHandshakeAcceptSignature(verifiedData, signature, senderUpeerId, senderYggAddress)) {
         security('Invalid HANDSHAKE_ACCEPT signature', { ip: rinfo.address }, 'network');
         return;
     }
 
-    if (!hasValidHandshakeIdentity(data, senderUpeerId, rinfo.address, 'HANDSHAKE_ACCEPT')) {
+    if (!hasValidHandshakeIdentity(verifiedData, senderUpeerId, rinfo.address, 'HANDSHAKE_ACCEPT')) {
         return;
     }
 
     network('Handshake accepted verified', rinfo.address, { upeerId: senderUpeerId }, 'handshake');
 
-    if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, data.type)) {
+    if (!rateLimiter.checkIdentity(rinfo.address, senderUpeerId, packetType)) {
         return;
     }
 
-    const ghost = await getContactByAddress(rinfo.address);
+    const ghost = await getContactByAddress(rinfo.address) as GhostContact | undefined;
     if (ghost && ghost.upeerId.startsWith('pending-')) {
         deleteContact(ghost.upeerId);
     }
 
-    const existing = await getContactByUpeerId(senderUpeerId);
+    const existing = await getContactByUpeerId(senderUpeerId) as ExistingContact | undefined;
     if (existing && existing.status === 'connected') {
         const currentAddress = rinfo.address;
         const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
-        addOrUpdateContact(senderUpeerId, currentAddress, existing.name, data.publicKey, 'connected', data.ephemeralPublicKey, undefined, undefined, undefined, incomingAddresses);
-        const safeEphKey = getSafeEphemeralPublicKey(data.ephemeralPublicKey);
+        addOrUpdateContact(senderUpeerId, currentAddress, existing.name, publicKey, 'connected', safeEphKey, undefined, undefined, undefined, incomingAddresses);
         if (safeEphKey) {
             updateContactEphemeralPublicKey(senderUpeerId, safeEphKey);
         }
@@ -87,18 +122,28 @@ export async function handleHandshakeAccept(
     let keyResult: { changed: boolean; oldKey?: string; newKey: string };
     try {
         keyResult = runTransaction<{ changed: boolean; oldKey?: string; newKey: string }>(() => {
-            const result = updateContactPublicKey(senderUpeerId, data.publicKey);
-            const safeEphKey = getSafeEphemeralPublicKey(data.ephemeralPublicKey);
+            const result = updateContactPublicKey(senderUpeerId, publicKey);
             if (safeEphKey) {
                 updateContactEphemeralPublicKey(senderUpeerId, safeEphKey);
             }
-            maybeUpdateSignedPreKey(senderUpeerId, data.publicKey, data.signedPreKey, 'HANDSHAKE_ACCEPT');
-            if (data.alias && typeof data.alias === 'string') {
+            maybeUpdateSignedPreKey(senderUpeerId, publicKey, data.signedPreKey, 'HANDSHAKE_ACCEPT');
+            if (typeof data.alias === 'string' && data.alias) {
                 updateContactName(senderUpeerId, data.alias.slice(0, 100));
             }
             const currentAddress = rinfo.address;
             const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
-            addOrUpdateContact(senderUpeerId, currentAddress, data.alias || existing.name, data.publicKey, 'connected', data.ephemeralPublicKey, undefined, undefined, undefined, incomingAddresses);
+            addOrUpdateContact(
+                senderUpeerId,
+                currentAddress,
+                typeof data.alias === 'string' && data.alias ? data.alias : existing.name,
+                publicKey,
+                'connected',
+                safeEphKey,
+                undefined,
+                undefined,
+                undefined,
+                incomingAddresses
+            );
             maybeSendAvatarUpdate(senderUpeerId, data.avatar, updateContactAvatar);
             return result;
         });
@@ -112,15 +157,13 @@ export async function handleHandshakeAccept(
             upeerId: senderUpeerId,
             oldFingerprint: computeKeyFingerprint(keyResult.oldKey),
             newFingerprint: computeKeyFingerprint(keyResult.newKey),
-            alias: data.alias || existing.name,
+            alias: typeof data.alias === 'string' && data.alias ? data.alias : existing.name,
         });
     }
 
-    if (data.publicKey) {
-        flushPendingOutbox(senderUpeerId, data.publicKey).catch((err) =>
-            warn('Failed to flush pending outbox', err, 'storage')
-        );
-    }
+    flushPendingOutbox(senderUpeerId, publicKey).catch((err) =>
+        warn('Failed to flush pending outbox', err, 'storage')
+    );
 
     queryOwnVaultsAfterHandshake(senderUpeerId, 'pending handshake accept');
     win?.webContents.send('contact-handshake-finished', { upeerId: senderUpeerId });

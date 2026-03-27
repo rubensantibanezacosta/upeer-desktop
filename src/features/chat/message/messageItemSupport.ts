@@ -1,4 +1,5 @@
 import type { LinkPreview } from '../../../types/chat.js';
+import type { FileTransfer } from '../../../hooks/fileTransferTypes.js';
 import type { FileMessageData } from '../file/FileMessageItem.js';
 
 export interface ContactCardData {
@@ -56,7 +57,7 @@ export const getContactCardSummary = (message: string): string | null => {
     return cardData.text?.trim() || 'Tarjeta de contacto';
 };
 
-export const parseMessage = (message: string, isMe: boolean, activeTransfers: any[]): ParsedMessageData => {
+export const parseMessage = (message: string, isMe: boolean, activeTransfers: FileTransfer[]): ParsedMessageData => {
     let cardData: ContactCardData | null = null;
     let fileData: FileMessageData | null = null;
     let isJSONFile = false;
@@ -94,6 +95,7 @@ export const parseMessage = (message: string, isMe: boolean, activeTransfers: an
                 direction,
                 isVaulting: activeTransfer?.isVaulting,
                 isVoiceNote: parsed.isVoiceNote || activeTransfer?.isVoiceNote,
+                filePath: parsed.filePath || activeTransfer?.filePath,
                 savedPath: parsed.savedPath || activeTransfer?.savedPath || (direction === 'sending' ? (parsed.filePath || activeTransfer?.filePath) : (parsed.tempPath || activeTransfer?.tempPath)),
             };
         } else if (parsed?.linkPreview && typeof parsed.text === 'string') {
@@ -129,6 +131,7 @@ export const parseMessage = (message: string, isMe: boolean, activeTransfers: an
                 progress,
                 direction,
                 isVaulting: activeTransfer?.isVaulting,
+                filePath: activeTransfer?.filePath,
                 savedPath: activeTransfer?.savedPath || (transferState === 'completed' ? activeTransfer?.tempPath : undefined),
             };
         }

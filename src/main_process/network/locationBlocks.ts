@@ -3,12 +3,23 @@ import { warn, debug } from '../security/secure-logger.js';
 import { validateAddress, prioritizeYggdrasil } from './addressing.js';
 import { canonicalStringify, safeBufferFromHex } from './cryptoUtils.js';
 import { findRenewalTokenInDHT, generateRenewalToken, verifyRenewalToken } from './renewalTokens.js';
-import type { RenewalToken, DeviceMetadata } from './types.js';
+import type { RenewalToken, DeviceMetadata, LocationBlock } from './types.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const LOCATION_BLOCK_TTL_MS = 30 * DAY_MS;
 export const LOCATION_BLOCK_TTL_MAX = 60 * DAY_MS;
 export const LOCATION_BLOCK_REFRESH_MS = 1 * DAY_MS;
+
+type SignedLocationPayload = {
+    upeerId: string;
+    addresses: string[];
+    dhtSeq: number;
+    expiresAt: number;
+    deviceId?: string;
+    deviceMeta?: DeviceMetadata;
+};
+
+type VerifiableLocationBlock = Pick<LocationBlock, 'address' | 'addresses' | 'dhtSeq' | 'signature' | 'expiresAt' | 'renewalToken' | 'deviceId' | 'deviceMeta'>;
 
 export function generateSignedLocationBlock(addressOrAddresses: string | string[], dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken, deviceMeta?: DeviceMetadata) {
     const ttl = ttlMs ?? LOCATION_BLOCK_TTL_MS;
@@ -21,7 +32,7 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
     const finalRenewalToken = renewalToken || generateRenewalToken(getMyUPeerId(), 3);
     const deviceId = getMyDeviceId();
 
-    const data: any = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt, deviceId };
+    const data: SignedLocationPayload = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt, deviceId };
     if (deviceMeta) data.deviceMeta = deviceMeta;
 
     const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
@@ -41,7 +52,7 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
 
 export function verifyLocationBlock(
     upeerId: string,
-    block: { address: string; addresses?: string[]; dhtSeq: number; signature: string; expiresAt?: number; renewalToken?: RenewalToken; deviceId?: string; deviceMeta?: DeviceMetadata },
+    block: VerifiableLocationBlock,
     publicKeyHex: string
 ): boolean {
     if (block.expiresAt === undefined) {
@@ -58,7 +69,7 @@ export function verifyLocationBlock(
         const sortedAddresses = [...new Set(inputAddresses)].sort(prioritizeYggdrasil);
         sortedAddresses.forEach(addr => validateAddress(addr));
 
-        const data: any = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
+        const data: SignedLocationPayload = { upeerId, addresses: sortedAddresses, dhtSeq: block.dhtSeq, expiresAt: block.expiresAt };
         if (block.deviceId) data.deviceId = block.deviceId;
         if (block.deviceMeta) data.deviceMeta = block.deviceMeta;
 
@@ -92,7 +103,7 @@ export function verifyLocationBlock(
 
 export async function verifyLocationBlockWithDHT(
     upeerId: string,
-    block: { address: string; addresses?: string[]; dhtSeq: number; signature: string; expiresAt?: number; renewalToken?: RenewalToken },
+    block: VerifiableLocationBlock,
     publicKeyHex: string
 ): Promise<boolean> {
     if (block.expiresAt === undefined) return false;
@@ -113,8 +124,9 @@ export async function verifyLocationBlockWithDHT(
         const sortedAddresses = [...new Set(inputAddresses)].sort(prioritizeYggdrasil);
         sortedAddresses.forEach(addr => validateAddress(addr));
         return verifyLocationBlock(upeerId, block, publicKeyHex);
-    } catch (err: any) {
-        debug('DHT verification error', { error: err.message }, 'dht');
+    } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        debug('DHT verification error', { error: errorMsg }, 'dht');
         return false;
     }
 }

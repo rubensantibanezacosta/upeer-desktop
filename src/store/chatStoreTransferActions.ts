@@ -1,9 +1,10 @@
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { formatMessageTimestamp, updateTransferMessageContent } from './chatStoreSupport.js';
+import type { LinkPreview, PendingFile, TransferMessageUpdates } from '../types/chat.js';
 
 export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
     clearUntrustworthyAlert: () => set({ untrustworthyAlert: null }),
-    setPendingFiles: (files: any[]) => set({ pendingFiles: files }),
+    setPendingFiles: (files: PendingFile[]) => set({ pendingFiles: files }),
     setIsDragging: (dragging: boolean) => set({ isDragging: dragging }),
 
     handleRetryMessage: async (msgId: string) => {
@@ -13,7 +14,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
             return;
         }
         let retryMessage = message.message;
-        let retryLinkPreview: any;
+        let retryLinkPreview: LinkPreview | undefined;
         if (retryMessage.startsWith('{') && retryMessage.endsWith('}')) {
             try {
                 const parsed = JSON.parse(retryMessage);
@@ -73,7 +74,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
                 timestamp: formatMessageTimestamp(Date.now()),
                 replyTo: replyTo?.id,
                 senderUpeerId: isMine ? myIdentity?.upeerId : undefined,
-                senderName: isMine ? ((myIdentity as any)?.alias || (myIdentity as any)?.name || 'Yo') : undefined,
+                senderName: isMine ? (myIdentity?.alias || myIdentity?.name || 'Yo') : undefined,
                 senderAvatar: isMine ? (myIdentity?.avatar ?? undefined) : undefined,
                 date: Date.now(),
             }],
@@ -93,10 +94,10 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
         });
     },
 
-    updateFileTransferMessage: (fileId: string, updates: any) => {
+    updateFileTransferMessage: (fileId: string, updates: TransferMessageUpdates) => {
         set((state) => ({
-            chatHistory: state.chatHistory.map((message: any) => updateTransferMessageContent(message, fileId, updates)),
-            groupChatHistory: state.groupChatHistory.map((message: any) => updateTransferMessageContent(message, fileId, updates)),
+            chatHistory: state.chatHistory.map((message) => updateTransferMessageContent(message, fileId, updates)),
+            groupChatHistory: state.groupChatHistory.map((message) => updateTransferMessageContent(message, fileId, updates)),
         }));
     },
 });

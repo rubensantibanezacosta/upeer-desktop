@@ -8,32 +8,41 @@ import { debug } from '../../../security/secure-logger.js';
 // MAX_STORE_ENTRIES cota la tienda en RAM; las entradas más antiguas se desalojan al llenarse.
 const MAX_STORE_ENTRIES = 10_000;
 
+type DeviceValue = {
+    deviceId: string;
+    dhtSeq?: number;
+};
+
+function isDeviceValue(value: unknown): value is DeviceValue {
+    return typeof value === 'object' && value !== null && 'deviceId' in value && typeof (value as { deviceId?: unknown }).deviceId === 'string';
+}
+
 export class ValueStore {
     private store: Map<string, StoredValue> = new Map();
 
     // Store a value
-    set(key: Buffer, value: any, publisher: string, signature?: string): void {
+    set(key: Buffer, value: unknown, publisher: string, signature?: string): void {
         const keyHex = key.toString('hex');
 
         // Multi-device support: if the value is a location block with deviceId,
         // we store a list of blocks for the same upeerId instead of a single value.
         let finalValue = value;
-        if (value && value.deviceId) {
+        if (isDeviceValue(value)) {
             const existing = this.store.get(keyHex);
-            let list = [];
+            let list: DeviceValue[] = [];
             if (existing && Array.isArray(existing.value)) {
-                list = existing.value;
-            } else if (existing && existing.value && !Array.isArray(existing.value)) {
+                list = existing.value.filter(isDeviceValue);
+            } else if (existing && isDeviceValue(existing.value)) {
                 // Migration: convert single old block to list if it had no deviceId but same upeerId
                 list = [existing.value];
             }
 
             // Remove old entry for the same deviceId if it exists
-            list = list.filter((b: any) => b.deviceId !== value.deviceId);
+            list = list.filter((item) => item.deviceId !== value.deviceId);
             // Add new block
             list.push(value);
             // Sort by dhtSeq descending and limit to 10 devices per user to prevent abuse
-            list.sort((a: any, b: any) => (b.dhtSeq || 0) - (a.dhtSeq || 0));
+            list.sort((left, right) => (right.dhtSeq || 0) - (left.dhtSeq || 0));
             finalValue = list.slice(0, 10);
         }
 

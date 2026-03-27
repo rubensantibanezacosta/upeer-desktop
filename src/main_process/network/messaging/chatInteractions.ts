@@ -17,19 +17,46 @@ import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { emitMessageStatusUpdated, getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 
+type ChatContactRecord = {
+    upeerId: string;
+    name?: string | null;
+    address?: string | null;
+    publicKey?: string | null;
+    avatar?: string | null;
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
+    knownAddresses?: string | string[] | null;
+};
+
+type StoredMessageRecord = {
+    senderUpeerId?: string | null;
+};
+
+type GroupRecordLike = {
+    status: 'active' | 'invited';
+    members: string[];
+};
+
+type ContactCardPayload = {
+    name?: string | null;
+    address?: string | null;
+    upeerId?: string | null;
+    publicKey?: string | null;
+    avatar?: string | null;
+};
+
 export async function sendReadReceipt(upeerId: string, id: string): Promise<void> {
     const myId = getMyUPeerId();
     if (await updateMessageStatus(id, 'read')) {
         await emitMessageStatusUpdated(id, 'read');
     }
 
-    const msg = await getMessageById(id);
+    const msg = await getMessageById(id) as StoredMessageRecord | undefined;
     if (!msg) return;
     const targetId = upeerId.startsWith('grp-') ? msg.senderUpeerId : upeerId;
     if (!targetId || targetId === myId) return;
 
-    const contact = await getContactByUpeerId(targetId);
-    if (!contact) return;
+    const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
+    if (!contact?.publicKey) return;
 
     const data = {
         type: 'READ',
@@ -56,9 +83,9 @@ export async function sendReadReceipt(upeerId: string, id: string): Promise<void
     }).catch((err) => error('Failed to vault READ receipt', err, 'vault'));
 }
 
-export async function sendContactCard(targetUpeerId: string, contact: any): Promise<string | undefined> {
-    const targetContact = await getContactByUpeerId(targetUpeerId);
-    if (!targetContact || targetContact.status !== 'connected') return undefined;
+export async function sendContactCard(targetUpeerId: string, contact: ContactCardPayload): Promise<string | undefined> {
+    const targetContact = await getContactByUpeerId(targetUpeerId) as ChatContactRecord | undefined;
+    if (!targetContact || targetContact.status !== 'connected' || !targetContact.publicKey) return undefined;
 
     const msgId = crypto.randomUUID();
     const serializedMessage = JSON.stringify({
@@ -109,13 +136,13 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
     const myPublicKey = getMyPublicKey().toString('hex');
 
     if (isGroup) {
-        const group = getGroupById(upeerId);
+        const group = getGroupById(upeerId) as GroupRecordLike | null;
         if (!group || group.status !== 'active') return;
 
         for (const memberId of group.members) {
             if (memberId === myId) continue;
-            const contact = await getContactByUpeerId(memberId);
-            if (contact?.status === 'connected') {
+            const contact = await getContactByUpeerId(memberId) as ChatContactRecord | undefined;
+            if (contact?.status === 'connected' && contact.publicKey) {
                 for (const address of getFanOutAddresses(contact)) {
                     sendSecureUDPMessage(address, signedData, contact.publicKey);
                 }
@@ -138,8 +165,8 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
         return;
     }
 
-    const contact = await getContactByUpeerId(upeerId);
-    if (!contact) return;
+    const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
+    if (!contact?.publicKey) return;
     for (const address of getFanOutAddresses(contact)) {
         sendSecureUDPMessage(address, signedData, contact.publicKey);
     }

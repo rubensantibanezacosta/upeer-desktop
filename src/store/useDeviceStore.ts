@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error desconocido';
+
 export interface Device {
     id: number;
     upeerId: string;
@@ -31,36 +33,34 @@ export const useDeviceStore = create<DeviceState & DeviceActions>((set, get) => 
     fetchDevices: async () => {
         set({ isLoading: true, error: null });
         try {
-            const result = await (window as any).upeer.getDevices();
+            const result = await window.upeer.getDevices();
             set({ devices: result, isLoading: false });
-        } catch (err: any) {
-            set({ error: err.message, isLoading: false });
+        } catch (error: unknown) {
+            set({ error: getErrorMessage(error), isLoading: false });
         }
     },
 
     setTrust: async (deviceId, isTrusted) => {
         try {
-            await (window as any).upeer.setDeviceTrust(deviceId, isTrusted);
-            // Optimistic update
+            await window.upeer.setDeviceTrust(deviceId, isTrusted);
             set({
                 devices: get().devices.map(d =>
                     d.deviceId === deviceId ? { ...d, isTrusted } : d
                 )
             });
-        } catch (err: any) {
-            set({ error: err.message });
+        } catch (error: unknown) {
+            set({ error: getErrorMessage(error) });
         }
     },
 
     removeDevice: async (deviceId) => {
         try {
-            await (window as any).upeer.deleteDevice(deviceId);
-            // Optimistic update
+            await window.upeer.deleteDevice(deviceId);
             set({
                 devices: get().devices.filter(d => d.deviceId !== deviceId)
             });
-        } catch (err: any) {
-            set({ error: err.message });
+        } catch (error: unknown) {
+            set({ error: getErrorMessage(error) });
         }
     }
 }));

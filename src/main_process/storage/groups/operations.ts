@@ -24,7 +24,29 @@ export interface GroupCryptoState {
     senderKeyCreatedAt?: number;
 }
 
-function parseGroup(raw: any): GroupRecord {
+type GroupRow = Omit<GroupRecord, 'members'> & {
+    members: string;
+};
+
+type LastGroupMessageRow = {
+    message?: string | null;
+    timestamp?: number | string | null;
+    status?: string | null;
+    isMine?: boolean | null;
+};
+
+type GroupInfoUpdate = {
+    name?: string;
+    avatar?: string | null;
+};
+
+type GroupCryptoUpdate = {
+    epoch?: number;
+    senderKey?: string;
+    senderKeyCreatedAt?: number;
+};
+
+function parseGroup(raw: GroupRow): GroupRecord {
     let members: string[] = [];
     try {
         members = JSON.parse(raw.members || '[]');
@@ -89,7 +111,7 @@ export function updateGroupAvatar(groupId: string, avatar: string): void {
 export function updateGroupInfo(groupId: string, fields: { name?: string; avatar?: string | null }): void {
     const db = getDb();
     const schema = getSchema();
-    const set: Record<string, any> = {};
+    const set: GroupInfoUpdate = {};
     if (fields.name !== undefined) set.name = fields.name;
     if (fields.avatar !== undefined) set.avatar = fields.avatar;
     if (Object.keys(set).length === 0) return;
@@ -99,12 +121,12 @@ export function updateGroupInfo(groupId: string, fields: { name?: string; avatar
 export function getGroups(): GroupRecord[] {
     const db = getDb();
     const schema = getSchema();
-    const rawGroups = db.select().from(schema.groups).all().map(parseGroup);
+    const rawGroups = (db.select().from(schema.groups).all() as GroupRow[]).map(parseGroup);
     const result = rawGroups.map(g => {
         const lastMsgObj = db.select().from(schema.messages)
             .where(eq(schema.messages.chatUpeerId, g.groupId))
             .orderBy(desc(schema.messages.timestamp))
-            .limit(1).get() as any;
+            .limit(1).get() as LastGroupMessageRow | undefined;
         return {
             ...g,
             lastMessage: lastMsgObj?.message as string | undefined,
@@ -142,7 +164,7 @@ export function updateGroupMembers(groupId: string, members: string[]): void {
 export function updateGroupCrypto(groupId: string, cryptoState: GroupCryptoState): void {
     const db = getDb();
     const schema = getSchema();
-    const set: Record<string, any> = {};
+    const set: GroupCryptoUpdate = {};
     if (cryptoState.epoch !== undefined) set.epoch = cryptoState.epoch;
     if (cryptoState.senderKey !== undefined) set.senderKey = cryptoState.senderKey;
     if (cryptoState.senderKeyCreatedAt !== undefined) set.senderKeyCreatedAt = cryptoState.senderKeyCreatedAt;

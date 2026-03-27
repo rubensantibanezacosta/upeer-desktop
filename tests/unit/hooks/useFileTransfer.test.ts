@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFileTransfer } from '../../../src/hooks/useFileTransfer';
+import type { FileTransfer, StartTransferParams } from '../../../src/hooks/fileTransferTypes';
 
-// Mock de window.upeer (IPC Bridge)
 const mockUpeer = {
     onFileTransferStarted: vi.fn(),
     onFileTransferProgress: vi.fn(),
@@ -16,7 +16,10 @@ const mockUpeer = {
     saveTransferredFile: vi.fn(),
 };
 
-(window as any).upeer = mockUpeer;
+window.upeer = mockUpeer as unknown as Window['upeer'];
+
+type TransferResult = Awaited<ReturnType<ReturnType<typeof useFileTransfer>['startTransfer']>>;
+type ProgressInput = Pick<FileTransfer, 'state' | 'progress'>;
 
 describe('useFileTransfer hook', () => {
     beforeEach(() => {
@@ -189,13 +192,13 @@ describe('useFileTransfer hook', () => {
         mockUpeer.startFileTransfer.mockResolvedValue({ success: true, fileId: 'new-file' });
         const { result } = renderHook(() => useFileTransfer());
 
-        const startParams = {
+        const startParams: StartTransferParams = {
             upeerId: 'peer1',
             filePath: '/path/to/file.jpg',
             thumbnail: 'thumb-data'
         };
 
-        let startResult: any;
+        let startResult: TransferResult | undefined;
         await act(async () => {
             startResult = await result.current.startTransfer(startParams);
         });
@@ -222,9 +225,9 @@ describe('useFileTransfer hook', () => {
             await new Promise(resolve => setTimeout(resolve, 0));
         });
 
-        const t1 = { state: 'completed', progress: 100 } as any;
-        const t2 = { state: 'active', progress: 45.67 } as any;
-        const t3 = { state: 'failed' } as any;
+        const t1: ProgressInput = { state: 'completed', progress: 100 };
+        const t2: ProgressInput = { state: 'active', progress: 45.67 };
+        const t3: Partial<ProgressInput> & Pick<FileTransfer, 'state'> = { state: 'failed' };
 
         expect(result.current.formatProgress(t1)).toBe('Completado');
         expect(result.current.formatProgress(t2)).toBe('45.7%');

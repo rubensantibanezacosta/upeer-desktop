@@ -2,6 +2,7 @@ import { FileTransfer } from './types.js';
 import { saveFileMessage, updateMessageStatus } from '../../storage/messages/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { getMyUPeerId } from '../../security/identity.js';
+import type { MessageDeliveryStatus } from '../../storage/messages/status.js';
 
 export async function saveTransferToDB(transfer: FileTransfer) {
     try {
@@ -42,9 +43,9 @@ export async function saveTransferToDB(transfer: FileTransfer) {
     }
 }
 
-export async function updateTransferMessageStatus(fileId: string, status: string) {
+export async function updateTransferMessageStatus(fileId: string, status: MessageDeliveryStatus) {
     try {
-        return await updateMessageStatus(fileId, status as any);
+        return await updateMessageStatus(fileId, status);
     } catch (err) {
         warn('Failed to update file transfer status in DB', err, 'file-transfer');
         return false;

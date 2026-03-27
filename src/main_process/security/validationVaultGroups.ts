@@ -3,7 +3,82 @@ import {
     type ValidationResult,
 } from './validationShared.js';
 
-export function validateVaultStore(data: any): ValidationResult {
+type VaultStorePayload = {
+    payloadHash?: unknown;
+    recipientSid?: unknown;
+    data?: unknown;
+};
+
+type VaultQueryPayload = {
+    requesterSid?: unknown;
+};
+
+type VaultAckPayload = {
+    payloadHashes?: unknown;
+};
+
+type VaultDeliveryEntry = {
+    senderSid?: unknown;
+    payloadHash?: unknown;
+    data?: unknown;
+};
+
+type VaultDeliveryPayload = {
+    entries?: unknown;
+};
+
+type VaultRenewPayload = {
+    payloadHash?: unknown;
+    newExpiresAt?: unknown;
+};
+
+type GroupMsgPayload = {
+    groupId?: unknown;
+    content?: unknown;
+    nonce?: unknown;
+    epoch?: unknown;
+    id?: unknown;
+    replyTo?: unknown;
+};
+
+type GroupAckPayload = {
+    id?: unknown;
+    groupId?: unknown;
+};
+
+type GroupPayload = {
+    groupId?: unknown;
+    payload?: unknown;
+    nonce?: unknown;
+};
+
+type GroupLeavePayload = {
+    groupId?: unknown;
+    signature?: unknown;
+};
+
+type ReputationIdsPayload = {
+    ids?: unknown;
+};
+
+type ReputationMissingPayload = {
+    missing?: unknown;
+};
+
+type ReputationVouch = {
+    id?: unknown;
+    fromId?: unknown;
+    toId?: unknown;
+    type?: unknown;
+    timestamp?: unknown;
+    signature?: unknown;
+};
+
+type ReputationDeliverPayload = {
+    vouches?: unknown;
+};
+
+export function validateVaultStore(data: VaultStorePayload): ValidationResult {
     if (!data.payloadHash || typeof data.payloadHash !== 'string' || data.payloadHash.length > 200) {
         return { valid: false, error: 'Invalid payloadHash' };
     }
@@ -19,14 +94,14 @@ export function validateVaultStore(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateVaultQuery(data: any): ValidationResult {
+export function validateVaultQuery(data: VaultQueryPayload): ValidationResult {
     if (!data.requesterSid || typeof data.requesterSid !== 'string' || data.requesterSid.length > 64) {
         return { valid: false, error: 'Invalid requesterSid' };
     }
     return { valid: true };
 }
 
-export function validateVaultAck(data: any): ValidationResult {
+export function validateVaultAck(data: VaultAckPayload): ValidationResult {
     if (!Array.isArray(data.payloadHashes)) {
         return { valid: false, error: 'Invalid payloadHashes' };
     }
@@ -41,14 +116,14 @@ export function validateVaultAck(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateVaultDelivery(data: any): ValidationResult {
+export function validateVaultDelivery(data: VaultDeliveryPayload): ValidationResult {
     if (!Array.isArray(data.entries)) {
         return { valid: false, error: 'Invalid entries' };
     }
     if (data.entries.length > 100) {
         return { valid: false, error: 'Too many vault entries' };
     }
-    for (const entry of data.entries) {
+    for (const entry of data.entries as VaultDeliveryEntry[]) {
         if (!entry || typeof entry !== 'object') {
             return { valid: false, error: 'Invalid vault entry' };
         }
@@ -65,7 +140,7 @@ export function validateVaultDelivery(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateVaultRenew(data: any): ValidationResult {
+export function validateVaultRenew(data: VaultRenewPayload): ValidationResult {
     if (!data.payloadHash || typeof data.payloadHash !== 'string' || data.payloadHash.length !== 64) {
         return { valid: false, error: 'Invalid payloadHash' };
     }
@@ -75,7 +150,7 @@ export function validateVaultRenew(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateGroupMsg(data: any): ValidationResult {
+export function validateGroupMsg(data: GroupMsgPayload): ValidationResult {
     if (!data.groupId || typeof data.groupId !== 'string' || data.groupId.length > 100) {
         return { valid: false, error: 'Invalid groupId' };
     }
@@ -97,7 +172,7 @@ export function validateGroupMsg(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateGroupAck(data: any): ValidationResult {
+export function validateGroupAck(data: GroupAckPayload): ValidationResult {
     if (!data.id || typeof data.id !== 'string' || data.id.length > 100) {
         return { valid: false, error: 'Invalid id' };
     }
@@ -107,7 +182,7 @@ export function validateGroupAck(data: any): ValidationResult {
     return { valid: true };
 }
 
-function validateGroupPayload(data: any, errorMessage: string): ValidationResult {
+function validateGroupPayload(data: GroupPayload, errorMessage: string): ValidationResult {
     if (!data.groupId || typeof data.groupId !== 'string' || data.groupId.length > 100) {
         return { valid: false, error: 'Invalid groupId' };
     }
@@ -123,15 +198,15 @@ function validateGroupPayload(data: any, errorMessage: string): ValidationResult
     return { valid: true };
 }
 
-export function validateGroupInvite(data: any): ValidationResult {
+export function validateGroupInvite(data: GroupPayload): ValidationResult {
     return validateGroupPayload(data, 'Group invite payload too large');
 }
 
-export function validateGroupUpdate(data: any): ValidationResult {
+export function validateGroupUpdate(data: GroupPayload): ValidationResult {
     return validateGroupPayload(data, 'Group update payload too large');
 }
 
-export function validateGroupLeave(data: any): ValidationResult {
+export function validateGroupLeave(data: GroupLeavePayload): ValidationResult {
     if (!data.groupId || typeof data.groupId !== 'string' || data.groupId.length > 100) {
         return { valid: false, error: 'Invalid groupId' };
     }
@@ -141,7 +216,7 @@ export function validateGroupLeave(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateReputationGossip(data: any): ValidationResult {
+export function validateReputationGossip(data: ReputationIdsPayload): ValidationResult {
     if (!Array.isArray(data.ids)) return { valid: false, error: 'ids debe ser un array' };
     if (data.ids.length > 500) return { valid: false, error: 'Demasiados IDs' };
     for (const id of data.ids) {
@@ -150,7 +225,7 @@ export function validateReputationGossip(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateReputationRequest(data: any): ValidationResult {
+export function validateReputationRequest(data: ReputationMissingPayload): ValidationResult {
     if (!Array.isArray(data.missing)) return { valid: false, error: 'missing debe ser un array' };
     if (data.missing.length > 100) return { valid: false, error: 'Demasiados IDs faltantes' };
     for (const id of data.missing) {
@@ -159,10 +234,10 @@ export function validateReputationRequest(data: any): ValidationResult {
     return { valid: true };
 }
 
-export function validateReputationDeliver(data: any): ValidationResult {
+export function validateReputationDeliver(data: ReputationDeliverPayload): ValidationResult {
     if (!Array.isArray(data.vouches)) return { valid: false, error: 'vouches debe ser un array' };
     if (data.vouches.length > 50) return { valid: false, error: 'Demasiados vouches' };
-    for (const vouch of data.vouches) {
+    for (const vouch of data.vouches as ReputationVouch[]) {
         if (!isValidHexId(vouch.id)) return { valid: false, error: 'id inválido' };
         if (!isValidHexId(vouch.fromId)) return { valid: false, error: 'fromId inválido' };
         if (!isValidHexId(vouch.toId)) return { valid: false, error: 'toId inválido' };

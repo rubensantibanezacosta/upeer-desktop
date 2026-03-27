@@ -1,5 +1,7 @@
 import { getDocument } from 'pdfjs-dist';
 
+type GetDocumentParameters = Parameters<typeof getDocument>[0];
+
 const clampScale = (width: number, height: number, maxWidth: number, maxHeight: number) => {
     const widthScale = maxWidth / Math.max(width, 1);
     const heightScale = maxHeight / Math.max(height, 1);
@@ -17,7 +19,7 @@ export const generatePdfThumbnail = async (
         useWorkerFetch: false,
         isEvalSupported: false,
         disableFontFace: true,
-    } as any);
+    } as GetDocumentParameters);
 
     const pdf = await loadingTask.promise;
 

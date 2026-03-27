@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import sodium from 'sodium-native';
 import { sealPacket, unsealPacket, SEALED_TYPES } from '../../../src/main_process/network/sealed.js';
 
+type SealedPacket = {
+    ciphertext: string;
+};
+
 describe('Sealed Sender Unit Tests', () => {
     // Generar un par de claves de identidad persistente para el receptor
     const recipientPk = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
@@ -48,7 +52,7 @@ describe('Sealed Sender Unit Tests', () => {
             return ok ? plaintext : null;
         };
 
-        const unsealed = unsealPacket(sealed as any, myEdSkFn);
+        const unsealed = unsealPacket(sealed as SealedPacket, myEdSkFn);
 
         expect(unsealed).not.toBeNull();
         expect(unsealed?.type).toBe('CHAT');
@@ -64,7 +68,7 @@ describe('Sealed Sender Unit Tests', () => {
             return null; // Simula fallo de descifrado
         };
 
-        const result = unsealPacket(sealed as any, wrongSkFn);
+        const result = unsealPacket(sealed as SealedPacket, wrongSkFn);
         expect(result).toBeNull();
     });
 

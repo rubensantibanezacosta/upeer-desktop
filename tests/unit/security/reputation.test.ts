@@ -4,8 +4,15 @@ import {
     computeVouchId,
     VOUCH_WEIGHTS,
     VOUCH_POSITIVE,
-    computeScorePure
+    computeScorePure,
+    type StoredVouch,
 } from '../../../src/main_process/security/reputation/vouches-pure.js';
+
+type LooseStoredVouch = Omit<StoredVouch, 'type'> & { type: string };
+
+function toStoredVouches(vouches: LooseStoredVouch[]): StoredVouch[] {
+    return vouches as unknown as StoredVouch[];
+}
 
 describe('Reputation - Vouches Pure Logic', () => {
 
@@ -19,72 +26,70 @@ describe('Reputation - Vouches Pure Logic', () => {
         const id2 = computeVouchId(from, to, type, ts);
 
         expect(id1).toBe(id2);
-        expect(id1.length).toBe(64); // SHA256 hex
+        expect(id1.length).toBe(64);
     });
 
     it('should calculate score correctly based on direct contacts only', () => {
         const directContacts = new Set(['friend-1', 'friend-2']);
-        const vouches: any[] = [
-            { fromId: 'friend-1', type: VouchType.HANDSHAKE, positive: true }, // +1
-            { fromId: 'friend-2', type: VouchType.VAULT_HELPED, positive: true }, // +2
-            { fromId: 'stranger', type: VouchType.HANDSHAKE, positive: true }, // Ignored
-        ];
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: VouchType.HANDSHAKE, positive: true, timestamp: 1, signature: 'sig', receivedAt: 1 },
+            { id: 'v2', fromId: 'friend-2', toId: 'target-id', type: VouchType.VAULT_HELPED, positive: true, timestamp: 2, signature: 'sig', receivedAt: 2 },
+            { id: 'v3', fromId: 'stranger', toId: 'target-id', type: VouchType.HANDSHAKE, positive: true, timestamp: 3, signature: 'sig', receivedAt: 3 },
+        ]);
 
         const score = computeScorePure(vouches, directContacts);
-        expect(score).toBe(50 + 1 + 2); // 53
+        expect(score).toBe(53);
     });
 
     it('should respect MAX_CONTRIBUTING_VOUCHES_PER_SENDER', () => {
         const directContacts = new Set(['friend-1']);
-        const vouches: any[] = [];
-        // Añadir 15 vouches de handshake (+1 cada uno)
+        const vouches: LooseStoredVouch[] = [];
         for (let i = 0; i < 15; i++) {
-            vouches.push({ fromId: 'friend-1', type: VouchType.HANDSHAKE, positive: true, timestamp: i });
+            vouches.push({ id: `v-${i}`, fromId: 'friend-1', toId: 'target-id', type: VouchType.HANDSHAKE, positive: true, timestamp: i, signature: 'sig', receivedAt: i });
         }
 
-        const score = computeScorePure(vouches, directContacts);
-        // Debería sumar solo 10 (límite por emisor)
-        expect(score).toBe(50 + 10);
+        const score = computeScorePure(toStoredVouches(vouches), directContacts);
+        expect(score).toBe(60);
     });
 
     it('should calculate score correctly with negative weights', () => {
         const directContacts = new Set(['friend-1']);
-        const vouches: any[] = [
-            { fromId: 'friend-1', type: VouchType.SPAM, positive: false }, // -5 (según constantes)
-        ];
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: VouchType.SPAM, positive: false, timestamp: 1, signature: 'sig', receivedAt: 1 },
+        ]);
 
         const score = computeScorePure(vouches, directContacts);
-        expect(score).toBe(50 - 5);
+        expect(score).toBe(45);
     });
 
     it('should stay within 0-100 bounds', () => {
         const directContacts = new Set(['friend-1']);
-        const vouches: any[] = [];
-        // Añadir muchos fallos de integridad (-15 cada uno)
+        const vouches: LooseStoredVouch[] = [];
         for (let i = 0; i < 10; i++) {
-            vouches.push({ fromId: 'friend-1', type: VouchType.INTEGRITY_FAIL, positive: false, timestamp: i });
+            vouches.push({ id: `v-${i}`, fromId: 'friend-1', toId: 'target-id', type: VouchType.INTEGRITY_FAIL, positive: false, timestamp: i, signature: 'sig', receivedAt: i });
         }
 
-        const score = computeScorePure(vouches, directContacts);
-        expect(score).toBe(0); // No 50 - 150 = -100
+        const score = computeScorePure(toStoredVouches(vouches), directContacts);
+        expect(score).toBe(0);
     });
 
     it('should test floating point precision in score delta', () => {
         const directContacts = new Set(['friend-1', 'friend-2']);
-        const vouches: any[] = [
-            { fromId: 'friend-1', type: VouchType.VAULT_RETRIEVED, positive: true }, // +1.5
-            { fromId: 'friend-2', type: VouchType.VAULT_RETRIEVED, positive: true }, // +1.5
-        ];
-        // Total delta = 3.0
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: VouchType.VAULT_RETRIEVED, positive: true, timestamp: 1, signature: 'sig', receivedAt: 1 },
+            { id: 'v2', fromId: 'friend-2', toId: 'target-id', type: VouchType.VAULT_RETRIEVED, positive: true, timestamp: 2, signature: 'sig', receivedAt: 2 },
+        ]);
+
         const score = computeScorePure(vouches, directContacts);
         expect(score).toBe(53);
     });
 
     it('should handle vouch types with zero or missing weights (default to 1.0)', () => {
         const directContacts = new Set(['friend-1']);
-        const vouches: any[] = [
-            { fromId: 'friend-1', type: 'UNKNOWN_TYPE', positive: true }, // Should use 1.0 default
-        ];
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: 'UNKNOWN_TYPE', positive: true, timestamp: 1, signature: 'sig', receivedAt: 1 },
+        ]);
+
         const score = computeScorePure(vouches, directContacts);
         expect(score).toBe(51);
     });
@@ -122,31 +127,35 @@ describe('Reputation - Vouches Pure Logic', () => {
 
     it('should ignore vouches with unknown types and default to 1.0', () => {
         const directContacts = new Set(['friend-1']);
-        const vouches: any[] = [
-            { fromId: 'friend-1', type: 'ALIEN_ATTACK', positive: true, timestamp: 100 }
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: 'ALIEN_ATTACK', positive: true, timestamp: 100, signature: 'sig', receivedAt: 100 },
         ];
         const score = computeScorePure(vouches, directContacts);
-        expect(score).toBe(51); // 50 + 1.0 (default)
+        expect(score).toBe(51);
     });
 
     it('should handle multiple senders within limits', () => {
         const directContacts = new Set(['peer-A', 'peer-B']);
-        const vouches: any[] = [
-            { fromId: 'peer-A', type: VouchType.VAULT_CHUNK, positive: true, timestamp: 1 }, // +3
-            { fromId: 'peer-B', type: VouchType.SPAM, positive: false, timestamp: 2 },        // -5
-        ];
+        const vouches = toStoredVouches([
+            { id: 'v1', fromId: 'peer-A', toId: 'target-id', type: VouchType.VAULT_CHUNK, positive: true, timestamp: 1, signature: 'sig', receivedAt: 1 },
+            { id: 'v2', fromId: 'peer-B', toId: 'target-id', type: VouchType.SPAM, positive: false, timestamp: 2, signature: 'sig', receivedAt: 2 },
+        ]);
         const score = computeScorePure(vouches, directContacts);
-        expect(score).toBe(48); // 50 + 3 - 5
+        expect(score).toBe(48);
     });
 
     it('should not allow score to drop below 0 even with extreme malicious activity', () => {
         const directContacts = new Set(['peer-A']);
-        const vouches: any[] = Array.from({ length: 20 }, (_, i) => ({
+        const vouches = toStoredVouches(Array.from({ length: 20 }, (_, i) => ({
+            id: `v-${i}`,
             fromId: 'peer-A',
+            toId: 'target-id',
             type: VouchType.INTEGRITY_FAIL,
             positive: false,
-            timestamp: i
-        }));
+            timestamp: i,
+            signature: 'sig',
+            receivedAt: i,
+        })));
         const score = computeScorePure(vouches, directContacts);
         expect(score).toBe(0);
     });

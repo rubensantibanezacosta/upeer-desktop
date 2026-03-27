@@ -88,11 +88,12 @@ export class FileTransferStore {
 
     getAllTransfers(): FileTransfer[] {
         return Array.from(this.transfers.values()).map(transfer => {
-            const cleanTransfer: any = {};
+            const cleanTransfer: Partial<FileTransfer> = {};
             for (const key in transfer) {
-                if (Object.prototype.hasOwnProperty.call(transfer, key)) {
+                const typedKey = key as keyof FileTransfer;
+                if (Object.prototype.hasOwnProperty.call(transfer, typedKey)) {
                     if (!key.startsWith('_') && key !== 'fileBuffer' && key !== 'pendingChunks') {
-                        cleanTransfer[key] = (transfer as any)[key];
+                        cleanTransfer[typedKey] = transfer[typedKey];
                     }
                 }
             }

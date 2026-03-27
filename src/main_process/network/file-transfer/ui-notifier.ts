@@ -2,6 +2,8 @@ import { BrowserWindow } from 'electron';
 import { FileTransfer } from './types.js';
 import { warn } from '../../security/secure-logger.js';
 
+type FileTransferUIEvent = Record<string, unknown>;
+
 export class UINotifier {
     private lastUINotify = new Map<string, number>();
 
@@ -81,7 +83,7 @@ export class UINotifier {
         });
     }
 
-    public safeSend(channel: string, data: any) {
+    public safeSend(channel: string, data: unknown) {
         if (!this.window || this.window.isDestroyed()) return;
         try {
             if (this.window.webContents && !this.window.webContents.isDestroyed()) {

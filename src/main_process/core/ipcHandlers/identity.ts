@@ -50,7 +50,7 @@ export function registerIdentityHandlers(): void {
     try {
       const myId = getMyUPeerId();
       const contacts = await getContacts();
-      const connectedCount = (contacts as any[]).filter(c => c.status === 'connected').length;
+      const connectedCount = contacts.filter(contact => contact.status === 'connected').length;
       const vouchScore = await getVouchScore(myId);
       return { vouchScore, connectionCount: connectedCount };
     } catch {

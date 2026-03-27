@@ -4,6 +4,8 @@ import { TransferPhase, FileTransfer } from './types.js';
 import { CHUNK_PREPARE_CONCURRENCY, prepareChunkPayload } from './senderSupport.js';
 import type { TransferManager } from './transfer-manager.js';
 
+type PreparedChunk = Awaited<ReturnType<typeof prepareChunkPayload>>;
+
 export async function sendNextChunks(this: TransferManager, transfer: FileTransfer) {
     if (!this.tryStartSendBatch(transfer.fileId)) return;
     let didSendChunks = false;
@@ -50,7 +52,7 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
             nextChunkIndex: nextIdx + chunkIndexes.length
         }) || current;
 
-        const preparedChunks: Array<{ chunkIndex: number; chunkLength: number; chunkMsg: any }> = [];
+        const preparedChunks: PreparedChunk[] = [];
         for (let batchStart = 0; batchStart < chunkIndexes.length; batchStart += CHUNK_PREPARE_CONCURRENCY) {
             const batchIndexes = chunkIndexes.slice(batchStart, batchStart + CHUNK_PREPARE_CONCURRENCY);
             const preparedBatch = await Promise.all(
@@ -59,8 +61,8 @@ export async function sendNextChunks(this: TransferManager, transfer: FileTransf
             preparedChunks.push(...preparedBatch);
         }
 
-        if (!(reserved as any)._chunksSentTimes) (reserved as any)._chunksSentTimes = new Map<number, number>();
-        const chunksSentTimes = (reserved as any)._chunksSentTimes as Map<number, number>;
+        const chunksSentTimes = reserved._chunksSentTimes ?? new Map<number, number>();
+        reserved._chunksSentTimes = chunksSentTimes;
 
         for (const prepared of preparedChunks) {
             chunksSentTimes.set(prepared.chunkIndex, Date.now());

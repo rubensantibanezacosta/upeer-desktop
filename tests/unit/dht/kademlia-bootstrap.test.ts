@@ -2,6 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import dns from 'node:dns';
 import fs from 'node:fs';
 import { BootstrapManager } from '../../../src/main_process/network/dht/kademlia/bootstrap.js';
+import type { RoutingTable } from '../../../src/main_process/network/dht/kademlia/routing.js';
+import type { KademliaContact, SeedNode } from '../../../src/main_process/network/dht/kademlia/types.js';
+
+type MockRoutingTable = Pick<RoutingTable, 'addContact' | 'getContactCount'> & {
+    addContact: ReturnType<typeof vi.fn>;
+    getContactCount: ReturnType<typeof vi.fn>;
+};
+type SendMessage = ConstructorParameters<typeof BootstrapManager>[1];
+type BootstrapManagerInternals = BootstrapManager & {
+    loadSeedNodesFromDNS: () => Promise<SeedNode[]>;
+    loadSeedNodes: () => Promise<SeedNode[]>;
+    loadSeedNodesFromFile: () => Promise<SeedNode[]>;
+};
+
+function getInternals(manager: BootstrapManager): BootstrapManagerInternals {
+    return manager as unknown as BootstrapManagerInternals;
+}
 
 vi.mock('node:dns', () => ({
     default: {
@@ -24,8 +41,8 @@ vi.mock('../../../src/main_process/network/dht/kademlia/routing.js', () => ({
 
 describe('BootstrapManager Unit Tests', () => {
     let bootstrapManager: BootstrapManager;
-    let mockRoutingTable: any;
-    let mockSendMessage: any;
+    let mockRoutingTable: MockRoutingTable;
+    let mockSendMessage: ReturnType<typeof vi.fn<SendMessage>>;
     const userDataPath = '/tmp/upeer-test';
 
     beforeEach(() => {
@@ -33,10 +50,9 @@ describe('BootstrapManager Unit Tests', () => {
         mockRoutingTable = {
             addContact: vi.fn(),
             getContactCount: vi.fn().mockReturnValue(0),
-            getClosestNodes: vi.fn().mockReturnValue([])
         };
         mockSendMessage = vi.fn();
-        bootstrapManager = new BootstrapManager(mockRoutingTable as any, mockSendMessage, undefined, userDataPath);
+        bootstrapManager = new BootstrapManager(mockRoutingTable, mockSendMessage, undefined, userDataPath);
     });
 
     it('should initialize correctly', () => {
@@ -46,9 +62,9 @@ describe('BootstrapManager Unit Tests', () => {
     describe('loadSeedNodesFromDNS', () => {
         it('should load seed nodes from DNS correctly', async () => {
             const mockDnsRecord = [['upeerId=seed1;address=1.1.1.1;publicKey=pub1']];
-            (dns.promises.resolveTxt as any).mockResolvedValue(mockDnsRecord);
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue(mockDnsRecord);
 
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromDNS();
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromDNS();
 
             expect(seeds).toHaveLength(1);
             expect(seeds[0].upeerId).toBe('seed1');
@@ -64,17 +80,17 @@ describe('BootstrapManager Unit Tests', () => {
                 ['invalid=key;value=pair'], // Bad format
                 ['upeerId=seed_partial;address=4.4.4.4'] // Missing publicKey
             ];
-            (dns.promises.resolveTxt as any).mockResolvedValue(mockDnsRecord);
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue(mockDnsRecord);
 
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromDNS();
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromDNS();
 
             expect(seeds).toHaveLength(1);
             expect(seeds[0].upeerId).toBe('seed2');
         });
 
         it('should return empty array if DNS resolution fails', async () => {
-            (dns.promises.resolveTxt as any).mockRejectedValue(new Error('DNS Error'));
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromDNS();
+            vi.mocked(dns.promises.resolveTxt).mockRejectedValue(new Error('DNS Error'));
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromDNS();
             expect(seeds).toEqual([]);
         });
     });
@@ -82,73 +98,70 @@ describe('BootstrapManager Unit Tests', () => {
     describe('loadSeedNodes', () => {
         it('should aggregate seeds from all sources and filter duplicates', async () => {
             const mockDnsRecord = [['upeerId=dns1;address=1.1.1.1;publicKey=pub1']];
-            (dns.promises.resolveTxt as any).mockResolvedValue(mockDnsRecord);
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue(mockDnsRecord);
 
-            (fs.existsSync as any).mockReturnValue(true);
-            (fs.readFileSync as any).mockReturnValue(JSON.stringify([
+            vi.mocked(fs.existsSync).mockReturnValue(true);
+            vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify([
                 { upeerId: 'file1', address: '2.2.2.2', publicKey: 'pub2' },
-                { upeerId: 'dns1', address: '1.1.1.1', publicKey: 'pub1' } // Duplicate
+                { upeerId: 'dns1', address: '1.1.1.1', publicKey: 'pub1' }
             ]));
 
-            const seeds = await (bootstrapManager as any).loadSeedNodes();
+            const seeds = await getInternals(bootstrapManager).loadSeedNodes();
 
-            // Hardcoded SEED_NODES length is 0 in types.ts (verified)
-            // + 1 DNS (dns1)
-            // + 1 File (file1)
             expect(seeds.length).toBe(2);
-            const ids = seeds.map((s: any) => s.upeerId);
+            const ids = seeds.map((seed) => seed.upeerId);
             expect(ids).toContain('dns1');
             expect(ids).toContain('file1');
         });
 
         it('should return 0 sources if both DNS and File fail and SEED_NODES is empty', async () => {
-            (dns.promises.resolveTxt as any).mockRejectedValue(new Error('DNS Down'));
-            (fs.existsSync as any).mockReturnValue(false);
+            vi.mocked(dns.promises.resolveTxt).mockRejectedValue(new Error('DNS Down'));
+            vi.mocked(fs.existsSync).mockReturnValue(false);
 
-            const seeds = await (bootstrapManager as any).loadSeedNodes();
+            const seeds = await getInternals(bootstrapManager).loadSeedNodes();
             expect(seeds.length).toBe(0);
         });
 
         it('should return 0 file seeds if File fails', async () => {
-            (dns.promises.resolveTxt as any).mockResolvedValue([]);
-            (fs.existsSync as any).mockReturnValue(true);
-            (fs.readFileSync as any).mockImplementation(() => { throw new Error('FS Error'); });
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue([]);
+            vi.mocked(fs.existsSync).mockReturnValue(true);
+            vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('FS Error'); });
 
-            const seedsOutput = await (bootstrapManager as any).loadSeedNodes();
+            const seedsOutput = await getInternals(bootstrapManager).loadSeedNodes();
             expect(seedsOutput.length).toBe(0);
-            const seedsFile = await (bootstrapManager as any).loadSeedNodesFromFile();
+            const seedsFile = await getInternals(bootstrapManager).loadSeedNodesFromFile();
             expect(seedsFile).toEqual([]);
         });
 
         it('should handle findFileSync returning empty on non-string path', async () => {
             const mgrNoPath = new BootstrapManager(mockRoutingTable, mockSendMessage, undefined, undefined);
-            const seeds = await (mgrNoPath as any).loadSeedNodesFromFile();
+            const seeds = await getInternals(mgrNoPath).loadSeedNodesFromFile();
             expect(seeds).toEqual([]);
         });
 
         it('should return empty if file content is malformed', async () => {
-            (fs.existsSync as any).mockReturnValue(true);
-            (fs.readFileSync as any).mockReturnValue('not json');
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromFile();
+            vi.mocked(fs.existsSync).mockReturnValue(true);
+            vi.mocked(fs.readFileSync).mockReturnValue('not json');
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromFile();
             expect(seeds).toEqual([]);
         });
 
         it('should return empty if data is not an array', async () => {
-            (fs.existsSync as any).mockReturnValue(true);
-            (fs.readFileSync as any).mockReturnValue(JSON.stringify({ not: 'an array' }));
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromFile();
+            vi.mocked(fs.existsSync).mockReturnValue(true);
+            vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ not: 'an array' }));
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromFile();
             expect(seeds).toEqual([]);
         });
 
         it('should parse valid seeds from file', async () => {
-            (fs.existsSync as any).mockReturnValue(true);
+            vi.mocked(fs.existsSync).mockReturnValue(true);
             const mockData = [
                 { upeerId: 'fseed1', address: '1.2.3.4', publicKey: 'fpub1' },
-                { upeerId: 'fseed2', address: '5.6.7.8' } // Invalid, missing publicKey
+                { upeerId: 'fseed2', address: '5.6.7.8' }
             ];
-            (fs.readFileSync as any).mockReturnValue(JSON.stringify(mockData));
+            vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockData));
 
-            const seeds = await (bootstrapManager as any).loadSeedNodesFromFile();
+            const seeds = await getInternals(bootstrapManager).loadSeedNodesFromFile();
             expect(seeds).toHaveLength(1);
             expect(seeds[0].upeerId).toBe('fseed1');
         });
@@ -163,8 +176,8 @@ describe('BootstrapManager Unit Tests', () => {
         it('should add valid connected contacts to routing table', () => {
             const mockContacts = [
                 { upeerId: '0123456789abcdef0123456789abcdef', publicKey: 'pub1', address: 'addr1', status: 'connected' },
-                { upeerId: 'deadbeefdeadbeefdeadbeefdeadbeef', publicKey: 'pub2', address: 'addr2', status: 'pending' }, // Filtered
-                { upeerId: 'badid', status: 'connected' } // Missing fields
+                { upeerId: 'deadbeefdeadbeefdeadbeefdeadbeef', publicKey: 'pub2', address: 'addr2', status: 'pending' },
+                { upeerId: 'badid', status: 'connected' }
             ];
             const getContacts = () => mockContacts;
             const mgr = new BootstrapManager(mockRoutingTable, mockSendMessage, getContacts);
@@ -193,30 +206,27 @@ describe('BootstrapManager Unit Tests', () => {
         });
 
         it('should load seeds and attempt to ping each', async () => {
-            // Mock loadSeedNodes through its sub-methods
-            (dns.promises.resolveTxt as any).mockResolvedValue([['upeerId=dns1;address=1.1.1.1;publicKey=pub1']]);
-            (fs.existsSync as any).mockReturnValue(false);
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue([['upeerId=dns1;address=1.1.1.1;publicKey=pub1']]);
+            vi.mocked(fs.existsSync).mockReturnValue(false);
 
-            await (bootstrapManager as any).attemptBootstrapFromSeeds();
+            await getInternals(bootstrapManager).attemptBootstrapFromSeeds();
 
-            // Should add seed contacts + hardcoded (at least DNS one)
             expect(mockRoutingTable.addContact).toHaveBeenCalled();
             expect(mockSendMessage).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({ type: 'DHT_PING' }));
         });
 
         it('should handle send failures gracefully', async () => {
-            (dns.promises.resolveTxt as any).mockResolvedValue([['upeerId=dns1;address=1.1.1.1;publicKey=pub1']]);
+            vi.mocked(dns.promises.resolveTxt).mockResolvedValue([['upeerId=dns1;address=1.1.1.1;publicKey=pub1']]);
             mockSendMessage.mockImplementation(() => { throw new Error('Send fail'); });
 
-            await (bootstrapManager as any).attemptBootstrapFromSeeds();
-            // Should not throw
+            await getInternals(bootstrapManager).attemptBootstrapFromSeeds();
             expect(mockRoutingTable.addContact).toHaveBeenCalled();
         });
     });
 
     describe('updateBootstrapStatus', () => {
         it('should update bootstrapped status correctly', () => {
-            mockRoutingTable.getContactCount.mockReturnValue(1); // Below default BOOTSTRAP_MIN_NODES=10
+            mockRoutingTable.getContactCount.mockReturnValue(1);
             bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.isBootstrapped()).toBe(false);
 
@@ -239,7 +249,7 @@ describe('BootstrapManager Unit Tests', () => {
     describe('retryBootstrap', () => {
         it('should bypass the timeout and retry', async () => {
             await bootstrapManager.attemptBootstrapFromSeeds();
-            const spy = vi.spyOn(bootstrapManager as any, 'loadSeedNodes');
+            const spy = vi.spyOn(getInternals(bootstrapManager), 'loadSeedNodes');
 
             await bootstrapManager.retryBootstrap();
             expect(spy).toHaveBeenCalled();
@@ -249,7 +259,7 @@ describe('BootstrapManager Unit Tests', () => {
     describe('helper methods', () => {
         it('should return contact count', () => {
             mockRoutingTable.getContactCount.mockReturnValue(5);
-            bootstrapManager.updateBootstrapStatus(); // We need to call this to sync manager's internal totalContacts
+            bootstrapManager.updateBootstrapStatus();
             expect(bootstrapManager.getContactCount()).toBe(5);
         });
 

@@ -4,6 +4,7 @@ import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
 import {
     decryptGroupControlPayload,
+    GroupControlPacket,
     normalizeAvatarForCompare,
     sameMembers,
     updateGroupEphemeralKeyIfValid,
@@ -11,7 +12,7 @@ import {
 
 export async function handleGroupUpdate(
     senderUpeerId: string,
-    data: any,
+    data: GroupControlPacket,
     win: BrowserWindow | null
 ): Promise<void> {
     const { groupId, adminUpeerId } = data;

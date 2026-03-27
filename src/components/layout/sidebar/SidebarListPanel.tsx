@@ -13,6 +13,10 @@ import { EmptyState } from './EmptyState.js';
 import type { ChatMessage, Contact, Group } from '../../../types/chat.js';
 import type { SidebarFilter } from '../../../store/useNavigationStore.js';
 
+type SearchResultMessage = ChatMessage & {
+    senderDisplayName?: string;
+};
+
 interface SidebarListPanelProps {
     groups: Group[];
     contacts: Contact[];
@@ -22,8 +26,8 @@ interface SidebarListPanelProps {
     sidebarFilter: SidebarFilter;
     selectedId?: string;
     selectedGroupId?: string;
-    searchResults: ChatMessage[];
-    typingStatus: Record<string, any>;
+    searchResults: SearchResultMessage[];
+    typingStatus: Record<string, NodeJS.Timeout>;
     onSelectContact: (id: string) => void;
     onSelectGroup?: (groupId: string) => void;
     onToggleFavorite: (id: string) => void;
@@ -109,16 +113,16 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                                             <ListItemContent>
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                                                     <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                                                        {(msg as any).senderName || 'Mensaje'}
+                                                        {msg.senderName || msg.senderDisplayName || 'Mensaje'}
                                                     </Typography>
                                                     <Typography level="body-xs" sx={{ opacity: 0.6 }}>
                                                         {msg.timestamp}
                                                     </Typography>
                                                 </Box>
                                                 <Typography level="body-xs" sx={{ color: 'text.secondary', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', overflow: 'hidden' }}>
-                                                    {(msg as any).senderDisplayName && (
+                                                    {msg.senderDisplayName && (
                                                         <Box component="span" sx={{ fontWeight: 600, mr: 0.5 }}>
-                                                            {(msg as any).senderDisplayName}:
+                                                            {msg.senderDisplayName}:
                                                         </Box>
                                                     )}
                                                     {highlightText(msg.message, sidebarSearch)}

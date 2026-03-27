@@ -7,13 +7,15 @@ vi.mock('@mui/icons-material/LockRounded', () => ({ default: () => null }));
 
 const mockVerifyPin = vi.fn();
 const mockDeleteIdentity = vi.fn();
+type AppLockUpeer = Pick<Window['upeer'], 'verifyPin' | 'deleteIdentity'>;
+type AppLockWindow = Window & { upeer: AppLockUpeer };
 
 beforeEach(() => {
     vi.clearAllMocks();
-    window.upeer = {
+    (window as AppLockWindow).upeer = {
         verifyPin: mockVerifyPin,
         deleteIdentity: mockDeleteIdentity,
-    } as any;
+    };
     vi.stubGlobal('confirm', vi.fn(() => true));
 });
 
@@ -126,5 +128,49 @@ describe('AppLock', () => {
             expect(window.confirm).toHaveBeenCalled();
             expect(mockDeleteIdentity).toHaveBeenCalledTimes(1);
         });
+    });
+
+    it('debe enviar al login tras 10 intentos fallidos de PIN', async () => {
+        mockVerifyPin.mockResolvedValue(false);
+        const onTooManyAttempts = vi.fn();
+
+        render(<AppLock onUnlock={vi.fn()} onTooManyAttempts={onTooManyAttempts} />);
+
+        for (let attempt = 1; attempt <= 10; attempt += 1) {
+            const inputs = document.querySelectorAll('input[type="password"]');
+            fireEvent.change(inputs[0], { target: { value: '9' } });
+            fireEvent.change(inputs[1], { target: { value: '9' } });
+            fireEvent.change(inputs[2], { target: { value: '9' } });
+            fireEvent.change(inputs[3], { target: { value: '9' } });
+
+            await waitFor(() => {
+                expect(mockVerifyPin).toHaveBeenCalledTimes(attempt);
+            });
+        }
+
+        await waitFor(() => {
+            expect(onTooManyAttempts).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('debe mostrar una alerta cuando queden 5 intentos o menos', async () => {
+        mockVerifyPin.mockResolvedValue(false);
+
+        render(<AppLock onUnlock={vi.fn()} />);
+
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
+            const inputs = document.querySelectorAll('input[type="password"]');
+            fireEvent.change(inputs[0], { target: { value: '9' } });
+            fireEvent.change(inputs[1], { target: { value: '9' } });
+            fireEvent.change(inputs[2], { target: { value: '9' } });
+            fireEvent.change(inputs[3], { target: { value: '9' } });
+
+            await waitFor(() => {
+                expect(mockVerifyPin).toHaveBeenCalledTimes(attempt);
+            });
+        }
+
+        expect(screen.getByText(/Intentos restantes: 5/i)).toBeInTheDocument();
+        expect(screen.getByText(/Atención: te quedan 5 intentos o menos antes de volver al login/i)).toBeInTheDocument();
     });
 });

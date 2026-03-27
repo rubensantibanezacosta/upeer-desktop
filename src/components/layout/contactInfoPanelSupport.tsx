@@ -10,6 +10,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import { parseMessage } from '../../features/chat/message/messageItemSupport.js';
+import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { toMediaUrl } from '../../utils/fileUtils.js';
 import { ChatMessage, Contact } from '../../types/chat.js';
 import { isMediaFile } from './contactInfoHelpers.js';
@@ -31,7 +32,7 @@ export interface ContactInfoDangerAction {
     onClick: () => void;
 }
 
-export const useSharedMediaItems = (chatHistory: ChatMessage[], activeTransfers: any[]) => useMemo(() => {
+export const useSharedMediaItems = (chatHistory: ChatMessage[], activeTransfers: FileTransfer[]) => useMemo(() => {
     return chatHistory
         .map((message) => {
             const { fileData } = parseMessage(message.message, message.isMine, activeTransfers);

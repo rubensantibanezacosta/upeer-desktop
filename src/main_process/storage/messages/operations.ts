@@ -9,7 +9,28 @@ export { updateMessageStatus, getMessageStatus };
 
 const sanitizedTempDir = path.join(os.tmpdir(), 'chat-p2p-sanitized');
 
-function isBrokenLegacySanitizedMessage(message: any): boolean {
+type LegacySanitizedMessage = {
+    id: string;
+    message?: string | null;
+};
+
+type MessageRow = {
+    id: string;
+    chatUpeerId: string;
+    timestamp: number;
+    message: string;
+    isMine?: boolean;
+    status?: MessageDeliveryStatus | string | null;
+};
+
+type MessageUpdateFields = {
+    message: string;
+    isEdited: boolean;
+    signature?: string;
+    version?: number;
+};
+
+function isBrokenLegacySanitizedMessage(message: LegacySanitizedMessage): boolean {
     if (!message || typeof message.message !== 'string' || !message.message.startsWith('{')) return false;
 
     try {
@@ -21,8 +42,12 @@ function isBrokenLegacySanitizedMessage(message: any): boolean {
     }
 }
 
-function purgeBrokenLegacySanitizedMessages(messages: any[], db: any, schema: any) {
-    const validMessages: any[] = [];
+function purgeBrokenLegacySanitizedMessages(
+    messages: MessageRow[],
+    db: ReturnType<typeof getDb>,
+    schema: ReturnType<typeof getSchema>
+) {
+    const validMessages: MessageRow[] = [];
 
     for (const message of messages) {
         if (!isBrokenLegacySanitizedMessage(message)) {
@@ -99,7 +124,7 @@ export function getMessages(chatUpeerId: string) {
         .where(eq(schema.messages.chatUpeerId, chatUpeerId))
         .orderBy(desc(schema.messages.timestamp))
         .limit(100)
-        .all();
+        .all() as MessageRow[];
 
     const validMessages = purgeBrokenLegacySanitizedMessages(msgs, db, schema);
 
@@ -115,7 +140,7 @@ export function updateMessageContent(id: string, newMessage: string, signature?:
     const db = getDb();
     const schema = getSchema();
 
-    const updates: any = {
+    const updates: MessageUpdateFields = {
         message: newMessage,
         isEdited: true,
         signature: signature
@@ -198,7 +223,7 @@ export function getMessagesAround(chatUpeerId: string, targetMsgId: string, cont
         ))
         .orderBy(desc(schema.messages.timestamp))
         .limit(half + 1)
-        .all();
+        .all() as MessageRow[];
 
     const after = db.select().from(schema.messages)
         .where(and(
@@ -207,7 +232,7 @@ export function getMessagesAround(chatUpeerId: string, targetMsgId: string, cont
         ))
         .orderBy(schema.messages.timestamp)
         .limit(half)
-        .all();
+        .all() as MessageRow[];
 
     const merged = purgeBrokenLegacySanitizedMessages([...before, ...after], db, schema);
     const unique = Array.from(new Map(merged.map(m => [m.id, m])).values())

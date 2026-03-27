@@ -1,3 +1,5 @@
+import type { RenewalToken } from '../../network/types.js';
+
 export interface SurvivalKitData {
     version: string;
     myUpeerId: string;
@@ -12,12 +14,12 @@ export interface SurvivalKitData {
             dhtSeq: number;
             signature: string;
             expiresAt: number;
-            renewalToken?: any;
+            renewalToken?: RenewalToken;
         };
         lastSeen: number;
     }>;
     renewalTokens: Array<{
         targetId: string;
-        token: any;
+        token: RenewalToken;
     }>;
 }

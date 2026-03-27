@@ -1,9 +1,17 @@
 import { verify } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 
-function buildCandidatePayloads(packet: any): any[] {
+type SignedTransferPacket = {
+    signature?: string;
+    senderUpeerId?: string;
+    senderYggAddress?: string;
+    isInternalSync?: boolean;
+    [key: string]: unknown;
+};
+
+function buildCandidatePayloads(packet: SignedTransferPacket): Array<Record<string, unknown>> {
     const { signature: _signature, senderUpeerId, senderYggAddress, isInternalSync, ...basePayload } = packet;
-    const candidates = [basePayload];
+    const candidates: Array<Record<string, unknown>> = [basePayload];
 
     if (senderUpeerId !== undefined) {
         candidates.push({ ...basePayload, senderUpeerId });
@@ -29,7 +37,7 @@ function buildCandidatePayloads(packet: any): any[] {
     });
 }
 
-export function verifyFileTransferPacketSignature(packet: any, publicKey?: string): boolean {
+export function verifyFileTransferPacketSignature(packet: SignedTransferPacket, publicKey?: string): boolean {
     if (!packet?.signature) return true;
     if (!publicKey) return false;
 

@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AppLock } from '../../../../src/components/ui/AppLock';
 
-// Mock de la API de uPeer expuesta en el objeto window
 const mockVerifyPin = vi.fn();
 const mockDeleteIdentity = vi.fn();
 const mockIsPinEnabled = vi.fn();
-(window as any).upeer = {
+type AppLockUpeer = Pick<Window['upeer'], 'verifyPin' | 'isPinEnabled' | 'deleteIdentity'>;
+type AppLockWindow = Window & { upeer: AppLockUpeer };
+
+(window as AppLockWindow).upeer = {
     verifyPin: mockVerifyPin,
     isPinEnabled: mockIsPinEnabled,
     deleteIdentity: mockDeleteIdentity
@@ -29,16 +31,13 @@ describe('AppLock Component (UI-to-Backend Integration)', () => {
 
         render(<AppLock onUnlock={onUnlock} />);
 
-        // MUI Joy renderiza inputs reales pero podemos seleccionarlos directamente
         const passwordInputs = document.querySelectorAll('input[type="password"]');
         expect(passwordInputs).toHaveLength(4);
 
-        // Simular escritura en los 4 campos
         fireEvent.change(passwordInputs[0], { target: { value: '1' } });
         fireEvent.change(passwordInputs[1], { target: { value: '2' } });
         fireEvent.change(passwordInputs[2], { target: { value: '3' } });
 
-        // El último dígito dispara el handleUnlock
         fireEvent.change(passwordInputs[3], { target: { value: '4' } });
 
         await waitFor(() => {
@@ -91,5 +90,49 @@ describe('AppLock Component (UI-to-Backend Integration)', () => {
             expect(window.confirm).toHaveBeenCalled();
             expect(mockDeleteIdentity).toHaveBeenCalledTimes(1);
         });
+    });
+
+    it('should redirect to login after 10 invalid PIN attempts', async () => {
+        mockVerifyPin.mockResolvedValue(false);
+        const onTooManyAttempts = vi.fn();
+
+        render(<AppLock onUnlock={vi.fn()} onTooManyAttempts={onTooManyAttempts} />);
+
+        for (let attempt = 1; attempt <= 10; attempt += 1) {
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            fireEvent.change(passwordInputs[0], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[1], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[2], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[3], { target: { value: '0' } });
+
+            await waitFor(() => {
+                expect(mockVerifyPin).toHaveBeenCalledTimes(attempt);
+            });
+        }
+
+        await waitFor(() => {
+            expect(onTooManyAttempts).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('should warn when 5 or fewer PIN attempts remain', async () => {
+        mockVerifyPin.mockResolvedValue(false);
+
+        render(<AppLock onUnlock={vi.fn()} />);
+
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            fireEvent.change(passwordInputs[0], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[1], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[2], { target: { value: '0' } });
+            fireEvent.change(passwordInputs[3], { target: { value: '0' } });
+
+            await waitFor(() => {
+                expect(mockVerifyPin).toHaveBeenCalledTimes(attempt);
+            });
+        }
+
+        expect(screen.getByText(/Intentos restantes: 5/i)).toBeDefined();
+        expect(screen.getByText(/Atención: te quedan 5 intentos o menos antes de volver al login/i)).toBeDefined();
     });
 });

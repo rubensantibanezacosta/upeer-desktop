@@ -1,58 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/joy';
+import { AttachmentType } from '../../features/chat/input/AttachmentButton.js';
 import type { LinkPreview } from '../../types/chat.js';
+import type { ChatMessage, Contact, Group, PendingFile } from '../../types/chat.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
-import { forwardMessageToTargets } from '../../features/chat/message/forwardMessage.js';
+import { forwardMessageToTargets, type ForwardTarget } from '../../features/chat/message/forwardMessage.js';
+import type { FileTransferController } from '../../hooks/useFileTransfer.js';
+import type { AppStore } from '../../store/useAppStore.js';
+import type { ChatStore } from '../../store/chatStoreTypes.js';
+import type { NavigationStore } from '../../store/useNavigationStore.js';
 import { MainLayoutContent } from './MainLayoutContent.js';
 import { LayoutLoader } from './mainLayoutHelpers.js';
 import { MainLayoutOverlays } from './MainLayoutOverlays.js';
 
-interface MainLayoutProps {
+export interface PreviewableMedia {
+    url: string;
+    name: string;
+    mimeType: string;
+    fileId: string;
+}
+
+export interface MainLayoutProps {
     isAppLocked: boolean | null;
-    setIsAppLocked: (locked: boolean) => void;
+    setIsAppLocked: React.Dispatch<React.SetStateAction<boolean | null>>;
     isAuthenticated: boolean | null;
-    setAuthenticated: (auth: boolean) => void;
+    setAuthenticated: AppStore['setAuthenticated'];
     isDragging: boolean;
     handleDragOver: (e: React.DragEvent) => void;
     handleDragLeave: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
-    activeContact: any;
-    activeGroup: any;
+    activeContact?: Contact;
+    activeGroup?: Group;
     isIncomingRequest: boolean;
     targetUpeerId: string;
     activeGroupId: string;
     message: string;
     setMessage: (val: string) => void;
-    handleSend: (linkPreview?: LinkPreview | null) => void;
-    handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void;
-    handleAttachFile: (type: any) => void;
+    handleSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
+    handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
+    handleAttachFile: (type: AttachmentType) => void | Promise<void>;
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
-    currentReplyToMessage: any;
-    setReplyToMessage: (id: string, msg: any) => void;
-    handleAcceptContact: (id: string) => void;
+    currentReplyToMessage: ChatMessage | null;
+    setReplyToMessage: (id: string, msg: ChatMessage | null) => void;
+    handleAcceptContact: () => void;
     handleDeleteContact: (id: string) => void;
     handleToggleFavorite: (id: string) => Promise<void>;
     handleClearChat: (id: string) => void;
     handleBlockContact: () => void;
-    handleReaction: (id: string, emoji: string, isGroup: boolean) => void;
+    handleReaction: (id: string, emoji: string, remove: boolean) => void;
     handleUpdateMessage: (id: string, msg: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (id: string) => void;
-    handleMediaClick: (media: any) => void;
-    navigation: any;
-    appStore: any;
-    chatStore: any;
+    handleMediaClick: (media: PreviewableMedia) => void;
+    navigation: NavigationStore;
+    appStore: AppStore;
+    chatStore: ChatStore;
     isFilePickerOpen: boolean;
     isPreparingAttachments: boolean;
     setFilePickerOpen: (open: boolean) => void;
-    pendingFiles: any[];
-    setPendingFiles: (files: any[]) => void;
-    handleFileSubmit: (files: any[], thumbnails?: any[], captions?: any[]) => void;
+    pendingFiles: PendingFile[];
+    setPendingFiles: (files: PendingFile[]) => void;
+    handleFileSubmit: (files: PendingFile[], thumbnails?: (string | undefined)[], captions?: string[]) => void | Promise<void>;
     handleSendVoiceNote: (file: File) => Promise<void>;
-    fileTransfer: any;
-    editingMessage: any;
-    setEditingMessage: (msg: any) => void;
+    fileTransfer: FileTransferController;
+    editingMessage: ChatMessage | null;
+    setEditingMessage: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
@@ -68,7 +81,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     isFilePickerOpen, isPreparingAttachments, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
-    const [forwardingMsg, setForwardingMsg] = useState<any>(null);
+    const [forwardingMsg, setForwardingMsg] = useState<ChatMessage | null>(null);
     const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
     const [isInviteGroupMembersOpen, setIsInviteGroupMembersOpen] = useState(false);
 
@@ -88,7 +101,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         return <LayoutLoader />;
     }
 
-    if (isAppLocked) return <AppLock onUnlock={() => setIsAppLocked(false)} />;
+    if (isAppLocked) {
+        return (
+            <AppLock
+                onUnlock={() => setIsAppLocked(false)}
+                onTooManyAttempts={() => {
+                    setIsAppLocked(false);
+                    setAuthenticated(false);
+                    navigation.goToChat();
+                }}
+            />
+        );
+    }
 
     if (isAuthenticated === null) {
         return <LayoutLoader />;
@@ -98,7 +122,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         return <LoginScreen onUnlocked={() => { setAuthenticated(true); chatStore.refreshData(); chatStore.refreshGroups(); }} />;
     }
 
-    const handleForward = async (targets: { id: string; isGroup: boolean }[]) => {
+    const handleForward = async (targets: ForwardTarget[]) => {
         if (!forwardingMsg) return;
         await forwardMessageToTargets(forwardingMsg.message, targets);
         chatStore.refreshContacts();

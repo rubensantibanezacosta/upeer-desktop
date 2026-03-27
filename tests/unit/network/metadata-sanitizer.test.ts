@@ -3,6 +3,11 @@ import path from 'node:path';
 import os from 'node:os';
 import { EventEmitter } from 'node:events';
 
+type MockFfmpegProcess = EventEmitter & {
+    stderr: EventEmitter;
+    stdio: ['ignore', 'pipe', 'pipe'];
+};
+
 const mockSharpInstance = {
     metadata: vi.fn().mockResolvedValue({
         exif: Buffer.from('exif-data'),
@@ -24,7 +29,7 @@ vi.mock('sharp', () => ({
 }));
 
 const createMockFFmpegProcess = (exitCode = 0, emitError = false) => {
-    const proc = new EventEmitter() as any;
+    const proc = new EventEmitter() as MockFfmpegProcess;
     proc.stderr = new EventEmitter();
     proc.stdio = ['ignore', 'pipe', 'pipe'];
     setTimeout(() => {
@@ -215,7 +220,7 @@ describe('MetadataSanitizer', () => {
         it('should return securityWarning when ffmpeg exits with error code', async () => {
             mockSpawnBehavior.exitCode = 1;
             const freshSanitizer = new MetadataSanitizer();
-            (freshSanitizer as any).ffmpegAvailable = true;
+            Reflect.set(freshSanitizer, 'ffmpegAvailable', true);
 
             const result = await freshSanitizer.sanitizeFile('/path/to/video.mp4', 'video/mp4');
 

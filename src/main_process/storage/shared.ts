@@ -1,15 +1,21 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-// @journeyapps/sqlcipher no exporta tipos de clase compatibles con InstanceType;
-// usamos any para sqlite y conservamos tipado fuerte solo para drizzle.
 import * as schema from './schema.js';
 import { eq, desc, or, and, lt, sql } from 'drizzle-orm';
 import { error } from '../security/secure-logger.js';
 
+type SqliteTransaction<T> = () => T;
+
+export interface SqliteLike {
+    close(): void;
+    exec(sql: string): unknown;
+    transaction<T>(fn: () => T): SqliteTransaction<T>;
+}
+
 // Shared database instance
-let sqlite: any | null = null;
+let sqlite: SqliteLike | null = null;
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-export function setDatabase(instance: ReturnType<typeof drizzle<typeof schema>>, sqliteInstance: any) {
+export function setDatabase(instance: ReturnType<typeof drizzle<typeof schema>>, sqliteInstance: SqliteLike) {
     db = instance;
     sqlite = sqliteInstance;
 }

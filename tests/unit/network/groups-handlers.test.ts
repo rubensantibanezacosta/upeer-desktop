@@ -12,6 +12,14 @@ import * as contactKeysOps from '../../../src/main_process/storage/contacts/keys
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 
+type GroupWindow = NonNullable<Parameters<typeof handleGroupMessage>[3]>;
+type GroupContact = Parameters<typeof handleGroupMessage>[1];
+type GroupMessageData = Parameters<typeof handleGroupMessage>[2];
+type GroupInviteData = Parameters<typeof handleGroupInvite>[1];
+type GroupUpdateData = Parameters<typeof handleGroupUpdate>[1];
+type GroupAckData = Parameters<typeof handleGroupAck>[1];
+type GroupLeaveData = Parameters<typeof handleGroupLeave>[1];
+
 // Mocks
 vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     deleteGroup: vi.fn(),
@@ -73,7 +81,7 @@ vi.mock('../../../src/main_process/network/groupState.js', () => ({
 }));
 
 describe('Group Handlers Final Coverage', () => {
-    const mockWin = { webContents: { send: vi.fn() } } as any;
+    const mockWin = { webContents: { send: vi.fn() } } as unknown as GroupWindow;
     const groupId = 'group-uuid-123';
     const senderId = 'sender-upeer-id';
 
@@ -84,11 +92,11 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupMessage', () => {
         it('should process valid group message', async () => {
             const group = { id: groupId, members: [senderId, 'my-id'], adminUpeerId: 'admin', epoch: 1, senderKey: 'c'.repeat(64) };
-            const data = { id: '550e8400-e29b-41d4-a716-446655440000', groupId, content: 'hi', nonce: '11'.repeat(24), epoch: 1, timestamp: 1710000000000 };
-            (groupsOps.getGroupById as any).mockReturnValue(group);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            const data: GroupMessageData = { id: '550e8400-e29b-41d4-a716-446655440000', groupId, content: 'hi', nonce: '11'.repeat(24), epoch: 1, timestamp: 1710000000000 };
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(group);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
-            await handleGroupMessage(senderId, { upeerId: senderId } as any, data, mockWin);
+            await handleGroupMessage(senderId, { upeerId: senderId } as GroupContact, data, mockWin);
 
             expect(messagesOps.saveMessage).toHaveBeenCalledWith(
                 data.id,
@@ -109,7 +117,7 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should decrypt using stored group sender key', async () => {
             const group = { id: groupId, members: [senderId, 'my-id'], adminUpeerId: 'admin', epoch: 4, senderKey: 'c'.repeat(64) };
-            const data = {
+            const data: GroupMessageData = {
                 id: '550e8400-e29b-41d4-a716-446655440000',
                 groupId,
                 content: 'aa',
@@ -117,10 +125,10 @@ describe('Group Handlers Final Coverage', () => {
                 epoch: 4,
                 timestamp: 1710000000000
             };
-            (groupsOps.getGroupById as any).mockReturnValue(group);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(group);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
-            await handleGroupMessage(senderId, { upeerId: senderId, publicKey: 'b'.repeat(64) } as any, data, mockWin);
+            await handleGroupMessage(senderId, { upeerId: senderId, publicKey: 'b'.repeat(64) } as GroupContact, data, mockWin);
 
             expect(messagesOps.saveMessage).toHaveBeenCalledWith(
                 data.id,
@@ -137,21 +145,21 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should fail if groupId or content is missing', async () => {
             const group = { id: groupId, members: [senderId], epoch: 1, senderKey: 'c'.repeat(64) };
-            (groupsOps.getGroupById as any).mockReturnValue(group);
-            await handleGroupMessage(senderId, { upeerId: senderId } as any, { groupId }, mockWin);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(group);
+            await handleGroupMessage(senderId, { upeerId: senderId } as GroupContact, { groupId } as GroupMessageData, mockWin);
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
         });
 
         it('should save self-synced group messages as mine', async () => {
             const myId = 'my-id';
             const group = { id: groupId, groupId, members: [senderId, myId], adminUpeerId: 'admin', epoch: 1, senderKey: 'c'.repeat(64) };
-            const data = { id: '550e8400-e29b-41d4-a716-446655440001', groupId, content: 'hi', nonce: '11'.repeat(24), epoch: 1, timestamp: 1710000000001, isInternalSync: true };
-            (identity.getMyUPeerId as any).mockReturnValue(myId);
-            (groupsOps.getGroupById as any).mockReturnValue(group);
-            (messagesOps.getMessageById as any).mockResolvedValue(null);
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            const data: GroupMessageData = { id: '550e8400-e29b-41d4-a716-446655440001', groupId, content: 'hi', nonce: '11'.repeat(24), epoch: 1, timestamp: 1710000000001, isInternalSync: true };
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(group);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
-            await handleGroupMessage(myId, { upeerId: myId, name: 'Yo' } as any, data, mockWin);
+            await handleGroupMessage(myId, { upeerId: myId, name: 'Yo' } as GroupContact, data, mockWin);
 
             expect(messagesOps.saveMessage).toHaveBeenCalledWith(
                 data.id,
@@ -175,17 +183,17 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupInvite', () => {
         it('should decrypt, save and surface a new group invite', async () => {
             const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'], epoch: 1, senderKey: 'c'.repeat(64), avatar: 'data:image/png;base64,abc' });
-            (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
-            (groupsOps.getGroupById as any).mockReturnValue(null);
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' });
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from(innerPayload));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleGroupInvite(senderId, {
                 groupId,
                 payload: 'aa',
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64)
-            }, mockWin);
+            } as GroupInviteData, mockWin);
 
             expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
             expect(identity.decrypt).toHaveBeenCalledWith(
@@ -226,21 +234,21 @@ describe('Group Handlers Final Coverage', () => {
         });
 
         it('should fail if decryption fails', async () => {
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub' });
-            (identity.decrypt as any).mockReturnValue(null);
-            (identity.decryptWithIdentityKey as any).mockReturnValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub' } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(null);
 
-            await handleGroupInvite(senderId, { groupId, payload: 'hex', nonce: 'hex' }, mockWin);
+            await handleGroupInvite(senderId, { groupId, payload: 'hex', nonce: 'hex' } as GroupInviteData, mockWin);
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
         });
 
         it('should fallback to identity-key decryption for static-key group invites', async () => {
             const innerPayload = JSON.stringify({ groupName: 'Static Group', members: [senderId, 'my-id'], epoch: 1, senderKey: 'c'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(null);
-            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from(innerPayload));
-            (groupsOps.getGroupById as any).mockReturnValue(null);
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' });
-            (messagesOps.saveMessage as any).mockResolvedValue({ changes: 1 });
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from(innerPayload));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleGroupInvite(senderId, {
                 groupId,
@@ -248,7 +256,7 @@ describe('Group Handlers Final Coverage', () => {
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64),
                 useRecipientEphemeral: false,
-            }, mockWin);
+            } as GroupInviteData, mockWin);
 
             expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
                 Buffer.from('bb', 'hex'),
@@ -268,22 +276,22 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should reject invite updates for existing groups from non-admin members', async () => {
             const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'], epoch: 2, senderKey: 'c'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
-            (groupsOps.getGroupById as any).mockReturnValue({
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from(innerPayload));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({
                 groupId,
                 members: [senderId, 'my-id'],
                 adminUpeerId: 'actual-admin',
                 epoch: 1,
                 senderKey: 'd'.repeat(64)
             });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Mallory' });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Mallory' } as never);
 
             await handleGroupInvite(senderId, {
                 groupId,
                 adminUpeerId: senderId,
                 payload: 'aa',
                 nonce: 'bb'
-            }, mockWin);
+            } as GroupInviteData, mockWin);
 
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
@@ -291,8 +299,8 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should ignore duplicate invite with same epoch and sender key', async () => {
             const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'], epoch: 2, senderKey: 'c'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(Buffer.from(innerPayload));
-            (groupsOps.getGroupById as any).mockReturnValue({
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from(innerPayload));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({
                 groupId,
                 name: 'Test Group',
                 members: [senderId, 'my-id'],
@@ -300,14 +308,14 @@ describe('Group Handlers Final Coverage', () => {
                 epoch: 2,
                 senderKey: 'c'.repeat(64)
             });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
 
             await handleGroupInvite(senderId, {
                 groupId,
                 adminUpeerId: senderId,
                 payload: 'aa',
                 nonce: 'bb'
-            }, mockWin);
+            } as GroupInviteData, mockWin);
 
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
@@ -318,16 +326,16 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupUpdate', () => {
         it('should update group info', async () => {
             const inner = JSON.stringify({ groupName: 'New Name' });
-            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64) });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(Buffer.from(inner));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64) });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from(inner));
 
             await handleGroupUpdate(senderId, {
                 groupId,
                 payload: 'aa',
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64)
-            }, mockWin);
+            } as GroupUpdateData, mockWin);
             expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
             expect(identity.decrypt).toHaveBeenCalledWith(
                 Buffer.from('bb', 'hex'),
@@ -339,15 +347,15 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should ignore stale group update epochs', async () => {
             const inner = JSON.stringify({ epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] });
-            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, adminUpeerId: senderId, members: [senderId, 'my-id'], epoch: 2, senderKey: 'd'.repeat(64) });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(Buffer.from(inner));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, adminUpeerId: senderId, members: [senderId, 'my-id'], epoch: 2, senderKey: 'd'.repeat(64) });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from(inner));
 
             await handleGroupUpdate(senderId, {
                 groupId,
                 payload: 'aa',
                 nonce: 'bb'
-            }, mockWin);
+            } as GroupUpdateData, mockWin);
 
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
@@ -356,10 +364,10 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should fallback to identity-key decryption for static-key group updates', async () => {
             const inner = JSON.stringify({ groupName: 'Static Name' });
-            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] });
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'b'.repeat(64) });
-            (identity.decrypt as any).mockReturnValue(null);
-            (identity.decryptWithIdentityKey as any).mockReturnValue(Buffer.from(inner));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
+            vi.mocked(identity.decrypt).mockReturnValue(null);
+            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from(inner));
 
             await handleGroupUpdate(senderId, {
                 groupId,
@@ -367,7 +375,7 @@ describe('Group Handlers Final Coverage', () => {
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64),
                 useRecipientEphemeral: false,
-            }, mockWin);
+            } as GroupUpdateData, mockWin);
 
             expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
                 Buffer.from('bb', 'hex'),
@@ -381,7 +389,7 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupAck', () => {
         it('should update status', async () => {
             const uuid = '550e8400-e29b-41d4-a716-446655440000';
-            await handleGroupAck(senderId, { id: uuid, groupId }, mockWin);
+            await handleGroupAck(senderId, { id: uuid, groupId } as GroupAckData, mockWin);
             expect(messagesOps.updateMessageStatus).toHaveBeenCalled();
         });
     });
@@ -389,21 +397,21 @@ describe('Group Handlers Final Coverage', () => {
     describe('handleGroupLeave', () => {
         it('should verify signature and leave', async () => {
             const groupControl = await import('../../../src/main_process/network/messaging/groupControl.js');
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' });
-            (identity.verify as any).mockReturnValue(true);
-            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, members: [senderId, 'other'], epoch: 1, senderKey: 'd'.repeat(64) });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' } as never);
+            vi.mocked(identity.verify).mockReturnValue(true);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, members: [senderId, 'other'], epoch: 1, senderKey: 'd'.repeat(64) });
 
-            await handleGroupLeave(senderId, { groupId, signature: 'sig' }, mockWin);
+            await handleGroupLeave(senderId, { groupId, signature: 'sig' } as GroupLeaveData, mockWin);
             expect(groupsOps.updateGroupMembers).toHaveBeenCalled();
             expect(groupControl.rotateGroupAfterMemberRemoval).toHaveBeenCalledWith(groupId, senderId);
         });
 
         it('should delete local group state for internal self leave sync', async () => {
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
-            (identity.verify as any).mockReturnValue(true);
-            (groupsOps.getGroupById as any).mockReturnValue({ id: groupId, members: ['my-id', 'other'], epoch: 1, senderKey: 'd'.repeat(64) });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(identity.verify).mockReturnValue(true);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, members: ['my-id', 'other'], epoch: 1, senderKey: 'd'.repeat(64) });
 
-            await handleGroupLeave('my-id', { groupId, signature: 'sig', isInternalSync: true }, mockWin);
+            await handleGroupLeave('my-id', { groupId, signature: 'sig', isInternalSync: true } as GroupLeaveData, mockWin);
 
             expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(groupId);
             expect(groupsOps.deleteGroup).toHaveBeenCalledWith(groupId);

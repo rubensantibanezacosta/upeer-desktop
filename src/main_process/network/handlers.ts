@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 
+import type { NetworkPacket } from './types.js';
 
 import { IdentityRateLimiter } from '../security/identity-rate-limiter.js';
 import {
@@ -36,11 +37,18 @@ export async function handlePacket(
     msg: Buffer,
     rinfo: { address: string; port: number },
     win: BrowserWindow | null,
-    sendResponse: (ip: string, data: any) => void,
+    sendResponse: (ip: string, data: NetworkPacket) => void,
     startDhtSearch: (upeerId: string) => void
 ) {
     try {
-        const fullPacket = JSON.parse(msg.toString());
+        const fullPacketRaw: unknown = JSON.parse(msg.toString());
+
+        if (typeof fullPacketRaw !== 'object' || fullPacketRaw === null) {
+            security('Invalid packet format', { ip: rinfo.address }, 'network');
+            return;
+        }
+
+        const fullPacket = fullPacketRaw as NetworkPacket;
 
         // ── Sealed Sender: desempaquetar antes de cualquier otro procesamiento ──
         // El paquete SEALED no tiene senderUpeerId en claro.
@@ -62,6 +70,8 @@ export async function handlePacket(
         }
 
         const { signature, senderUpeerId, senderYggAddress, ...data } = fullPacket;
+
+        const dataPacket = { ...data, type: fullPacket.type } as NetworkPacket;
 
         // BUG CM fix: guardar la IP de transporte TCP real ANTES del override.
         // El rate-limiter IP debe usar la dirección real (no la declarada por el peer).
@@ -102,17 +112,17 @@ export async function handlePacket(
         }
 
         // Input validation
-        const validation = validateMessage(data.type, data);
+        const validation = validateMessage(dataPacket.type, dataPacket);
         if (!validation.valid) {
-            if (data.type === 'FILE_CHUNK' || data.type === 'FILE_ACK' || data.type === 'FILE_PROPOSAL') {
+            if (dataPacket.type === 'FILE_CHUNK' || dataPacket.type === 'FILE_ACK' || dataPacket.type === 'FILE_PROPOSAL') {
                 debug('FILE_* validation rejected', {
-                    type: data.type,
-                    fileId: data.fileId,
-                    chunkIndex: data.chunkIndex,
+                    type: dataPacket.type,
+                    fileId: (dataPacket as { fileId?: string }).fileId,
+                    chunkIndex: (dataPacket as { chunkIndex?: number }).chunkIndex,
                     error: validation.error
                 }, 'file-transfer');
             }
-            security('Invalid message', { ip: rinfo.address, type: data.type, error: validation.error }, 'network');
+            security('Invalid message', { ip: rinfo.address, type: dataPacket.type, error: validation.error }, 'network');
             return;
         }
 
@@ -165,9 +175,14 @@ export async function handlePacket(
             }
         });
         // senderUpeerId y senderYggAddress se incluyen en la firma para evitar address spoofing.
-        const payloadForVerification: any = { ...dataForVerification, senderUpeerId };
+        const payloadForVerification: NetworkPacket = { ...dataForVerification as NetworkPacket, senderUpeerId };
         if (senderYggAddress !== undefined) {
             payloadForVerification.senderYggAddress = senderYggAddress;
+        }
+
+        if (!signature || typeof signature !== 'string') {
+            security('Packet missing signature', { ip: rinfo.address, upeerId, type: data.type }, 'network');
+            return;
         }
 
         let verified = verify(

@@ -4,6 +4,9 @@ import { updateMessageStatus, getMessageStatus } from '../../../src/main_process
 import { saveReaction, deleteReaction } from '../../../src/main_process/storage/messages/reactions.js';
 import { getDb, getSchema, getSqlite } from '../../../src/main_process/storage/shared.js';
 
+type MessageWithId = { id: string };
+type MessageWithTimestamp = { timestamp: number };
+
 vi.mock('node:fs', async () => {
     const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
     return {
@@ -17,25 +20,25 @@ vi.mock('node:fs', async () => {
 });
 
 vi.mock('drizzle-orm', () => ({
-    like: (a: any, b: any) => ({ type: 'like', a, b }),
-    gte: (a: any, b: any) => ({ type: 'gte', a, b }),
-    lte: (a: any, b: any) => ({ type: 'lte', a, b }),
+    like: (a: unknown, b: unknown) => ({ type: 'like', a, b }),
+    gte: (a: unknown, b: unknown) => ({ type: 'gte', a, b }),
+    lte: (a: unknown, b: unknown) => ({ type: 'lte', a, b }),
 }));
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(),
     getSqlite: vi.fn(),
-    eq: (a: any, b: any) => ({ type: 'eq', a, b }),
-    lt: (a: any, b: any) => ({ type: 'lt', a, b }),
-    desc: (a: any) => ({ type: 'desc', a }),
-    and: (...args: any[]) => ({ type: 'and', args }),
-    or: (...args: any[]) => ({ type: 'or', args }),
-    runTransaction: (fn: any) => fn(),
+    eq: (a: unknown, b: unknown) => ({ type: 'eq', a, b }),
+    lt: (a: unknown, b: unknown) => ({ type: 'lt', a, b }),
+    desc: (a: unknown) => ({ type: 'desc', a }),
+    and: (...args: unknown[]) => ({ type: 'and', args }),
+    or: (...args: unknown[]) => ({ type: 'or', args }),
+    runTransaction: (fn: () => unknown) => fn(),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/status.js', async (importOriginal) => {
-    const actual = await importOriginal() as any;
+    const actual = await importOriginal<typeof import('../../../src/main_process/storage/messages/status.js')>();
     return {
         ...actual,
         updateMessageStatus: vi.fn(actual.updateMessageStatus),
@@ -121,9 +124,9 @@ describe('Storage - Message Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (getDb as any).mockReturnValue(mockDb);
-        (getSchema as any).mockReturnValue(mockSchema);
-        (getSqlite as any).mockReturnValue(mockSqlite);
+        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
+        vi.mocked(getSchema).mockReturnValue(mockSchema as ReturnType<typeof getSchema>);
+        vi.mocked(getSqlite).mockReturnValue(mockSqlite as NonNullable<ReturnType<typeof getSqlite>>);
     });
 
     it('should save a message and handle conflict by updating status', async () => {
@@ -766,7 +769,7 @@ describe('Storage - Message Operations', () => {
             }));
 
             const result = getMessagesAround('peer-1', 'msg-2');
-            const ids = result.map((m: any) => m.id);
+            const ids = result.map((m: MessageWithId) => m.id);
             expect(ids).toContain('msg-1');
             expect(ids).toContain('msg-2');
             expect(ids).toContain('msg-3');
@@ -798,7 +801,7 @@ describe('Storage - Message Operations', () => {
             }));
 
             const result = getMessagesAround('peer-1', 'msg-2');
-            const ids = result.map((m: any) => m.id);
+            const ids = result.map((m: MessageWithId) => m.id);
             expect(ids.filter((id: string) => id === 'msg-2')).toHaveLength(1);
         });
 
@@ -832,7 +835,7 @@ describe('Storage - Message Operations', () => {
             }));
 
             const result = getMessagesAround('peer-1', 'msg-2');
-            const timestamps = result.map((m: any) => m.timestamp);
+            const timestamps = result.map((m: MessageWithTimestamp) => m.timestamp);
             expect(timestamps).toEqual([...timestamps].sort((a, b) => a - b));
         });
     });

@@ -6,6 +6,12 @@ import * as deviceOps from '../../../src/main_process/storage/devices-operations
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 
+type DhtUpdateContact = Parameters<typeof handleDhtUpdate>[1];
+type DhtUpdateData = Parameters<typeof handleDhtUpdate>[2];
+type DhtExchangeData = Parameters<typeof handleDhtExchange>[1];
+type DhtQueryData = Parameters<typeof handleDhtQuery>[1];
+type DhtResponseData = Parameters<typeof handleDhtResponse>[1];
+
 // Mock de dependencias
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
@@ -51,17 +57,17 @@ describe('DHT Handlers', () => {
         });
 
         it('should ignore if signature is invalid', async () => {
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(false);
-            const data = {
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(false);
+            const data: DhtUpdateData = {
                 locationBlock: { dhtSeq: 10, address: '1.2.3.4', signature: 'bad-sig' }
             };
-            await handleDhtUpdate('peer-id', { publicKey: 'pubkey' }, data);
+            await handleDhtUpdate('peer-id', { publicKey: 'pubkey' } as DhtUpdateContact, data);
             expect(locationOps.updateContactDhtLocation).not.toHaveBeenCalled();
         });
 
         it('should update location if dhtSeq is newer', async () => {
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
-            const data = {
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
+            const data: DhtUpdateData = {
                 locationBlock: {
                     dhtSeq: 10,
                     address: '1.2.3.4',
@@ -70,16 +76,16 @@ describe('DHT Handlers', () => {
                     renewalToken: 'token'
                 }
             };
-            await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' }, data);
+            await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' } as DhtUpdateContact, data);
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledWith(
                 'peer-id', '1.2.3.4', 10, 'valid-sig', 123456789, 'token'
             );
         });
 
         it('should upsert device info if present in locationBlock', async () => {
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
             const deviceMeta = { clientName: 'Test', platform: 'linux', clientVersion: '1.0' };
-            const data = {
+            const data: DhtUpdateData = {
                 locationBlock: {
                     dhtSeq: 10,
                     address: '1.2.3.4',
@@ -88,33 +94,33 @@ describe('DHT Handlers', () => {
                     deviceMeta
                 }
             };
-            await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' }, data);
+            await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' } as DhtUpdateContact, data);
             expect(deviceOps.upsertDevice).toHaveBeenCalledWith('peer-id', 'dev-123', deviceMeta);
         });
 
         it('should not update if dhtSeq is older or equal', async () => {
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
-            const data = {
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
+            const data: DhtUpdateData = {
                 locationBlock: { dhtSeq: 5, address: '1.2.3.4', signature: 'valid-sig' }
             };
-            await handleDhtUpdate('peer-id', { dhtSeq: 10, publicKey: 'pubkey' }, data);
+            await handleDhtUpdate('peer-id', { dhtSeq: 10, publicKey: 'pubkey' } as DhtUpdateContact, data);
             expect(locationOps.updateContactDhtLocation).not.toHaveBeenCalled();
         });
     });
 
     describe('handleDhtExchange', () => {
         it('should ignore if peers array is missing', async () => {
-            await handleDhtExchange('peer-id', {});
+            await handleDhtExchange('peer-id', {} as DhtExchangeData);
             expect(locationOps.updateContactDhtLocation).not.toHaveBeenCalled();
         });
 
         it('should process valid peers and skip invalid ones', async () => {
-            (identity.getMyUPeerId as any).mockReturnValue('me');
-            (contactsOps.getContactByUpeerId as any).mockImplementation(async (id: string) => {
+            vi.mocked(identity.getMyUPeerId).mockReturnValue('me');
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (id: string) => {
                 if (id === 'friend') return { upeerId: 'friend', publicKey: 'pk-friend', dhtSeq: 0 };
                 return null;
             });
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
 
             const peers = [
                 { upeerId: 'me', publicKey: 'pk-me', locationBlock: {} }, // Skip myself
@@ -122,7 +128,7 @@ describe('DHT Handlers', () => {
                 { upeerId: 'friend', publicKey: 'pk-friend', locationBlock: { dhtSeq: 5, address: 'b', signature: 's' } } // Valid
             ];
 
-            await handleDhtExchange('peer-id', { peers });
+            await handleDhtExchange('peer-id', { peers } as DhtExchangeData);
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledTimes(1);
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledWith('friend', 'b', 5, 's', undefined, undefined);
         });
@@ -141,10 +147,10 @@ describe('DHT Handlers', () => {
                 renewalToken: JSON.stringify({ key: 'val' }),
                 publicKey: 'target-pk'
             };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(mockTarget);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(mockTarget as never);
 
             const sendResponse = vi.fn();
-            await handleDhtQuery('peer-id', { targetId }, '1.1.1.1', sendResponse);
+            await handleDhtQuery('peer-id', { targetId } as DhtQueryData, '1.1.1.1', sendResponse);
 
             expect(sendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 type: 'DHT_RESPONSE',
@@ -158,16 +164,16 @@ describe('DHT Handlers', () => {
         });
 
         it('should return closest peers if target is not connected', async () => {
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue(null);
-            (contactsOps.getContacts as any).mockReturnValue([
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContacts).mockReturnValue([
                 { upeerId: 'closer', status: 'connected', address: '2.2.2.2', dhtSeq: 1, dhtSignature: 's', publicKey: 'p' },
                 { upeerId: 'farther', status: 'connected', address: '3.3.3.3', dhtSeq: 1, dhtSignature: 's', publicKey: 'p' },
                 { upeerId: 'not-conn', status: 'disconnected' }
-            ]);
+            ] as never);
 
             const targetId = '00000000'; // Close to nothing specifically here
             const sendResponse = vi.fn();
-            await handleDhtQuery('peer-id', { targetId }, '1.1.1.1', sendResponse);
+            await handleDhtQuery('peer-id', { targetId } as DhtQueryData, '1.1.1.1', sendResponse);
 
             expect(sendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 type: 'DHT_RESPONSE',
@@ -181,10 +187,10 @@ describe('DHT Handlers', () => {
         it('should update location if locationBlock is present and valid', async () => {
             const targetId = 'target-id';
             const block = { dhtSeq: 10, address: '5.5.5.5', signature: 's' };
-            (contactsOps.getContactByUpeerId as any).mockResolvedValue({ upeerId: targetId, dhtSeq: 5, publicKey: 'pk' });
-            (networkUtils.verifyLocationBlock as any).mockReturnValue(true);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: targetId, dhtSeq: 5, publicKey: 'pk' } as never);
+            vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
 
-            await handleDhtResponse('peer-id', { targetId, locationBlock: block }, vi.fn());
+            await handleDhtResponse('peer-id', { targetId, locationBlock: block } as DhtResponseData, vi.fn());
 
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledWith(
                 targetId, '5.5.5.5', 10, 's', undefined, undefined
@@ -192,8 +198,8 @@ describe('DHT Handlers', () => {
         });
 
         it('should process neighbors and send follow-up queries if unknown or newer', async () => {
-            (identity.getMyUPeerId as any).mockReturnValue('me');
-            (contactsOps.getContactByUpeerId as any).mockImplementation(async (id: string) => {
+            vi.mocked(identity.getMyUPeerId).mockReturnValue('me');
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (id: string) => {
                 if (id === 'known-older') return { upeerId: 'known-older', dhtSeq: 1, address: '3.3.3.3' };
                 return null; // Unknown
             });
@@ -205,7 +211,7 @@ describe('DHT Handlers', () => {
             ];
 
             const sendResponse = vi.fn();
-            await handleDhtResponse('peer-id', { targetId: 'search-target', neighbors }, sendResponse);
+            await handleDhtResponse('peer-id', { targetId: 'search-target', neighbors } as DhtResponseData, sendResponse);
 
             // Should query unknown
             expect(sendResponse).toHaveBeenCalledWith('2.2.2.2', { type: 'DHT_QUERY', targetId: 'search-target' });

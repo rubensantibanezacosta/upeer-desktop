@@ -7,8 +7,61 @@ import { upsertDevice } from '../../storage/devices-operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { verifyLocationBlock } from '../utils.js';
 import { network, security } from '../../security/secure-logger.js';
+import type { DeviceMetadata, LocationBlock, RenewalToken } from '../types.js';
 
-export async function handleDhtUpdate(upeerId: string, contact: any, data: any) {
+type ContactRecord = {
+    upeerId: string;
+    status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
+    publicKey?: string;
+    address?: string;
+    dhtSeq?: number | null;
+    dhtSignature?: string | null;
+    dhtExpiresAt?: number | null;
+    renewalToken?: string | null;
+};
+
+type DhtUpdateData = {
+    locationBlock?: LocationBlock & { deviceMeta?: DeviceMetadata };
+};
+
+type DhtExchangePeer = {
+    upeerId: string;
+    publicKey: string;
+    locationBlock: LocationBlock & { deviceMeta?: DeviceMetadata };
+};
+
+type DhtExchangeData = {
+    peers?: DhtExchangePeer[];
+};
+
+type DhtQueryData = {
+    targetId: string;
+};
+
+type DhtResponseNeighbor = {
+    upeerId: string;
+    publicKey?: string;
+    locationBlock?: LocationBlock;
+};
+
+type DhtResponseData = {
+    type: 'DHT_RESPONSE';
+    targetId: string;
+    locationBlock?: LocationBlock;
+    publicKey?: string;
+    neighbors?: DhtResponseNeighbor[];
+};
+
+function parseRenewalToken(value?: string | null): RenewalToken | undefined {
+    if (!value) return undefined;
+    try {
+        return JSON.parse(value) as RenewalToken;
+    } catch {
+        return undefined;
+    }
+}
+
+export async function handleDhtUpdate(upeerId: string, contact: ContactRecord, data: DhtUpdateData) {
     const block = data.locationBlock;
     if (!block || typeof block.dhtSeq !== 'number' || !block.address || !block.signature) return;
 
@@ -33,7 +86,7 @@ export async function handleDhtUpdate(upeerId: string, contact: any, data: any) 
     }
 }
 
-export async function handleDhtExchange(upeerId: string, data: any) {
+export async function handleDhtExchange(upeerId: string, data: DhtExchangeData) {
     if (!Array.isArray(data.peers)) return;
     network('Receiving peer locations', undefined, { upeerId, count: data.peers.length }, 'dht');
 
@@ -66,11 +119,11 @@ export async function handleDhtExchange(upeerId: string, data: any) {
     }
 }
 
-export async function handleDhtQuery(upeerId: string, data: any, fromAddress: string, sendResponse: (ip: string, data: any) => void) {
+export async function handleDhtQuery(upeerId: string, data: DhtQueryData, fromAddress: string, sendResponse: (ip: string, data: DhtResponseData) => void) {
     network('DHT query', undefined, { requester: upeerId, target: data.targetId }, 'dht');
-    const target = await getContactByUpeerId(data.targetId);
+    const target = await getContactByUpeerId(data.targetId) as ContactRecord | null;
 
-    const responseData: any = { type: 'DHT_RESPONSE', targetId: data.targetId };
+    const responseData: DhtResponseData = { type: 'DHT_RESPONSE', targetId: data.targetId };
 
     if (target && target.status === 'connected' && target.dhtSignature) {
         // BUG BX fix: incluir dhtExpiresAt en el locationBlock de respuesta.
@@ -79,16 +132,14 @@ export async function handleDhtQuery(upeerId: string, data: any, fromAddress: st
         // BUG CG fix: incluir renewalToken para que el receptor pueda auto-renovar al expirar.
         responseData.locationBlock = {
             address: target.address,
-            dhtSeq: target.dhtSeq,
+            dhtSeq: target.dhtSeq || 0,
             signature: target.dhtSignature,
             expiresAt: target.dhtExpiresAt ?? undefined,
-            renewalToken: target.renewalToken
-                ? (() => { try { return JSON.parse(target.renewalToken); } catch { return undefined; } })()
-                : undefined
+            renewalToken: parseRenewalToken(target.renewalToken),
         };
         responseData.publicKey = target.publicKey;
     } else {
-        const allContacts = getContacts() as any[];
+        const allContacts = getContacts() as ContactRecord[];
         const distanceXOR = (idA: string, idB: string) => {
             try { return BigInt('0x' + idA) ^ BigInt('0x' + idB); }
             catch { return BigInt(0); }
@@ -104,12 +155,10 @@ export async function handleDhtQuery(upeerId: string, data: any, fromAddress: st
                 // BUG CG fix: incluir renewalToken para auto-renovación al expirar.
                 locationBlock: {
                     address: c.address,
-                    dhtSeq: c.dhtSeq,
+                    dhtSeq: c.dhtSeq || 0,
                     signature: c.dhtSignature,
                     expiresAt: c.dhtExpiresAt ?? undefined,
-                    renewalToken: c.renewalToken
-                        ? (() => { try { return JSON.parse(c.renewalToken); } catch { return undefined; } })()
-                        : undefined
+                    renewalToken: parseRenewalToken(c.renewalToken),
                 },
                 dist: distanceXOR(c.upeerId, data.targetId)
             }))
@@ -122,10 +171,10 @@ export async function handleDhtQuery(upeerId: string, data: any, fromAddress: st
     sendResponse(fromAddress, responseData);
 }
 
-export async function handleDhtResponse(upeerId: string, data: any, sendResponse: (ip: string, data: any) => void) {
+export async function handleDhtResponse(upeerId: string, data: DhtResponseData, sendResponse: (ip: string, data: DhtQueryData) => void) {
     if (data.locationBlock) {
         const block = data.locationBlock;
-        const existing = await getContactByUpeerId(data.targetId);
+        const existing = await getContactByUpeerId(data.targetId) as ContactRecord | null;
         if (!existing) return;
 
         const isValid = verifyLocationBlock(data.targetId, block, existing.publicKey || data.publicKey);
@@ -138,7 +187,7 @@ export async function handleDhtResponse(upeerId: string, data: any, sendResponse
         network('DHT search referrals', undefined, { requester: upeerId, target: data.targetId, count: data.neighbors.length }, 'dht');
         for (const peer of data.neighbors) {
             if (peer.upeerId === getMyUPeerId()) continue;
-            const existing = await getContactByUpeerId(peer.upeerId);
+            const existing = await getContactByUpeerId(peer.upeerId) as ContactRecord | null;
             if (!existing) {
                 if (peer.locationBlock?.address) {
                     sendResponse(peer.locationBlock.address, { type: 'DHT_QUERY', targetId: data.targetId });

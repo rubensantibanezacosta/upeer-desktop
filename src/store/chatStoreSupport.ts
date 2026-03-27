@@ -1,4 +1,4 @@
-import type { ChatMessage, Contact, Group } from '../types/chat.js';
+import type { ChatMessage, Contact, Group, MessageReaction, MyIdentity, RawChatMessage, TransferMessageUpdates } from '../types/chat.js';
 
 export const formatMessageTimestamp = (timestamp?: number) => {
     const safeTimestamp = typeof timestamp === 'number' && Number.isFinite(timestamp)
@@ -10,7 +10,7 @@ export const formatMessageTimestamp = (timestamp?: number) => {
     }).format(new Date(safeTimestamp));
 };
 
-export const mapContactMessage = (message: any) => ({
+export const mapContactMessage = (message: RawChatMessage): ChatMessage => ({
     id: message.id,
     upeerId: message.chatUpeerId,
     isMine: !!message.isMine,
@@ -26,11 +26,11 @@ export const mapContactMessage = (message: any) => ({
 
 export const mapGroupMessage = (
     chatId: string,
-    message: any,
+    message: RawChatMessage,
     contacts: Contact[],
-    myIdentity: { alias?: string | null; name?: string | null; avatar?: string | null } | null,
-) => {
-    const sender = message.isMine ? myIdentity : contacts.find((contact: any) => contact.upeerId === message.senderUpeerId);
+    myIdentity: MyIdentity | null,
+): ChatMessage => {
+    const sender = message.isMine ? myIdentity : contacts.find((contact) => contact.upeerId === message.senderUpeerId);
     return {
         id: message.id,
         upeerId: chatId,
@@ -45,19 +45,19 @@ export const mapGroupMessage = (
         isEdited: !!message.isEdited,
         isDeleted: !!message.isDeleted,
         senderUpeerId: message.senderUpeerId,
-        senderName: (sender as any)?.name || (sender as any)?.alias || message.senderName || 'Usuario desconocido',
-        senderAvatar: (sender as any)?.avatar ?? undefined,
+        senderName: sender?.name || sender?.alias || message.senderName || 'Usuario desconocido',
+        senderAvatar: sender?.avatar ?? undefined,
         date: message.timestamp,
     };
 };
 
-export const buildSearchResults = (raw: any[], contacts: Contact[], groups: Group[]): ChatMessage[] => raw
-    .filter((message: any) => !message.message?.startsWith('{'))
-    .map((message: any) => {
+export const buildSearchResults = (raw: RawChatMessage[], contacts: Contact[], groups: Group[]): ChatMessage[] => raw
+    .filter((message) => !message.message?.startsWith('{'))
+    .map((message) => {
         const isGroup = message.chatUpeerId?.startsWith('grp-');
-        const group = isGroup ? groups.find((item: any) => item.groupId === message.chatUpeerId) : undefined;
-        const contact = !isGroup ? contacts.find((item: any) => item.upeerId === message.chatUpeerId) : undefined;
-        const senderContact = contacts.find((item: any) => item.upeerId === message.senderUpeerId);
+        const group = isGroup ? groups.find((item) => item.groupId === message.chatUpeerId) : undefined;
+        const contact = !isGroup ? contacts.find((item) => item.upeerId === message.chatUpeerId) : undefined;
+        const senderContact = contacts.find((item) => item.upeerId === message.senderUpeerId);
         const conversationName = group?.name || contact?.name || message.chatUpeerId;
         const senderName = message.isMine ? 'Tú' : (senderContact?.name || contact?.name || 'Desconocido');
         return {
@@ -75,14 +75,14 @@ export const buildSearchResults = (raw: any[], contacts: Contact[], groups: Grou
         } as ChatMessage;
     });
 
-export const applyReactionUpdate = (message: any, actorId: string, emoji: string, remove: boolean) => {
+export const applyReactionUpdate = (message: ChatMessage, actorId: string, emoji: string, remove: boolean): ChatMessage => {
     if (remove) {
         return {
             ...message,
-            reactions: (message.reactions || []).filter((reaction: any) => !(reaction.upeerId === actorId && reaction.emoji === emoji)),
+            reactions: (message.reactions || []).filter((reaction: MessageReaction) => !(reaction.upeerId === actorId && reaction.emoji === emoji)),
         };
     }
-    if ((message.reactions || []).some((reaction: any) => reaction.upeerId === actorId && reaction.emoji === emoji)) {
+    if ((message.reactions || []).some((reaction: MessageReaction) => reaction.upeerId === actorId && reaction.emoji === emoji)) {
         return message;
     }
     return {
@@ -91,7 +91,7 @@ export const applyReactionUpdate = (message: any, actorId: string, emoji: string
     };
 };
 
-export const updateTransferMessageContent = (message: any, fileId: string, updates: any) => {
+export const updateTransferMessageContent = (message: ChatMessage, fileId: string, updates: TransferMessageUpdates): ChatMessage => {
     if (!message.message.startsWith('{') || !message.message.endsWith('}')) {
         return message;
     }

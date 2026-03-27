@@ -13,12 +13,14 @@ interface AppActions {
     setNetworkStatus: (status: YggNetworkStatus) => void;
     setFirstConnect: (first: boolean) => void;
     setYggAddress: (address: string | undefined) => void;
-    
+
     // Auth check logic
     checkAuth: () => Promise<void>;
 }
 
-export const useAppStore = create<AppState & AppActions>((set) => ({
+export type AppStore = AppState & AppActions;
+
+export const useAppStore = create<AppStore>((set) => ({
     isAuthenticated: null,
     networkStatus: 'connecting',
     isFirstConnect: true,

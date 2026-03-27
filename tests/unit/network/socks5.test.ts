@@ -3,6 +3,16 @@ import net from 'node:net';
 import { EventEmitter } from 'node:events';
 import { parseIPv6ToBuffer, encodeFrame, socks5Connect } from '../../../src/main_process/network/server/socks5.js';
 
+type MockSocket = EventEmitter & Pick<net.Socket, 'write' | 'setTimeout' | 'destroy'>;
+
+function createMockSocket(): MockSocket {
+    const socket = new EventEmitter() as MockSocket;
+    socket.write = vi.fn();
+    socket.setTimeout = vi.fn();
+    socket.destroy = vi.fn();
+    return socket;
+}
+
 vi.mock('node:net', () => {
     return {
         default: {
@@ -30,7 +40,6 @@ describe('SOCKS5 Unit Tests', () => {
 
         it('should handle brackets and malformed address', () => {
             expect(parseIPv6ToBuffer('[::1]').readUInt16BE(14)).toBe(1);
-            // Malformed case to trigger catch in socks5Connect later
             expect(parseIPv6ToBuffer('::G1').readUInt16BE(0)).toBe(0);
         });
     });
@@ -45,14 +54,11 @@ describe('SOCKS5 Unit Tests', () => {
     });
 
     describe('socks5Connect', () => {
-        let mockSocket: any;
+        let mockSocket: MockSocket;
 
         beforeEach(() => {
-            mockSocket = new EventEmitter();
-            mockSocket.write = vi.fn();
-            mockSocket.setTimeout = vi.fn();
-            mockSocket.destroy = vi.fn();
-            (net.createConnection as any).mockReturnValue(mockSocket);
+            mockSocket = createMockSocket();
+            vi.mocked(net.createConnection).mockReturnValue(mockSocket);
         });
 
         it('should complete SOCKS5 handshake successfully', async () => {

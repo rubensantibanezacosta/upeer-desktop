@@ -25,9 +25,9 @@ describe('Reputation Handlers', () => {
     describe('handleReputationGossip', () => {
         it('should request missing IDs from peer', () => {
             const ourIds = ['id1', 'id2'];
-            const theirIds = ['id1', 'id3']; // Nos falta 'id3'
+            const theirIds = ['id1', 'id3'];
 
-            (vouches.getGossipIds as any).mockReturnValue(ourIds);
+            vi.mocked(vouches.getGossipIds).mockReturnValue(ourIds);
 
             handleReputationGossip(mockPeerId, { ids: theirIds }, mockSendResponse, mockRinfo);
 
@@ -39,13 +39,12 @@ describe('Reputation Handlers', () => {
 
         it('should push our IDs if peer is missing them', () => {
             const ourIds = ['id1', 'id2'];
-            const theirIds = ['id1']; // Al peer le falta 'id2'
+            const theirIds = ['id1'];
 
-            (vouches.getGossipIds as any).mockReturnValue(ourIds);
+            vi.mocked(vouches.getGossipIds).mockReturnValue(ourIds);
 
             handleReputationGossip(mockPeerId, { ids: theirIds }, mockSendResponse, mockRinfo);
 
-            // Debería enviar REPUTATION_GOSSIP con nuestra lista completa (o paginada)
             expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
                 type: 'REPUTATION_GOSSIP',
                 ids: expect.any(Array)
@@ -55,9 +54,8 @@ describe('Reputation Handlers', () => {
         });
 
         it('should handle missing data.ids gracefully', () => {
-            (vouches.getGossipIds as any).mockReturnValue(['id1']);
+            vi.mocked(vouches.getGossipIds).mockReturnValue(['id1']);
             handleReputationGossip(mockPeerId, {}, mockSendResponse, mockRinfo);
-            // Debería responder con GOSSIP porque el peer mandó "nada" y nosotros tenemos "algo"
             expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
                 type: 'REPUTATION_GOSSIP'
             }));
@@ -67,7 +65,7 @@ describe('Reputation Handlers', () => {
             const ourIds: string[] = [];
             const theirIds = Array.from({ length: 100 }, (_, i) => `id${i}`);
 
-            (vouches.getGossipIds as any).mockReturnValue(ourIds);
+            vi.mocked(vouches.getGossipIds).mockReturnValue(ourIds);
 
             handleReputationGossip(mockPeerId, { ids: theirIds }, mockSendResponse, mockRinfo);
 
@@ -80,7 +78,7 @@ describe('Reputation Handlers', () => {
 
         it('should do nothing if both are synchronized', () => {
             const ids = ['id1', 'id2'];
-            (vouches.getGossipIds as any).mockReturnValue(ids);
+            vi.mocked(vouches.getGossipIds).mockReturnValue(ids);
 
             handleReputationGossip(mockPeerId, { ids }, mockSendResponse, mockRinfo);
 
@@ -93,7 +91,7 @@ describe('Reputation Handlers', () => {
             const requestedIds = ['id1'];
             const mockVouches = [{ id: 'id1', fromId: 'a', toId: 'b' }];
 
-            (vouches.getVouchesForDelivery as any).mockReturnValue(mockVouches);
+            vi.mocked(vouches.getVouchesForDelivery).mockReturnValue(mockVouches);
 
             handleReputationRequest(mockPeerId, { missing: requestedIds }, mockSendResponse, mockRinfo);
 
@@ -105,7 +103,7 @@ describe('Reputation Handlers', () => {
         });
 
         it('should not send response if no vouches found', () => {
-            (vouches.getVouchesForDelivery as any).mockReturnValue([]);
+            vi.mocked(vouches.getVouchesForDelivery).mockReturnValue([]);
 
             handleReputationRequest(mockPeerId, { missing: ['id_none'] }, mockSendResponse, mockRinfo);
 

@@ -19,13 +19,41 @@ import { sendSecureUDPMessage } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 
-export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string, linkPreview?: { [key: string]: any } | null): Promise<void> {
+type LinkPreviewPayload = Record<string, unknown>;
+
+type ChatContactRecord = {
+    upeerId: string;
+    publicKey?: string | null;
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
+    address?: string | null;
+    knownAddresses?: string | string[] | null;
+};
+
+type StoredMessageRecord = {
+    version?: number | null;
+    message?: string;
+};
+
+type GroupRecordLike = {
+    members: string[];
+};
+
+type DhtContactNode = {
+    upeerId?: string;
+    address: string;
+};
+
+type KademliaContactLookup = {
+    findClosestContacts(targetId: string, count: number): DhtContactNode[];
+};
+
+export async function sendChatUpdate(upeerId: string, msgId: string, newContent: string, linkPreview?: LinkPreviewPayload | null): Promise<void> {
     if (newContent.length > MAX_MESSAGE_SIZE_BYTES) {
         error(`Chat update size exceeds limit (${newContent.length} > ${MAX_MESSAGE_SIZE_BYTES})`, { upeerId, msgId }, 'security');
         return;
     }
 
-    const existing = await getMessageById(msgId);
+    const existing = await getMessageById(msgId) as StoredMessageRecord | undefined;
     const newVersion = (existing?.version ?? 0) + 1;
     const myId = getMyUPeerId();
     const isGroup = upeerId.startsWith('grp-');
@@ -45,7 +73,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     updateMessageContent(msgId, payload, signature.toString('hex'), newVersion);
 
     const broadcastUpdate = async (targetId: string, isGroupContext: boolean) => {
-        const contact = await getContactByUpeerId(targetId);
+        const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
         if (!contact || !contact.publicKey) return;
         const encrypted = encrypt(Buffer.from(payload, 'utf-8'), Buffer.from(contact.publicKey, 'hex'));
         const data = {
@@ -71,7 +99,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     };
 
     if (isGroup) {
-        const group = getGroupById(upeerId);
+        const group = getGroupById(upeerId) as GroupRecordLike | null;
         if (!group) return;
         for (const memberId of group.members) {
             if (memberId === myId) continue;
@@ -104,9 +132,9 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
 export async function sendChatDelete(upeerId: string, msgId: string): Promise<void> {
     const myId = getMyUPeerId();
     const isGroup = upeerId.startsWith('grp-');
-    const msg = await getMessageById(msgId) as any;
+    const msg = await getMessageById(msgId) as StoredMessageRecord | undefined;
     const { cleanupLocalAttachmentFile, extractLocalAttachmentInfo } = await import('../../utils/localAttachmentCleanup.js');
-    const attachment = msg?.message ? extractLocalAttachmentInfo(msg.message) : null;
+    const attachment = typeof msg?.message === 'string' ? extractLocalAttachmentInfo(msg.message) : null;
     if (attachment?.fileId) {
         const { fileTransferManager } = await import('../file-transfer/transfer-manager.js');
         fileTransferManager.cancelTransfer(attachment.fileId, 'message deleted');
@@ -125,8 +153,8 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
     const myPublicKey = getMyPublicKey().toString('hex');
 
     const broadcastDelete = async (targetId: string) => {
-        const contact = await getContactByUpeerId(targetId);
-        if (contact && contact.status === 'connected') {
+        const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
+        if (contact && contact.status === 'connected' && contact.publicKey) {
             for (const address of getFanOutAddresses(contact)) {
                 sendSecureUDPMessage(address, signedData, contact.publicKey);
             }
@@ -137,7 +165,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
     };
 
     if (isGroup) {
-        const group = getGroupById(upeerId);
+        const group = getGroupById(upeerId) as GroupRecordLike | null;
         if (group) {
             for (const memberId of group.members) {
                 if (memberId === myId) continue;
@@ -157,7 +185,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
     });
 
     const allContacts = await getContacts();
-    const trustedFriends = (allContacts as any[]).filter((contact: any) => contact.status === 'connected' && contact.upeerId !== myId && contact.upeerId !== upeerId);
+    const trustedFriends = (allContacts as ChatContactRecord[]).filter((contact) => contact.status === 'connected' && contact.upeerId !== myId && contact.upeerId !== upeerId);
     for (const friend of trustedFriends.slice(0, 3)) {
         import('../vault/manager.js').then(({ VaultManager }) => {
             VaultManager.replicateToVaults(friend.upeerId, signedData);
@@ -177,11 +205,11 @@ export async function sendChatClear(upeerId: string, customTimestamp?: number): 
 
     try {
         const { getKademliaInstance } = await import('../dht/handlers.js');
-        const kademlia = getKademliaInstance();
+        const kademlia = getKademliaInstance() as KademliaContactLookup | null;
         const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
         if (kademlia) {
             const selfNodes = kademlia.findClosestContacts(myId, 20)
-                .filter((node: any) => node.upeerId === myId && node.address !== myYggAddress);
+                .filter((node) => node.upeerId === myId && node.address !== myYggAddress);
             for (const node of selfNodes) {
                 sendSecureUDPMessage(node.address, data, myPublicKey);
             }
@@ -198,7 +226,7 @@ export async function sendChatClear(upeerId: string, customTimestamp?: number): 
     import('../vault/manager.js').then(({ VaultManager }) => {
         VaultManager.replicateToVaults(myId, vaultPacket);
         const allContacts = getContacts();
-        const trustedFriends = (allContacts as any[]).filter((contact: any) => contact && contact.upeerId !== myId);
+        const trustedFriends = (allContacts as ChatContactRecord[]).filter((contact) => contact && contact.upeerId !== myId);
         for (const friend of trustedFriends.slice(0, 3)) {
             VaultManager.replicateToVaults(friend.upeerId, vaultPacket);
         }

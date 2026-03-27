@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RoutingTable } from '../../../src/main_process/network/dht/kademlia/routing.js';
-import { toKademliaId } from '../../../src/main_process/network/dht/kademlia/types.js';
+import { toKademliaId, type KademliaContact } from '../../../src/main_process/network/dht/kademlia/types.js';
+
+function createContact(upeerId: string, address: string, publicKey: string, lastSeen = Date.now()): KademliaContact {
+    return {
+        upeerId,
+        nodeId: toKademliaId(upeerId),
+        address,
+        lastSeen,
+        publicKey,
+    };
+}
 
 describe('Kademlia RoutingTable Unit Tests', () => {
     const myUpeerId = '00000000000000000000000000000001';
@@ -18,14 +28,7 @@ describe('Kademlia RoutingTable Unit Tests', () => {
 
     it('should add a contact to the correct bucket', () => {
         const contactUpeerId = 'ffffffffffffffffffffffffffffffff';
-        const contactNodeId = toKademliaId(contactUpeerId);
-        const contact = {
-            upeerId: contactUpeerId,
-            nodeId: contactNodeId,
-            address: '2001:db8::1',
-            lastSeen: Date.now(),
-            publicKey: 'pk1'
-        } as any;
+        const contact = createContact(contactUpeerId, '2001:db8::1', 'pk1');
 
         const added = routingTable.addContact(contact);
         expect(added).toBe(true);
@@ -37,13 +40,13 @@ describe('Kademlia RoutingTable Unit Tests', () => {
     });
 
     it('should not add ourselves', () => {
-        const myself = {
+        const myself: KademliaContact = {
             upeerId: myUpeerId,
             nodeId: myNodeId,
             address: '2001:db8::1',
             lastSeen: Date.now(),
             publicKey: 'pk-me'
-        } as any;
+        };
 
         const added = routingTable.addContact(myself);
         expect(added).toBe(false);
@@ -52,13 +55,7 @@ describe('Kademlia RoutingTable Unit Tests', () => {
 
     it('should remove a contact correctly', () => {
         const contactUpeerId = 'ffffffffffffffffffffffffffffffff';
-        const contact = {
-            upeerId: contactUpeerId,
-            nodeId: toKademliaId(contactUpeerId),
-            address: '2001:db8::1',
-            lastSeen: Date.now(),
-            publicKey: 'pk1'
-        } as any;
+        const contact = createContact(contactUpeerId, '2001:db8::1', 'pk1');
 
         routingTable.addContact(contact);
         expect(routingTable.getContactCount()).toBe(1);
@@ -78,21 +75,9 @@ describe('Kademlia RoutingTable Unit Tests', () => {
         const closeId = '80000000000000000000000000000001';
         const farId = '10000000000000000000000000000000';
 
-        const contactClose = {
-            upeerId: closeId,
-            nodeId: toKademliaId(closeId),
-            address: '::1',
-            lastSeen: Date.now(),
-            publicKey: 'pk1'
-        } as any;
+        const contactClose = createContact(closeId, '::1', 'pk1');
 
-        const contactFar = {
-            upeerId: farId,
-            nodeId: toKademliaId(farId),
-            address: '::2',
-            lastSeen: Date.now(),
-            publicKey: 'pk2'
-        } as any;
+        const contactFar = createContact(farId, '::2', 'pk2');
 
         routingTable.addContact(contactFar);
         routingTable.addContact(contactClose);
@@ -104,18 +89,16 @@ describe('Kademlia RoutingTable Unit Tests', () => {
     });
 
     it('should identify stale buckets for refresh', () => {
-        // Since we can't easily advance time for KBucket internal private state without mocks
-        // we'll just verify the method exists and returns an array
         const stale = routingTable.refreshStaleBuckets();
         expect(Array.isArray(stale)).toBe(true);
     });
 
     it('should return all contacts', () => {
-        const c1 = { upeerId: 'aaaa', nodeId: toKademliaId('0'.repeat(31) + 'a'), address: '::1', lastSeen: 0 };
-        const c2 = { upeerId: 'bbbb', nodeId: toKademliaId('0'.repeat(31) + 'b'), address: '::2', lastSeen: 0 };
+        const c1 = createContact('aaaa', '::1', 'pk-a', 0);
+        const c2 = createContact('bbbb', '::2', 'pk-b', 0);
 
-        routingTable.addContact(c1 as any);
-        routingTable.addContact(c2 as any);
+        routingTable.addContact(c1);
+        routingTable.addContact(c2);
 
         const all = routingTable.getAllContacts();
         expect(all).toHaveLength(2);

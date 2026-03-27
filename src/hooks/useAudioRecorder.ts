@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al acceder al micrófono';
+
 export interface AudioRecorderState {
     isRecording: boolean;
     duration: number;
@@ -43,8 +45,8 @@ export const useAudioRecorder = () => {
             timerRef.current = setInterval(() => {
                 setState((prev) => ({ ...prev, duration: prev.duration + 1 }));
             }, 1000);
-        } catch (err: any) {
-            setState((prev) => ({ ...prev, error: err.message || 'Error al acceder al micrófono' }));
+        } catch (error: unknown) {
+            setState((prev) => ({ ...prev, error: getErrorMessage(error) }));
         }
     }, []);
 
