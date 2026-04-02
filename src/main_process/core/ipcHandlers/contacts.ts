@@ -3,6 +3,7 @@ import { getAllWindows } from '../windowManager.js';
 import {
   getContacts,
   getContactByAddress,
+  getContactByUpeerId,
   deleteContact,
   addOrUpdateContact,
   blockContact,
@@ -14,6 +15,7 @@ import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
 import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import { warn } from '../../security/secure-logger.js';
 import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
 
@@ -63,14 +65,46 @@ export function registerContactHandlers(): void {
       return { success: false, error: 'Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo nodos 200::/8 y prefijos 300::/8.' };
     }
 
+    const myUpeerId = getMyUPeerId();
+    if (myUpeerId && targetUpeerId === myUpeerId) {
+      return { success: false, error: 'No puedes guardarte a ti mismo como contacto.' };
+    }
+
+    const existingContact = await getContactByUpeerId(targetUpeerId);
+    if (existingContact?.status === 'blocked') {
+      return {
+        success: false,
+        error: 'Ese contacto está bloqueado. Desbloquéalo antes de volver a guardarlo.',
+        upeerId: targetUpeerId,
+      };
+    }
+
     // Limpieza de fantasmas: Borramos cualquier rastro previo de esta IP
-    const oldGhost = await getContactByAddress(targetIp);
-    if (oldGhost && oldGhost.upeerId.startsWith('pending-')) {
-      await deleteContact(oldGhost.upeerId);
+    const contactAtAddress = await getContactByAddress(targetIp);
+    if (contactAtAddress?.upeerId.startsWith('pending-')) {
+      await deleteContact(contactAtAddress.upeerId);
+    } else if (contactAtAddress && contactAtAddress.upeerId !== targetUpeerId) {
+      return {
+        success: false,
+        error: 'Esa dirección ya pertenece a otro contacto guardado.',
+        upeerId: contactAtAddress.upeerId,
+      };
     }
 
     // BUG DS fix: limitar longitud del nombre para evitar almacenamiento arbitrario
     const sanitizedName = typeof name === 'string' ? name.slice(0, 100) : '';
+
+    if (existingContact) {
+      addOrUpdateContact(
+        targetUpeerId,
+        targetIp,
+        existingContact.name || sanitizedName,
+        existingContact.publicKey,
+        existingContact.status,
+      );
+
+      return { success: true, upeerId: targetUpeerId, alreadyExists: true };
+    }
 
     // Create pending contact with the real ID from the start
     addOrUpdateContact(targetUpeerId, targetIp, sanitizedName, undefined, 'pending');

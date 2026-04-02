@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Avatar, Button } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import HowToRegIcon from '@mui/icons-material/HowToReg';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import BlockIcon from '@mui/icons-material/Block';
+import { QRCodeSVG } from 'qrcode.react';
+import { useChatStore } from '../../store/useChatStore.js';
 
 interface ContactCardProps {
     name: string;
@@ -25,10 +29,77 @@ const normalizeYggdrasilAddress = (addr: string): string => {
 export const ContactCard: React.FC<ContactCardProps> = ({ name, address, upeerId, isMe, avatar }) => {
     const normalizedAddress = normalizeYggdrasilAddress(address);
     const fullIdentity = `${upeerId}@${normalizedAddress}`;
+    const contacts = useChatStore((state) => state.contacts);
+    const myIdentity = useChatStore((state) => state.myIdentity);
+    const refreshContacts = useChatStore((state) => state.refreshContacts);
+    const setTargetUpeerId = useChatStore((state) => state.setTargetUpeerId);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [didSave, setDidSave] = useState(false);
+
+    const existingContact = useMemo(
+        () => contacts.find((contact) => contact.upeerId === upeerId && !contact.isConversationOnly),
+        [contacts, upeerId]
+    );
+    const isSelfContact = myIdentity?.upeerId === upeerId;
+    const existingStatus = existingContact?.status;
+    const isBlockedContact = existingStatus === 'blocked';
+    const isPendingContact = existingStatus === 'pending' || existingStatus === 'incoming';
+    const isSavedContact = !!existingContact && !isBlockedContact;
+    const isActionDisabled = isSaving || isSelfContact || isBlockedContact || isPendingContact || isSavedContact || didSave;
+
+    useEffect(() => {
+        setIsSaving(false);
+        setSaveError(null);
+        setDidSave(false);
+    }, [fullIdentity]);
+
+    const buttonLabel = (() => {
+        if (isSaving) return 'Guardando...';
+        if (isSelfContact) return 'Eres tú';
+        if (isBlockedContact) return 'Contacto bloqueado';
+        if (isPendingContact) return 'Solicitud pendiente';
+        if (isSavedContact || didSave) return 'Ya guardado';
+        return 'Guardar contacto';
+    })();
+
+    const buttonIcon = (() => {
+        if (isSelfContact || isSavedContact || didSave) return <HowToRegIcon />;
+        if (isBlockedContact) return <BlockIcon />;
+        if (isPendingContact) return <AccessTimeIcon />;
+        return <PersonAddIcon />;
+    })();
+
+    const handleSaveContact = async () => {
+        if (isActionDisabled) return;
+
+        setIsSaving(true);
+        setSaveError(null);
+
+        try {
+            const result = await window.upeer.addContact(fullIdentity, name);
+
+            if (!result.success) {
+                setSaveError(result.error ?? 'No se pudo guardar el contacto.');
+                return;
+            }
+
+            setDidSave(true);
+            await refreshContacts();
+
+            if (result.upeerId) {
+                setTargetUpeerId(result.upeerId);
+            }
+        } catch {
+            setSaveError('No se pudo guardar el contacto.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <Box sx={{ p: 1.25, borderRadius: 'md', bgcolor: isMe ? 'rgba(255,255,255,0.08)' : 'background.level1' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.25 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <Avatar size="lg" src={avatar} sx={{ fontWeight: 700, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'primary.100', color: isMe ? 'white' : 'primary.600', borderRadius: 'md' }}>
                     {(name?.[0] ?? '?').toUpperCase()}
                 </Avatar>
@@ -38,29 +109,45 @@ export const ContactCard: React.FC<ContactCardProps> = ({ name, address, upeerId
                 </Box>
             </Box>
             <Box sx={{ backgroundColor: isMe ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)', p: 1.25, borderRadius: 'md', mb: 1.25 }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, mb: 0.35, display: 'flex', alignItems: 'center', gap: 0.5, letterSpacing: '0.05em' }}>
-                    <ShieldIcon sx={{ fontSize: '13px' }} /> UPEER ID
+                <Typography level="body-xs" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', opacity: 0.9 }}>
+                    {fullIdentity}
                 </Typography>
-                <Typography level="body-xs" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', opacity: 0.9, mb: 1 }}>
-                    {upeerId}
-                </Typography>
-                <Typography level="body-xs" sx={{ fontWeight: 700, mb: 0.35, letterSpacing: '0.05em' }}>
-                    DIRECCIÓN
-                </Typography>
-                <Typography level="body-xs" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', opacity: 0.75 }}>
-                    {normalizedAddress}
-                </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.25 }}>
+                <Box sx={{ p: 2, borderRadius: 'md', backgroundColor: '#ffffff', display: 'inline-flex', boxShadow: 'sm' }}>
+                    <QRCodeSVG value={fullIdentity} size={180} level="M" includeMargin={false} />
+                </Box>
             </Box>
             <Button
                 size="sm"
-                variant="soft"
+                variant="outlined"
+                color="neutral"
                 fullWidth
-                startDecorator={<PersonAddIcon />}
-                onClick={() => window.upeer.addContact(fullIdentity, name)}
-                sx={{ borderRadius: 'xl', fontWeight: 600 }}
+                startDecorator={buttonIcon}
+                onClick={() => void handleSaveContact()}
+                disabled={isActionDisabled}
+                sx={{
+                    fontWeight: 600,
+                    borderColor: isMe ? 'rgba(255,255,255,0.28)' : 'divider',
+                    color: isMe ? 'white' : 'text.primary',
+                    '&:hover': {
+                        borderColor: isMe ? 'rgba(255,255,255,0.4)' : 'neutral.outlinedBorder',
+                        backgroundColor: isMe ? 'rgba(255,255,255,0.08)' : 'background.level2',
+                    },
+                    '&.Mui-disabled': {
+                        color: isMe ? 'rgba(255,255,255,0.6)' : 'text.tertiary',
+                        borderColor: isMe ? 'rgba(255,255,255,0.15)' : 'divider',
+                        backgroundColor: isMe ? 'rgba(255, 255, 255, 0.05)' : 'background.level1',
+                    }
+                }}
             >
-                Guardar contacto
+                {buttonLabel}
             </Button>
+            {saveError ? (
+                <Typography level="body-xs" color="danger" sx={{ mt: 0.75 }}>
+                    {saveError}
+                </Typography>
+            ) : null}
         </Box>
     );
 };

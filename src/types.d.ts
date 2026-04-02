@@ -27,7 +27,7 @@ declare global {
             searchMessages: (query: string) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
             getContacts: () => Promise<UpeerContact[]>;
-            addContact: (address: string, name: string) => Promise<{ success: boolean, upeerId: string }>;
+            addContact: (address: string, name: string) => Promise<{ success: boolean; upeerId?: string; error?: string; alreadyExists?: boolean }>;
             acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;
             deleteContact: (upeerId: string) => Promise<boolean>;
             blockContact: (upeerId: string) => Promise<boolean>;

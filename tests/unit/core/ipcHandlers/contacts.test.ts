@@ -5,7 +5,7 @@ import * as contactsOps from '../../../../src/main_process/storage/contacts/oper
 import * as contactsMessaging from '../../../../src/main_process/network/messaging/contacts.js';
 
 type AddContactPayload = { address: string; name: string };
-type AddContactResult = { success: boolean; upeerId?: string; error?: string };
+type AddContactResult = { success: boolean; upeerId?: string; error?: string; alreadyExists?: boolean };
 type AddContactHandler = (event: unknown, payload: AddContactPayload) => Promise<AddContactResult>;
 
 function getAddContactHandler(): AddContactHandler {
@@ -28,6 +28,7 @@ vi.mock('../../../../src/main_process/core/windowManager.js', () => ({
 vi.mock('../../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(async () => []),
     getContactByAddress: vi.fn(async () => null),
+    getContactByUpeerId: vi.fn(async () => null),
     deleteContact: vi.fn(async () => undefined),
     addOrUpdateContact: vi.fn(),
     blockContact: vi.fn(),
@@ -56,6 +57,10 @@ vi.mock('../../../../src/main_process/security/reputation/vouches.js', () => ({
 
 vi.mock('../../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
+}));
+
+vi.mock('../../../../src/main_process/security/identity.js', () => ({
+    getMyUPeerId: vi.fn(() => 'self-peer-id'),
 }));
 
 describe('Contacts IPC Handlers', () => {
@@ -115,5 +120,73 @@ describe('Contacts IPC Handlers', () => {
 
         expect(result.success).toBe(false);
         expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
+    });
+
+    it('rejects saving your own identity', async () => {
+        const handler = getAddContactHandler();
+
+        const result = await handler({}, { address: 'self-peer-id@300::1', name: 'Yo' });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/ti mismo/i);
+        expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
+        expect(contactsMessaging.sendContactRequest).not.toHaveBeenCalled();
+    });
+
+    it('returns stable success when the contact already exists without degrading it to pending', async () => {
+        const handler = getAddContactHandler();
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-123',
+            address: '300::old',
+            name: 'Alice local',
+            status: 'connected',
+            publicKey: 'pub',
+        });
+
+        const result = await handler({}, { address: 'peer-123@300::1', name: 'Alice remota' });
+
+        expect(result).toEqual({ success: true, upeerId: 'peer-123', alreadyExists: true });
+        expect(contactsOps.addOrUpdateContact).toHaveBeenCalledWith(
+            'peer-123',
+            '300::1',
+            'Alice local',
+            'pub',
+            'connected'
+        );
+        expect(contactsMessaging.sendContactRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects an address already owned by another saved contact', async () => {
+        const handler = getAddContactHandler();
+        vi.mocked(contactsOps.getContactByAddress).mockResolvedValue({
+            upeerId: 'peer-existing',
+            address: '300::1',
+            name: 'Bob',
+            status: 'connected',
+        });
+
+        const result = await handler({}, { address: 'peer-123@300::1', name: 'Alice' });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/otro contacto/i);
+        expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
+        expect(contactsMessaging.sendContactRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects re-saving a blocked contact', async () => {
+        const handler = getAddContactHandler();
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-123',
+            address: '300::1',
+            name: 'Alice',
+            status: 'blocked',
+        });
+
+        const result = await handler({}, { address: 'peer-123@300::1', name: 'Alice' });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/bloqueado/i);
+        expect(contactsOps.addOrUpdateContact).not.toHaveBeenCalled();
+        expect(contactsMessaging.sendContactRequest).not.toHaveBeenCalled();
     });
 });

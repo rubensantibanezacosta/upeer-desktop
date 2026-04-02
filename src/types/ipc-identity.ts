@@ -87,6 +87,7 @@ export interface AddContactResponse {
     success: boolean;
     upeerId?: string;
     error?: string;
+    alreadyExists?: boolean;
 }
 
 export interface AcceptContactRequestRequest {

@@ -132,7 +132,7 @@ describe('Reputation - Vouches Pure Logic', () => {
         const directContacts = new Set(['friend-1']);
         const vouches = toStoredVouches([
             { id: 'v1', fromId: 'friend-1', toId: 'target-id', type: 'ALIEN_ATTACK', positive: true, timestamp: 100, signature: 'sig', receivedAt: 100 },
-        ];
+        ]);
         const score = computeScorePure(vouches, directContacts);
         expect(score).toBe(51);
     });
