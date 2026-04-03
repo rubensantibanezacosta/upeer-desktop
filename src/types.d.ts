@@ -79,6 +79,7 @@ declare global {
             onContactRequest: (callback: (data: import('./types/chat.js').IncomingContactRequestEvent) => void) => UpeerUnsubscribe;
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => UpeerUnsubscribe;
+            onKeyChangeAlert: (callback: (data: import('./types/chat.js').KeyChangeAlert) => void) => UpeerUnsubscribe;
             onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => UpeerUnsubscribe;
             onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => UpeerUnsubscribe;
             onReputationUpdated: (callback: () => void) => UpeerUnsubscribe;

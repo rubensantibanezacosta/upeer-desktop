@@ -49,6 +49,7 @@ export const GroupItemActions: React.FC<GroupItemActionsProps> = ({
                 onClick={(event) => event.stopPropagation()}
                 slotProps={{
                     root: {
+                        'aria-label': `Abrir acciones del grupo ${groupId}`,
                         variant: 'plain',
                         color: 'neutral',
                         size: 'sm',

@@ -1,6 +1,6 @@
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
-import { decrypt, decryptWithIdentityKey } from '../../security/identity.js';
+import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
+import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
 
 export type GroupPayload = {
     groupName?: string;
@@ -15,6 +15,8 @@ export interface GroupControlPacket extends GroupPayload {
     payload?: string;
     nonce?: string;
     adminUpeerId?: string;
+    x3dhInit?: X3DHInitPacket;
+    ratchetHeader?: RatchetHeader;
     ephemeralPublicKey?: string;
     useRecipientEphemeral?: boolean;
     signature?: string;
@@ -41,30 +43,24 @@ export function updateGroupEphemeralKeyIfValid(upeerId: string, ephemeralPublicK
     return ephemeralPublicKey;
 }
 
-export async function decryptGroupControlPayload(upeerId: string, data: GroupControlPacket): Promise<GroupPayload | null> {
-    const contact = await getContactByUpeerId(upeerId);
-    const senderKey = typeof data.ephemeralPublicKey === 'string' && /^[0-9a-f]{64}$/i.test(data.ephemeralPublicKey)
-        ? data.ephemeralPublicKey
-        : contact?.publicKey;
-
-    if (!senderKey || typeof data.nonce !== 'string' || typeof data.payload !== 'string') return null;
-
-    const decrypted = decrypt(
-        Buffer.from(data.nonce, 'hex'),
-        Buffer.from(data.payload, 'hex'),
-        Buffer.from(senderKey, 'hex')
-    );
-
-    const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
-        ? decryptWithIdentityKey(
-            Buffer.from(data.nonce, 'hex'),
-            Buffer.from(data.payload, 'hex'),
-            Buffer.from(senderKey, 'hex')
-        )
-        : null;
-
-    const resolved = decrypted ?? staticDecrypted;
-    if (!resolved) return null;
-
-    return JSON.parse(resolved.toString('utf-8')) as GroupPayload;
+export async function decryptGroupControlPayload(
+    upeerId: string,
+    data: GroupControlPacket,
+    onReset?: () => void | Promise<void>,
+): Promise<GroupPayload | null> {
+    if (data.ratchetHeader) {
+        const doubleRatchetContent = await decryptDoubleRatchetPayload(upeerId, {
+            content: data.payload,
+            nonce: data.nonce,
+            ratchetHeader: data.ratchetHeader,
+            x3dhInit: data.x3dhInit,
+        }, onReset);
+        if (doubleRatchetContent) {
+            return JSON.parse(doubleRatchetContent) as GroupPayload;
+        }
+    }
+    if (typeof data.nonce === 'string' || typeof data.payload === 'string') {
+        await onReset?.();
+    }
+    return null;
 }

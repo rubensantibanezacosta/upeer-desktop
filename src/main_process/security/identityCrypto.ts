@@ -1,20 +1,5 @@
 import sodium from 'sodium-native';
-import { identityState, EPHEMERAL_KEY_MAX_MESSAGES, MAX_PREVIOUS_EPH_KEYS } from './identityState.js';
-
-function rotateEphemeralKey(): void {
-    if (identityState.ephemeralPublicKey && identityState.ephemeralSecretKey) {
-        identityState.previousEphemeralSecretKeys.unshift(identityState.ephemeralSecretKey);
-        if (identityState.previousEphemeralSecretKeys.length > MAX_PREVIOUS_EPH_KEYS) {
-            identityState.previousEphemeralSecretKeys.pop();
-        }
-    }
-    const publicKey = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
-    const secretKey = Buffer.alloc(sodium.crypto_box_SECRETKEYBYTES);
-    sodium.crypto_box_keypair(publicKey, secretKey);
-    identityState.ephemeralPublicKey = publicKey;
-    identityState.ephemeralSecretKey = secretKey;
-    identityState.ephemeralKeyRotationCounter = 0;
-}
+import { identityState } from './identityState.js';
 
 export function getUPeerIdFromPublicKey(publicKey: Buffer): string {
     const hash = Buffer.alloc(sodium.crypto_generichash_BYTES);
@@ -39,8 +24,6 @@ export function encrypt(message: Buffer, recipientPublicKey: Buffer): { nonce: s
     sodium.randombytes_buf(nonce);
     const ciphertext = Buffer.alloc(message.length + sodium.crypto_box_MACBYTES);
     sodium.crypto_box_easy(ciphertext, message, nonce, recipientPublicKey, identityState.ephemeralSecretKey);
-    identityState.ephemeralKeyRotationCounter++;
-    if (identityState.ephemeralKeyRotationCounter >= EPHEMERAL_KEY_MAX_MESSAGES) rotateEphemeralKey();
     return {
         nonce: nonce.toString('hex'),
         ciphertext: ciphertext.toString('hex'),

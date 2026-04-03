@@ -118,6 +118,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                             Nombre del Grupo
                         </Typography>
                         <Input
+                            aria-label="Nombre del grupo"
                             autoFocus
                             placeholder="Ej: Equipo de Desarrollo, Amigos..."
                             value={groupName}
@@ -152,6 +153,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                     {/* Contact search and list */}
                     <Stack spacing={1.5} sx={{ minHeight: 0, flexGrow: 1 }}>
                         <Input
+                            aria-label="Buscar en tus contactos"
                             placeholder="Buscar en tus contactos..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
@@ -184,6 +186,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                                         const isChecked = selectedIds.includes(c.upeerId);
                                         return (
                                             <ListItem
+                                                aria-label={`Seleccionar contacto ${c.name}`}
                                                 key={c.upeerId}
                                                 onClick={() => toggleMember(c.upeerId)}
                                                 sx={{

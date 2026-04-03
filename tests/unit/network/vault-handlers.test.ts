@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleVaultDelivery } from '../../../src/main_process/network/handlers/vault.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
+import * as vouches from '../../../src/main_process/security/reputation/vouches.js';
 import { fileTransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as validation from '../../../src/main_process/security/validation.js';
@@ -126,6 +127,7 @@ describe('Vault Delivery Handler', () => {
         expect(validation.validateMessage).toHaveBeenCalled();
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
+        expect(vouches.issueVouch).not.toHaveBeenCalledWith(custodianSid, 'VAULT_RETRIEVED');
     });
 
     it('should process valid CHAT entries from vault', async () => {
@@ -152,6 +154,7 @@ describe('Vault Delivery Handler', () => {
             '1.2.3.4',
             mockSendResponse
         );
+        expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'VAULT_RETRIEVED');
     });
 
     it('should process own vaulted CHAT entries using local identity and internal sync', async () => {

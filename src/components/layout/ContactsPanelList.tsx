@@ -88,6 +88,7 @@ export const ContactsPanelList: React.FC<ContactsPanelListProps> = ({
                 return (
                     <ListItem key={contact.upeerId} sx={{ p: 0, mb: 0.5 }}>
                         <ListItemButton
+                            aria-label={`Abrir ficha de ${contact.name}`}
                             selected={activeContact?.upeerId === contact.upeerId}
                             onClick={() => onSelectContact(contact.upeerId)}
                             sx={{

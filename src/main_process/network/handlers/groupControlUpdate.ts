@@ -1,5 +1,7 @@
 import { BrowserWindow } from 'electron';
-import { getGroupById, updateGroupCrypto, updateGroupInfo, updateGroupMembers } from '../../storage/groups/operations.js';
+import { deleteGroup, getGroupById, updateGroupCrypto, updateGroupInfo, updateGroupMembers } from '../../storage/groups/operations.js';
+import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
+import { getMySignedPreKeyBundle, getMyUPeerId } from '../../security/identity.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
 import {
@@ -13,10 +15,13 @@ import {
 export async function handleGroupUpdate(
     senderUpeerId: string,
     data: GroupControlPacket,
-    win: BrowserWindow | null
+    win: BrowserWindow | null,
+    fromAddress?: string,
+    sendResponse?: (ip: string, data: Record<string, unknown>) => void,
 ): Promise<void> {
     const { groupId, adminUpeerId } = data;
     if (!groupId || !data.payload || !data.nonce) return;
+    const myId = getMyUPeerId();
 
     updateGroupEphemeralKeyIfValid(senderUpeerId, data.ephemeralPublicKey);
 
@@ -35,7 +40,10 @@ export async function handleGroupUpdate(
     let senderKey: string | undefined;
 
     try {
-        const inner = await decryptGroupControlPayload(senderUpeerId, data);
+        const inner = await decryptGroupControlPayload(senderUpeerId, data, async () => {
+            if (!fromAddress || !sendResponse) return;
+            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        });
         if (!inner) {
             security('GROUP_UPDATE: decryption failed', { senderUpeerId, groupId }, 'security');
             return;
@@ -82,6 +90,13 @@ export async function handleGroupUpdate(
     const sameMemberSet = !members || sameMembers(members, group.members);
     const sameEpochState = epoch === undefined || (epoch === group.epoch && senderKey === group.senderKey);
     if (sameName && sameAvatar && sameMemberSet && sameEpochState) {
+        return;
+    }
+
+    if (members && !members.includes(myId)) {
+        deleteMessagesByChatId(groupId);
+        deleteGroup(groupId);
+        win?.webContents.send('group-updated', { groupId, members: [] });
         return;
     }
 

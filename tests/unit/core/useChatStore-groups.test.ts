@@ -7,6 +7,7 @@ type MockUpeer = {
     inviteToGroup: ReturnType<typeof vi.fn>;
     leaveGroup: ReturnType<typeof vi.fn>;
     clearChat: ReturnType<typeof vi.fn>;
+    getContacts: ReturnType<typeof vi.fn>;
     getGroups: ReturnType<typeof vi.fn>;
     sendChatUpdate?: ReturnType<typeof vi.fn>;
 };
@@ -49,6 +50,7 @@ describe('useChatStore groups integration', () => {
             inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
             leaveGroup: vi.fn().mockResolvedValue({ success: true }),
             clearChat: vi.fn().mockResolvedValue({ success: true }),
+            getContacts: vi.fn().mockResolvedValue([]),
             getGroups: vi.fn().mockResolvedValue([]),
         };
     });

@@ -17,6 +17,7 @@ import {
     updateContactLocation,
 } from '../storage/contacts/location.js';
 import {
+    updateContactStatus,
     updateLastSeen
 } from '../storage/contacts/status.js';
 
@@ -230,6 +231,9 @@ export async function handlePacket(
         }
 
         const nowIso = new Date().toISOString();
+        if (contact.status === 'offline') {
+            updateContactStatus(upeerId, 'connected');
+        }
         updateLastSeen(upeerId);
         win?.webContents.send('contact-presence', {
             upeerId,

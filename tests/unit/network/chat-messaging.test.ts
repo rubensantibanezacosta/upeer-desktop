@@ -36,6 +36,11 @@ vi.mock('../../../src/main_process/storage/messages/status.js', () => ({
     getMessageStatus: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
+    getRatchetSession: vi.fn(() => null),
+    saveRatchetSession: vi.fn(),
+}));
+
 vi.mock('../../../src/main_process/storage/messages/reactions.js', () => ({
     saveReaction: vi.fn(),
     deleteReaction: vi.fn(),
@@ -49,7 +54,21 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyEphemeralPublicKeyHex: vi.fn(() => '22'.repeat(32)),
     incrementEphemeralMessageCounter: vi.fn(),
     getMyIdentitySkBuffer: vi.fn(() => Buffer.alloc(32)),
+    getMySignedPreKey: vi.fn(() => ({ spkPub: '55'.repeat(32), spkSig: '66'.repeat(64), spkId: 13 })),
     getMyPublicKey: vi.fn(() => Buffer.from('11'.repeat(32), 'hex')),
+}));
+
+vi.mock('../../../src/main_process/security/ratchet.js', () => ({
+    x3dhInitiator: vi.fn(() => ({
+        ekPub: Buffer.from('33'.repeat(32), 'hex'),
+        sharedSecret: Buffer.alloc(32, 7),
+    })),
+    ratchetInitAlice: vi.fn(() => ({ rk: Buffer.alloc(32) })),
+    ratchetEncrypt: vi.fn(() => ({
+        header: { dh: '44'.repeat(32), pn: 0, n: 0 },
+        ciphertext: 'ratchet-cipher',
+        nonce: 'ratchet-nonce',
+    })),
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -105,9 +124,13 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
 }));
 
 describe('network/messaging/chat.ts', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
         vi.useRealTimers();
+        const { resetPendingDirectMessages } = await import('../../../src/main_process/network/messaging/chatRetry.js');
+        resetPendingDirectMessages();
+        const { resetEncryptedOperationRetries } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        resetEncryptedOperationRetries();
     });
 
     it('vaults immediately when contact is known but disconnected', async () => {
@@ -121,6 +144,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-offline',
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
             address: '200::2',
         } as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
@@ -145,11 +170,15 @@ describe('network/messaging/chat.ts', () => {
             'peer-offline',
             expect.objectContaining({
                 type: 'CHAT',
-                content: 'ciphertext',
-                nonce: 'nonce',
+                content: 'ratchet-cipher',
+                nonce: 'ratchet-nonce',
                 timestamp: expect.any(Number),
-                ephemeralPublicKey: '22'.repeat(32),
-                useRecipientEphemeral: false,
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 7,
+                    ikPub: '11'.repeat(32),
+                },
                 replyTo: 'reply-1',
                 senderUpeerId: 'self-id',
                 signature: Buffer.from('sig').toString('hex')
@@ -157,6 +186,52 @@ describe('network/messaging/chat.ts', () => {
         );
         expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(expect.any(String), 'vaulted');
         expect(startDhtSearch).toHaveBeenCalledWith('peer-offline', expect.any(Function));
+    });
+
+    it('uses Double Ratchet for new offline vaulted messages when the contact already has signedPreKey', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-offline-dr',
+            status: 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 42,
+            address: '200::22',
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+
+        await sendUDPMessage('peer-offline-dr', 'hola offline dr');
+
+        expect(ratchet.x3dhInitiator).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(saveRatchetSession).toHaveBeenCalled();
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline-dr',
+            expect.objectContaining({
+                type: 'CHAT',
+                content: 'ratchet-cipher',
+                nonce: 'ratchet-nonce',
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 42,
+                    ikPub: '11'.repeat(32),
+                },
+                senderUpeerId: 'self-id',
+            })
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline-dr',
+            expect.not.objectContaining({ ephemeralPublicKey: expect.anything() })
+        );
     });
 
     it('uses the serialized preview payload for offline vault delivery', async () => {
@@ -169,6 +244,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-offline',
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 8,
             address: '200::2',
         } as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
@@ -199,9 +276,71 @@ describe('network/messaging/chat.ts', () => {
             'peer-offline',
             expect.objectContaining({
                 type: 'CHAT',
-                content: 'ciphertext',
-                nonce: 'nonce',
+                content: 'ratchet-cipher',
+                nonce: 'ratchet-nonce',
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 8,
+                    ikPub: '11'.repeat(32),
+                },
                 replyTo: 'reply-1',
+                senderUpeerId: 'self-id',
+            })
+        );
+    });
+
+    it('sends contact cards through the normal chat pipeline so offline peers get vault delivery too', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendContactCard } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-contact-card',
+            status: 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            address: '200::77',
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+
+        const msgId = await sendContactCard('peer-contact-card', {
+            name: 'Alice',
+            address: '300::1',
+            upeerId: 'peer-alice',
+            publicKey: 'cc'.repeat(32),
+        });
+
+        expect(msgId).toEqual(expect.any(String));
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            expect.any(String),
+            'peer-contact-card',
+            true,
+            JSON.stringify({
+                type: 'contact_card',
+                text: '',
+                contact: {
+                    name: 'Alice',
+                    address: '300::1',
+                    upeerId: 'peer-alice',
+                    publicKey: 'cc'.repeat(32),
+                    avatar: undefined,
+                },
+            }),
+            undefined,
+            '',
+            'sent',
+            'self-id',
+            expect.any(Number)
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-contact-card',
+            expect.objectContaining({
+                type: 'CHAT',
                 senderUpeerId: 'self-id',
             })
         );
@@ -217,6 +356,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-offline',
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 9,
             address: '200::2',
         } as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
@@ -229,11 +370,9 @@ describe('network/messaging/chat.ts', () => {
         expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
     });
 
-    it('encrypts legacy chat fallback to the recipient identity key even when ephemeral is available', async () => {
+    it('fails fast when a connected contact lacks Double Ratchet bootstrap material', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
 
         vi.mocked(getContactByUpeerId).mockResolvedValue({
@@ -246,21 +385,47 @@ describe('network/messaging/chat.ts', () => {
             knownAddresses: '[]'
         } as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
-        await sendUDPMessage('peer-online', 'hola legacy');
+        await expect(sendUDPMessage('peer-online', 'hola legacy')).rejects.toThrow('missing-signed-prekey');
+    });
 
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from('hola legacy', 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+    it('retries pending connected direct messages after DR_RESET with the same id', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { registerPendingDirectMessage, retryPendingDirectMessages } = await import('../../../src/main_process/network/messaging/chatRetry.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 10,
+            address: '200::9',
+            knownAddresses: JSON.stringify(['200::10'])
+        } as ContactRecord);
+
+        registerPendingDirectMessage({
+            messageId: '12345678-1234-1234-1234-123456789012',
+            upeerId: 'peer-online',
+            payload: 'hola retry',
+            knownAddresses: ['200::10'],
+            timestamp: Date.now(),
+        });
+
+        const retried = await retryPendingDirectMessages('peer-online');
+
+        expect(retried).toBe(1);
+        expect(sendSecureUDPMessage).toHaveBeenNthCalledWith(
+            1,
             '200::9',
-            expect.objectContaining({
-                type: 'CHAT',
-                useRecipientEphemeral: false,
-                ephemeralPublicKey: '22'.repeat(32),
-            }),
+            expect.objectContaining({ id: '12345678-1234-1234-1234-123456789012', type: 'CHAT' }),
+            'aa'.repeat(32),
+            false
+        );
+        expect(sendSecureUDPMessage).toHaveBeenNthCalledWith(
+            2,
+            '200::10',
+            expect.objectContaining({ id: '12345678-1234-1234-1234-123456789012', type: 'CHAT' }),
             'aa'.repeat(32),
             false
         );
@@ -276,11 +441,12 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 11,
             address: '200::9',
             knownAddresses: '[]'
         } as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         const preview = {
             url: 'https://example.com',
@@ -322,43 +488,38 @@ describe('network/messaging/chat.ts', () => {
     it('uses recipient identity key for chat updates even when ephemeral is available', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
 
         vi.mocked(getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
-            ephemeralPublicKey: 'bb'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
             address: '200::9',
         } as ContactRecord);
         vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
 
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
-
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
 
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from('mensaje editado', 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
+        expect(ratchet.x3dhInitiator).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(saveRatchetSession).toHaveBeenCalled();
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::9',
             expect.objectContaining({
                 type: 'CHAT_UPDATE',
-                useRecipientEphemeral: false,
-                ephemeralPublicKey: '22'.repeat(32),
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 7,
+                    ikPub: '11'.repeat(32),
+                },
             }),
             'aa'.repeat(32)
-        );
-        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
-            'peer-online',
-            expect.objectContaining({
-                type: 'CHAT_UPDATE',
-                useRecipientEphemeral: false,
-            })
         );
         expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(
             '12345678-1234-1234-1234-123456789012',
@@ -368,10 +529,83 @@ describe('network/messaging/chat.ts', () => {
         );
     });
 
-    it('serializes a provided link preview in chat updates', async () => {
+    it('retries pending encrypted chat updates after DR_RESET', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { retryPendingEncryptedOperations } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            address: '200::9',
+        } as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+
+        await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
+
+        vi.mocked(sendSecureUDPMessage).mockClear();
+
+        const retried = await retryPendingEncryptedOperations('peer-online');
+
+        expect(retried).toBe(1);
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::9',
+            expect.objectContaining({
+                type: 'CHAT_UPDATE',
+                msgId: '12345678-1234-1234-1234-123456789012',
+            }),
+            'aa'.repeat(32)
+        );
+    });
+
+    it('vaults self-synced chat updates encrypted for own vaults', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            address: '200::9',
+        } as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+
+        await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'edit vault self');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(ratchet.x3dhInitiator).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(saveRatchetSession).toHaveBeenCalled();
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'self-id',
+            expect.objectContaining({
+                type: 'CHAT_UPDATE',
+                senderUpeerId: 'self-id',
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 13,
+                    ikPub: '11'.repeat(32),
+                },
+                signature: Buffer.from('sig').toString('hex')
+            })
+        );
+    });
+
+    it('serializes a provided link preview in DR chat updates', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const { fetchOgPreview } = await import('../../../src/main_process/network/og-fetcher.js');
         const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
 
@@ -379,12 +613,12 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
-            ephemeralPublicKey: 'bb'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 12,
             address: '200::9',
             knownAddresses: '[]'
         } as ContactRecord);
         vi.mocked(messagesOps.getMessageById).mockResolvedValue({ version: 0 } as NonNullable<MessageRecord>);
-        vi.mocked(identity.encrypt).mockReturnValue({ ciphertext: 'ciphertext', nonce: 'nonce' } as EncryptResult);
 
         const preview = { url: 'https://example.com', title: 'Example' };
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'hola https://example.com', preview);
@@ -396,10 +630,8 @@ describe('network/messaging/chat.ts', () => {
             Buffer.from('sig').toString('hex'),
             1
         );
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from(JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }), 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
     });
 
     it('serializes a provided link preview without refetching it', async () => {
@@ -412,6 +644,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 14,
             address: '200::9',
             knownAddresses: '[]'
         } as ContactRecord);
@@ -450,6 +684,8 @@ describe('network/messaging/chat.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
 
@@ -457,6 +693,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 15,
             address: '200::10',
             knownAddresses: '[]'
         } as ContactRecord);
@@ -470,13 +708,20 @@ describe('network/messaging/chat.ts', () => {
 
         await sendUDPMessage('peer-online', 'hola sync');
 
+        expect(ratchet.x3dhInitiator).toHaveBeenCalledTimes(3);
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalledTimes(3);
+        expect(saveRatchetSession).toHaveBeenCalledTimes(3);
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'CHAT',
                 replyTo: undefined,
-                useRecipientEphemeral: false,
-                ephemeralPublicKey: '22'.repeat(32)
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 15,
+                    ikPub: '11'.repeat(32),
+                }
             }),
             'aa'.repeat(32),
             false
@@ -486,12 +731,43 @@ describe('network/messaging/chat.ts', () => {
             expect.objectContaining({
                 type: 'CHAT',
                 replyTo: undefined,
-                useRecipientEphemeral: false,
-                ephemeralPublicKey: '22'.repeat(32)
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 13,
+                    ikPub: '11'.repeat(32),
+                }
             }),
             '11'.repeat(32),
             true
         );
+    });
+
+    it('does not silently downgrade to legacy when Double Ratchet fails after a session exists', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 21,
+            address: '200::10',
+            knownAddresses: '[]'
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(ratchetOps.getRatchetSession).mockReturnValueOnce({ state: { rk: Buffer.alloc(32) }, spkIdUsed: 21 } as never);
+        vi.mocked(ratchet.ratchetEncrypt).mockImplementationOnce(() => {
+            throw new Error('ratchet-corruption');
+        });
+
+        await expect(sendUDPMessage('peer-online', 'no downgrade')).rejects.toThrow('ratchet-corruption');
+        expect(identity.encrypt).not.toHaveBeenCalled();
     });
 
     it('vaults a normal chat message for self-sync when no other own device is reachable', async () => {
@@ -499,12 +775,16 @@ describe('network/messaging/chat.ts', () => {
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
 
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 16,
             address: '200::10',
             knownAddresses: '[]'
         } as ContactRecord);
@@ -516,12 +796,20 @@ describe('network/messaging/chat.ts', () => {
         await sendUDPMessage('peer-online', 'hola vault sync');
         await new Promise((resolve) => setTimeout(resolve, 0));
 
+        expect(ratchet.x3dhInitiator).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(saveRatchetSession).toHaveBeenCalled();
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'self-id',
             expect.objectContaining({
                 type: 'CHAT',
                 senderUpeerId: 'self-id',
-                useRecipientEphemeral: false,
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 13,
+                    ikPub: '11'.repeat(32),
+                },
                 signature: Buffer.from('sig').toString('hex')
             })
         );
@@ -540,6 +828,8 @@ describe('network/messaging/chat.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 17,
             address: '200::9',
             knownAddresses: '[]'
         } as ContactRecord);

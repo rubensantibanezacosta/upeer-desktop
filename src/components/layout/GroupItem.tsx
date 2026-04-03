@@ -30,6 +30,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
     return (
         <ListItem sx={{ p: 0 }}>
             <ListItemButton
+                aria-label={`Abrir grupo ${group.name}`}
                 selected={isSelected}
                 onClick={() => onSelect(group.groupId)}
                 sx={{

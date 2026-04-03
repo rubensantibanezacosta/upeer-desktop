@@ -1,8 +1,7 @@
 import crypto from 'node:crypto';
 import {
-    encrypt,
-    getMyEphemeralPublicKeyHex,
     getMyPublicKeyHex,
+    getMySignedPreKey,
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
@@ -10,6 +9,7 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
+import { encryptChatPayload } from './chatEncryption.js';
 
 export interface GroupDeliveryContact {
     upeerId: string;
@@ -17,6 +17,8 @@ export interface GroupDeliveryContact {
     status: string;
     address?: string;
     knownAddresses?: string;
+    signedPreKey?: string | null;
+    signedPreKeyId?: number | null;
 }
 
 export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, packet: Record<string, unknown>): Promise<void> => {
@@ -55,8 +57,15 @@ export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId
 
 export const resolveGroupContact = async (targetUpeerId: string) => {
     const myId = getMyUPeerId();
+    const mySignedPreKey = getMySignedPreKey();
     return await getContactByUpeerId(targetUpeerId) || (targetUpeerId === myId
-        ? { upeerId: myId, publicKey: getMyPublicKeyHex(), status: 'disconnected' }
+        ? {
+            upeerId: myId,
+            publicKey: getMyPublicKeyHex(),
+            status: 'disconnected',
+            signedPreKey: mySignedPreKey.spkPub,
+            signedPreKeyId: mySignedPreKey.spkId,
+        }
         : null);
 };
 
@@ -65,22 +74,21 @@ export const buildEncryptedGroupPacket = async (
     groupId: string,
     adminUpeerId: string,
     sensitivePayload: string,
-    targetKeyHex: string,
+    targetUpeerId: string,
+    contact: GroupDeliveryContact,
 ) => {
-    const ephPubKey = getMyEphemeralPublicKeyHex();
-    const { ciphertext, nonce } = encrypt(
-        Buffer.from(sensitivePayload, 'utf-8'),
-        Buffer.from(targetKeyHex, 'hex')
-    );
+    const encrypted = await encryptChatPayload(targetUpeerId, sensitivePayload, contact);
 
     return {
         type,
         groupId,
         adminUpeerId,
-        payload: ciphertext,
-        nonce,
-        ephemeralPublicKey: ephPubKey,
-        useRecipientEphemeral: false,
+        payload: encrypted.content,
+        nonce: encrypted.nonce,
+        ...(encrypted.ratchetHeader ? { ratchetHeader: encrypted.ratchetHeader } : {}),
+        ...(encrypted.x3dhInit ? { x3dhInit: encrypted.x3dhInit } : {}),
+        ...(encrypted.ephemeralPublicKey ? { ephemeralPublicKey: encrypted.ephemeralPublicKey } : {}),
+        ...(encrypted.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encrypted.useRecipientEphemeral } : {}),
     };
 };
 
@@ -92,6 +100,7 @@ export const deliverGroupPacket = async ({
     vaultSeed,
     warnMessage,
     skipDirectSend,
+    skipVault,
     warnContext,
 }: {
     targetUpeerId: string;
@@ -101,13 +110,16 @@ export const deliverGroupPacket = async ({
     vaultSeed: string;
     warnMessage: string;
     skipDirectSend?: boolean;
+    skipVault?: boolean;
     warnContext: Record<string, unknown>;
 }) => {
     if (!skipDirectSend && contact.status === 'connected') {
         await sendPacketToKnownAddresses(contact, packet);
     }
 
-    await vaultPacket(targetUpeerId, signedPacket, vaultSeed);
+    if (!skipVault) {
+        await vaultPacket(targetUpeerId, signedPacket, vaultSeed);
+    }
 
     if (!skipDirectSend && contact.status !== 'connected') {
         warn(warnMessage, warnContext, 'vault');

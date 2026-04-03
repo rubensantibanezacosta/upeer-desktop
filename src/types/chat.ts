@@ -66,6 +66,13 @@ export interface UntrustworthyInfo {
     [key: string]: unknown;
 }
 
+export interface KeyChangeAlert {
+    upeerId: string;
+    oldFingerprint: string;
+    newFingerprint: string;
+    alias?: string;
+}
+
 export interface IncomingRequest {
     publicKey: string;
     avatar?: string;

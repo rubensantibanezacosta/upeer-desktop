@@ -40,6 +40,14 @@ export class VaultManager {
     private static MAX_REPLICATION_FACTOR = 12;
     private static MIN_REPLICATION_FACTOR = 3;
 
+    private static async sendVaultQuery(address: string, packet: VaultReplicatedPacket, source: string): Promise<void> {
+        try {
+            await sendSecureUDPMessage(address, packet);
+        } catch (err) {
+            warn(`Failed to send VAULT_QUERY to ${source}`, err, 'vault');
+        }
+    }
+
     private static async getDynamicReplicationFactor(recipientSid: string): Promise<number> {
         try {
             const score = await getVouchScore(recipientSid);
@@ -184,7 +192,8 @@ export class VaultManager {
         if (kademlia) {
             const ptrKey = createVaultPointerKey(myId);
 
-            kademlia.findValue(ptrKey).then(async (ptrResult) => {
+            try {
+                const ptrResult = await kademlia.findValue(ptrKey);
                 if (ptrResult && ptrResult.value && Array.isArray(ptrResult.value.custodians)) {
                     const selfCustodians = ptrResult.value.custodians;
 
@@ -193,18 +202,20 @@ export class VaultManager {
                         try {
                             const addr = await kademlia.findLocationBlock(custodianId);
                             if (addr && addr.address) {
-                                sendSecureUDPMessage(addr.address, queryPacket);
+                                await this.sendVaultQuery(addr.address, queryPacket, `custodian ${custodianId}`);
                             }
                         } catch (err) {
                             debug('Could not find self-custodian location', { custodianId }, 'vault');
                         }
                     }
                 }
-            }).catch(err => warn('Failed to find self-vault pointers in DHT', err, 'vault'));
+            } catch (err) {
+                warn('Failed to find self-vault pointers in DHT', err, 'vault');
+            }
         }
 
         for (const friend of onlineFriends) {
-            sendSecureUDPMessage(friend.address, queryPacket);
+            await this.sendVaultQuery(friend.address, queryPacket, `online friend ${friend.upeerId ?? friend.address}`);
         }
     }
 }

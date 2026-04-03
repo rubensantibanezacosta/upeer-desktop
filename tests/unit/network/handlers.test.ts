@@ -268,6 +268,26 @@ describe('network/handlers.ts - handlePacket', () => {
         expect(contactStatus.updateLastSeen).toHaveBeenCalledWith('peer1');
     });
 
+    it('should promote an offline contact back to connected when a verified packet arrives', async () => {
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            publicKey: '00'.repeat(32),
+            status: 'offline'
+        } as NonNullable<KnownContact>);
+
+        const packet = {
+            type: 'PING',
+            senderUpeerId: 'peer1',
+            signature: '00'.repeat(64)
+        };
+        const msg = Buffer.from(JSON.stringify(packet));
+
+        await handlePacket(msg, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(contactStatus.updateContactStatus).toHaveBeenCalledWith('peer1', 'connected');
+        expect(contactStatus.updateLastSeen).toHaveBeenCalledWith('peer1');
+    });
+
     it('should handle DHT_ packet and delegate to handleDhtPacket', async () => {
         vi.mocked(identity.verify).mockReturnValue(true);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);

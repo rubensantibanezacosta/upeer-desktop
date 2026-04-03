@@ -45,6 +45,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             <Tooltip title="Chats" placement="right">
                 <Box>
                     <IconButton
+                        aria-label="Chats"
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
                         onClick={onOpenChats}
@@ -57,6 +58,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             <Tooltip title="Contactos" placement="right">
                 <Box>
                     <IconButton
+                        aria-label="Contactos"
                         variant={activeView === 'contacts' ? 'soft' : 'plain'}
                         color={activeView === 'contacts' ? 'primary' : 'neutral'}
                         onClick={onOpenContacts}
@@ -81,6 +83,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Tooltip title="Ajustes" placement="right">
                 <IconButton
+                    aria-label="Ajustes"
                     variant={activeView === 'settings' ? 'soft' : 'plain'}
                     color={activeView === 'settings' ? 'primary' : 'neutral'}
                     onClick={onOpenSettings}
@@ -91,6 +94,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             </Tooltip>
             <Tooltip title="Mi perfil" placement="right">
                 <Avatar
+                    aria-label="Mi perfil"
                     size="sm"
                     src={myAvatar || undefined}
                     onClick={onOpenIdentity}

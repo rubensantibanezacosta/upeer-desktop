@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import {
     getMyPublicKey,
     getMyUPeerId,
@@ -8,13 +7,13 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getGroupById } from '../../storage/groups/operations.js';
 import {
     getMessageById,
-    saveMessage,
     updateMessageStatus,
 } from '../../storage/messages/operations.js';
 import { deleteReaction, saveReaction } from '../../storage/messages/reactions.js';
 import { error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendUDPMessage } from './chatSend.js';
 import { emitMessageStatusUpdated, getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 
 type ChatContactRecord = {
@@ -84,10 +83,6 @@ export async function sendReadReceipt(upeerId: string, id: string): Promise<void
 }
 
 export async function sendContactCard(targetUpeerId: string, contact: ContactCardPayload): Promise<string | undefined> {
-    const targetContact = await getContactByUpeerId(targetUpeerId) as ChatContactRecord | undefined;
-    if (!targetContact || targetContact.status !== 'connected' || !targetContact.publicKey) return undefined;
-
-    const msgId = crypto.randomUUID();
     const serializedMessage = JSON.stringify({
         type: 'contact_card',
         text: '',
@@ -99,22 +94,8 @@ export async function sendContactCard(targetUpeerId: string, contact: ContactCar
             avatar: contact.avatar || undefined,
         },
     });
-    const data = {
-        type: 'CHAT_CONTACT',
-        id: msgId,
-        contactName: contact.name,
-        contactAddress: contact.address,
-        upeerId: contact.upeerId,
-        contactPublicKey: contact.publicKey,
-        contactAvatar: contact.avatar,
-    };
-    const signature = sign(Buffer.from(canonicalStringify(data)));
-    await saveMessage(msgId, targetUpeerId, true, serializedMessage, undefined, signature.toString('hex'));
-
-    for (const address of getFanOutAddresses(targetContact)) {
-        sendSecureUDPMessage(address, data, targetContact.publicKey);
-    }
-    return msgId;
+    const result = await sendUDPMessage(targetUpeerId, serializedMessage);
+    return result?.id;
 }
 
 export async function sendChatReaction(upeerId: string, msgId: string, emoji: string, remove: boolean): Promise<void> {

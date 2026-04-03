@@ -24,6 +24,7 @@ export const ContactMediaStrip: React.FC<ContactMediaStripProps> = ({ items, onO
     return (
         <Box sx={{ borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>
             <ListItemButton
+                aria-label="Abrir multimedia compartida"
                 sx={{ px: 2, py: 1.25, borderRadius: 0 }}
                 onClick={onViewAll}
             >

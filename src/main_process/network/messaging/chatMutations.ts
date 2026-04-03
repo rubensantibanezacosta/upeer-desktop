@@ -1,7 +1,6 @@
 import {
-    encrypt,
-    getMyEphemeralPublicKeyHex,
     getMyPublicKey,
+    getMySignedPreKey,
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
@@ -17,7 +16,9 @@ import { buildMessagePayload } from '../messagePayload.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { encryptChatPayload } from './chatEncryption.js';
 import { getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
+import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
 
 type LinkPreviewPayload = Record<string, unknown>;
 
@@ -72,18 +73,24 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     const signature = sign(Buffer.from(payload));
     updateMessageContent(msgId, payload, signature.toString('hex'), newVersion);
 
-    const broadcastUpdate = async (targetId: string, isGroupContext: boolean) => {
+    const broadcastUpdate = async (
+        targetId: string,
+        isGroupContext: boolean,
+        options?: { skipVault?: boolean; registerRetry?: boolean }
+    ) => {
         const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
         if (!contact || !contact.publicKey) return;
-        const encrypted = encrypt(Buffer.from(payload, 'utf-8'), Buffer.from(contact.publicKey, 'hex'));
+        const encrypted = await encryptChatPayload(targetId, payload, contact);
         const data = {
             type: 'CHAT_UPDATE',
             msgId,
-            content: encrypted.ciphertext,
+            content: encrypted.content,
             nonce: encrypted.nonce,
             version: newVersion,
-            ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
-            useRecipientEphemeral: false,
+            ...(encrypted.ratchetHeader ? { ratchetHeader: encrypted.ratchetHeader } : {}),
+            ...(encrypted.x3dhInit ? { x3dhInit: encrypted.x3dhInit } : {}),
+            ...(encrypted.ephemeralPublicKey ? { ephemeralPublicKey: encrypted.ephemeralPublicKey } : {}),
+            ...(encrypted.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encrypted.useRecipientEphemeral } : {}),
             ...(isGroupContext ? { chatUpeerId: upeerId } : {}),
         };
         const dataSignature = sign(Buffer.from(canonicalStringify(data)));
@@ -92,10 +99,17 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
             for (const address of getFanOutAddresses(contact)) {
                 sendSecureUDPMessage(address, signedData, contact.publicKey);
             }
+            if (options?.registerRetry !== false) {
+                registerEncryptedOperationRetry(targetId, `chat-update:${msgId}`, async () => {
+                    await broadcastUpdate(targetId, isGroupContext, { skipVault: true, registerRetry: false });
+                });
+            }
         }
-        import('../vault/manager.js').then(({ VaultManager }) => {
-            VaultManager.replicateToVaults(targetId, signedData);
-        });
+        if (!options?.skipVault) {
+            import('../vault/manager.js').then(({ VaultManager }) => {
+                VaultManager.replicateToVaults(targetId, signedData);
+            });
+        }
     };
 
     if (isGroup) {
@@ -124,8 +138,31 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     for (const address of selfAddresses) {
         sendSecureUDPMessage(address, signedSelfSync, myPublicKey, true);
     }
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(myId, signedSelfSync);
+    import('../vault/manager.js').then(async ({ VaultManager }) => {
+        const mySignedPreKey = getMySignedPreKey();
+        const selfEncrypted = await encryptChatPayload(myId, payload, {
+            publicKey: myPublicKey,
+            signedPreKey: mySignedPreKey.spkPub,
+            signedPreKeyId: mySignedPreKey.spkId,
+        });
+        const selfVaultPacket = {
+            type: 'CHAT_UPDATE',
+            msgId,
+            content: selfEncrypted.content,
+            nonce: selfEncrypted.nonce,
+            version: newVersion,
+            chatUpeerId: upeerId,
+            ...(selfEncrypted.ratchetHeader ? { ratchetHeader: selfEncrypted.ratchetHeader } : {}),
+            ...(selfEncrypted.x3dhInit ? { x3dhInit: selfEncrypted.x3dhInit } : {}),
+            ...(selfEncrypted.ephemeralPublicKey ? { ephemeralPublicKey: selfEncrypted.ephemeralPublicKey } : {}),
+            ...(selfEncrypted.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: selfEncrypted.useRecipientEphemeral } : {}),
+            senderUpeerId: myId,
+        };
+        const selfVaultSignature = sign(Buffer.from(canonicalStringify(selfVaultPacket)));
+        await VaultManager.replicateToVaults(myId, {
+            ...selfVaultPacket,
+            signature: selfVaultSignature.toString('hex')
+        });
     });
 }
 

@@ -34,7 +34,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
         <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
             {!newChatSearch && (
                 <Box>
-                    <Box onClick={onOpenAddContact} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
+                    <Box aria-label="Nueva conversación" role="button" onClick={onOpenAddContact} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
                         <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
                             <PersonAddIcon />
                         </Avatar>
@@ -44,7 +44,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
                         </Box>
                     </Box>
                     {onOpenCreateGroup && (
-                        <Box onClick={onOpenCreateGroup} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
+                        <Box aria-label="Nuevo grupo" role="button" onClick={onOpenCreateGroup} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
                             <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
                                 <GroupAddIcon />
                             </Avatar>

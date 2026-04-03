@@ -137,52 +137,54 @@ export default function App() {
 
     return (
         <CssVarsProvider defaultMode="dark">
-            <MainLayout
-                isAppLocked={isAppLocked}
-                setIsAppLocked={setIsAppLocked}
-                isAuthenticated={appStore.isAuthenticated}
-                setAuthenticated={appStore.setAuthenticated}
-                isDragging={chatStore.isDragging}
-                handleDragOver={handleDragOver}
-                handleDragLeave={handleDragLeave}
-                handleDrop={handleDrop}
-                activeContact={activeContact}
-                activeGroup={activeGroup}
-                isIncomingRequest={activeContact?.status === 'incoming'}
-                targetUpeerId={chatStore.targetUpeerId}
-                activeGroupId={chatStore.activeGroupId}
-                message={message}
-                setMessage={(val: string) => chatStore.setMessage(chatStore.activeGroupId || chatStore.targetUpeerId, val)}
-                handleSend={(linkPreview?: LinkPreview | null) => chatStore.handleSend(linkPreview)}
-                handleSendGroupMessage={(linkPreview?: LinkPreview | null) => chatStore.handleSendGroupMessage(message, linkPreview)}
-                handleAttachFile={handleAttachFile}
-                handleTyping={handleTyping}
-                handleScrollToMessage={handleScrollToMessage}
-                currentReplyToMessage={chatStore.activeGroupId ? (chatStore.replyByConversation[chatStore.activeGroupId] || null) : (chatStore.replyByConversation[chatStore.targetUpeerId] || null)}
-                setReplyToMessage={chatStore.setReplyToMessage}
-                handleAcceptContact={chatStore.handleAcceptContact}
-                handleDeleteContact={chatStore.handleDeleteContact}
-                handleToggleFavorite={chatStore.handleToggleFavorite}
-                handleClearChat={chatStore.handleClearChat}
-                handleBlockContact={chatStore.handleBlockContact}
-                handleReaction={chatStore.handleReaction}
-                handleUpdateMessage={chatStore.handleUpdateMessage}
-                handleDeleteMessage={chatStore.handleDeleteMessage}
-                handleMediaClick={handleMediaClick}
-                navigation={navigation}
-                appStore={appStore}
-                chatStore={chatStore}
-                isFilePickerOpen={navigation.isFilePickerOpen}
-                setFilePickerOpen={navigation.setFilePickerOpen}
-                pendingFiles={chatStore.pendingFiles}
-                setPendingFiles={chatStore.setPendingFiles}
-                handleFileSubmit={handleFileSubmit}
-                handleSendVoiceNote={handleSendVoiceNote}
-                fileTransfer={fileTransfer}
-                isPreparingAttachments={navigation.isPreparingAttachments}
-                editingMessage={editingMessage}
-                setEditingMessage={setEditingMessage}
-            />
+            <div data-testid="app-shell">
+                <MainLayout
+                    isAppLocked={isAppLocked}
+                    setIsAppLocked={setIsAppLocked}
+                    isAuthenticated={appStore.isAuthenticated}
+                    setAuthenticated={appStore.setAuthenticated}
+                    isDragging={chatStore.isDragging}
+                    handleDragOver={handleDragOver}
+                    handleDragLeave={handleDragLeave}
+                    handleDrop={handleDrop}
+                    activeContact={activeContact}
+                    activeGroup={activeGroup}
+                    isIncomingRequest={activeContact?.status === 'incoming'}
+                    targetUpeerId={chatStore.targetUpeerId}
+                    activeGroupId={chatStore.activeGroupId}
+                    message={message}
+                    setMessage={(val: string) => chatStore.setMessage(chatStore.activeGroupId || chatStore.targetUpeerId, val)}
+                    handleSend={(linkPreview?: LinkPreview | null) => chatStore.handleSend(linkPreview)}
+                    handleSendGroupMessage={(linkPreview?: LinkPreview | null) => chatStore.handleSendGroupMessage(message, linkPreview)}
+                    handleAttachFile={handleAttachFile}
+                    handleTyping={handleTyping}
+                    handleScrollToMessage={handleScrollToMessage}
+                    currentReplyToMessage={chatStore.activeGroupId ? (chatStore.replyByConversation[chatStore.activeGroupId] || null) : (chatStore.replyByConversation[chatStore.targetUpeerId] || null)}
+                    setReplyToMessage={chatStore.setReplyToMessage}
+                    handleAcceptContact={chatStore.handleAcceptContact}
+                    handleDeleteContact={chatStore.handleDeleteContact}
+                    handleToggleFavorite={chatStore.handleToggleFavorite}
+                    handleClearChat={chatStore.handleClearChat}
+                    handleBlockContact={chatStore.handleBlockContact}
+                    handleReaction={chatStore.handleReaction}
+                    handleUpdateMessage={chatStore.handleUpdateMessage}
+                    handleDeleteMessage={chatStore.handleDeleteMessage}
+                    handleMediaClick={handleMediaClick}
+                    navigation={navigation}
+                    appStore={appStore}
+                    chatStore={chatStore}
+                    isFilePickerOpen={navigation.isFilePickerOpen}
+                    setFilePickerOpen={navigation.setFilePickerOpen}
+                    pendingFiles={chatStore.pendingFiles}
+                    setPendingFiles={chatStore.setPendingFiles}
+                    handleFileSubmit={handleFileSubmit}
+                    handleSendVoiceNote={handleSendVoiceNote}
+                    fileTransfer={fileTransfer}
+                    isPreparingAttachments={navigation.isPreparingAttachments}
+                    editingMessage={editingMessage}
+                    setEditingMessage={setEditingMessage}
+                />
+            </div>
         </CssVarsProvider>
     );
 }

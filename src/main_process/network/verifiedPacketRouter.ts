@@ -97,6 +97,8 @@ type EditableChatPayload = {
     content?: string;
     newContent?: string;
     nonce?: string;
+    x3dhInit?: ChatX3dhInit;
+    ratchetHeader?: RatchetHeader;
     ephemeralPublicKey?: string;
     useRecipientEphemeral?: boolean;
     chatUpeerId?: string;
@@ -116,6 +118,7 @@ type ChatClearPayload = {
     chatUpeerId?: string;
     clearTimestamp?: number;
     timestamp?: number;
+    isInternalSync?: boolean;
 };
 
 type ChatReactionPayload = {
@@ -126,6 +129,7 @@ type ChatReactionPayload = {
     reaction?: string;
     emojiToDelete?: string;
     remove?: boolean;
+    isInternalSync?: boolean;
 };
 
 type VaultAckPayload = {
@@ -268,6 +272,8 @@ function toEditableChatPayload(data: VerifiedPacketData): EditableChatPayload {
         content: typeof data.content === 'string' ? data.content : undefined,
         newContent: typeof data.newContent === 'string' ? data.newContent : undefined,
         nonce: typeof data.nonce === 'string' ? data.nonce : undefined,
+        x3dhInit: isChatX3dhInit(data.x3dhInit) ? data.x3dhInit : undefined,
+        ratchetHeader: isRatchetHeader(data.ratchetHeader) ? data.ratchetHeader : undefined,
         ephemeralPublicKey: typeof data.ephemeralPublicKey === 'string' ? data.ephemeralPublicKey : undefined,
         useRecipientEphemeral: typeof data.useRecipientEphemeral === 'boolean' ? data.useRecipientEphemeral : undefined,
         chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
@@ -291,6 +297,7 @@ function toChatClearPayload(data: VerifiedPacketData): ChatClearPayload {
         chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
         clearTimestamp: typeof data.clearTimestamp === 'number' ? data.clearTimestamp : undefined,
         timestamp: typeof data.timestamp === 'number' ? data.timestamp : undefined,
+        isInternalSync: data.isInternalSync === true,
     };
 }
 
@@ -303,6 +310,7 @@ function toChatReactionPayload(data: VerifiedPacketData): ChatReactionPayload {
         reaction: typeof data.reaction === 'string' ? data.reaction : undefined,
         emojiToDelete: typeof data.emojiToDelete === 'string' ? data.emojiToDelete : undefined,
         remove: data.remove === true,
+        isInternalSync: data.isInternalSync === true,
     };
 }
 
@@ -378,6 +386,8 @@ function toGroupControlPacket(data: VerifiedPacketData): GroupControlPacket {
         payload: typeof data.payload === 'string' ? data.payload : undefined,
         nonce: typeof data.nonce === 'string' ? data.nonce : undefined,
         adminUpeerId: typeof data.adminUpeerId === 'string' ? data.adminUpeerId : undefined,
+        x3dhInit: isChatX3dhInit(data.x3dhInit) ? data.x3dhInit : undefined,
+        ratchetHeader: isRatchetHeader(data.ratchetHeader) ? data.ratchetHeader : undefined,
         ephemeralPublicKey: typeof data.ephemeralPublicKey === 'string' ? data.ephemeralPublicKey : undefined,
         useRecipientEphemeral: typeof data.useRecipientEphemeral === 'boolean' ? data.useRecipientEphemeral : undefined,
         signature: typeof data.signature === 'string' ? data.signature : undefined,
@@ -503,7 +513,7 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             handleChatReaction(upeerId, toChatReactionPayload(data), win);
             break;
         case 'CHAT_UPDATE':
-            handleChatEdit(upeerId, toEditableChatPayload(data), win, signature);
+            handleChatEdit(upeerId, toEditableChatPayload(data), win, signature, rinfo.address, sendResponse);
             break;
         case 'CHAT_DELETE':
             handleChatDelete(upeerId, toChatDeletePayload(data), win);
@@ -544,10 +554,10 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             handleGroupAck(upeerId, toGroupAckPayload(data), win);
             break;
         case 'GROUP_INVITE':
-            handleGroupInvite(upeerId, toGroupInvitePacket(data), win);
+            handleGroupInvite(upeerId, toGroupInvitePacket(data), win, rinfo.address, sendResponse);
             break;
         case 'GROUP_UPDATE':
-            handleGroupUpdate(upeerId, toGroupControlPacket(data), win);
+            handleGroupUpdate(upeerId, toGroupControlPacket(data), win, rinfo.address, sendResponse);
             break;
         case 'GROUP_LEAVE':
             handleGroupLeave(upeerId, toGroupControlPacket(data), win);
@@ -579,7 +589,17 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
                     updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
                 }
             }
+            const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
+            const { retryPendingEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');
+            const retried = await retryPendingDirectMessages(upeerId);
+            const retriedEncrypted = await retryPendingEncryptedOperations(upeerId);
             info('DR session reset by peer', { upeerId }, 'security');
+            if (retried > 0) {
+                info('Retried pending direct messages after DR_RESET', { upeerId, retried }, 'security');
+            }
+            if (retriedEncrypted > 0) {
+                info('Retried pending encrypted operations after DR_RESET', { upeerId, retriedEncrypted }, 'security');
+            }
             break;
         }
         default:

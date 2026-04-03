@@ -50,6 +50,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 slotProps={{
                     root: {
+                        'aria-label': `Abrir acciones del mensaje ${_msgId || ''}`,
                         variant: 'plain' as const,
                         color: 'neutral' as const,
                         size: 'sm' as const,

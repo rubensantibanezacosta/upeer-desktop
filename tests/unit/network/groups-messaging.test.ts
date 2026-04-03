@@ -31,12 +31,32 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyPublicKeyHex: vi.fn(() => '11'.repeat(32)),
+    getMySignedPreKey: vi.fn(() => ({ spkPub: '55'.repeat(32), spkSig: '66'.repeat(64), spkId: 13 })),
     getMyUPeerId: vi.fn(() => 'self-id'),
     sign: vi.fn(() => Buffer.from('sig')),
     encrypt: vi.fn(() => ({ ciphertext: 'ciphertext', nonce: 'nonce' })),
     getMyEphemeralPublicKeyHex: vi.fn(() => '22'.repeat(32)),
     incrementEphemeralMessageCounter: vi.fn(),
+    getMyIdentitySkBuffer: vi.fn(() => Buffer.alloc(32)),
     getMyPublicKey: vi.fn(() => Buffer.from('11'.repeat(32), 'hex')),
+}));
+
+vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
+    getRatchetSession: vi.fn(() => null),
+    saveRatchetSession: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/security/ratchet.js', () => ({
+    x3dhInitiator: vi.fn(() => ({
+        ekPub: Buffer.from('33'.repeat(32), 'hex'),
+        sharedSecret: Buffer.alloc(32, 7),
+    })),
+    ratchetInitAlice: vi.fn(() => ({ rk: Buffer.alloc(32) })),
+    ratchetEncrypt: vi.fn(() => ({
+        header: { dh: '44'.repeat(32), pn: 0, n: 0 },
+        ciphertext: 'ratchet-cipher',
+        nonce: 'ratchet-nonce',
+    })),
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -77,8 +97,10 @@ vi.mock('../../../src/main_process/network/groupState.js', () => ({
 }));
 
 describe('network/messaging/groups.ts', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        const { resetEncryptedOperationRetries } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        resetEncryptedOperationRetries();
     });
 
     it('vaults the initial group invite for self so other own devices receive senderKey and epoch', async () => {
@@ -105,17 +127,23 @@ describe('network/messaging/groups.ts', () => {
             expect.objectContaining({
                 type: 'GROUP_INVITE',
                 senderUpeerId: 'self-id',
-                useRecipientEphemeral: false
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 13,
+                    ikPub: '11'.repeat(32),
+                }
             }),
             undefined,
             expect.any(String)
         );
     });
 
-    it('uses static key for offline GROUP_UPDATE delivery', async () => {
+    it('uses Double Ratchet for offline GROUP_UPDATE delivery when the member has signedPreKey', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
+        const { saveRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -129,21 +157,25 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-offline',
             status: 'disconnected',
             publicKey: 'aa'.repeat(32),
-            ephemeralPublicKey: 'bb'.repeat(32),
-            ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 9,
         } as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from(JSON.stringify({ groupName: 'Nuevo nombre' }), 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
+        expect(ratchet.x3dhInitiator).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(saveRatchetSession).toHaveBeenCalled();
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'peer-offline',
             expect.objectContaining({
                 type: 'GROUP_UPDATE',
-                useRecipientEphemeral: false,
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 9,
+                    ikPub: '11'.repeat(32),
+                },
                 senderUpeerId: 'self-id'
             }),
             undefined,
@@ -151,10 +183,10 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
-    it('uses static identity key for online GROUP_UPDATE delivery', async () => {
+    it('uses Double Ratchet for online GROUP_UPDATE delivery', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
@@ -174,24 +206,25 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
-            ephemeralPublicKey: 'bb'.repeat(32),
-            ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 10,
             address: '200::10',
             knownAddresses: '[]'
         } as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from(JSON.stringify({ groupName: 'Nuevo nombre' }), 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_UPDATE',
-                useRecipientEphemeral: false,
-                ephemeralPublicKey: '22'.repeat(32)
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 10,
+                    ikPub: '11'.repeat(32),
+                }
             }),
             'aa'.repeat(32)
         );
@@ -204,6 +237,43 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String)
+        );
+    });
+
+    it('retries pending encrypted group updates after DR_RESET', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { retryPendingEncryptedOperations } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-1',
+            members: ['self-id', 'peer-online'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 11,
+            address: '200::10',
+            knownAddresses: '[]'
+        } as ContactRecord);
+
+        await updateGroup('grp-1', { name: 'Nuevo nombre' });
+
+        vi.mocked(sendSecureUDPMessage).mockClear();
+
+        const retried = await retryPendingEncryptedOperations('peer-online');
+
+        expect(retried).toBe(1);
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::10',
+            expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-1' }),
+            'aa'.repeat(32)
         );
     });
 
@@ -293,8 +363,8 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
-            ephemeralPublicKey: 'bb'.repeat(32),
-            ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 12,
             address: '200::10',
             knownAddresses: '[]'
         } as ContactRecord);
@@ -329,7 +399,7 @@ describe('network/messaging/groups.ts', () => {
     it('includes the group avatar when inviting a member to an existing group', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { inviteToGroup } = await import('../../../src/main_process/network/messaging/groups.js');
@@ -353,27 +423,26 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 18,
             address: '200::10',
             knownAddresses: '[]'
         } as ContactRecord);
 
         await inviteToGroup('grp-1', 'peer-online');
 
-        expect(identity.encrypt).toHaveBeenCalledWith(
-            Buffer.from(JSON.stringify({
-                groupName: 'Grupo con avatar',
-                members: ['self-id', 'peer-online'],
-                epoch: 2,
-                senderKey: 'dd'.repeat(32),
-                avatar: 'data:image/jpeg;base64,avatar'
-            }), 'utf-8'),
-            Buffer.from('aa'.repeat(32), 'hex')
-        );
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_INVITE',
-                groupId: 'grp-1'
+                groupId: 'grp-1',
+                ratchetHeader: { dh: '44'.repeat(32), pn: 0, n: 0 },
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 18,
+                    ikPub: '11'.repeat(32),
+                }
             }),
             'aa'.repeat(32)
         );
@@ -444,6 +513,8 @@ describe('network/messaging/groups.ts', () => {
             upeerId: 'peer-online',
             status: 'connected',
             publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 19,
             address: '200::10',
             knownAddresses: 'not-json'
         } as ContactRecord);

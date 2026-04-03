@@ -59,7 +59,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
             }}
         >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <IconButton size="sm" variant="plain" color="neutral" onClick={onClose}>
+                <IconButton aria-label="Cerrar info del contacto" size="sm" variant="plain" color="neutral" onClick={onClose}>
                     <CloseIcon />
                 </IconButton>
                 <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del contacto</Typography>
@@ -89,7 +89,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                     </ListItem>
                 ))}
                 <ListItem sx={{ p: 0 }}>
-                    <ListItemButton onClick={onOpenCipher} sx={{ borderRadius: 'md', py: 1.5 }}>
+                    <ListItemButton aria-label="Abrir detalles de cifrado" onClick={onOpenCipher} sx={{ borderRadius: 'md', py: 1.5 }}>
                         <ListItemDecorator sx={{ color: 'inherit' }}><LockIcon sx={{ fontSize: 22 }} /></ListItemDecorator>
                         <ListItemContent><Typography level="body-sm">Cifrado</Typography></ListItemContent>
                         <ChevronRightIcon sx={{ fontSize: 18, color: 'text.tertiary' }} />

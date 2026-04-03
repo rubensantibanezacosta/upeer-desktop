@@ -150,12 +150,13 @@ export async function redistributeVaultSegmentShards(fileHash: string, segIdx: n
         return;
     }
 
+    const redistributions: Promise<boolean>[] = [];
     for (let index = 0; index < shards.length; index++) {
         const shard = shards[index];
         const custodian = custodians[index % custodians.length];
         const payloadHash = `shard:${fileHash}:${segIdx}:${index}`;
 
-        void (async () => {
+        redistributions.push((async () => {
             try {
                 await sendSecureUDPMessage(custodian.address, {
                     type: 'VAULT_STORE',
@@ -166,11 +167,17 @@ export async function redistributeVaultSegmentShards(fileHash: string, segIdx: n
                     data: shard.toString('hex'),
                     expiresAt: Date.now() + VAULT_TTL_MS,
                 });
+                return true;
             } catch (err: unknown) {
                 debug('Failed to redistribute shard', { custodian: custodian.upeerId, error: err }, 'vault');
+                return false;
             }
-        })();
+        })());
     }
 
-    info('Shard redistribution completed', { fileHash, shards: shards.length, custodians: custodians.length }, 'vault');
+    const results = await Promise.allSettled(redistributions);
+    const delivered = results.filter(result => result.status === 'fulfilled' && result.value).length;
+    const failed = results.length - delivered;
+
+    info('Shard redistribution completed', { fileHash, shards: shards.length, custodians: custodians.length, delivered, failed }, 'vault');
 }

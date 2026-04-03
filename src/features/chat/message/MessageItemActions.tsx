@@ -46,6 +46,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
         <Box sx={{ opacity: isHovered || emojiOpen ? 1 : 0, transition: 'opacity 0.1s', display: 'flex', alignItems: 'center', gap: 0.5, pointerEvents: isHovered || emojiOpen ? 'auto' : 'none' }}>
             <Box ref={emojiPickerRef} sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <IconButton
+                    aria-label={`Reaccionar al mensaje ${msg.id ?? ''}`}
                     size="sm"
                     variant="plain"
                     color="neutral"
@@ -59,6 +60,8 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
                         {QUICK_EMOJIS.map((emoji) => (
                             <Tooltip key={emoji} title={getQuickEmojiLabel(emoji)} variant="soft">
                                 <Box
+                                    role="button"
+                                    aria-label={`${getQuickEmojiLabel(emoji)} en mensaje ${msg.id ?? ''}`}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         if (msg.id) {

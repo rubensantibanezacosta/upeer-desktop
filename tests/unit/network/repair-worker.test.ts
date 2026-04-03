@@ -1,19 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockWhere = vi.fn();
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
+const {
+    mockWhere,
+    mockFrom,
+    mockSelect,
+    mockSendSecureUDPMessage,
+    mockGetContacts,
+    mockGetMyUPeerId,
+    mockGetExpiringSoonEntries,
+    mockRenewVaultEntry,
+    mockDecode,
+    mockEncode,
+} = vi.hoisted(() => ({
+    mockWhere: vi.fn(),
+    mockFrom: vi.fn(),
+    mockSelect: vi.fn(),
+    mockSendSecureUDPMessage: vi.fn(),
+    mockGetContacts: vi.fn(),
+    mockGetMyUPeerId: vi.fn(() => 'self-peer'),
+    mockGetExpiringSoonEntries: vi.fn(),
+    mockRenewVaultEntry: vi.fn(),
+    mockDecode: vi.fn(),
+    mockEncode: vi.fn(),
+}));
+
 const mockDb = {
     select: mockSelect,
 };
-
-const mockSendSecureUDPMessage = vi.fn();
-const mockGetContacts = vi.fn();
-const mockGetMyUPeerId = vi.fn(() => 'self-peer');
-const mockGetExpiringSoonEntries = vi.fn();
-const mockRenewVaultEntry = vi.fn();
-const mockDecode = vi.fn();
-const mockEncode = vi.fn();
 
 vi.mock('drizzle-orm', () => ({
     eq: vi.fn((left: unknown, right: unknown) => ({ left, right })),
@@ -75,6 +88,12 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
 }));
 
 import { RepairWorker } from '../../../src/main_process/network/vault/repair-worker.js';
+import { renewExpiringVaultEntries, runLazyVaultMaintenance } from '../../../src/main_process/network/vault/repairWorkerMaintenance.js';
+import {
+    collectMissingVaultShards,
+    redistributeVaultSegmentShards,
+    repairVaultAsset,
+} from '../../../src/main_process/network/vault/repairWorkerRepair.js';
 
 type DistributedShard = {
     shardIndex: number;
@@ -91,14 +110,7 @@ type RepairWorkerInternals = {
     redistributeSegmentShards: (fileHash: string, segIdx: number, segmentData: Buffer) => Promise<void>;
 };
 
-const repairWorkerInternals: RepairWorkerInternals = {
-    runMaintenance: Reflect.get(RepairWorker, 'runMaintenance').bind(RepairWorker) as RepairWorkerInternals['runMaintenance'],
-    renewExpiring: Reflect.get(RepairWorker, 'renewExpiring').bind(RepairWorker) as RepairWorkerInternals['renewExpiring'],
-    repairAsset: Reflect.get(RepairWorker, 'repairAsset').bind(RepairWorker) as RepairWorkerInternals['repairAsset'],
-    reconstructSegment: Reflect.get(RepairWorker, 'reconstructSegment').bind(RepairWorker) as RepairWorkerInternals['reconstructSegment'],
-    collectMissingShards: Reflect.get(RepairWorker, 'collectMissingShards').bind(RepairWorker) as RepairWorkerInternals['collectMissingShards'],
-    redistributeSegmentShards: Reflect.get(RepairWorker, 'redistributeSegmentShards').bind(RepairWorker) as RepairWorkerInternals['redistributeSegmentShards'],
-};
+const repairWorkerInternals = RepairWorker as unknown as RepairWorkerInternals;
 
 describe('RepairWorker', () => {
     beforeEach(() => {
@@ -143,7 +155,7 @@ describe('RepairWorker', () => {
             { upeerId: 'offline-peer', address: 'addr-3', status: 'disconnected' },
         ]);
 
-        await repairWorkerInternals.renewExpiring();
+        await renewExpiringVaultEntries();
 
         expect(mockRenewVaultEntry).toHaveBeenCalledWith('hash-1', now + 60 * 24 * 60 * 60 * 1000);
         expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(2);
@@ -160,7 +172,7 @@ describe('RepairWorker', () => {
         const repairSpy = vi.spyOn(repairWorkerInternals, 'repairAsset').mockResolvedValue(undefined);
         const renewSpy = vi.spyOn(repairWorkerInternals, 'renewExpiring').mockResolvedValue(undefined);
 
-        await repairWorkerInternals.runMaintenance();
+        await runLazyVaultMaintenance(6, renewSpy, repairSpy);
 
         expect(renewSpy).toHaveBeenCalledOnce();
         expect(repairSpy).toHaveBeenCalledTimes(1);
@@ -179,7 +191,7 @@ describe('RepairWorker', () => {
         const reconstructSpy = vi.spyOn(repairWorkerInternals, 'reconstructSegment').mockResolvedValue(undefined);
         const collectSpy = vi.spyOn(repairWorkerInternals, 'collectMissingShards').mockResolvedValue(undefined);
 
-        await repairWorkerInternals.repairAsset('file-hash');
+        await repairVaultAsset('file-hash', reconstructSpy, collectSpy);
 
         expect(reconstructSpy).toHaveBeenCalledWith('file-hash', 0, expect.any(Array));
         expect(collectSpy).toHaveBeenCalledWith('file-hash', 1, expect.any(Array));
@@ -193,7 +205,7 @@ describe('RepairWorker', () => {
             { upeerId: 'custodian-2', address: 'addr-2', status: 'connected' },
         ]);
 
-        const promise = repairWorkerInternals.collectMissingShards('file-hash', 2, [0, 3]);
+        const promise = collectMissingVaultShards('file-hash', 2, [0, 3]);
         await vi.runAllTimersAsync();
         await promise;
 
@@ -211,11 +223,45 @@ describe('RepairWorker', () => {
             { upeerId: 'custodian-4', address: 'addr-4', status: 'connected' },
         ]);
 
-        await repairWorkerInternals.redistributeSegmentShards('file-hash', 4, Buffer.from('segment-data'));
-        await Promise.resolve();
+        await redistributeVaultSegmentShards('file-hash', 4, Buffer.from('segment-data'));
 
         expect(mockEncode).toHaveBeenCalledOnce();
         expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(4);
         expect(mockSendSecureUDPMessage).toHaveBeenCalledWith('addr-1', expect.objectContaining({ type: 'VAULT_STORE', payloadHash: 'shard:file-hash:4:0' }));
+    });
+
+    it('espera a que terminen los envíos antes de resolver la redistribución', async () => {
+        mockGetContacts.mockResolvedValue([
+            { upeerId: 'self-peer', address: 'self-addr', status: 'connected' },
+            { upeerId: 'custodian-1', address: 'addr-1', status: 'connected' },
+            { upeerId: 'custodian-2', address: 'addr-2', status: 'connected' },
+            { upeerId: 'custodian-3', address: 'addr-3', status: 'connected' },
+            { upeerId: 'custodian-4', address: 'addr-4', status: 'connected' },
+        ]);
+
+        let releaseSend: (() => void) | undefined;
+        const sendBarrier = new Promise<void>((resolve) => {
+            releaseSend = resolve;
+        });
+
+        mockSendSecureUDPMessage.mockImplementation(() => sendBarrier);
+
+        let resolved = false;
+        const redistribution = redistributeVaultSegmentShards('file-hash', 4, Buffer.from('segment-data'))
+            .then(() => {
+                resolved = true;
+            });
+
+        for (let attempt = 0; attempt < 10 && mockSendSecureUDPMessage.mock.calls.length < 4; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(4);
+        expect(resolved).toBe(false);
+
+        releaseSend?.();
+        await redistribution;
+
+        expect(resolved).toBe(true);
     });
 });

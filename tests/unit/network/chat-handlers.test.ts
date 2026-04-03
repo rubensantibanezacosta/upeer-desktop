@@ -6,6 +6,7 @@ import * as contactKeysOps from '../../../src/main_process/storage/contacts/keys
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 import * as ratchet from '../../../src/main_process/security/ratchet.js';
+import * as chatRetry from '../../../src/main_process/network/messaging/chatRetry.js';
 
 type ChatWindow = NonNullable<Parameters<typeof handleChatMessage>[3]>;
 type ChatContact = Parameters<typeof handleChatMessage>[1];
@@ -46,11 +47,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'my-peer-id'),
     getSpkBySpkId: vi.fn(),
     getMyIdentitySkBuffer: vi.fn(),
-    getMySignedPreKeyBundle: vi.fn(() => ({
-        signedPreKeyPublic: 'ab'.repeat(32),
-        signedPreKeySig: 'cd'.repeat(64),
-        signedPreKeyId: Date.now(),
-    })),
+    getMySignedPreKeyBundle: vi.fn(() => ({ spkPub: 'ab'.repeat(32), spkSig: 'cd'.repeat(64), spkId: 7 })),
 }));
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
@@ -72,6 +69,10 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     getRatchetSession: vi.fn(() => null),
     saveRatchetSession: vi.fn(),
     deleteRatchetSession: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({
+    clearPendingDirectMessage: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', () => ({
@@ -145,33 +146,21 @@ describe('Chat Handlers', () => {
             expect(reputation.issueVouch).toHaveBeenCalledWith(senderId, 'HANDSHAKE');
         });
 
-        it('should decrypt a message if nonce is provided', async () => {
+        it('should reject non-DR encrypted messages and request a reset', async () => {
             const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'encrypted-hex',
                 nonce: 'nonce-hex'
             };
 
-            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje descifrado'));
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
-
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(identity.decrypt).toHaveBeenCalled();
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                expect.any(String),
-                senderId,
-                false,
-                'mensaje descifrado',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(identity.decrypt).not.toHaveBeenCalled();
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
-        it('should prefer sender ephemeral public key when decrypting crypto_box messages', async () => {
+        it('should drop legacy vaulted chat packets', async () => {
             const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
@@ -180,30 +169,14 @@ describe('Chat Handlers', () => {
                 useRecipientEphemeral: false,
             };
 
-            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje vault'));
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
-
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(identity.decrypt).toHaveBeenCalledWith(
-                Buffer.from(data.nonce, 'hex'),
-                Buffer.from(data.content, 'hex'),
-                Buffer.from(data.ephemeralPublicKey, 'hex')
-            );
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                expect.any(String),
-                senderId,
-                false,
-                'mensaje vault',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(identity.decrypt).not.toHaveBeenCalled();
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
-        it('should fall back to identity-key decryption for vaulted static-recipient messages', async () => {
+        it('should drop static-recipient legacy packets', async () => {
             const data: ChatMessageData = {
                 id: '33333333-3333-3333-3333-333333333333',
                 content: 'aa',
@@ -212,28 +185,11 @@ describe('Chat Handlers', () => {
                 useRecipientEphemeral: false,
             };
 
-            vi.mocked(identity.decrypt).mockReturnValue(null);
-            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from('mensaje vaulted recuperado'));
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
-
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
-                Buffer.from(data.nonce, 'hex'),
-                Buffer.from(data.content, 'hex'),
-                Buffer.from(data.ephemeralPublicKey, 'hex')
-            );
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                data.id,
-                senderId,
-                false,
-                'mensaje vaulted recuperado',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(identity.decryptWithIdentityKey).not.toHaveBeenCalled();
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
         it('should handle decryption failure gracefully', async () => {
@@ -244,21 +200,12 @@ describe('Chat Handlers', () => {
             };
 
             vi.mocked(identity.decrypt).mockReturnValue(null);
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                expect.any(String),
-                senderId,
-                false,
-                '🔒 [Error de descifrado]',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-p2p-message', expect.anything());
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
         it('should skip processing if message ID already exists (deduplication)', async () => {
@@ -296,7 +243,7 @@ describe('Chat Handlers', () => {
             expect(mockSendResponse).not.toHaveBeenCalled();
         });
 
-        it('should decrypt and save vaulted self-sync messages as mine', async () => {
+        it('should drop legacy self-sync vaulted chat packets', async () => {
             const myId = 'my-peer-id';
             const data: ChatMessageData = {
                 id: '22222222-2222-2222-2222-222222222222',
@@ -309,30 +256,15 @@ describe('Chat Handlers', () => {
 
             vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
             vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
-            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('mensaje propio vaulted'));
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(myId, { upeerId: myId, publicKey: 'b'.repeat(64) } as ChatContact, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
 
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                data.id,
-                myId,
-                true,
-                'mensaje propio vaulted',
-                undefined,
-                'sig',
-                'read',
-                myId,
-                data.timestamp
-            );
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
-                isMine: true,
-                status: 'read',
-                message: 'mensaje propio vaulted'
-            }));
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-p2p-message', expect.anything());
+            expect(mockSendResponse).toHaveBeenCalledWith('127.0.0.1', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
-        it('should update contact ephemeral public key if provided in message data', async () => {
+        it('should ignore legacy packet ephemeral keys for chat messages', async () => {
             const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'hello',
@@ -340,12 +272,11 @@ describe('Chat Handlers', () => {
             };
 
             vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
             const keysOps = await import('../../../src/main_process/storage/contacts/keys.js');
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(keysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, data.ephemeralPublicKey);
+            expect(keysOps.updateContactEphemeralPublicKey).not.toHaveBeenCalled();
         });
 
         it('should handle X3DH and Double Ratchet initialization from Bob perspective', async () => {
@@ -393,21 +324,14 @@ describe('Chat Handlers', () => {
             };
 
             vi.mocked(identity.getSpkBySpkId).mockReturnValue(null);
-            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                expect.any(String),
-                senderId,
-                false,
-                '🔒 [Error crítico DR]',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-p2p-message', expect.anything());
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+                type: 'DR_RESET'
+            }));
         });
     });
 
@@ -418,6 +342,7 @@ describe('Chat Handlers', () => {
 
             await handleChatAck(senderId, data, mockWin);
 
+            expect(chatRetry.clearPendingDirectMessage).toHaveBeenCalledWith(data.id);
             expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(data.id, 'read');
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-status-updated', {
                 id: data.id,
@@ -436,7 +361,7 @@ describe('Chat Handlers', () => {
     });
 
     describe('handleChatEdit', () => {
-        it('should decrypt and update content if message is from the peer', async () => {
+        it('should reject legacy encrypted chat updates', async () => {
             const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
@@ -445,24 +370,15 @@ describe('Chat Handlers', () => {
                 version: 2,
             };
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
-            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
-            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('editado'));
 
-            await handleChatEdit(senderId, data, mockWin, 'edit-sig');
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig', '1.2.3.4', mockSendResponse);
 
-            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, data.ephemeralPublicKey);
-            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado', 'edit-sig', 2);
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-updated', {
-                id: data.msgId,
-                upeerId: senderId,
-                chatUpeerId: senderId,
-                content: 'editado',
-                signature: 'edit-sig'
-            });
+            expect(contactKeysOps.updateContactEphemeralPublicKey).not.toHaveBeenCalled();
+            expect(messagesOps.updateMessageContent).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
-        it('should fallback to stored ephemeral key when packet key is missing', async () => {
+        it('should reject legacy chat updates without packet ratchet header', async () => {
             const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
@@ -470,24 +386,15 @@ describe('Chat Handlers', () => {
                 version: 3,
             };
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
-            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
-                publicKey: 'b'.repeat(64),
-                ephemeralPublicKey: 'c'.repeat(64)
-            } as never);
-            vi.mocked(identity.decrypt).mockReturnValue(Buffer.from('editado 2'));
 
-            await handleChatEdit(senderId, data, mockWin, 'edit-sig-2');
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig-2', '1.2.3.4', mockSendResponse);
 
-            expect(identity.decrypt).toHaveBeenCalledWith(
-                Buffer.from(data.nonce, 'hex'),
-                Buffer.from(data.content, 'hex'),
-                Buffer.from('c'.repeat(64), 'hex')
-            );
-            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'editado 2', 'edit-sig-2', 3);
+            expect(identity.decrypt).not.toHaveBeenCalled();
+            expect(messagesOps.updateMessageContent).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
 
-        it('should fallback to identity-key decryption for vaulted static chat updates', async () => {
+        it('should reject static-recipient legacy chat updates', async () => {
             const data: ChatEditData = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'aa',
@@ -497,19 +404,37 @@ describe('Chat Handlers', () => {
                 useRecipientEphemeral: false,
             };
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
-            const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
-            vi.mocked(identity.decrypt).mockReturnValue(null);
-            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(Buffer.from('edit vaulted'));
 
-            await handleChatEdit(senderId, data, mockWin, 'edit-sig-3');
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig-3', '1.2.3.4', mockSendResponse);
 
-            expect(identity.decryptWithIdentityKey).toHaveBeenCalledWith(
-                Buffer.from(data.nonce, 'hex'),
-                Buffer.from(data.content, 'hex'),
-                Buffer.from(data.ephemeralPublicKey, 'hex')
+            expect(identity.decryptWithIdentityKey).not.toHaveBeenCalled();
+            expect(messagesOps.updateMessageContent).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
+        });
+
+        it('should decrypt Double Ratchet chat updates when a session already exists', async () => {
+            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+            const data = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'a'.repeat(32),
+                nonce: 'b'.repeat(48),
+                ratchetHeader: { dh: 'c'.repeat(64), pn: 0, n: 3 },
+                version: 6,
+            } as ChatEditData;
+
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
+            vi.mocked(ratchetOps.getRatchetSession).mockReturnValue({ state: {} as never, spkIdUsed: 7 } as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from('edit dr'));
+
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig-dr');
+
+            expect(ratchet.ratchetDecrypt).toHaveBeenCalledWith(
+                expect.any(Object),
+                data.ratchetHeader,
+                data.content,
+                data.nonce
             );
-            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'edit vaulted', 'edit-sig-3', 4);
+            expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'edit dr', 'edit-sig-dr', 6);
         });
 
         it('should apply self-synced edits to own messages', async () => {
@@ -532,6 +457,24 @@ describe('Chat Handlers', () => {
                 chatUpeerId: 'peer-chat',
                 content: 'edit local sync'
             }));
+        });
+
+        it('should send DR_RESET when ratchet decrypt for chat update fails', async () => {
+            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+            const data: ChatEditData = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                ratchetHeader: { dh: 'a'.repeat(64), pn: 0, n: 0 },
+            };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
+            vi.mocked(ratchetOps.getRatchetSession).mockReturnValue(null);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(null);
+
+            await handleChatEdit(senderId, data, mockWin, 'edit-sig', '1.2.3.4', mockSendResponse);
+
+            expect(messagesOps.updateMessageContent).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
         });
     });
 
@@ -579,18 +522,29 @@ describe('Chat Handlers', () => {
 
     describe('handleChatClear', () => {
         it('should clear the explicit chat context for self-sync packets', async () => {
-            const data: ChatClearData = { chatUpeerId: 'peer-chat', timestamp: 9999 };
+            const data: ChatClearData = { chatUpeerId: 'peer-chat', timestamp: 9999, isInternalSync: true };
 
             await handleChatClear('my-peer-id', data, mockWin);
 
             expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith('peer-chat', 9999);
             expect(mockWin.webContents.send).toHaveBeenCalledWith('chat-cleared', { upeerId: 'peer-chat' });
         });
+
+        it('should ignore external chatUpeerId override and clear only sender chat', async () => {
+            const data: ChatClearData = { chatUpeerId: 'victim-chat', timestamp: 7777 };
+
+            await handleChatClear(senderId, data, mockWin);
+
+            expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(senderId, 7777);
+            expect(messagesOps.deleteMessagesByChatId).not.toHaveBeenCalledWith('victim-chat', 7777);
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('chat-cleared', { upeerId: senderId });
+        });
     });
 
     describe('handleChatReaction', () => {
         it('should save reaction and notify UI', async () => {
             const data: ChatReactionData = { id: '12345678-1234-1234-1234-123456789012', reaction: '👍' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 } as never);
 
             await handleChatReaction(senderId, data, mockWin);
 
@@ -606,6 +560,7 @@ describe('Chat Handlers', () => {
 
         it('should delete reaction if emojiToDelete is provided', async () => {
             const data: ChatReactionData = { id: '12345678-1234-1234-1234-123456789012', emojiToDelete: '👍' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 0 } as never);
 
             await handleChatReaction(senderId, data, mockWin);
 
@@ -625,6 +580,7 @@ describe('Chat Handlers', () => {
                 reaction: '🔥',
                 chatUpeerId: 'grp-1'
             };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: 'grp-1', isMine: 0 } as never);
 
             await handleChatReaction(senderId, data, mockWin);
 
@@ -634,6 +590,42 @@ describe('Chat Handlers', () => {
                 upeerId: senderId,
                 chatUpeerId: 'grp-1',
                 emoji: '🔥',
+                remove: false
+            });
+        });
+
+        it('should ignore reaction for a message from another chat', async () => {
+            const data: ChatReactionData = {
+                id: '12345678-1234-1234-1234-123456789012',
+                reaction: '❌',
+                chatUpeerId: 'grp-1'
+            };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: 'peer-other', isMine: 0 } as never);
+
+            await handleChatReaction(senderId, data, mockWin);
+
+            expect(reactionsOps.saveReaction).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('message-reaction-updated', expect.objectContaining({ msgId: data.id }));
+        });
+
+        it('should preserve direct self-sync reactions using the stored chat context', async () => {
+            const myId = 'my-peer-id';
+            const data: ChatReactionData = {
+                id: '12345678-1234-1234-1234-123456789012',
+                reaction: '💾',
+                isInternalSync: true,
+            };
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: 'peer-chat', isMine: 1 } as never);
+
+            await handleChatReaction(myId, data, mockWin);
+
+            expect(reactionsOps.saveReaction).toHaveBeenCalledWith(data.id, myId, '💾');
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-reaction-updated', {
+                msgId: data.id,
+                upeerId: myId,
+                chatUpeerId: 'peer-chat',
+                emoji: '💾',
                 remove: false
             });
         });
@@ -662,10 +654,24 @@ describe('Chat Handlers', () => {
     describe('handleReadReceipt', () => {
         it('should update message status to read', async () => {
             const data: ReadReceiptData = { id: '12345678-1234-1234-1234-123456789012' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId, isMine: 1 } as never);
             await handleReadReceipt(senderId, data, mockWin);
 
             expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(data.id, 'read');
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-status-updated', expect.objectContaining({
+                id: data.id,
+                status: 'read'
+            }));
+        });
+
+        it('should ignore read receipt for messages from another chat or not owned by me', async () => {
+            const data: ReadReceiptData = { id: '12345678-1234-1234-1234-123456789012' };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: 'other-peer', isMine: 0 } as never);
+
+            await handleReadReceipt(senderId, data, mockWin);
+
+            expect(messagesOps.updateMessageStatus).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('message-status-updated', expect.objectContaining({
                 id: data.id,
                 status: 'read'
             }));

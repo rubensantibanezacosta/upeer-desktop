@@ -111,6 +111,15 @@ describe('Vault Protocol Handlers', () => {
             expect(vaultDb.deleteVaultEntry).toHaveBeenCalledWith('h1');
         });
 
+        it('should not reward reputation for unknown ack hashes', async () => {
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(undefined);
+
+            await vaultHandlers.handleVaultAck(senderSid, { payloadHashes: ['missing-hash'] });
+
+            expect(vaultDb.deleteVaultEntry).not.toHaveBeenCalled();
+            expect(vouches.issueVouch).not.toHaveBeenCalled();
+        });
+
         it('should ignore and issue malicious vouch if sender is not recipient', async () => {
             const entry = { payloadHash: 'h1', recipientSid: 'other' };
             vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry);

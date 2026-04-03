@@ -30,7 +30,7 @@ export const ContactInfoCipherView: React.FC<ContactInfoCipherViewProps> = ({ co
         zIndex: 10,
     }}>
         <Box sx={{ height: '60px', px: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-            <IconButton size="sm" variant="plain" color="neutral" onClick={onBack}>
+            <IconButton aria-label="Volver desde cifrado" size="sm" variant="plain" color="neutral" onClick={onBack}>
                 <ArrowBackIcon />
             </IconButton>
             <Typography level="title-md" sx={{ fontWeight: 600 }}>Cifrado</Typography>

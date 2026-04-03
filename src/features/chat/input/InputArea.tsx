@@ -137,7 +137,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             autoFocus={!disabled}
                             focusKey={focusKey}
                         />
-                        <IconButton variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled}>
+                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled}>
                             {message
                                 ? (editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />)
                                 : <MicIcon color="primary" />

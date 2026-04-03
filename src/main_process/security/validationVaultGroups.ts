@@ -50,7 +50,25 @@ type GroupPayload = {
     groupId?: unknown;
     payload?: unknown;
     nonce?: unknown;
+    x3dhInit?: unknown;
+    ratchetHeader?: unknown;
 };
+
+type X3dhInitPayload = {
+    ikPub?: unknown;
+    ekPub?: unknown;
+    spkId?: unknown;
+};
+
+type RatchetHeaderPayload = {
+    dh?: unknown;
+    pn?: unknown;
+    n?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
 
 type GroupLeavePayload = {
     groupId?: unknown;
@@ -194,6 +212,36 @@ function validateGroupPayload(data: GroupPayload, errorMessage: string): Validat
     }
     if (!data.nonce || typeof data.nonce !== 'string' || data.nonce.length !== 48) {
         return { valid: false, error: 'Invalid nonce' };
+    }
+    if (data.x3dhInit !== undefined) {
+        if (!isRecord(data.x3dhInit)) {
+            return { valid: false, error: 'x3dhInit must be an object' };
+        }
+        const x3dhInit = data.x3dhInit as X3dhInitPayload;
+        if (typeof x3dhInit.ikPub !== 'string' || x3dhInit.ikPub.length !== 64) {
+            return { valid: false, error: 'Invalid x3dhInit.ikPub' };
+        }
+        if (typeof x3dhInit.ekPub !== 'string' || x3dhInit.ekPub.length !== 64) {
+            return { valid: false, error: 'Invalid x3dhInit.ekPub' };
+        }
+        if (typeof x3dhInit.spkId !== 'number' || !Number.isInteger(x3dhInit.spkId) || x3dhInit.spkId < 0) {
+            return { valid: false, error: 'Invalid x3dhInit.spkId' };
+        }
+    }
+    if (data.ratchetHeader !== undefined) {
+        if (!isRecord(data.ratchetHeader)) {
+            return { valid: false, error: 'ratchetHeader must be an object' };
+        }
+        const ratchetHeader = data.ratchetHeader as RatchetHeaderPayload;
+        if (typeof ratchetHeader.dh !== 'string' || ratchetHeader.dh.length !== 64) {
+            return { valid: false, error: 'Invalid ratchetHeader.dh' };
+        }
+        if (typeof ratchetHeader.pn !== 'number' || ratchetHeader.pn < 0 || ratchetHeader.pn > 1_000_000) {
+            return { valid: false, error: 'Invalid ratchetHeader.pn' };
+        }
+        if (typeof ratchetHeader.n !== 'number' || ratchetHeader.n < 0 || ratchetHeader.n > 1_000_000) {
+            return { valid: false, error: 'Invalid ratchetHeader.n' };
+        }
     }
     return { valid: true };
 }

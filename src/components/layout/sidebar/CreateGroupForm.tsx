@@ -115,6 +115,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
             <FormControl required>
                 <FormLabel sx={{ fontWeight: 600, fontSize: '12px' }}>Nombre del grupo</FormLabel>
                 <Input
+                    aria-label="Nombre del grupo lateral"
                     autoFocus
                     placeholder="Ej: Equipo, Familia…"
                     value={groupName}
@@ -138,6 +139,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                 </Stack>
             )}
             <Input
+                aria-label="Buscar contactos del grupo"
                 placeholder="Buscar contactos…"
                 size="sm"
                 value={search}
@@ -163,6 +165,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                             const isChecked = selectedIds.includes(c.upeerId);
                             return (
                                 <ListItem
+                                    aria-label={`Seleccionar contacto lateral ${c.name}`}
                                     key={c.upeerId}
                                     onClick={() => toggleMember(c.upeerId)}
                                     sx={{

@@ -63,6 +63,8 @@ type ChatUpdatePayload = {
     msgId?: unknown;
     content?: unknown;
     nonce?: unknown;
+    x3dhInit?: X3dhInitPayload | unknown;
+    ratchetHeader?: RatchetHeaderPayload | unknown;
     ephemeralPublicKey?: unknown;
 };
 
@@ -306,6 +308,39 @@ export function validateChatUpdate(data: ChatUpdatePayload): ValidationResult {
     }
     if (data.nonce && (typeof data.nonce !== 'string' || data.nonce.length !== 48)) {
         return { valid: false, error: 'Invalid nonce' };
+    }
+    if ((data.ratchetHeader || data.nonce) && data.content.length < 32) {
+        return { valid: false, error: 'Ciphertext too short (min 32 hex chars)' };
+    }
+    if (data.x3dhInit) {
+        const x3dhInit = data.x3dhInit;
+        if (!isX3dhInitPayload(x3dhInit)) {
+            return { valid: false, error: 'x3dhInit must be an object' };
+        }
+        if (!x3dhInit.ikPub || typeof x3dhInit.ikPub !== 'string' || x3dhInit.ikPub.length !== 64) {
+            return { valid: false, error: 'Invalid x3dhInit.ikPub' };
+        }
+        if (!x3dhInit.ekPub || typeof x3dhInit.ekPub !== 'string' || x3dhInit.ekPub.length !== 64) {
+            return { valid: false, error: 'Invalid x3dhInit.ekPub' };
+        }
+        if (typeof x3dhInit.spkId !== 'number' || !Number.isInteger(x3dhInit.spkId) || x3dhInit.spkId < 0) {
+            return { valid: false, error: 'Invalid x3dhInit.spkId' };
+        }
+    }
+    if (data.ratchetHeader) {
+        const ratchetHeader = data.ratchetHeader;
+        if (!isRatchetHeaderPayload(ratchetHeader)) {
+            return { valid: false, error: 'ratchetHeader must be an object' };
+        }
+        if (ratchetHeader.dh && (typeof ratchetHeader.dh !== 'string' || ratchetHeader.dh.length !== 64)) {
+            return { valid: false, error: 'Invalid ratchetHeader.dh' };
+        }
+        if (ratchetHeader.pn !== undefined && (typeof ratchetHeader.pn !== 'number' || ratchetHeader.pn < 0 || ratchetHeader.pn > 1_000_000)) {
+            return { valid: false, error: 'Invalid ratchetHeader.pn' };
+        }
+        if (ratchetHeader.n !== undefined && (typeof ratchetHeader.n !== 'number' || ratchetHeader.n < 0 || ratchetHeader.n > 1_000_000)) {
+            return { valid: false, error: 'Invalid ratchetHeader.n' };
+        }
     }
     const ephemeralPublicKey = validateOptionalPublicKey(data.ephemeralPublicKey, 'ephemeralPublicKey');
     if (!ephemeralPublicKey.valid) return ephemeralPublicKey;

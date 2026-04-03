@@ -50,18 +50,18 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
 
         <Box sx={{ display: 'flex', gap: 1, pointerEvents: 'auto' }} onClick={(event) => event.stopPropagation()}>
             <Tooltip title="Responder" variant="soft" sx={{ zIndex: 3000 }}>
-                <IconButton variant="plain" color="neutral" onClick={() => onReply?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Responder desde visor" variant="plain" color="neutral" onClick={() => onReply?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                     <ReplyIcon />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Reenviar" variant="soft" sx={{ zIndex: 3000 }}>
-                <IconButton variant="plain" color="neutral" onClick={() => onForward?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Reenviar desde visor" variant="plain" color="neutral" onClick={() => onForward?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                     <ShortcutOutlinedIcon />
                 </IconButton>
             </Tooltip>
             <Box sx={{ position: 'relative' }}>
                 <Tooltip title="Reaccionar" variant="soft" sx={{ zIndex: 3000 }} open={emojiOpen ? false : undefined}>
-                    <IconButton variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); setEmojiOpen((value) => !value); }} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                    <IconButton aria-label="Reaccionar desde visor" variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); setEmojiOpen((value) => !value); }} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                         <AddReactionOutlinedIcon />
                     </IconButton>
                 </Tooltip>
@@ -71,6 +71,8 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
                         {QUICK_EMOJIS.map((emoji) => (
                             <Box
                                 key={emoji}
+                                role="button"
+                                aria-label={`Reacción ${emoji} desde visor`}
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onReact?.(currentItem, emoji);
@@ -86,17 +88,17 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
                 )}
             </Box>
             <Tooltip title="Ir al mensaje" variant="soft" sx={{ zIndex: 3000 }}>
-                <IconButton variant="plain" color="neutral" onClick={() => onGoToMessage?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Ir al mensaje desde visor" variant="plain" color="neutral" onClick={() => onGoToMessage?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                     <OpenInNewIcon />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Descargar" variant="soft" sx={{ zIndex: 3000 }}>
-                <IconButton variant="plain" color="neutral" onClick={() => onDownload(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Descargar desde visor" variant="plain" color="neutral" onClick={() => onDownload(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                     <DownloadOutlinedIcon />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Cerrar" variant="soft" sx={{ zIndex: 3000 }}>
-                <IconButton variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Cerrar visor multimedia" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                     <CloseIcon />
                 </IconButton>
             </Tooltip>

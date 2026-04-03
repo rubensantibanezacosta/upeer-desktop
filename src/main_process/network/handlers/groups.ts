@@ -140,6 +140,9 @@ export async function handleGroupAck(upeerId: string, data: GroupAckPayload, win
     const { id: msgId, groupId } = data;
     // Bug FE fix: misma protección UUID aplicada a los ACKs de grupo.
     if (!msgId || !_UUID_RE.test(String(msgId))) return;
+    const msg = await getMessageById(msgId);
+    if (!msg || msg.chatUpeerId !== groupId || !msg.isMine) return;
+
     if (await updateMessageStatus(msgId, 'delivered')) {
         win?.webContents.send('group-message-delivered', { id: msgId, groupId, upeerId });
         win?.webContents.send('message-status-updated', { id: msgId, status: 'delivered' });

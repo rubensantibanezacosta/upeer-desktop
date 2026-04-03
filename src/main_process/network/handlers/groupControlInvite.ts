@@ -12,6 +12,7 @@ import {
 } from '../../storage/groups/operations.js';
 import { saveMessage } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getMySignedPreKeyBundle, getMyUPeerId } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { isValidGroupEpoch, isValidGroupSenderKey } from '../groupState.js';
@@ -35,7 +36,9 @@ interface GroupInvitePacket extends GroupPayload {
 export async function handleGroupInvite(
     upeerId: string,
     data: GroupInvitePacket,
-    win: BrowserWindow | null
+    win: BrowserWindow | null,
+    fromAddress?: string,
+    sendResponse?: (ip: string, data: Record<string, unknown>) => void,
 ): Promise<void> {
     const { groupId, adminUpeerId } = data;
     if (!groupId || !data.payload || !data.nonce) return;
@@ -52,7 +55,10 @@ export async function handleGroupInvite(
     try {
         const contact = await getContactByUpeerId(upeerId);
         senderDisplayName = contact?.name || contact?.alias || upeerId;
-        const inner = await decryptGroupControlPayload(upeerId, data);
+        const inner = await decryptGroupControlPayload(upeerId, data, async () => {
+            if (!fromAddress || !sendResponse) return;
+            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        });
         if (!inner) {
             security('GROUP_INVITE: decryption failed', { upeerId, groupId }, 'security');
             return;
@@ -88,6 +94,13 @@ export async function handleGroupInvite(
     if (upeerId !== actualAdmin) {
         security('Identity mismatch in group invite!', { sender: upeerId, claimedAdmin: adminUpeerId }, 'security');
         issueVouch(upeerId, VouchType.MALICIOUS).catch((err) => warn('Failed to issue malicious vouch for group invite', err, 'reputation'));
+        return;
+    }
+
+    const myId = getMyUPeerId();
+    if (!members.includes(myId)) {
+        security('GROUP_INVITE without local membership', { sender: upeerId, groupId, myId }, 'security');
+        issueVouch(upeerId, VouchType.MALICIOUS).catch((err) => warn('Failed to issue malicious vouch for invalid membership invite', err, 'reputation'));
         return;
     }
 

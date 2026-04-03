@@ -16,6 +16,18 @@ type FileAckPayload = {
 };
 
 export async function handleAccept(this: TransferManager, upeerId: string, _address: string, data: FileAcceptPayload) {
+    const transfer = this.store.getTransfer(data.fileId, 'sending');
+    if (!transfer || (
+        transfer.phase !== TransferPhase.PROPOSED &&
+        transfer.phase !== TransferPhase.REPLICATING &&
+        transfer.phase !== TransferPhase.VAULTED
+    )) return;
+
+    if (transfer.upeerId !== upeerId) {
+        warn('Ignoring FILE_ACCEPT from unexpected peer', { fileId: data.fileId, expectedUpeerId: transfer.upeerId, actualUpeerId: upeerId }, 'security');
+        return;
+    }
+
     const contact = await getContactByUpeerId(upeerId);
     if (!contact?.publicKey) return;
 
@@ -23,13 +35,6 @@ export async function handleAccept(this: TransferManager, upeerId: string, _addr
         warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
         return;
     }
-
-    const transfer = this.store.getTransfer(data.fileId, 'sending');
-    if (!transfer || (
-        transfer.phase !== TransferPhase.PROPOSED &&
-        transfer.phase !== TransferPhase.REPLICATING &&
-        transfer.phase !== TransferPhase.VAULTED
-    )) return;
 
     const updated = this.store.updateTransfer(data.fileId, 'sending', { phase: TransferPhase.TRANSFERRING, state: 'active' });
     if (updated) {
@@ -46,6 +51,16 @@ export async function handleAccept(this: TransferManager, upeerId: string, _addr
 export async function handleAck(this: TransferManager, upeerId: string, address: string, data: FileAckPayload) {
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (!transfer || (transfer.state !== 'active' && transfer.state !== 'completed')) return;
+
+    if (transfer.upeerId !== upeerId) {
+        warn('Ignoring FILE_ACK from unexpected peer', {
+            fileId: data.fileId,
+            expectedUpeerId: transfer.upeerId,
+            actualUpeerId: upeerId,
+            chunkIndex: data.chunkIndex
+        }, 'security');
+        return;
+    }
 
     debug('FILE_ACK received', {
         fileId: data.fileId,

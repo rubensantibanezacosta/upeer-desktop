@@ -20,8 +20,13 @@ import {
     deliverGroupPacket,
     resolveGroupContact,
 } from './groupControlSupport.js';
+import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
 
-async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string): Promise<void> {
+async function sendGroupInvitePacket(
+    group: GroupRecord,
+    targetUpeerId: string,
+    options?: { skipVault?: boolean; registerRetry?: boolean }
+): Promise<void> {
     const myId = getMyUPeerId();
     const contact = await resolveGroupContact(targetUpeerId);
     if (!contact?.publicKey || !group.senderKey) return;
@@ -33,7 +38,7 @@ async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string):
         group.senderKey,
         group.avatar ?? undefined
     );
-    const packet = await buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, contact.publicKey);
+    const packet = await buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, targetUpeerId, contact);
     const signedPacket = buildSignedPacket(packet, myId);
     await deliverGroupPacket({
         targetUpeerId,
@@ -42,14 +47,22 @@ async function sendGroupInvitePacket(group: GroupRecord, targetUpeerId: string):
         contact,
         vaultSeed: `group-invite:${group.groupId}:${targetUpeerId}:${group.epoch}`,
         warnMessage: 'GROUP_INVITE vaulted for offline member',
+        skipVault: options?.skipVault,
         warnContext: { targetUpeerId, groupId: group.groupId },
     });
+
+    if (contact.status === 'connected' && options?.registerRetry !== false) {
+        registerEncryptedOperationRetry(targetUpeerId, `group-invite:${group.groupId}:${group.epoch}`, async () => {
+            await sendGroupInvitePacket(group, targetUpeerId, { skipVault: true, registerRetry: false });
+        });
+    }
 }
 
 async function broadcastGroupUpdatePacket(
     group: GroupRecord,
     fields: { name?: string; avatar?: string | null; members?: string[]; epoch?: number; senderKey?: string },
-    targetMembers: string[]
+    targetMembers: string[],
+    options?: { skipVault?: boolean; registerRetry?: boolean }
 ): Promise<void> {
     const myId = getMyUPeerId();
     const sensitivePayload = await buildGroupUpdatePayload({
@@ -64,7 +77,7 @@ async function broadcastGroupUpdatePacket(
         const contact = await resolveGroupContact(memberUpeerId);
         if (!contact?.publicKey) continue;
 
-        const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, contact.publicKey);
+        const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact);
         const signedPacket = buildSignedPacket(packet, myId);
         await deliverGroupPacket({
             targetUpeerId: memberUpeerId,
@@ -73,8 +86,15 @@ async function broadcastGroupUpdatePacket(
             contact,
             vaultSeed: `group-update:${group.groupId}:${memberUpeerId}:${signedPacket.signature}`,
             warnMessage: 'GROUP_UPDATE vaulted for offline member',
+            skipVault: options?.skipVault,
             warnContext: { memberUpeerId, groupId: group.groupId },
         });
+
+        if (contact.status === 'connected' && options?.registerRetry !== false) {
+            registerEncryptedOperationRetry(memberUpeerId, `group-update:${group.groupId}:${signedPacket.signature}`, async () => {
+                await broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false });
+            });
+        }
     }
 }
 

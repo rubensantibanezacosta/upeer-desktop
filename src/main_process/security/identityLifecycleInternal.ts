@@ -4,7 +4,6 @@ import path from 'node:path';
 import * as bip39 from 'bip39';
 import { debug, error, info } from './secure-logger.js';
 import {
-    EPHEMERAL_KEY_ROTATION_INTERVAL_MS,
     MAX_PREVIOUS_EPH_KEYS,
     MAX_PREVIOUS_SPK,
     MNEMONIC_MODE_FLAG,
@@ -71,7 +70,7 @@ function resetRotationIntervals(): void {
     if (identityState.spkRotationInterval) clearInterval(identityState.spkRotationInterval);
     if (identityState.ephemeralKeyRotationInterval) clearInterval(identityState.ephemeralKeyRotationInterval);
     identityState.spkRotationInterval = setInterval(() => rotateSpk(), SPK_ROTATION_INTERVAL_MS);
-    identityState.ephemeralKeyRotationInterval = setInterval(() => rotateEphemeralKey(), EPHEMERAL_KEY_ROTATION_INTERVAL_MS);
+    identityState.ephemeralKeyRotationInterval = null;
 }
 
 export function initIdentity(userDataPath: string): void {

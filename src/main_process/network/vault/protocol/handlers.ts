@@ -185,8 +185,7 @@ export async function handleVaultAck(senderSid: string, data: { payloadHashes: s
         // del custodio, impidiendo que el destinatario real los recuperara.
         const entry = await (await import('../../../storage/vault/operations.js')).getVaultEntryByHash(hash);
         if (!entry) {
-            debug('Received VAULT_ACK for unknown entry, rewarding custodian', { hash, custodian: senderSid }, 'vault');
-            issueVouch(senderSid, VouchType.VAULT_CHUNK).catch(() => { });
+            debug('Received VAULT_ACK for unknown entry, ignoring', { hash, sender: senderSid }, 'vault');
             continue;
         }
         if (entry.recipientSid !== senderSid) {

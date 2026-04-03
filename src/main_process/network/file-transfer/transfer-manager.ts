@@ -180,7 +180,7 @@ export class TransferManager implements ITransferManager {
                 break;
             case 'FILE_DONE_ACK':
                 if (typeof data.fileId !== 'string') return;
-                await this.handleDoneAck(data.fileId);
+                await this.handleDoneAck(upeerId, data.fileId);
                 break;
             case 'FILE_CANCEL':
             case 'FILE_END':
@@ -431,7 +431,9 @@ export class TransferManager implements ITransferManager {
         }
     }
 
-    public async handleDoneAck(fileId: string) {
+    public async handleDoneAck(upeerId: string, fileId: string) {
+        const transfer = this.store.getTransfer(fileId, 'sending');
+        if (!transfer || transfer.upeerId !== upeerId) return;
         this.clearDoneRetry(fileId);
         await this.finalizeTransfer(fileId, 'sending');
     }

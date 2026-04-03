@@ -15,6 +15,7 @@ vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => null }))
 vi.mock('@mui/icons-material/PushPin', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Notifications', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/MarkChatUnread', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Favorite', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Block', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => null }));

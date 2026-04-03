@@ -95,6 +95,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                 slots={{ root: IconButton }}
                 slotProps={{
                     root: {
+                        'aria-label': 'Adjuntar archivo',
                         variant: "plain",
                         color: "neutral",
                         disabled: disabled,

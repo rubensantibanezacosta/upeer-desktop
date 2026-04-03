@@ -24,6 +24,7 @@ import {
     decrypt,
     decryptX3DH,
     decryptSealed,
+    getMyEphemeralPublicKey,
     incrementEphemeralMessageCounter
 } from '../../../src/main_process/security/identity.js';
 
@@ -188,6 +189,8 @@ describe('IdentityManager', () => {
         initIdentity(tempDir);
         unlockSession(bip39.generateMnemonic());
 
+        const originalEphemeralKey = getMyEphemeralPublicKey().toString('hex');
+
         const message = Buffer.from('confidential');
         const recipientPk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
         sodium.randombytes_buf(recipientPk);
@@ -197,22 +200,22 @@ describe('IdentityManager', () => {
         expect(ciphertext).toBeDefined();
 
         // Para probar decrypt necesitamos la clave privada del receptor, 
-        // pero podemos probar el flujo de rotación.
+        // pero sí podemos fijar que la clave legacy no rota.
         for (let i = 0; i < 110; i++) {
             incrementEphemeralMessageCounter();
         }
-        // Debería haber rotado (cobertura de _rotateEphemeralKey)
+
+        expect(getMyEphemeralPublicKey().toString('hex')).toBe(originalEphemeralKey);
     });
 
-    it('should decrypt using previous ephemeral keys', () => {
+    it('should keep decrypting after many legacy counter increments without rotating the key', () => {
         initIdentity(tempDir);
         unlockSession(bip39.generateMnemonic());
 
-        const recipientPk = getMyPublicKey();
+        const recipientPk = getMyEphemeralPublicKey();
         const msg = Buffer.from('roundtrip');
         const { nonce, ciphertext } = encrypt(msg, recipientPk);
 
-        // Rotar clave efímera para que la actual cambie
         for (let i = 0; i < 101; i++) {
             incrementEphemeralMessageCounter();
         }

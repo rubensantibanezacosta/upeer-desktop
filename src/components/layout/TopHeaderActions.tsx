@@ -34,23 +34,23 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
         {contactName && (
             <>
                 <Tooltip title="Buscar en el chat" variant="soft">
-                    <IconButton size="md" variant="plain" color="neutral"><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
+                    <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral"><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
                 <Tooltip title="Llamada de voz" variant="soft">
-                    <IconButton size="md" variant="plain" color="neutral"><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
+                    <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral"><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
                 <Tooltip title="Videollamada" variant="soft">
-                    <IconButton size="md" variant="plain" color="neutral"><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
+                    <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral"><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
                 </Tooltip>
                 {isGroup && isAdmin && onInviteMembers && (
                     <Tooltip title="Añadir miembros" variant="soft">
-                        <IconButton size="md" variant="plain" color="neutral" onClick={onInviteMembers}>
+                        <IconButton aria-label="Añadir miembros" size="md" variant="plain" color="neutral" onClick={onInviteMembers}>
                             <PersonAddAlt1Icon sx={{ fontSize: '22px' }} />
                         </IconButton>
                     </Tooltip>
                 )}
                 <Box sx={{ width: '1px', height: '24px', backgroundColor: 'divider', mx: 0.5 }} />
-                <IconButton size="md" variant="plain" color="neutral"><MoreVertIcon /></IconButton>
+                <IconButton aria-label="Más acciones" size="md" variant="plain" color="neutral"><MoreVertIcon /></IconButton>
             </>
         )}
     </Box>

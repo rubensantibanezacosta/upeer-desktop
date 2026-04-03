@@ -71,6 +71,7 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
 
     return (
         <Box
+            aria-label="Barra de respuesta"
             onClick={() => replyToMessage.id && onScrollTo?.(replyToMessage.id)}
             sx={{
                 p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
@@ -104,6 +105,7 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
                 </Box>
             </Box>
             <IconButton
+                aria-label="Cancelar respuesta"
                 size="sm"
                 variant="plain"
                 color="neutral"

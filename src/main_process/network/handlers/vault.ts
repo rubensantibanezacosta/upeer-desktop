@@ -71,13 +71,10 @@ export async function handleVaultDelivery(
 
     debug('Handling vault delivery', { count: entries.length, from: senderSid }, 'vault');
 
-    issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => {
-        warn('Failed to issue vault retrieved vouch', { senderSid, err: String(err) }, 'reputation');
-    });
-
     // Solo ACK-ar entradas que pasaron integridad y fueron procesadas sin error.
     // Entradas corrompidas o manipuladas NO se ACKên → el custodio las conserva.
     const validatedHashes: string[] = [];
+    let processedEntries = 0;
     try {
         for (const entry of entries) {
             try {
@@ -223,6 +220,7 @@ export async function handleVaultDelivery(
                     }
                 }
                 // Llegamos aquí sin 'continue' ni excepción → entrada procesada correctamente.
+                processedEntries += 1;
                 if (typeof entry.payloadHash === 'string') {
                     validatedHashes.push(entry.payloadHash);
                 }
@@ -232,6 +230,12 @@ export async function handleVaultDelivery(
         }
     } catch (err) {
         error('Vault delivery processing failed', err, 'vault');
+    }
+
+    if (processedEntries > 0) {
+        issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => {
+            warn('Failed to issue vault retrieved vouch', { senderSid, err: String(err) }, 'reputation');
+        });
     }
 
     // ACK solo para entradas que pasaron integridad y fueron procesadas sin error.

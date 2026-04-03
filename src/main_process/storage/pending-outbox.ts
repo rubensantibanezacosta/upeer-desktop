@@ -14,7 +14,9 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from './shared.js';
 import { pendingOutbox } from './schema.js';
+import { getContactByUpeerId } from './contacts/operations.js';
 import { debug, warn } from '../security/secure-logger.js';
+import { encryptChatPayload } from '../network/messaging/chatEncryption.js';
 
 export async function savePendingOutboxMessage(
     recipientSid: string,
@@ -58,18 +60,19 @@ export async function flushPendingOutbox(
 
     debug('Flushing pending outbox', { recipientSid, count: messages.length }, 'vault');
 
-    const { encrypt, getMyUPeerId, sign } = await import('../security/identity.js');
+    const { getMyUPeerId, sign } = await import('../security/identity.js');
     const { canonicalStringify } = await import('../network/utils.js');
     const { VaultManager } = await import('../network/vault/manager.js');
     const myId = getMyUPeerId();
+    const contact = await getContactByUpeerId(recipientSid);
 
     for (const entry of messages) {
         try {
-            // Re-cifrar con la clave estática recién recibida
-            const { ciphertext, nonce } = encrypt(
-                Buffer.from(entry.plaintext, 'utf-8'),
-                Buffer.from(recipientPublicKeyHex, 'hex')
-            );
+            const encryptedPayload = await encryptChatPayload(recipientSid, entry.plaintext, {
+                publicKey: contact?.publicKey ?? recipientPublicKeyHex,
+                signedPreKey: contact?.signedPreKey,
+                signedPreKeyId: contact?.signedPreKeyId,
+            });
 
             // BUG J fix: usar el msgId original grabado en la outbox en vez de generar
             // uno nuevo. Sin esto, el remitente ve el mensaje con un UUID y el vault lo
@@ -77,9 +80,13 @@ export async function flushPendingOutbox(
             const vaultData = {
                 type: 'CHAT',
                 id: entry.msgId,
-                content: ciphertext,
-                nonce: nonce,
+                content: encryptedPayload.content,
+                nonce: encryptedPayload.nonce,
                 replyTo: entry.replyTo ?? undefined,
+                ...(encryptedPayload.ratchetHeader ? { ratchetHeader: encryptedPayload.ratchetHeader } : {}),
+                ...(encryptedPayload.x3dhInit ? { x3dhInit: encryptedPayload.x3dhInit } : {}),
+                ...(encryptedPayload.ephemeralPublicKey ? { ephemeralPublicKey: encryptedPayload.ephemeralPublicKey } : {}),
+                ...(encryptedPayload.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encryptedPayload.useRecipientEphemeral } : {}),
             };
 
             const sig = sign(Buffer.from(canonicalStringify(vaultData)));

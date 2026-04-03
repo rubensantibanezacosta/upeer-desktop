@@ -116,6 +116,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({ open, onClose, conta
 
                 <Box sx={{ px: 1.5, pb: 1.5 }}>
                     <Input
+                        aria-label="Buscar destino para reenviar"
                         placeholder="Buscar un nombre o número"
                         startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
                         value={query}
@@ -146,6 +147,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({ open, onClose, conta
                         return (
                             <ListItem key={t.id} sx={{ p: 0 }}>
                                 <ListItemButton
+                                    aria-label={`Seleccionar destino ${t.name}`}
                                     onClick={() => toggleSelection(t)}
                                     sx={{
                                         height: '72px',

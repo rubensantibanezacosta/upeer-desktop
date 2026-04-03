@@ -101,7 +101,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                 justifyContent: 'space-between',
                 background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
             }}>
-                <IconButton variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
+                <IconButton aria-label="Cerrar adjuntos" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <CloseIcon />
                 </IconButton>
 
@@ -190,7 +190,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                             sx={{ flexGrow: 1, borderRadius: 'lg' }}
                             disabled={isGenerating}
                         />
-                        <IconButton variant="plain" color={isGenerating ? 'neutral' : 'primary'} onClick={handleSendAll} disabled={isGenerating}>
+                        <IconButton aria-label="Enviar adjuntos" variant="plain" color={isGenerating ? 'neutral' : 'primary'} onClick={handleSendAll} disabled={isGenerating}>
                             <SendIcon />
                         </IconButton>
                     </Box>

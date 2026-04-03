@@ -1,4 +1,5 @@
 import React from 'react';
+import { Box } from '@mui/joy';
 import { IconButton } from '@mui/joy';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -13,6 +14,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, onRetry })
     if (status === 'failed') {
         return (
             <IconButton
+                aria-label="Reintentar mensaje"
                 size="sm"
                 variant="plain"
                 color="danger"
@@ -30,15 +32,18 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, onRetry })
     const isRead = status === 'read';
     const isSingleCheck = status === 'sent' || status === 'vaulted';
     const Icon = isSingleCheck ? DoneIcon : DoneAllIcon;
+    const readableStatus = isRead ? 'leído' : isSingleCheck ? 'enviado' : 'entregado';
     return (
-        <Icon sx={{
-            fontSize: '16px',
-            lineHeight: 1,
-            flexShrink: 0,
-            color: isRead ? '#53bdeb' : 'text.tertiary',
-            opacity: isRead ? 1 : 0.7,
-            verticalAlign: 'middle',
-        }} />
+        <Box component="span" aria-label={`Estado del mensaje: ${readableStatus}`} sx={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Icon sx={{
+                fontSize: '16px',
+                lineHeight: 1,
+                flexShrink: 0,
+                color: isRead ? '#53bdeb' : 'text.tertiary',
+                opacity: isRead ? 1 : 0.7,
+                verticalAlign: 'middle',
+            }} />
+        </Box>
     );
 };
 

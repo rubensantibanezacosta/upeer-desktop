@@ -21,7 +21,7 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         vi.restoreAllMocks();
     });
 
-    it('should correctly rotate Ephemeral Keys and search previous keys during decryption', () => {
+    it('should keep the legacy ephemeral key stable across counter increments', () => {
         identity.unlockSession(mnemonic);
         const originalPk = identity.getMyEphemeralPublicKey();
         const msg = Buffer.from('hello');
@@ -29,21 +29,18 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         // Encrypt with current key
         const encrypted = identity.encrypt(msg, originalPk);
 
-        // Rotate many times to populate previousEphemeralSecretKeys
         for (let i = 0; i < 3; i++) {
-            identity.incrementEphemeralMessageCounter(); // This will reach 100 in loop? No, the counter is internal.
-            // Force rotation by calling it 100 times or just mocking the interval/counter
+            identity.incrementEphemeralMessageCounter();
             for (let j = 0; j < 101; j++) identity.incrementEphemeralMessageCounter();
         }
 
         const newPk = identity.getMyEphemeralPublicKey();
-        expect(newPk.toString('hex')).not.toBe(originalPk.toString('hex'));
+        expect(newPk.toString('hex')).toBe(originalPk.toString('hex'));
 
-        // Decrypt with an OLD key (should work because it's in previousEphemeralSecretKeys)
         const decrypted = identity.decrypt(
             Buffer.from(encrypted.nonce, 'hex'),
             Buffer.from(encrypted.ciphertext, 'hex'),
-            originalPk // Sender is "me" using the old pk
+            originalPk
         );
 
         expect(decrypted?.toString()).toBe('hello');

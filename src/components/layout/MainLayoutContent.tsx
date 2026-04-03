@@ -11,6 +11,7 @@ import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { NavigationRail } from './NavigationRail.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
+import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
 import { MainLayoutPanels } from './MainLayoutPanels.js';
 import type { MainLayoutProps, PreviewableMedia } from './MainLayout.js';
@@ -114,6 +115,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
+    const keyChangeAlert = chatStore.keyChangeAlerts[targetUpeerId];
 
     return (
         <Box sx={{ display: 'flex', flexGrow: 1, minWidth: 0, width: '100%', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
@@ -193,6 +195,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         />
                                     ) : (
                                         <Box onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+                                            {keyChangeAlert && <KeyChangeAlertBanner alert={keyChangeAlert} onDismiss={() => chatStore.clearKeyChangeAlert(targetUpeerId)} />}
                                             <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}>
                                                 <ChatArea
                                                     key={activeGroupId || targetUpeerId}

@@ -193,8 +193,19 @@ npm run package             # Crear paquete portable
 npm run make                # Generar instaladores para todas las plataformas
 
 # Pruebas
-npm run test-phase11        # Probar reacciones, edición y eliminación
+npm run test:unit          # Suite unitaria
+npm run test:integration   # Flujos DR entre módulos
+npm run test:e2e           # Smoke E2E del renderer con Playwright
+npm run test:all           # Las tres capas seguidas
+npm run test-phase11       # Probar reacciones, edición y eliminación
 ```
+
+### Estrategia de validación
+
+- Unit: valida funciones, stores y handlers aislados.
+- Integración: valida flujos críticos entre cifrado DR, sesiones y vault.
+- E2E: valida que el renderer arranca y monta correctamente como experiencia de usuario.
+- Ninguna estrategia puede prometer un 100% matemático, pero estas tres capas sí elevan mucho la confianza y reducen regresiones reales.
 
 ## 📋 Roadmap
 

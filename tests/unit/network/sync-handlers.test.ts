@@ -31,6 +31,7 @@ vi.mock('../../../src/main_process/storage/messages/status.js', () => ({
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     updateMessageContent: vi.fn(),
     deleteMessageLocally: vi.fn(),
+    getMessageById: vi.fn(),
 }));
 vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
     getKademliaInstance: vi.fn(),
@@ -67,7 +68,7 @@ describe('Sync Handlers', () => {
 
             expect(messageStatus.updateMessageStatus).toHaveBeenCalledWith('msg-123', 'read');
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-status-updated', {
-                messageId: 'msg-123',
+                id: 'msg-123',
                 status: 'read'
             });
         });
@@ -90,6 +91,8 @@ describe('Sync Handlers', () => {
         });
 
         it('should process MESSAGE_DELETE', async () => {
+            vi.mocked(messageOps.getMessageById).mockResolvedValue({ id: 'msg-456', chatUpeerId: 'peer-chat' } as never);
+
             await handleSyncPulse('my-peer-id', {
                 deviceId: 'device-2',
                 action: 'MESSAGE_DELETE',
@@ -98,7 +101,9 @@ describe('Sync Handlers', () => {
 
             expect(messageOps.deleteMessageLocally).toHaveBeenCalledWith('msg-456');
             expect(mockWin.webContents.send).toHaveBeenCalledWith('message-deleted', {
-                messageId: 'msg-456'
+                id: 'msg-456',
+                upeerId: 'peer-chat',
+                chatUpeerId: 'peer-chat'
             });
         });
 
@@ -111,6 +116,8 @@ describe('Sync Handlers', () => {
         });
 
         it('should process MESSAGE_EDIT', async () => {
+            vi.mocked(messageOps.getMessageById).mockResolvedValue({ id: 'msg-789', chatUpeerId: 'peer-chat' } as never);
+
             await handleSyncPulse('my-peer-id', {
                 deviceId: 'device-2',
                 action: 'MESSAGE_EDIT',
@@ -119,8 +126,10 @@ describe('Sync Handlers', () => {
             }, mockWin);
 
             expect(messageOps.updateMessageContent).toHaveBeenCalledWith('msg-789', 'edited text');
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-content-updated', {
-                messageId: 'msg-789',
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-updated', {
+                id: 'msg-789',
+                upeerId: 'peer-chat',
+                chatUpeerId: 'peer-chat',
                 content: 'edited text'
             });
         });
@@ -163,6 +172,29 @@ describe('Sync Handlers', () => {
 
             await broadcastPulse('ACTION', {});
             expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        });
+
+        it('should deduplicate repeated self nodes and skip blank addresses', async () => {
+            vi.mocked(yggstack.getYggstackAddress).mockReturnValue('addr-self');
+            const mockKademlia = {
+                findClosestContacts: vi.fn().mockReturnValue([
+                    { upeerId: 'my-peer-id', address: 'addr-2' },
+                    { upeerId: 'my-peer-id', address: ' addr-2 ' },
+                    { upeerId: 'my-peer-id', address: '' },
+                    { upeerId: 'my-peer-id', address: 'addr-self' },
+                ])
+            } satisfies Pick<KademliaInstance, 'findClosestContacts'>;
+            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+
+            await broadcastPulse('MESSAGE_DELETE', { messageId: 'm2' });
+
+            expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+            expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+                'addr-2',
+                expect.objectContaining({ action: 'MESSAGE_DELETE', messageId: 'm2' }),
+                undefined,
+                true
+            );
         });
     });
 });

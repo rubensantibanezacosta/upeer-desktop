@@ -34,6 +34,7 @@ type MockKademlia = {
     findClosestContacts?: ReturnType<typeof vi.fn>;
     getAllStoredValues?: ReturnType<typeof vi.fn>;
     performMaintenance?: ReturnType<typeof vi.fn>;
+    addContact?: ReturnType<typeof vi.fn>;
     upeerId?: string;
 };
 
@@ -48,7 +49,10 @@ function createContact(overrides: Partial<NetworkContact> & Pick<NetworkContact,
 }
 
 function getKademliaMock(overrides: Partial<MockKademlia>): MockKademlia {
-    return overrides;
+    return {
+        addContact: vi.fn(),
+        ...overrides,
+    };
 }
 
 vi.mock('../../../src/main_process/network/dht/shared.js');
@@ -471,6 +475,7 @@ describe('network/dht/handlers.ts', () => {
 
         it('iterativeFindNode logic should find node through multiple jumps', async () => {
             const mockKademlia = {
+                addContact: vi.fn(),
                 findClosestContacts: vi.fn().mockReturnValue([{ upeerId: 'peer1', address: 'addr1', publicKey: 'pk1' }])
             };
             vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
@@ -496,6 +501,7 @@ describe('network/dht/handlers.ts', () => {
 
         it('iterativeFindNode should stop after max iterations or timeout', async () => {
             const mockKademlia = {
+                addContact: vi.fn(),
                 findClosestContacts: vi.fn().mockReturnValue([{ upeerId: 'peer1', address: 'addr1', publicKey: 'pk1' }])
             };
             vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);

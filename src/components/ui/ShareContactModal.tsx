@@ -99,6 +99,7 @@ export const ShareContactModal: React.FC<ShareContactModalProps> = ({ open, onCl
                     {filteredContacts.map((contact) => (
                         <ListItem key={contact.upeerId || contact.address} sx={{ p: 0 }}>
                             <ListItemButton
+                                aria-label={`Compartir contacto ${contact.name}`}
                                 onClick={() => handleShare(contact)}
                                 sx={{
                                     height: '72px',

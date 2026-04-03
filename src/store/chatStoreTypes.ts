@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { ChatMessage, Contact, Group, IncomingRequest, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
+import type { ChatMessage, Contact, Group, IncomingRequest, KeyChangeAlert, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
 
 export interface ChatState {
     myIdentity: MyIdentity | null;
@@ -18,6 +18,7 @@ export interface ChatState {
     incomingRequests: Record<string, IncomingRequest>;
     untrustworthyAlert: UntrustworthyInfo | null;
     untrustworthyAlerts: Record<string, UntrustworthyInfo>;
+    keyChangeAlerts: Record<string, KeyChangeAlert>;
     pendingFiles: PendingFile[];
     isDragging: boolean;
 }
@@ -57,6 +58,7 @@ export interface ChatActions {
     handleBlockContact: (id?: string) => void;
     handleUnblockContact: (id: string) => void;
     clearUntrustworthyAlert: () => void;
+    clearKeyChangeAlert: (upeerId?: string) => void;
     setPendingFiles: (files: PendingFile[]) => void;
     setIsDragging: (dragging: boolean) => void;
     handleRetryMessage: (msgId: string) => Promise<void>;

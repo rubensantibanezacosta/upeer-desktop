@@ -15,6 +15,8 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
     error: vi.fn(),
+    network: vi.fn(),
+    security: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -97,7 +99,7 @@ describe('TransferManager - Integration', () => {
 
         expect(mockSend).toHaveBeenCalledWith('addr1', { type: 'FILE_DONE', fileId }, 'pubkey');
 
-        await manager.handleDoneAck(fileId);
+        await manager.handleDoneAck('peer1', fileId);
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.state).toBe('completed');
     });

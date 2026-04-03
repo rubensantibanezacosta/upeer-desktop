@@ -55,6 +55,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onAdd, onDone })
                     <FormControl required>
                         <FormLabel sx={{ fontWeight: 600, fontSize: '12px' }}>Identidad upeer (ID@IP)</FormLabel>
                         <Input
+                            aria-label="Identidad upeer"
                             autoFocus
                             placeholder="fc33aa0e…@200:7704:49e5:b4cd:7910:2191:2574:351b"
                             value={id}
@@ -68,6 +69,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onAdd, onDone })
                     <FormControl required>
                         <FormLabel sx={{ fontWeight: 600, fontSize: '12px' }}>Alias del contacto</FormLabel>
                         <Input
+                            aria-label="Alias del contacto"
                             placeholder="Nombre o apodo para identificarlo"
                             value={name}
                             onChange={(e) => setName(e.target.value)}

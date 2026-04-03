@@ -35,6 +35,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
     return (
         <ListItem sx={{ p: 0 }}>
             <ListItemButton
+                aria-label={`Abrir chat con ${c.name}`}
                 selected={isSelected}
                 onClick={() => onSelect(c.upeerId)}
                 sx={{

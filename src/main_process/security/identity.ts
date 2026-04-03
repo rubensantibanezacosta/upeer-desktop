@@ -7,7 +7,7 @@ import {
     decryptSealed,
     decryptWithIdentityKey,
     decryptX3DH,
-    encrypt,
+    encrypt as encryptRaw,
     getUPeerIdFromPublicKey,
     sign,
     verify,
@@ -20,7 +20,8 @@ import {
     rotateSpk,
     unlockSession,
 } from './identityLifecycleInternal.js';
-import { EPHEMERAL_KEY_MAX_MESSAGES, identityState } from './identityState.js';
+import { identityState } from './identityState.js';
+import { EPHEMERAL_KEY_MAX_MESSAGES } from './identityState.js';
 import { getOrCreateDeviceKey } from './identityStorage.js';
 
 export {
@@ -28,7 +29,6 @@ export {
     decryptSealed,
     decryptWithIdentityKey,
     decryptX3DH,
-    encrypt,
     getUPeerIdFromPublicKey,
     initIdentity,
     lockSession,
@@ -36,6 +36,15 @@ export {
     unlockSession,
     verify,
 };
+
+export function encrypt(message: Buffer, recipientPublicKey: Buffer): { nonce: string; ciphertext: string } {
+    const encrypted = encryptRaw(message, recipientPublicKey);
+    identityState.ephemeralKeyRotationCounter++;
+    if (identityState.ephemeralKeyRotationCounter >= EPHEMERAL_KEY_MAX_MESSAGES) {
+        rotateEphemeralKey();
+    }
+    return encrypted;
+}
 
 export function getDhtSeq(): number {
     return identityState.dhtSeq;
@@ -177,7 +186,6 @@ export function setMyAvatar(avatar: string): void {
 
 export function incrementEphemeralMessageCounter(): void {
     identityState.ephemeralKeyRotationCounter++;
-    if (identityState.ephemeralKeyRotationCounter >= EPHEMERAL_KEY_MAX_MESSAGES) rotateEphemeralKey();
 }
 
 export function getMySignedPreKeyBundle(): { spkPub: string; spkSig: string; spkId: number } {

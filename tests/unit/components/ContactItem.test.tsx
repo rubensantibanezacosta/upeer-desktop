@@ -25,6 +25,7 @@ vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => <div dat
 vi.mock('@mui/icons-material/PushPin', () => ({ default: () => <div data-testid="PushPinIcon" /> }));
 vi.mock('@mui/icons-material/Notifications', () => ({ default: () => <div data-testid="NotificationsIcon" /> }));
 vi.mock('@mui/icons-material/MarkChatUnread', () => ({ default: () => <div data-testid="MarkChatUnreadIcon" /> }));
+vi.mock('@mui/icons-material/Favorite', () => ({ default: () => <div data-testid="FavoriteIcon" /> }));
 vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => <div data-testid="FavoriteBorderIcon" /> }));
 vi.mock('@mui/icons-material/Block', () => ({ default: () => <div data-testid="BlockIcon" /> }));
 vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => <div data-testid="DeleteSweepIcon" /> }));

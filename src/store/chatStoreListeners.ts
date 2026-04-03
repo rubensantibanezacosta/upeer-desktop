@@ -3,7 +3,7 @@ import { useNotificationStore } from './useNotificationStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { applyReactionUpdate, formatMessageTimestamp } from './chatStoreSupport.js';
-import type { ChatMessage, IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent } from '../types/chat.js';
+import type { ChatMessage, IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, KeyChangeAlert, UntrustworthyInfo } from '../types/chat.js';
 
 export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
     initListeners: () => {
@@ -80,6 +80,47 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             if (get().targetUpeerId.startsWith('pending-')) {
                 get().setTargetUpeerId(data.upeerId);
             }
+        });
+
+        window.upeer.onContactUntrustworthy((data) => {
+            const nextAlert: UntrustworthyInfo = {
+                upeerId: data.upeerId,
+                address: data.address,
+                alias: data.alias,
+                reason: data.reason,
+            };
+            set((state) => {
+                const currentRequest = state.incomingRequests[data.upeerId];
+                return {
+                    untrustworthyAlert: nextAlert,
+                    untrustworthyAlerts: {
+                        ...state.untrustworthyAlerts,
+                        [data.upeerId]: nextAlert,
+                    },
+                    incomingRequests: currentRequest ? {
+                        ...state.incomingRequests,
+                        [data.upeerId]: {
+                            ...currentRequest,
+                            untrustworthy: nextAlert,
+                        },
+                    } : state.incomingRequests,
+                };
+            });
+        });
+
+        window.upeer.onKeyChangeAlert((data) => {
+            const nextAlert: KeyChangeAlert = {
+                upeerId: data.upeerId,
+                oldFingerprint: data.oldFingerprint,
+                newFingerprint: data.newFingerprint,
+                alias: data.alias,
+            };
+            set((state) => ({
+                keyChangeAlerts: {
+                    ...state.keyChangeAlerts,
+                    [data.upeerId]: nextAlert,
+                },
+            }));
         });
 
         window.upeer.onTyping((data) => {

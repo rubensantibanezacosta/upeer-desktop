@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
 import { saveMessage, getMessageById } from '../../storage/messages/operations.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type ChatContactPacket = {
     id?: string;
     timestamp?: number;
@@ -42,7 +44,7 @@ export async function handleChatContact(
     fromAddress: string,
     sendResponse: (ip: string, data: AckPacket) => void,
 ): Promise<void> {
-    const msgId = typeof data.id === 'string' && data.id ? data.id : randomUUID();
+    const msgId = typeof data.id === 'string' && UUID_RE.test(data.id) ? data.id : randomUUID();
     const existing = await getMessageById(msgId);
 
     if (existing) {

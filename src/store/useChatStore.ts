@@ -22,6 +22,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     incomingRequests: {},
     untrustworthyAlert: null,
     untrustworthyAlerts: {},
+    keyChangeAlerts: {},
     pendingFiles: [],
     isDragging: false,
     setMyIdentity: (identity) => set({ myIdentity: identity }),

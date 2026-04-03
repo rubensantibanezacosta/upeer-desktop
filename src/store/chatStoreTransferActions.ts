@@ -4,6 +4,14 @@ import type { LinkPreview, PendingFile, TransferMessageUpdates } from '../types/
 
 export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
     clearUntrustworthyAlert: () => set({ untrustworthyAlert: null }),
+    clearKeyChangeAlert: (upeerId?: string) => set((state) => {
+        if (!upeerId) {
+            return { keyChangeAlerts: {} };
+        }
+        const keyChangeAlerts = { ...state.keyChangeAlerts };
+        delete keyChangeAlerts[upeerId];
+        return { keyChangeAlerts };
+    }),
     setPendingFiles: (files: PendingFile[]) => set({ pendingFiles: files }),
     setIsDragging: (dragging: boolean) => set({ isDragging: dragging }),
 

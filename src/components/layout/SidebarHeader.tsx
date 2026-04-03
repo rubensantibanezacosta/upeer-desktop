@@ -18,10 +18,10 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew }) => (
     }}>
         <Typography level="h4" sx={{ fontWeight: 600 }}>uPeer</Typography>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton size="sm" variant="plain" color="neutral" onClick={onAddNew}>
+            <IconButton aria-label="Nuevo chat" size="sm" variant="plain" color="neutral" onClick={onAddNew}>
                 <EditNoteIcon />
             </IconButton>
-            <IconButton size="sm" variant="plain" color="neutral">
+            <IconButton aria-label="Más opciones" size="sm" variant="plain" color="neutral">
                 <MoreVertIcon />
             </IconButton>
         </Box>
@@ -34,7 +34,7 @@ export const NewChatHeader: React.FC<{ onBack: () => void }> = ({ onBack }) => (
         backgroundColor: 'background.surface',
         height: '60px', boxSizing: 'border-box',
     }}>
-        <IconButton size="sm" variant="plain" color="neutral" onClick={onBack}>
+        <IconButton aria-label="Volver" size="sm" variant="plain" color="neutral" onClick={onBack}>
             <ArrowBackIcon />
         </IconButton>
         <Typography level="h4" sx={{ fontWeight: 600 }}>Nuevo chat</Typography>

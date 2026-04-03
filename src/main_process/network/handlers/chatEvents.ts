@@ -10,14 +10,15 @@ import {
     saveReaction,
     deleteReaction,
 } from '../../storage/messages/reactions.js';
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import {
-    decrypt,
-    decryptWithIdentityKey,
+    getMySignedPreKeyBundle,
     getMyUPeerId,
 } from '../../security/identity.js';
+import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { warn } from '../../security/secure-logger.js';
-import { isValidMessageId, updateEphemeralKeyIfValid } from './chatShared.js';
+import { clearPendingDirectMessage } from '../messaging/chatRetry.js';
+import { isValidMessageId } from './chatShared.js';
+import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
 
 type ChatEventMessageRecord = {
     id?: string;
@@ -26,17 +27,14 @@ type ChatEventMessageRecord = {
     message?: string;
 };
 
-type StoredChatContact = {
-    publicKey?: string;
-    ephemeralPublicKey?: string;
-};
-
 type EditableChatPayload = {
     id?: string;
     msgId?: string;
     content?: string;
     newContent?: string;
     nonce?: string;
+    x3dhInit?: X3DHInitPacket;
+    ratchetHeader?: RatchetHeader;
     ephemeralPublicKey?: string;
     useRecipientEphemeral?: boolean;
     chatUpeerId?: string;
@@ -53,6 +51,7 @@ type ChatClearPayload = {
     chatUpeerId?: string;
     clearTimestamp?: number;
     timestamp?: number;
+    isInternalSync?: boolean;
 };
 
 type ChatDeletePayload = {
@@ -71,6 +70,7 @@ type ChatReactionPayload = {
     reaction?: string;
     emojiToDelete?: string;
     remove?: boolean;
+    isInternalSync?: boolean;
 };
 
 async function resolveEditedContent(upeerId: string, data: EditableChatPayload): Promise<string | null> {
@@ -87,32 +87,15 @@ async function resolveEditedContent(upeerId: string, data: EditableChatPayload):
         return null;
     }
 
-    try {
-        const contact = (await getContactByUpeerId(upeerId)) as StoredChatContact | undefined;
-        const senderEphemeralKey = updateEphemeralKeyIfValid(upeerId, data.ephemeralPublicKey);
-        const decryptKeyHex = senderEphemeralKey ?? contact?.ephemeralPublicKey ?? contact?.publicKey;
-        if (!decryptKeyHex) {
-            return null;
+    if (data.ratchetHeader) {
+        const doubleRatchetContent = await decryptDoubleRatchetPayload(upeerId, data);
+        if (doubleRatchetContent) {
+            return doubleRatchetContent;
         }
-
-        const decrypted = decrypt(
-            Buffer.from(data.nonce, 'hex'),
-            Buffer.from(data.content, 'hex'),
-            Buffer.from(decryptKeyHex, 'hex')
-        );
-        const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
-            ? decryptWithIdentityKey(
-                Buffer.from(data.nonce, 'hex'),
-                Buffer.from(data.content, 'hex'),
-                Buffer.from(decryptKeyHex, 'hex')
-            )
-            : null;
-        const resolved = decrypted ?? staticDecrypted;
-        return resolved ? resolved.toString('utf-8') : null;
-    } catch (err) {
-        warn('Failed to decrypt chat edit payload', { upeerId, err: String(err) }, 'security');
-        return null;
     }
+
+    warn('Dropping non-DR chat update payload', { upeerId }, 'security');
+    return null;
 }
 
 export async function handleChatAck(
@@ -124,6 +107,7 @@ export async function handleChatAck(
     const messageId = data.id as string;
     const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (msg && msg.chatUpeerId === upeerId && msg.isMine) {
+        clearPendingDirectMessage(messageId);
         updateMessageStatus(messageId, data.status || 'delivered');
         win?.webContents.send('message-status-updated', {
             id: messageId,
@@ -137,7 +121,9 @@ export async function handleChatClear(
     data: ChatClearPayload,
     win: BrowserWindow | null
 ): Promise<void> {
-    const chatUpeerId = data.chatUpeerId || upeerId;
+    const myId = getMyUPeerId();
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+    const chatUpeerId = isInternalSync && data.chatUpeerId ? data.chatUpeerId : upeerId;
     deleteMessagesByChatId(chatUpeerId, data.clearTimestamp ?? data.timestamp);
     win?.webContents.send('chat-cleared', { upeerId: chatUpeerId });
 }
@@ -146,7 +132,9 @@ export async function handleChatEdit(
     upeerId: string,
     data: EditableChatPayload,
     win: BrowserWindow | null,
-    signature: string
+    signature: string,
+    fromAddress?: string,
+    sendResponse?: (ip: string, data: Record<string, unknown>) => void,
 ): Promise<void> {
     const msgId = data.msgId || data.id;
     if (!isValidMessageId(msgId)) return;
@@ -158,7 +146,15 @@ export async function handleChatEdit(
     const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
-    const newContent = await resolveEditedContent(upeerId, data);
+    const newContent = data.ratchetHeader
+        ? await decryptDoubleRatchetPayload(upeerId, data, async () => {
+            if (!fromAddress || !sendResponse) return;
+            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        })
+        : await resolveEditedContent(upeerId, data);
+    if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {
+        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+    }
     if (typeof newContent !== 'string') return;
 
     updateMessageContent(messageId, newContent, signature, data.version);
@@ -172,12 +168,15 @@ export async function handleChatEdit(
 }
 
 export async function handleReadReceipt(
-    _upeerId: string,
+    upeerId: string,
     data: ChatAckPayload,
     win: BrowserWindow | null
 ): Promise<void> {
     if (!isValidMessageId(data.id)) return;
     const messageId = data.id as string;
+    const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
+    if (!msg || msg.chatUpeerId !== upeerId || !msg.isMine) return;
+
     updateMessageStatus(messageId, 'read');
     win?.webContents.send('message-status-updated', {
         id: messageId,
@@ -220,6 +219,15 @@ export async function handleChatReaction(
     const id = data.msgId || data.id;
     if (!isValidMessageId(id)) return;
     const messageId = id as string;
+    const myId = getMyUPeerId();
+    const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
+    if (!msg) return;
+
+    const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+    const chatUpeerId = isInternalSync
+        ? (data.chatUpeerId || msg.chatUpeerId)
+        : (data.chatUpeerId || upeerId);
+    if (msg.chatUpeerId !== chatUpeerId) return;
 
     const isDelete = data.remove === true || Boolean(data.emojiToDelete);
     if (isDelete) {
@@ -229,7 +237,7 @@ export async function handleChatReaction(
         win?.webContents.send('message-reaction-updated', {
             msgId: messageId,
             upeerId,
-            chatUpeerId: data.chatUpeerId || upeerId,
+            chatUpeerId,
             emoji: emojiToRemove,
             remove: true,
         });
@@ -242,7 +250,7 @@ export async function handleChatReaction(
     win?.webContents.send('message-reaction-updated', {
         msgId: messageId,
         upeerId,
-        chatUpeerId: data.chatUpeerId || upeerId,
+        chatUpeerId,
         emoji,
         remove: false,
     });

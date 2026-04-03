@@ -26,7 +26,7 @@ export const ContactMediaExplorer: React.FC<ContactMediaExplorerProps> = ({ item
                 borderColor: 'divider',
                 flexShrink: 0,
             }}>
-                <IconButton size="sm" variant="plain" color="neutral" onClick={onBack}>
+                <IconButton aria-label="Volver desde multimedia" size="sm" variant="plain" color="neutral" onClick={onBack}>
                     <ArrowBackIcon />
                 </IconButton>
                 <Typography level="title-md" sx={{ fontWeight: 600 }}>Multimedia</Typography>
@@ -43,6 +43,7 @@ export const ContactMediaExplorer: React.FC<ContactMediaExplorerProps> = ({ item
                         {items.map(item => (
                             <AspectRatio
                                 key={item.fileId}
+                                aria-label={`Abrir multimedia ${item.fileName}`}
                                 ratio="1"
                                 onClick={() => item.url && onOpenMedia({ url: item.url, name: item.fileName, mimeType: item.mimeType, fileId: item.fileId })}
                                 sx={{

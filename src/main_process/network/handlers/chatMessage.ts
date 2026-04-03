@@ -8,13 +8,11 @@ import {
     getMessageById,
 } from '../../storage/messages/operations.js';
 import {
-    decrypt,
-    decryptWithIdentityKey,
     getMyUPeerId,
 } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { error, warn, info } from '../../security/secure-logger.js';
-import { isValidMessageId, updateEphemeralKeyIfValid } from './chatShared.js';
+import { isValidMessageId } from './chatShared.js';
 import type { RatchetHeader } from '../../security/ratchetShared.js';
 
 type ChatSignedPreKeyBundle = {
@@ -69,7 +67,7 @@ async function decryptDoubleRatchetContent(
     data: ChatIncomingPayload,
     sendResponse: (ip: string, data: AckPacket | DrResetPacket) => void,
     fromAddress: string
-): Promise<string> {
+): Promise<string | null> {
     const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
 
     try {
@@ -102,7 +100,7 @@ async function decryptDoubleRatchetContent(
         if (!session) {
             sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
             warn('No DR session and no x3dhInit, sent DR_RESET', { upeerId }, 'security');
-            return '🔒 [Sin sesión Double Ratchet]';
+            return null;
         }
 
         const ratchetHeader = data.ratchetHeader;
@@ -140,48 +138,20 @@ async function decryptDoubleRatchetContent(
             deleteRatchetSession(upeerId);
             sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
             error('Double Ratchet decrypt returned null after x3dh retry', { upeerId }, 'security');
-            return '🔒 [Error de descifrado DR]';
+            return null;
         }
 
         deleteRatchetSession(upeerId);
         sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
         error('Double Ratchet decrypt returned null', { upeerId }, 'security');
-        return '🔒 [Error de descifrado DR]';
+        return null;
     } catch (err) {
         const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
         deleteRatchetSession(upeerId);
         sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
         error('Double Ratchet decrypt failed, sent DR_RESET', err, 'security');
-        return '🔒 [Error crítico DR]';
+        return null;
     }
-}
-
-function decryptLegacyContent(data: ChatIncomingPayload, contact: ChatContactRecord): string {
-    const nonce = data.nonce;
-    if (!nonce) {
-        throw new Error('nonce-missing');
-    }
-
-    const senderEphemeralKey = updateEphemeralKeyIfValid(contact.upeerId, data.ephemeralPublicKey);
-    const senderKeyHex = senderEphemeralKey ?? contact.publicKey;
-    if (!senderKeyHex) {
-        throw new Error('La llave pública del remitente no está disponible');
-    }
-
-    const decrypted = decrypt(
-        Buffer.from(nonce, 'hex'),
-        Buffer.from(data.content, 'hex'),
-        Buffer.from(senderKeyHex, 'hex')
-    );
-    const staticDecrypted = !decrypted && data.useRecipientEphemeral === false
-        ? decryptWithIdentityKey(
-            Buffer.from(nonce, 'hex'),
-            Buffer.from(data.content, 'hex'),
-            Buffer.from(senderKeyHex, 'hex')
-        )
-        : null;
-    const resolvedDecrypted = decrypted ?? staticDecrypted;
-    return resolvedDecrypted ? resolvedDecrypted.toString('utf-8') : '🔒 [Error de descifrado]';
 }
 
 export async function handleChatMessage(
@@ -212,18 +182,19 @@ export async function handleChatMessage(
         }
     }
 
-    updateEphemeralKeyIfValid(upeerId, data.ephemeralPublicKey);
-
     let displayContent = data.content;
     if (data.ratchetHeader) {
-        displayContent = await decryptDoubleRatchetContent(upeerId, data, sendResponse, fromAddress);
-    } else if (data.nonce) {
-        try {
-            displayContent = decryptLegacyContent(data, { ...contact, upeerId });
-        } catch (err) {
-            displayContent = '🔒 [Error crítico de seguridad]';
-            error('Decryption failed', err, 'security');
+        const decryptedContent = await decryptDoubleRatchetContent(upeerId, data, sendResponse, fromAddress);
+        if (decryptedContent === null) {
+            warn('Dropping chat message that could not be decrypted with Double Ratchet', { upeerId, msgId }, 'security');
+            return;
         }
+        displayContent = decryptedContent;
+    } else if (data.nonce) {
+        const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
+        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        warn('Dropping non-DR chat message', { upeerId, msgId }, 'security');
+        return;
     }
 
     const saved = await saveMessage(

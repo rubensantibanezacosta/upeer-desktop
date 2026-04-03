@@ -105,6 +105,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     }
                 } : undefined}
                 role={!isGroup && onOpenInfo ? 'button' : undefined}
+                aria-label={!isGroup && onOpenInfo && contactName ? `Abrir info del contacto ${contactName}` : undefined}
                 tabIndex={!isGroup && onOpenInfo ? 0 : -1}
             >
                 <TopHeaderAvatar isGroup={isGroup} isAdmin={isAdmin} avatar={avatar} contactName={contactName} onAvatarClick={handleAvatarClick} avatarFileRef={avatarFileRef} onAvatarFileChange={handleAvatarFileChange} />
@@ -112,6 +113,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {isGroup && isAdmin && editingName ? (
                             <Input
+                                aria-label="Editar nombre del grupo"
                                 size="sm"
                                 variant="outlined"
                                 value={nameValue}
@@ -131,7 +133,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                 </Typography>
                                 {isGroup && isAdmin && contactName && (
                                     <Tooltip title="Editar nombre del grupo" variant="soft" size="sm">
-                                        <IconButton size="sm" variant="plain" color="neutral" onClick={startEditName}
+                                        <IconButton aria-label="Editar nombre del grupo" size="sm" variant="plain" color="neutral" onClick={startEditName}
                                             sx={{ minHeight: 'auto', p: 0.25 }}>
                                             <EditIcon sx={{ fontSize: 13 }} />
                                         </IconButton>

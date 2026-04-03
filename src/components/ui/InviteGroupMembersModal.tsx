@@ -151,6 +151,7 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
 
                     <Stack spacing={1.5} sx={{ minHeight: 0, flexGrow: 1 }}>
                         <Input
+                            aria-label="Buscar miembros"
                             placeholder="Buscar en tus contactos..."
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
@@ -183,6 +184,7 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
                                         const isChecked = selectedIds.includes(contact.upeerId);
                                         return (
                                             <ListItem
+                                                aria-label={`Seleccionar miembro ${contact.name}`}
                                                 key={contact.upeerId}
                                                 onClick={() => toggleMember(contact.upeerId)}
                                                 sx={{
