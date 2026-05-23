@@ -34,6 +34,10 @@ export function shouldReloadHistoryForIncomingTransfer(
     return isActiveGroupTransfer || isActiveDirectTransfer;
 }
 
+export function shouldResyncAfterVaultRecoveryTransition(previousStartupActive: boolean, nextStartupActive: boolean) {
+    return previousStartupActive && !nextStartupActive;
+}
+
 export default function App() {
     const navigation = useNavigationStore();
     const appStore = useAppStore();
@@ -44,6 +48,7 @@ export default function App() {
     const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
     const [isVaultRecoverySnackbarOpen, setIsVaultRecoverySnackbarOpen] = useState(false);
     const [vaultRecoveryMessage, setVaultRecoveryMessage] = useState('Recuperando mensajes vaulted…');
+    const previousVaultRecoveryActiveRef = React.useRef(false);
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
     const {
         activeGroupId,
@@ -128,13 +133,24 @@ export default function App() {
             }
         }) || (() => undefined);
         const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {
-            if (payload.startupActive) {
+            const shouldResync = shouldResyncAfterVaultRecoveryTransition(previousVaultRecoveryActiveRef.current, payload.active);
+            previousVaultRecoveryActiveRef.current = payload.active;
+
+            if (payload.active) {
                 setVaultRecoveryMessage(payload.message);
                 setIsVaultRecoverySnackbarOpen(true);
                 return;
             }
 
             setIsVaultRecoverySnackbarOpen(false);
+
+            if (shouldResync) {
+                void refreshContacts();
+                void refreshGroups();
+                if (activeGroupId || targetUpeerId) {
+                    void reloadLatestHistory();
+                }
+            }
         }) || (() => undefined);
 
         return () => {
@@ -143,7 +159,7 @@ export default function App() {
             unsubscribeStatus();
             unsubscribeVaultRecovery();
         };
-    }, [checkAuth, hydrateInitialShell, initListeners, setFirstConnect, setNetworkStatus, setYggAddress]);
+    }, [activeGroupId, checkAuth, hydrateInitialShell, initListeners, refreshContacts, refreshGroups, reloadLatestHistory, setFirstConnect, setNetworkStatus, setYggAddress, targetUpeerId]);
 
     const handleMediaClick = (media: PreviewableMedia) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;

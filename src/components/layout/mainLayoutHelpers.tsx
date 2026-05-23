@@ -80,7 +80,7 @@ export const VaultRecoverySnackbar: React.FC<VaultRecoverySnackbarProps> = ({ op
         <Snackbar
             data-testid="vault-recovery-snackbar"
             open={open}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             variant="soft"
             color="primary"
             sx={{ minWidth: { xs: 'calc(100vw - 32px)', sm: 360 } }}

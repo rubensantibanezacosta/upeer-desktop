@@ -1,4 +1,4 @@
-import App, { shouldReloadHistoryForIncomingTransfer } from '../../src/App.js';
+import App, { shouldReloadHistoryForIncomingTransfer, shouldResyncAfterVaultRecoveryTransition } from '../../src/App.js';
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock minimal de upeer para evitar errores de compilación/ejecución
@@ -28,5 +28,11 @@ describe('App Smoke Test', () => {
             '',
             'peer-1'
         )).toBe(false);
+    });
+
+    it('resincroniza al terminar el startup vault recovery', () => {
+        expect(shouldResyncAfterVaultRecoveryTransition(true, false)).toBe(true);
+        expect(shouldResyncAfterVaultRecoveryTransition(false, false)).toBe(false);
+        expect(shouldResyncAfterVaultRecoveryTransition(true, true)).toBe(false);
     });
 });
