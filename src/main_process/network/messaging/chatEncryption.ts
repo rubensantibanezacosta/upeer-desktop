@@ -35,6 +35,8 @@ export type EncryptedChatPayload = {
     content: string;
     nonce: string;
     ratchetHeader?: RatchetEncryptHeader;
+    ephemeralPublicKey?: string;
+    useRecipientEphemeral?: boolean;
     x3dhInit?: {
         ekPub: string;
         spkId: number | null | undefined;

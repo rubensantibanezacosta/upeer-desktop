@@ -197,7 +197,6 @@ describe('Group Handlers Final Coverage', () => {
 
     describe('handleGroupInvite', () => {
         it('should reject legacy encrypted group invites', async () => {
-            const innerPayload = JSON.stringify({ groupName: 'Test Group', members: [senderId, 'my-id'], epoch: 1, senderKey: 'c'.repeat(64), avatar: 'data:image/png;base64,abc' });
             vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
 
@@ -223,7 +222,6 @@ describe('Group Handlers Final Coverage', () => {
         });
 
         it('should reject static-recipient legacy group invites', async () => {
-            const innerPayload = JSON.stringify({ groupName: 'Static Group', members: [senderId, 'my-id'], epoch: 1, senderKey: 'c'.repeat(64) });
             vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
 
@@ -341,7 +339,6 @@ describe('Group Handlers Final Coverage', () => {
 
     describe('handleGroupUpdate', () => {
         it('should reject legacy encrypted group updates', async () => {
-            const inner = JSON.stringify({ groupName: 'New Name' });
             vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64) });
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64) } as never);
 
@@ -377,7 +374,6 @@ describe('Group Handlers Final Coverage', () => {
         });
 
         it('should reject static-recipient legacy group updates', async () => {
-            const inner = JSON.stringify({ groupName: 'Static Name' });
             vi.mocked(groupsOps.getGroupById).mockReturnValue({ id: groupId, groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] });
 
             await handleGroupUpdate(senderId, {

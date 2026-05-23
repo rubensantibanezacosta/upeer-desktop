@@ -19,7 +19,7 @@ import {
     emitMessageStatusUpdated,
     getSelfAddresses,
     markMessageAsFailed,
-    vaultChatForOfflineDelivery,
+    vaultExistingChatPacket,
 } from './chatSupport.js';
 import {
     clearPendingDirectMessage,
@@ -73,10 +73,11 @@ export async function sendConnectedChatMessage({
         replyTo,
     };
     const signature = sign(Buffer.from(canonicalStringify(peerPacket)));
+    const signatureHex = signature.toString('hex');
     const isToSelf = upeerId === selfId;
 
     if (persistMessage) {
-        await saveMessage(msgId, upeerId, true, payload, replyTo, signature.toString('hex'), isToSelf ? 'read' : 'sent', selfId, timestamp);
+        await saveMessage(msgId, upeerId, true, payload, replyTo, signatureHex, isToSelf ? 'read' : 'sent', selfId, timestamp);
     }
 
     const selfAddresses = syncOwnDevices ? await getSelfAddresses(selfId) : [];
@@ -160,7 +161,11 @@ export async function sendConnectedChatMessage({
                     warn('Message not delivered, starting vault replication', { msgId, upeerId }, 'vault');
                     const freshContact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
                     if (!freshContact?.publicKey) return;
-                    const nodes = await vaultChatForOfflineDelivery(upeerId, freshContact, msgId, payload, replyTo, selfId, timestamp);
+                    const nodes = await vaultExistingChatPacket(upeerId, {
+                        ...peerPacket,
+                        senderUpeerId: selfId,
+                        signature: signatureHex,
+                    });
                     if (nodes > 0) {
                         if (await updateMessageStatus(msgId, 'vaulted')) {
                             clearPendingDirectMessage(msgId);

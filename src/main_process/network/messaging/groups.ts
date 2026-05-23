@@ -1,12 +1,10 @@
 import crypto from 'node:crypto';
 import {
     getMyPublicKeyHex,
-    getMyPublicKey,
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
 import type { LinkPreview } from '../../types/chat.js';
-import type { Contact } from '../../types/chat.js';
 import {
     getContactByUpeerId,
 } from '../../storage/contacts/operations.js';

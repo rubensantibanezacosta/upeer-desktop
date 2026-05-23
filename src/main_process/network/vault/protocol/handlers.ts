@@ -24,6 +24,7 @@ async function getDirectIdsForVaultScoring(): Promise<string[]> {
             return await vouchesModule.getDirectContactIds();
         }
     } catch {
+        return [];
     }
 
     return [];

@@ -4,13 +4,11 @@ import * as contactsOpsModule from '../../../src/main_process/storage/contacts/o
 import * as groupsOpsModule from '../../../src/main_process/storage/groups/operations.js';
 import * as messagesOpsModule from '../../../src/main_process/storage/messages/operations.js';
 import * as messageStatusModule from '../../../src/main_process/storage/messages/status.js';
-import * as identityModule from '../../../src/main_process/security/identity.js';
 
 type ContactRecord = NonNullable<Awaited<ReturnType<typeof contactsOpsModule.getContactByUpeerId>>>;
 type GroupRecord = NonNullable<ReturnType<typeof groupsOpsModule.getGroupById>>;
 type SaveMessageResult = Awaited<ReturnType<typeof messagesOpsModule.saveMessage>>;
 type MessageRecord = Awaited<ReturnType<typeof messagesOpsModule.getMessageById>>;
-type EncryptResult = ReturnType<typeof identityModule.encrypt>;
 type MessageStatus = ReturnType<typeof messageStatusModule.getMessageStatus>;
 type KademliaNode = { upeerId: string; address: string };
 type KademliaInstance = { findClosestContacts: (upeerId: string, limit: number) => KademliaNode[] };
@@ -434,7 +432,6 @@ describe('network/messaging/chat.ts', () => {
     it('drops imageBase64 from previews that would exceed online chat validation limits', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const identity = await import('../../../src/main_process/security/identity.js');
         const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
 
         vi.mocked(getContactByUpeerId).mockResolvedValue({
@@ -844,6 +841,94 @@ describe('network/messaging/chat.ts', () => {
 
         expect(result).toBeDefined();
         expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
+    });
+
+    it('vaults the original encrypted packet after direct ack timeout instead of re-encrypting it', async () => {
+        vi.useFakeTimers();
+
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const messageStatus = await import('../../../src/main_process/storage/messages/status.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendConnectedChatMessage } = await import('../../../src/main_process/network/messaging/chatDirectDelivery.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-online',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 18,
+            address: '200::9',
+            knownAddresses: '[]'
+        } as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as MessageStatus);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+        vi.mocked(ratchet.ratchetEncrypt).mockReturnValueOnce({
+            header: { dh: '44'.repeat(32), pn: 0, n: 0 },
+            ciphertext: 'direct-cipher',
+            nonce: 'direct-nonce',
+        } as never).mockReturnValueOnce({
+            header: { dh: '77'.repeat(32), pn: 0, n: 1 },
+            ciphertext: 'fallback-cipher',
+            nonce: 'fallback-nonce',
+        } as never);
+
+        await sendConnectedChatMessage({
+            contact: {
+                upeerId: 'peer-online',
+                status: 'connected',
+                publicKey: 'aa'.repeat(32),
+                signedPreKey: 'bb'.repeat(32),
+                signedPreKeyId: 18,
+                address: '200::9',
+            },
+            knownAddresses: [],
+            msgId: '12345678-1234-1234-1234-123456789012',
+            payload: 'hola timeout',
+            selfId: 'self-id',
+            timestamp: 123456789,
+            upeerId: 'peer-online',
+            ackTimeoutMs: 2500,
+            syncOwnDevices: false,
+        });
+
+        await vi.advanceTimersByTimeAsync(2600);
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::9',
+            expect.objectContaining({
+                content: 'direct-cipher',
+                nonce: 'direct-nonce',
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 18,
+                    ikPub: '11'.repeat(32),
+                },
+            }),
+            'aa'.repeat(32),
+            false
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-online',
+            expect.objectContaining({
+                content: 'direct-cipher',
+                nonce: 'direct-nonce',
+                x3dhInit: {
+                    ekPub: '33'.repeat(32),
+                    spkId: 18,
+                    ikPub: '11'.repeat(32),
+                },
+                senderUpeerId: 'self-id',
+            })
+        );
+        expect(VaultManager.replicateToVaults).not.toHaveBeenCalledWith(
+            'peer-online',
+            expect.objectContaining({ content: 'fallback-cipher' })
+        );
     });
 
     it('cleans local attachment data when deleting a file message', async () => {

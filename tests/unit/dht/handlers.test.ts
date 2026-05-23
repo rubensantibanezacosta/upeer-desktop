@@ -17,7 +17,6 @@ import * as locationOps from '../../../src/main_process/storage/contacts/locatio
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 import { AdaptivePow } from '../../../src/main_process/security/pow.js';
 import type { Contact } from '../../../src/types/chat.js';
-import type { KademliaContact } from '../../../src/main_process/network/dht/kademlia/types.js';
 
 type NetworkContact = Contact & {
     dhtSeq?: number;

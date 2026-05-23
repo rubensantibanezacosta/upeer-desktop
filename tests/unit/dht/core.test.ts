@@ -6,7 +6,7 @@ import * as utils from '../../../src/main_process/network/utils';
 import * as handlers from '../../../src/main_process/network/dht/handlers';
 import type { Contact } from '../../../src/types/chat.js';
 import type { KademliaContact } from '../../../src/main_process/network/dht/kademlia/types.js';
-import type { LocationBlock, RenewalToken } from '../../../src/main_process/network/types.js';
+import type { LocationBlock } from '../../../src/main_process/network/types.js';
 
 type NetworkContact = Contact & {
     dhtSignature?: string | null;

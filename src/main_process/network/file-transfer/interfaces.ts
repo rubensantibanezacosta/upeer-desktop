@@ -25,7 +25,14 @@ export interface ITransferManager {
     clearRetryTimer(fileId: string, chunkIndex?: number): void;
     finalizeTransfer(fileId: string, direction: 'sending' | 'receiving'): Promise<void>;
     cancelTransfer(fileId: string, directionOrReason?: 'sending' | 'receiving' | string, reasonText?: string): void;
-    startVaultingFailover(fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: unknown): Promise<void>;
+    startVaultingFailover(
+        fileId: string,
+        upeerId: string,
+        peerPublicKey: string | undefined,
+        aesKey: Buffer | undefined,
+        encThumb: unknown,
+        options?: { allowDuringTransfer?: boolean }
+    ): Promise<void>;
     notifyVaultProgress(fileId: string, processed: number, total: number): void;
     sendNextChunks(transfer: FileTransfer, address: string): Promise<void>;
     findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving'): FileTransfer[];

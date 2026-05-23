@@ -470,6 +470,37 @@ export class TransferManager implements ITransferManager {
             if (transfer.state !== 'active') continue;
             if (now - transfer.lastActivity < timeoutMs) continue;
 
+            if (transfer.direction === 'sending' &&
+                transfer.phase === TransferPhase.TRANSFERRING &&
+                this.transferKeys.has(transfer.fileId) &&
+                (transfer.sanitizedPath || transfer.filePath)) {
+                this.clearRetryTimer(transfer.fileId);
+                this.clearDoneRetry(transfer.fileId);
+                this.transferLocks.delete(transfer.fileId);
+                this.activeSendBatches.delete(transfer.fileId);
+                this.dhtSearchTimestamps.delete(transfer.upeerId);
+
+                import('../../storage/contacts/operations.js')
+                    .then(async ({ getContactByUpeerId }) => {
+                        const contact = await getContactByUpeerId(transfer.upeerId);
+                        await this.startVaultingFailover(
+                            transfer.fileId,
+                            transfer.upeerId,
+                            contact?.publicKey,
+                            this.transferKeys.get(transfer.fileId),
+                            transfer.thumbnail,
+                            { allowDuringTransfer: true }
+                        );
+                    })
+                    .catch((err) => {
+                        error('Failed to start vault failover for stale sending transfer', err, 'vault');
+                        this.store.updateTransfer(transfer.fileId, transfer.direction, { state: 'failed' });
+                        const failedTransfer = this.store.getTransfer(transfer.fileId, transfer.direction) || transfer;
+                        this.ui.notifyFailed(failedTransfer, 'peer_disconnected');
+                    });
+                continue;
+            }
+
             this.store.updateTransfer(transfer.fileId, transfer.direction, { state: 'failed' });
             this.clearRetryTimer(transfer.fileId);
             this.transferKeys.delete(transfer.fileId);

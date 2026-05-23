@@ -1,5 +1,5 @@
 import { ipcRenderer, webUtils } from 'electron';
-import type { IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, LinkPreview, PendingFile, TransferMessageUpdates } from './types/chat.js';
+import type { IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, LinkPreview, TransferMessageUpdates } from './types/chat.js';
 
 type ContactCardPayload = {
     name: string;

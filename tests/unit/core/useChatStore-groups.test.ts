@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChatStore } from '../../../src/store/chatStoreTypes.js';
 import type { ChatMessage, LinkPreview, MyIdentity } from '../../../src/types/chat.js';
 
 type MockUpeer = {
@@ -16,11 +15,6 @@ type WindowWithUpeer = Window & { upeer: MockUpeer };
 
 function getWindowWithUpeer(): WindowWithUpeer {
     return window as WindowWithUpeer;
-}
-
-function setChatState(update: Partial<ChatStore>): void {
-    const { useChatStore } = require('../../../src/store/useChatStore.js') as { useChatStore: { setState: (state: Partial<ChatStore>) => void } };
-    useChatStore.setState(update);
 }
 
 const myIdentity: MyIdentity = { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' };

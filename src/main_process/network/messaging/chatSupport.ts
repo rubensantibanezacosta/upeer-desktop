@@ -93,6 +93,14 @@ export async function vaultChatForOfflineDelivery(
     return VaultManager.replicateToVaults(recipientUpeerId, innerPacket);
 }
 
+export async function vaultExistingChatPacket(
+    recipientUpeerId: string,
+    packet: Record<string, unknown>,
+): Promise<number> {
+    const { VaultManager } = await import('../vault/manager.js');
+    return VaultManager.replicateToVaults(recipientUpeerId, packet);
+}
+
 export async function getSelfAddresses(myId: string): Promise<string[]> {
     const selfAddresses = new Set<string>();
     try {

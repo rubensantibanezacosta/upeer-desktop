@@ -4,7 +4,6 @@ import { registerFileHandlers } from '../../../../src/main_process/core/ipcHandl
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-type EventWithSender = { sender: { id: number } };
 type OpenFilePayload = { filePath: string };
 type PersistPayload = { filePath: string; fileName: string };
 type SaveBufferPayload = { base64: string; fileName: string };

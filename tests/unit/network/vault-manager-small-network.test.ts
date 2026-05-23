@@ -37,6 +37,35 @@ describe('vault manager small-network attachment cases', () => {
         vi.clearAllMocks();
     });
 
+    it('stores FILE_PROPOSAL locally when the network only contains self', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const vaultOps = await import('../../../src/main_process/storage/vault/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([] as never);
+
+        const packet = {
+            type: 'FILE_PROPOSAL',
+            fileId: '550e8400-e29b-41d4-a716-4466554400ca',
+            fileName: 'solo-self.bin',
+            fileSize: 2048,
+            mimeType: 'application/octet-stream',
+            totalChunks: 2,
+            chunkSize: 1024,
+            fileHash: 'c'.repeat(64),
+            signature: 'sig',
+            senderUpeerId: 'self-id'
+        };
+
+        const nodes = await VaultManager.replicateToVaults('peer-2', packet);
+
+        expect(nodes).toBe(1);
+        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
+    });
+
     it('stores FILE_PROPOSAL locally when only sender and offline recipient exist', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const vaultOps = await import('../../../src/main_process/storage/vault/operations.js');
@@ -90,6 +119,21 @@ describe('vault manager small-network attachment cases', () => {
             '200::peer-1',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );
+    });
+
+    it('does not query anyone when the network only contains self', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
+            { upeerId: 'self-id', address: '200::self', status: 'connected' }
+        ] as never);
+
+        await VaultManager.queryOwnVaults();
+
+        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
     });
 
     it('queries the single known peer even if it is still marked disconnected', async () => {

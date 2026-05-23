@@ -3,6 +3,7 @@ import { TransferManager } from '../../../src/main_process/network/file-transfer
 import { TransferPhase } from '../../../src/main_process/network/file-transfer/types.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
+import * as contacts from '../../../src/main_process/storage/contacts/operations.js';
 
 type TransferManagerSend = Parameters<TransferManager['initialize']>[0];
 type TransferManagerWindow = Parameters<TransferManager['initialize']>[1];
@@ -513,6 +514,100 @@ describe('TransferManager - Integration', () => {
                 fileId: 'stale-file',
                 reason: 'peer_disconnected',
                 state: 'failed'
+            })
+        );
+    });
+
+    it('should vault an attachment that looked online but never gets accepted', async () => {
+        vi.useFakeTimers();
+        try {
+            vi.mocked(contacts.getContactByUpeerId).mockResolvedValue({
+                upeerId: 'peer1',
+                publicKey: 'pubkey',
+                status: 'connected'
+            } as never);
+            vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
+                name: 'ghost.txt',
+                size: 100,
+                mimeType: 'text/plain',
+                hash: '9'.repeat(64)
+            });
+            manager.chunker.calculateChunks = vi.fn().mockReturnValue(1);
+
+            const fileId = await manager.startSend('peer1', 'addr1', '/path/to/ghost.txt');
+
+            await vi.advanceTimersByTimeAsync(7000);
+
+            const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+            const transfer = manager.getTransfer(fileId, 'sending');
+
+            expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+                'peer1',
+                expect.objectContaining({
+                    type: 'FILE_PROPOSAL',
+                    fileId,
+                    senderUpeerId: 'my-peer-id'
+                })
+            );
+            expect(transfer?.phase).toBe(TransferPhase.REPLICATING);
+            expect(transfer?.state).toBe('active');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('should vault a sending attachment when the peer drops mid-transfer', async () => {
+        vi.mocked(contacts.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer1',
+            publicKey: 'pubkey',
+            status: 'disconnected'
+        } as never);
+
+        const fileId = '550e8400-e29b-41d4-a716-4466554400ab';
+        manager.store.createTransfer({
+            fileId,
+            upeerId: 'peer1',
+            peerAddress: 'addr1',
+            fileName: 'mid-transfer.bin',
+            fileSize: 2048,
+            mimeType: 'application/octet-stream',
+            totalChunks: 2,
+            chunkSize: 1024,
+            fileHash: '1'.repeat(64),
+            direction: 'sending',
+            filePath: '/tmp/mid-transfer.bin'
+        });
+        manager.store.updateTransfer(fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+        });
+        manager.transferKeys.set(fileId, Buffer.alloc(32, 7));
+
+        const current = manager.getTransfer(fileId, 'sending');
+        if (!current) throw new Error('Transfer not found');
+        current.lastActivity = Date.now() - 10_000;
+
+        manager.checkStaleTransfers(1000);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const transfer = manager.getTransfer(fileId, 'sending');
+
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer1',
+            expect.objectContaining({
+                type: 'FILE_PROPOSAL',
+                fileId,
+                senderUpeerId: 'my-peer-id'
+            })
+        );
+        expect(transfer?.phase).toBe(TransferPhase.REPLICATING);
+        expect(transfer?.state).toBe('active');
+        expect(mockWindow.webContents.send).not.toHaveBeenCalledWith(
+            'file-transfer-failed',
+            expect.objectContaining({
+                fileId,
+                reason: 'peer_disconnected'
             })
         );
     });

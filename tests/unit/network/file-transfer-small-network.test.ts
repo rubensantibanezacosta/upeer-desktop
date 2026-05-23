@@ -82,7 +82,22 @@ describe('file transfer small-network resilience', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         const dbHelper = await import('../../../src/main_process/network/file-transfer/db-helper.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         expect(dbHelper.updateTransferMessageStatus).toHaveBeenCalledWith(fileId, 'vaulted');
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-2',
+            expect.objectContaining({
+                type: 'FILE_PROPOSAL',
+                fileId,
+                fileName: 'tiny.bin',
+                fileSize: 2048,
+                totalChunks: 2,
+                chunkSize: 1024,
+                fileHash: 'd'.repeat(64),
+                senderUpeerId: 'self-id',
+                signature: Buffer.from('signature').toString('hex'),
+            })
+        );
     });
 
     it('starts shard vaulting for large attachments when only self-custodian is available', async () => {

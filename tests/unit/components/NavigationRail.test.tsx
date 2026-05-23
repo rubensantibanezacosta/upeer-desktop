@@ -50,13 +50,13 @@ describe('NavigationRail Component', () => {
 
     it('highlights active view', () => {
         const { rerender } = render(<NavigationRail {...defaultProps} activeView="chat" />);
-        const chatButton = screen.getByLabelText('Chats');
-        const actualButton = chatButton.tagName === 'BUTTON' ? chatButton : chatButton.querySelector('button') || chatButton;
-        expect(actualButton.className).toContain('MuiIconButton-variantSoft');
+        const chatButton = screen.getByTestId('ChatIcon').closest('button');
+        expect(chatButton).not.toBeNull();
+        expect(chatButton.className).toContain('MuiIconButton-variantSoft');
 
         rerender(<NavigationRail {...defaultProps} activeView="settings" />);
-        const settingsButton = screen.getByLabelText('Ajustes');
-        const actualSettingsButton = settingsButton.tagName === 'BUTTON' ? settingsButton : settingsButton.querySelector('button') || settingsButton;
-        expect(actualSettingsButton.className).toContain('MuiIconButton-variantSoft');
+        const settingsButton = screen.getByTestId('SettingsIcon').closest('button');
+        expect(settingsButton).not.toBeNull();
+        expect(settingsButton.className).toContain('MuiIconButton-variantSoft');
     });
 });

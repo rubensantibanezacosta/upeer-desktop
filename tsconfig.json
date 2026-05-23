@@ -20,10 +20,12 @@
     "forge.env.d.ts",
     "drizzle.config.ts",
     "forge.config.ts",
+    "playwright.config.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",
     "vite.renderer.config.ts",
     "vitest.config.ts"
+    ,"vitest.integration.config.ts"
   ],
   "exclude": ["node_modules", "out", "dist", "coverage"]
 }

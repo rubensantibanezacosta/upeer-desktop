@@ -84,8 +84,11 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
                 const sig = sign(Buffer.from(canonicalStringify(acceptMsg)));
                 acceptMsg.signature = sig.toString('hex');
                 this.send(address, acceptMsg, contact?.publicKey);
+                return;
             }
-            return;
+            if (existing.state !== 'failed' && existing.state !== 'cancelled') {
+                return;
+            }
         }
 
         try {
@@ -125,23 +128,44 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             thumbnail = undefined;
         }
 
-        const transfer = this.store.createTransfer({
-            fileId: data.fileId,
-            messageId: typeof data.messageId === 'string' ? data.messageId : data.fileId,
-            upeerId,
-            chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : upeerId,
-            peerAddress: address,
-            fileName: data.fileName,
-            fileSize: data.fileSize,
-            mimeType: data.mimeType,
-            totalChunks: data.totalChunks,
-            chunkSize: data.chunkSize,
-            fileHash: data.fileHash,
-            thumbnail,
-            caption: data.caption,
-            isVoiceNote: data.isVoiceNote,
-            direction: 'receiving' as const
-        });
+        const transfer = existing
+            ? (this.store.updateTransfer(data.fileId, 'receiving', {
+                messageId: typeof data.messageId === 'string' ? data.messageId : data.fileId,
+                upeerId,
+                chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : upeerId,
+                peerAddress: address,
+                fileName: data.fileName,
+                fileSize: data.fileSize,
+                mimeType: data.mimeType,
+                totalChunks: data.totalChunks,
+                chunkSize: data.chunkSize,
+                fileHash: data.fileHash,
+                thumbnail,
+                caption: data.caption,
+                isVoiceNote: data.isVoiceNote,
+                state: 'pending',
+                phase: TransferPhase.PROPOSED,
+                chunksProcessed: 0,
+                pendingChunks: new Set(),
+                startedAt: Date.now(),
+            }) ?? existing)
+            : this.store.createTransfer({
+                fileId: data.fileId,
+                messageId: typeof data.messageId === 'string' ? data.messageId : data.fileId,
+                upeerId,
+                chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : upeerId,
+                peerAddress: address,
+                fileName: data.fileName,
+                fileSize: data.fileSize,
+                mimeType: data.mimeType,
+                totalChunks: data.totalChunks,
+                chunkSize: data.chunkSize,
+                fileHash: data.fileHash,
+                thumbnail,
+                caption: data.caption,
+                isVoiceNote: data.isVoiceNote,
+                direction: 'receiving' as const
+            });
 
         debug('FILE_PROPOSAL accepted', {
             fileId: transfer.fileId,

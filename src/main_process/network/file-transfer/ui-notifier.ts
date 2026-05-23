@@ -2,8 +2,6 @@ import { BrowserWindow } from 'electron';
 import { FileTransfer } from './types.js';
 import { warn } from '../../security/secure-logger.js';
 
-type FileTransferUIEvent = Record<string, unknown>;
-
 export class UINotifier {
     private lastUINotify = new Map<string, number>();
 

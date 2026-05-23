@@ -12,10 +12,18 @@ type VaultingContact = {
     status: string;
 };
 
-export async function startVaultingFailover(this: TransferManager, fileId: string, upeerId: string, peerPublicKey: string | undefined, aesKey: Buffer | undefined, encThumb: string | undefined) {
+export async function startVaultingFailover(
+    this: TransferManager,
+    fileId: string,
+    upeerId: string,
+    peerPublicKey: string | undefined,
+    aesKey: Buffer | undefined,
+    encThumb: string | undefined,
+    options?: { allowDuringTransfer?: boolean }
+) {
     const currentTransfer = this.store.getTransfer(fileId, 'sending');
     if (!currentTransfer || currentTransfer.state !== 'active') return;
-    if (currentTransfer.phase === TransferPhase.TRANSFERRING || currentTransfer.state === 'completed') return;
+    if ((currentTransfer.phase === TransferPhase.TRANSFERRING && !options?.allowDuringTransfer) || currentTransfer.state === 'completed') return;
 
     if (aesKey) {
         if (currentTransfer.fileSize > 10 * 1024 * 1024) {

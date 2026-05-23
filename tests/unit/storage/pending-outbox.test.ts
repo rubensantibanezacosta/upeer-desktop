@@ -7,7 +7,6 @@ import {
 } from '../../../src/main_process/storage/pending-outbox.js';
 import { getDb } from '../../../src/main_process/storage/shared.js';
 import { pendingOutbox } from '../../../src/main_process/storage/schema.js';
-import * as identity from '../../../src/main_process/security/identity.js';
 
 vi.mock('../../../src/main_process/storage/shared.js');
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
