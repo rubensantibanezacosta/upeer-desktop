@@ -11,6 +11,7 @@ import {
     renewVaultEntry
 } from '../../../src/main_process/storage/vault/operations.js';
 import { getDb } from '../../../src/main_process/storage/shared.js';
+import { vaultStorage } from '../../../src/main_process/storage/schema.js';
 
 type MockDb = {
     select: ReturnType<typeof vi.fn>;
@@ -23,6 +24,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(() => ({
         vaultStorage: {
+            id: 'id',
             payloadHash: 'payloadHash',
             recipientSid: 'recipientSid',
             senderSid: 'senderSid',
@@ -107,15 +109,18 @@ describe('Storage - Vault Operations', () => {
 
     it('should retrieve non-expired entries for recipient', async () => {
         const mockEntries = [{ payloadHash: 'h1', data: 'd1' }];
+        const orderBy = vi.fn().mockReturnValue(mockEntries);
+        const where = vi.fn().mockReturnValue({ orderBy });
         mockDb.select.mockReturnValue({
             from: vi.fn().mockReturnValue({
-                where: vi.fn().mockReturnValue(mockEntries)
+                where
             })
         });
 
         const results = await getVaultEntriesForRecipient('recipient-sid');
         expect(results).toEqual(mockEntries);
         expect(mockDb.select).toHaveBeenCalled();
+        expect(orderBy).toHaveBeenCalledWith(vaultStorage.id);
     });
 
     it('should delete vault entry and return boolean success', async () => {

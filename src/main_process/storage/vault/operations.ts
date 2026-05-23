@@ -77,7 +77,7 @@ export async function getVaultEntriesForRecipient(recipientSid: string) {
             eq(vaultStorage.recipientSid, recipientSid),
             gt(vaultStorage.expiresAt, now)
         )
-    );
+    ).orderBy(vaultStorage.id);
 }
 
 /**
