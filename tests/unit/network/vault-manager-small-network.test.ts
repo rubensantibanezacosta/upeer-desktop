@@ -91,4 +91,24 @@ describe('vault manager small-network attachment cases', () => {
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );
     });
+
+    it('queries the single known peer even if it is still marked disconnected', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
+            { upeerId: 'self-id', address: '200::self', status: 'connected' },
+            { upeerId: 'peer-1', address: '200::peer-1', status: 'disconnected' }
+        ] as never);
+
+        await VaultManager.queryOwnVaults();
+
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::peer-1',
+            expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
+        );
+    });
 });

@@ -42,6 +42,10 @@ function queryOwnVaultsOnReconnect(upeerId: string): void {
     });
 }
 
+function isReconnectState(status: unknown): boolean {
+    return status === 'offline' || status === 'disconnected';
+}
+
 export async function handlePacket(
     msg: Buffer,
     rinfo: { address: string; port: number },
@@ -239,7 +243,7 @@ export async function handlePacket(
         }
 
         const nowIso = new Date().toISOString();
-        if (contact.status === 'offline') {
+        if (isReconnectState(contact.status)) {
             updateContactStatus(upeerId, 'connected');
             queryOwnVaultsOnReconnect(upeerId);
         }

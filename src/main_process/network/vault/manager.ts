@@ -180,7 +180,16 @@ export class VaultManager {
     static async queryOwnVaults() {
         const allContacts = await getContacts();
         const myId = getMyUPeerId();
-        const onlineFriends = allContacts.filter(c => c.status === 'connected' && c.upeerId !== myId);
+        const knownPeers = allContacts.filter((contact) =>
+            contact.upeerId !== myId
+            && typeof contact.address === 'string'
+            && contact.address.length > 0
+        );
+        const onlineFriends = knownPeers.filter(c => c.status === 'connected');
+        const fallbackSinglePeer = onlineFriends.length === 0 && knownPeers.length === 1
+            ? [knownPeers[0]]
+            : [];
+        const queriedAddresses = new Set<string>();
 
         const queryPacket = {
             type: 'VAULT_QUERY',
@@ -215,7 +224,15 @@ export class VaultManager {
         }
 
         for (const friend of onlineFriends) {
+            queriedAddresses.add(friend.address);
             await this.sendVaultQuery(friend.address, queryPacket, `online friend ${friend.upeerId ?? friend.address}`);
+        }
+
+        for (const peer of fallbackSinglePeer) {
+            if (queriedAddresses.has(peer.address)) {
+                continue;
+            }
+            await this.sendVaultQuery(peer.address, queryPacket, `single known peer ${peer.upeerId ?? peer.address}`);
         }
     }
 }
