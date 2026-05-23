@@ -29,4 +29,5 @@ export interface ITransferManager {
     notifyVaultProgress(fileId: string, processed: number, total: number): void;
     sendNextChunks(transfer: FileTransfer, address: string): Promise<void>;
     findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving'): FileTransfer[];
+    tryRecoverVaultTransferByFileHash(fileHash: string): Promise<void>;
 }

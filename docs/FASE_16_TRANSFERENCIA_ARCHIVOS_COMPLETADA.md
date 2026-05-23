@@ -54,7 +54,7 @@ La Fase 16 (Transferencia de Archivos) ha sido **completamente implementada** co
 
 ```bash
 # Tests de chunker y validación
-npm run test-file-transfer
+pnpm run test-file-transfer
 
 # Resultado: 11 tests pasados, 0 fallidos
 ```
@@ -182,15 +182,15 @@ src/components/
 git clone https://github.com/upeer/chat-p2p
 
 # 2. Instalar dependencias
-npm install
+pnpm install
 
 # 3. Iniciar aplicación (base de datos limpia)
 rm -rf ~/.config/upeer\ Chat/p2p-chat.db
-npm start
+pnpm start
 
 # 4. Abrir segunda instancia para pruebas
 # En otra terminal:
-npm start -- --user-data-dir=~/.config/upeer-chat-test
+pnpm start -- --user-data-dir=~/.config/upeer-chat-test
 ```
 
 ### Para desarrolladores:

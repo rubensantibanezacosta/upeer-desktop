@@ -176,7 +176,7 @@ async function main() {
         log(`yggstack versión: ${YGGSTACK_VERSION}\n`);
         try {
             await downloadForPlatform(currentPlatform);
-            log('✓ Descarga completada. Ya puedes ejecutar "npm start".');
+            log('✓ Descarga completada. Ya puedes ejecutar "pnpm start".');
         } catch (e) {
             err(`Descarga fallida: ${e.message}`);
             err('Revisa la versión en YGGSTACK_VERSION o descarga manualmente desde:');

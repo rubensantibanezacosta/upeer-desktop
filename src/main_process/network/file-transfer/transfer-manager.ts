@@ -12,6 +12,7 @@ import { ITransferManager } from './interfaces.js';
 // Import refactored logic
 import * as sender from './sender-logic.js';
 import * as receiver from './receiver-logic.js';
+import * as vaultRecovery from './receiverVaultRecovery.js';
 
 type FileTransferPacket = {
     type: string;
@@ -89,6 +90,7 @@ export class TransferManager implements ITransferManager {
     public handleFileDone = receiver.handleFileDone;
     public handleFileCancel = receiver.handleFileCancel;
     public handleHeartbeat = receiver.handleHeartbeat;
+    public tryRecoverVaultTransferByFileHash = vaultRecovery.tryRecoverVaultTransferByFileHash;
 
     public getAllTransfers() {
         return this.store.getAllTransfers();

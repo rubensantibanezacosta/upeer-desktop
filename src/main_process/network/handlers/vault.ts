@@ -11,6 +11,9 @@ import { validateMessage } from '../../security/validation.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { debug, security, warn, error } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../file-transfer/transfer-manager.js';
+import { saveVaultEntry } from '../../storage/vault/operations.js';
+import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
+import { SHARD_TTL_MS } from '../vault/manager.js';
 
 type VaultSendResponse = (ip: string, data: Record<string, unknown>) => void;
 
@@ -158,7 +161,10 @@ export async function handleVaultDelivery(
                             'delivered'
                         );
                     } else if (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_')) {
-                        fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket);
+                        await fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket);
+                        if (innerPacket.type === 'FILE_PROPOSAL' && typeof innerPacket.fileHash === 'string') {
+                            await fileTransferManager.tryRecoverVaultTransferByFileHash(innerPacket.fileHash);
+                        }
                     } else if (innerPacket.type === 'GROUP_MSG') {
                         const { handleGroupMessage } = await import('./groups.js');
                         await handleGroupMessage(entry.senderSid, originalContact, innerPacket, win);
@@ -196,26 +202,21 @@ export async function handleVaultDelivery(
                         // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)
                         const parts = entry.payloadHash.split(':');
                         const fileHash = parts[1];
-                        let shardIndex = 0;
+                        const segmentIndex = parts.length === 4 ? parseInt(parts[2], 10) : 0;
+                        const shardIndex = parseInt(parts.length === 4 ? parts[3] : parts[2], 10);
 
-                        if (parts.length === 4) {
-                            shardIndex = parseInt(parts[3]);
-                        } else {
-                            shardIndex = parseInt(parts[2]);
-                        }
-
-                        if (fileHash && !isNaN(shardIndex)) {
-                            await saveFileMessage(
-                                fileHash,
+                        if (fileHash && !isNaN(shardIndex) && !isNaN(segmentIndex)) {
+                            const myId = getMyUPeerId();
+                            await saveVaultEntry(
+                                entry.payloadHash,
+                                myId,
                                 entry.senderSid,
-                                false,
-                                fileHash, // Usamos hash como nombre temporal si no viene
-                                fileHash,
-                                0, // Tamaño desconocido para shard individual
-                                'application/octet-stream',
-                                undefined,
-                                'delivered'
+                                3,
+                                entry.data,
+                                Date.now() + SHARD_TTL_MS
                             );
+                            await trackDistributedAsset(fileHash, entry.payloadHash, shardIndex, 12, myId, segmentIndex);
+                            await fileTransferManager.tryRecoverVaultTransferByFileHash(fileHash);
                         }
                     }
                 }

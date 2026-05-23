@@ -21,7 +21,7 @@ function terminateAfterFatalError(source: 'unhandled-rejection' | 'uncaught-exce
  */
 export function setupProcessHandlers(): void {
   // Silenciar EPIPE en stdout/stderr — ocurre cuando el proceso se arranca piped
-  // (ej: `npm start | head -N`) y el receptor cierra antes de que termine el log.
+  // (ej: `pnpm start | head -N`) y el receptor cierra antes de que termine el log.
   // Sin este handler Node.js lo trata como excepción no capturada y Electron
   // muestra un diálogo de error.
   process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });

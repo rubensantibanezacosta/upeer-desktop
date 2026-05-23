@@ -15,7 +15,7 @@ type FileAckPayload = {
     chunkIndex: number;
 };
 
-export async function handleAccept(this: TransferManager, upeerId: string, _address: string, data: FileAcceptPayload) {
+export async function handleAccept(this: TransferManager, upeerId: string, address: string, data: FileAcceptPayload) {
     const transfer = this.store.getTransfer(data.fileId, 'sending');
     if (!transfer || (
         transfer.phase !== TransferPhase.PROPOSED &&
@@ -36,7 +36,12 @@ export async function handleAccept(this: TransferManager, upeerId: string, _addr
         return;
     }
 
-    const updated = this.store.updateTransfer(data.fileId, 'sending', { phase: TransferPhase.TRANSFERRING, state: 'active' });
+    const nextAddress = typeof address === 'string' && address.trim().length > 0 ? address.trim() : transfer.peerAddress;
+    const updated = this.store.updateTransfer(data.fileId, 'sending', {
+        peerAddress: nextAddress,
+        phase: TransferPhase.TRANSFERRING,
+        state: 'active'
+    });
     if (updated) {
         this.ui.notifyProgress(updated, true);
         const messageId = updated.messageId || data.fileId;

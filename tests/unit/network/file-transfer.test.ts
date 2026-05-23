@@ -104,6 +104,33 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.state).toBe('completed');
     });
 
+    it('should update peer address from FILE_ACCEPT after offline recovery and send chunks there', async () => {
+        const fileId = '550e8400-e29b-41d4-a716-4466554400aa';
+        const sendNextChunksSpy = vi.spyOn(manager, 'sendNextChunks').mockResolvedValue(undefined);
+
+        manager.store.createTransfer({
+            fileId,
+            upeerId: 'peer1',
+            peerAddress: 'addr-stale',
+            fileName: 'recover.txt',
+            fileSize: 4,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'c'.repeat(64),
+            direction: 'sending'
+        });
+        manager.store.updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });
+
+        await manager.handleAccept('peer1', 'addr-fresh', { type: 'FILE_ACCEPT', fileId, signature: 'sig' });
+
+        const transfer = manager.getTransfer(fileId, 'sending');
+        expect(transfer?.peerAddress).toBe('addr-fresh');
+        expect(sendNextChunksSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ fileId, peerAddress: 'addr-fresh' })
+        );
+    });
+
     it('should include isVoiceNote in FILE_PROPOSAL when sending a voice note', async () => {
         vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'voice.webm',

@@ -70,11 +70,11 @@ http://www.apache.org/licenses/LICENSE-2.0
 For a complete list of all dependencies and their licenses, run:
 
 ```bash
-npx license-checker --summary
+pnpm dlx license-checker --summary
 ```
 
 Or for detailed output:
 
 ```bash
-npx license-checker --json > licenses.json
+pnpm dlx license-checker --json > licenses.json
 ```

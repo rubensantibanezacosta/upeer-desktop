@@ -2,10 +2,12 @@ import { eq } from 'drizzle-orm';
 import { debug, info, warn } from '../../security/secure-logger.js';
 import { distributedAssets } from '../../storage/schema.js';
 import { getDb } from '../../storage/shared.js';
+import { getVaultEntryByHash } from '../../storage/vault/operations.js';
 import { VAULT_TTL_MS } from './manager.js';
 import { ErasureCoder } from './redundancy/erasure.js';
 
 type DistributedShard = {
+    cid?: string;
     shardIndex: number;
     data: string;
     segmentIndex?: number | null;
@@ -20,16 +22,31 @@ export async function repairVaultAsset(
 
     try {
         const db = getDb();
-        const shards = await db.select()
+        const trackedShards = await db.select()
             .from(distributedAssets)
-            .where(eq(distributedAssets.fileHash, fileHash)) as DistributedShard[];
+            .where(eq(distributedAssets.fileHash, fileHash)) as Array<DistributedShard & { cid?: string }>;
 
-        if (shards.length === 0) {
+        const shardsWithData = (await Promise.all(trackedShards.map(async (shard) => {
+            const cid = typeof shard.cid === 'string' ? shard.cid : undefined;
+            if (!cid) {
+                return null;
+            }
+            const entry = await getVaultEntryByHash(cid);
+            if (!entry?.data) {
+                return null;
+            }
+            return {
+                ...shard,
+                data: entry.data,
+            } satisfies DistributedShard;
+        }))).filter((shard): shard is DistributedShard => shard !== null);
+
+        if (trackedShards.length === 0) {
             return;
         }
 
         const segments = new Map<number, DistributedShard[]>();
-        for (const shard of shards) {
+        for (const shard of shardsWithData) {
             const segmentIndex = typeof shard.segmentIndex === 'number' ? shard.segmentIndex : 0;
             let segmentShards = segments.get(segmentIndex);
             if (!segmentShards) {
@@ -39,8 +56,17 @@ export async function repairVaultAsset(
             segmentShards.push(shard);
         }
 
-        for (const [segIdx, segShards] of segments.entries()) {
-            const existingIndices = new Set(segShards.map(shard => shard.shardIndex));
+        const trackedSegments = new Map<number, number[]>();
+        for (const shard of trackedShards) {
+            const segmentIndex = typeof shard.segmentIndex === 'number' ? shard.segmentIndex : 0;
+            const segmentShardIndices = trackedSegments.get(segmentIndex) ?? [];
+            segmentShardIndices.push(shard.shardIndex);
+            trackedSegments.set(segmentIndex, segmentShardIndices);
+        }
+
+        for (const [segIdx, trackedIndices] of trackedSegments.entries()) {
+            const segShards = segments.get(segIdx) ?? [];
+            const existingIndices = new Set(trackedIndices);
             const allIndices = Array.from({ length: 12 }, (_, index) => index);
             const missingIndices = allIndices.filter(index => !existingIndices.has(index));
 

@@ -207,18 +207,30 @@ export class ChunkVault {
                     expiresAt: Date.now() + SHARD_TTL_MS
                 };
 
-                sendSecureUDPMessage(custodian.address, vaultPacket);
-                remoteCopies += 1;
+                try {
+                    await sendSecureUDPMessage(custodian.address, vaultPacket);
+                    remoteCopies += 1;
 
-                if (custodian.upeerId) {
-                    await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
+                    if (custodian.upeerId) {
+                        await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
 
-                    const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
-                    if (kademlia) {
-                        const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
-                        const ptrKey = createVaultPointerKey(fileHash);
-                        kademlia.storeValue(ptrKey, { fileHash, custodians: [myId, custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
+                        const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
+                        if (kademlia) {
+                            const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
+                            const ptrKey = createVaultPointerKey(fileHash);
+                            kademlia.storeValue(ptrKey, { fileHash, custodians: [myId, custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
+                        }
                     }
+                } catch (err) {
+                    warn('Failed to store shard on remote custodian', {
+                        fileHash,
+                        cid,
+                        segmentIndex: segIdx,
+                        shardIndex: i,
+                        custodianId: custodian.upeerId,
+                        address: custodian.address,
+                        error: err instanceof Error ? err.message : String(err)
+                    }, 'vault');
                 }
             }
 
@@ -231,3 +243,7 @@ export class ChunkVault {
         return remoteCopies + shards.length;
     }
 }
+
+export const VAULT_SEGMENT_SIZE = 128 * 1024;
+export const VAULT_SEGMENT_OVERHEAD = 28;
+export const VAULT_REQUIRED_SHARDS = 4;

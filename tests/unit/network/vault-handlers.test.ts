@@ -20,9 +20,22 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveFileMessage: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
+    saveVaultEntry: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/vault/asset-operations.js', () => ({
+    trackDistributedAsset: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
+    SHARD_TTL_MS: 60_000,
+}));
+
 vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', () => ({
     fileTransferManager: {
-        handleMessage: vi.fn()
+        handleMessage: vi.fn(),
+        tryRecoverVaultTransferByFileHash: vi.fn()
     }
 }));
 
@@ -257,6 +270,18 @@ describe('Vault Delivery Handler', () => {
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
         expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_OFFER' }));
+        expect(fileTransferManager.tryRecoverVaultTransferByFileHash).not.toHaveBeenCalled();
+    });
+
+    it('should trigger vault attachment recovery after FILE_PROPOSAL entries', async () => {
+        const innerPacket = { type: 'FILE_PROPOSAL', fileHash: 'a'.repeat(64), fileId: 'file-1', fileName: 'doc.bin', fileSize: 12, mimeType: 'application/octet-stream', totalChunks: 1, chunkSize: 12, signature: 'sig' };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_PROPOSAL' }));
+        expect(fileTransferManager.tryRecoverVaultTransferByFileHash).toHaveBeenCalledWith('a'.repeat(64));
     });
 
     it('should process GROUP_MSG, GROUP_INVITE, GROUP_UPDATE and GROUP_LEAVE entries', async () => {
@@ -304,6 +329,8 @@ describe('Vault Delivery Handler', () => {
     });
 
     it('should handle raw file shards', async () => {
+        const vaultOps = await import('../../../src/main_process/storage/vault/operations.js');
+        const assetOps = await import('../../../src/main_process/storage/vault/asset-operations.js');
         const entry = {
             senderSid: 'origin-id',
             payloadHash: 'shard:abc:0',
@@ -315,17 +342,24 @@ describe('Vault Delivery Handler', () => {
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
-        expect(messagesOps.saveFileMessage).toHaveBeenCalledWith(
-            'abc',
+        expect(messagesOps.saveFileMessage).not.toHaveBeenCalled();
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledWith(
+            'shard:abc:0',
+            'my-id',
             'origin-id',
-            false,
-            'abc',
-            'abc',
-            0,
-            'application/octet-stream',
-            undefined,
-            'delivered'
+            3,
+            'some-hex-data',
+            expect.any(Number)
         );
+        expect(assetOps.trackDistributedAsset).toHaveBeenCalledWith(
+            'abc',
+            'shard:abc:0',
+            0,
+            12,
+            'my-id',
+            0
+        );
+        expect(fileTransferManager.tryRecoverVaultTransferByFileHash).toHaveBeenCalledWith('abc');
     });
 
     it('should request next page if data.hasMore is true', async () => {

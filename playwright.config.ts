@@ -8,7 +8,7 @@ export default defineConfig({
         headless: true,
     },
     webServer: {
-        command: 'npm run test:e2e:serve',
+        command: 'pnpm run test:e2e:serve',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: true,
         timeout: 120_000,

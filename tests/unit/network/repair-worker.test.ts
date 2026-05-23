@@ -8,6 +8,7 @@ const {
     mockGetContacts,
     mockGetMyUPeerId,
     mockGetExpiringSoonEntries,
+    mockGetVaultEntryByHash,
     mockRenewVaultEntry,
     mockDecode,
     mockEncode,
@@ -19,6 +20,7 @@ const {
     mockGetContacts: vi.fn(),
     mockGetMyUPeerId: vi.fn(() => 'self-peer'),
     mockGetExpiringSoonEntries: vi.fn(),
+    mockGetVaultEntryByHash: vi.fn(),
     mockRenewVaultEntry: vi.fn(),
     mockDecode: vi.fn(),
     mockEncode: vi.fn(),
@@ -49,6 +51,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 
 vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
     getExpiringSoonEntries: mockGetExpiringSoonEntries,
+    getVaultEntryByHash: mockGetVaultEntryByHash,
     renewVaultEntry: mockRenewVaultEntry,
 }));
 
@@ -121,6 +124,7 @@ describe('RepairWorker', () => {
         mockSelect.mockReturnValue({ from: mockFrom });
         mockGetContacts.mockResolvedValue([]);
         mockGetExpiringSoonEntries.mockResolvedValue([]);
+        mockGetVaultEntryByHash.mockImplementation(async (payloadHash: string) => ({ data: `${payloadHash}-data` }));
         mockDecode.mockReturnValue(Buffer.from('reconstructed'));
         mockEncode.mockReturnValue([Buffer.from('aa', 'hex'), Buffer.from('bb', 'hex'), Buffer.from('cc', 'hex'), Buffer.from('dd', 'hex')]);
         RepairWorker.stop();
@@ -181,12 +185,12 @@ describe('RepairWorker', () => {
 
     it('reconstructs segments when enough shards exist and queries custodians otherwise', async () => {
         mockWhere.mockResolvedValueOnce([
-            { shardIndex: 0, data: 'aa', segmentIndex: 0 },
-            { shardIndex: 1, data: 'bb', segmentIndex: 0 },
-            { shardIndex: 2, data: 'cc', segmentIndex: 0 },
-            { shardIndex: 3, data: 'dd', segmentIndex: 0 },
-            { shardIndex: 0, data: 'ee', segmentIndex: 1 },
-            { shardIndex: 1, data: 'ff', segmentIndex: 1 },
+            { cid: 'shard:file-hash:0:0', shardIndex: 0, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:1', shardIndex: 1, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:2', shardIndex: 2, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:3', shardIndex: 3, segmentIndex: 0 },
+            { cid: 'shard:file-hash:1:0', shardIndex: 0, segmentIndex: 1 },
+            { cid: 'shard:file-hash:1:1', shardIndex: 1, segmentIndex: 1 },
         ]);
         const reconstructSpy = vi.spyOn(repairWorkerInternals, 'reconstructSegment').mockResolvedValue(undefined);
         const collectSpy = vi.spyOn(repairWorkerInternals, 'collectMissingShards').mockResolvedValue(undefined);
@@ -195,6 +199,23 @@ describe('RepairWorker', () => {
 
         expect(reconstructSpy).toHaveBeenCalledWith('file-hash', 0, expect.any(Array));
         expect(collectSpy).toHaveBeenCalledWith('file-hash', 1, expect.any(Array));
+    });
+
+    it('ignores tracked shards without local vault payload and requests missing ones', async () => {
+        mockWhere.mockResolvedValueOnce([
+            { cid: 'shard:file-hash:0:0', shardIndex: 0, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:1', shardIndex: 1, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:2', shardIndex: 2, segmentIndex: 0 },
+            { cid: 'shard:file-hash:0:3', shardIndex: 3, segmentIndex: 0 },
+        ]);
+        mockGetVaultEntryByHash.mockImplementation(async (payloadHash: string) => payloadHash.endsWith(':0') ? { data: 'aa' } : undefined);
+        const reconstructSpy = vi.spyOn(repairWorkerInternals, 'reconstructSegment').mockResolvedValue(undefined);
+        const collectSpy = vi.spyOn(repairWorkerInternals, 'collectMissingShards').mockResolvedValue(undefined);
+
+        await repairVaultAsset('file-hash', reconstructSpy, collectSpy);
+
+        expect(reconstructSpy).not.toHaveBeenCalled();
+        expect(collectSpy).toHaveBeenCalledWith('file-hash', 0, expect.arrayContaining([4, 5, 6]));
     });
 
     it('collects missing shards from connected custodians', async () => {

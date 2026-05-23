@@ -143,7 +143,7 @@ $ upeer-chat
 ### Requisitos
 
 - Node.js 18+
-- npm 10+
+- pnpm 10+
 - Git
 
 ### Clonar y configurar
@@ -154,13 +154,13 @@ git clone https://github.com/upeer/chat-p2p.git
 cd chat-p2p
 
 # Instalar dependencias
-npm install
+pnpm install
 
 # Iniciar en modo desarrollo
-npm start
+pnpm start
 
 # Construir paquetes de distribución
-npm run make
+pnpm run make
 ```
 
 ### Estructura del Proyecto
@@ -185,19 +185,19 @@ chat-p2p/
 
 ```bash
 # Desarrollo
-npm start                    # Iniciar aplicación en desarrollo
-npm run lint                # Verificar código TypeScript
+pnpm start                   # Iniciar aplicación en desarrollo
+pnpm run lint                # Verificar código TypeScript
 
 # Construcción
-npm run package             # Crear paquete portable
-npm run make                # Generar instaladores para todas las plataformas
+pnpm run package            # Crear paquete portable
+pnpm run make               # Generar instaladores para todas las plataformas
 
 # Pruebas
-npm run test:unit          # Suite unitaria
-npm run test:integration   # Flujos DR entre módulos
-npm run test:e2e           # Smoke E2E del renderer con Playwright
-npm run test:all           # Las tres capas seguidas
-npm run test-phase11       # Probar reacciones, edición y eliminación
+pnpm run test:unit         # Suite unitaria
+pnpm run test:integration  # Flujos DR entre módulos
+pnpm run test:e2e          # Smoke E2E del renderer con Playwright
+pnpm run test:all          # Las tres capas seguidas
+pnpm run test-phase11      # Probar reacciones, edición y eliminación
 ```
 
 ### Estrategia de validación
