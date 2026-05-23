@@ -173,6 +173,7 @@ export async function handleVaultDelivery(
                             innerPacket.fileSize || 0,
                             innerPacket.mimeType || 'application/octet-stream',
                             undefined,
+                            undefined,
                             'delivered'
                         );
                     } else if (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_')) {

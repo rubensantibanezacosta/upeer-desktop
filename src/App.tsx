@@ -8,7 +8,7 @@ import { useFilePersistence } from './hooks/useFilePersistence.js';
 import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
-import { StartupRecoveryOverlay, VaultRecoverySnackbar } from './components/layout/mainLayoutHelpers.js';
+import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
 import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
@@ -56,8 +56,6 @@ export default function App() {
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
     const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
     const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
-    const [isVaultRecoverySnackbarOpen, setIsVaultRecoverySnackbarOpen] = useState(false);
-    const [vaultRecoveryMessage, setVaultRecoveryMessage] = useState('Recuperando mensajes vaulted…');
     const previousVaultRecoveryActiveRef = React.useRef(false);
     const activeGroupIdRef = React.useRef(activeGroupId);
     const targetUpeerIdRef = React.useRef(targetUpeerId);
@@ -157,14 +155,6 @@ export default function App() {
         const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {
             const shouldResync = shouldResyncAfterVaultRecoveryTransition(previousVaultRecoveryActiveRef.current, payload.active);
             previousVaultRecoveryActiveRef.current = payload.active;
-
-            if (payload.active) {
-                setVaultRecoveryMessage(payload.message);
-                setIsVaultRecoverySnackbarOpen(true);
-                return;
-            }
-
-            setIsVaultRecoverySnackbarOpen(false);
 
             if (shouldResync) {
                 void refreshContactsRef.current();
@@ -302,7 +292,6 @@ export default function App() {
                     setEditingMessage={setEditingMessage}
                 />
                 <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
-                <VaultRecoverySnackbar open={!isAppLocked && appStore.isAuthenticated === true && isVaultRecoverySnackbarOpen} message={vaultRecoveryMessage} />
             </div>
         </CssVarsProvider>
     );

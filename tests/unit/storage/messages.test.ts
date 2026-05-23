@@ -487,6 +487,7 @@ describe('Storage - Message Operations', () => {
         const valuesCall = mockDb.insert().values.mock.calls[0][0];
         const parsedMsg = JSON.parse(valuesCall.message);
         expect(parsedMsg.type).toBe('file');
+        expect(parsedMsg.transferId).toBe('file-123');
         expect(parsedMsg.fileName).toBe('test.pdf');
         expect(parsedMsg.isVoiceNote).toBeUndefined();
     });

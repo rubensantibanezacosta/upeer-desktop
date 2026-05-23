@@ -135,6 +135,19 @@ describe('thumbnail roundtrip – emisor → receptor', () => {
         expect(messageJson.direction).toBe('receiving');
     });
 
+    it('receive-p2p-message conserva el message id externo pero usa el fileId real como transferId', async () => {
+        const proposal = buildProposal(FILE_ID_2, realAesKey, { messageId: 'msg-offline-1' });
+        await manager.handleFileProposal('peer-id', '200::1', proposal);
+
+        const receiveEvent = safeSendCalls.find(c => c.channel === 'receive-p2p-message');
+        expect(receiveEvent).toBeDefined();
+
+        const payload = receiveEvent?.data as { id: string; message: string };
+        const messageJson = JSON.parse(payload.message);
+        expect(payload.id).toBe('msg-offline-1');
+        expect(messageJson.transferId).toBe(FILE_ID_2);
+    });
+
     it('file-transfer-started se emite al aceptar la propuesta', async () => {
         const proposal = buildProposal(FILE_ID_3, realAesKey);
         await manager.handleFileProposal('peer-id', '200::1', proposal);

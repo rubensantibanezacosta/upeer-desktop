@@ -285,6 +285,7 @@ describe('Vault Delivery Handler', () => {
             123,
             'text/plain',
             undefined,
+            undefined,
             'delivered'
         );
     });

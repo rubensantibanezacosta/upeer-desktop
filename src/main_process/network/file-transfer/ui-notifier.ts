@@ -47,7 +47,7 @@ export class UINotifier {
         const messageId = transfer.messageId || transfer.fileId;
         const fileMessage = {
             type: 'file',
-            transferId: messageId,
+            transferId: transfer.fileId,
             fileName: transfer.fileName,
             fileSize: transfer.fileSize,
             mimeType: transfer.mimeType,

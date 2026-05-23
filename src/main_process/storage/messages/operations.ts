@@ -269,6 +269,7 @@ export async function saveFileMessage(id: string, chatUpeerId: string, isMine: b
 
     const messageJson = JSON.stringify({
         type: 'file',
+        transferId: fileId,
         fileId,
         fileName,
         fileSize,

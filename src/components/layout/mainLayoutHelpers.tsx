@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Snackbar, Typography } from '@mui/joy';
+import { Box, Typography } from '@mui/joy';
 
 export const LayoutLoader: React.FC = () => (
     <Box sx={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'background.body' }}>
@@ -63,42 +63,6 @@ export const StartupRecoveryOverlay: React.FC<StartupRecoveryOverlayProps> = ({ 
                 </Box>
             </Box>
         </Box>
-    );
-};
-
-interface VaultRecoverySnackbarProps {
-    open: boolean;
-    message: string;
-}
-
-export const VaultRecoverySnackbar: React.FC<VaultRecoverySnackbarProps> = ({ open, message }) => {
-    if (!open) {
-        return null;
-    }
-
-    return (
-        <Snackbar
-            data-testid="vault-recovery-snackbar"
-            open={open}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-            variant="soft"
-            color="primary"
-            sx={{ minWidth: { xs: 'calc(100vw - 32px)', sm: 360 } }}
-            startDecorator={(
-                <Box sx={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    border: '2px solid',
-                    borderColor: 'primary.500',
-                    borderTopColor: 'transparent',
-                    animation: 'spin 0.8s linear infinite',
-                    '@keyframes spin': { to: { transform: 'rotate(360deg)' } },
-                }} />
-            )}
-        >
-            <Typography level="body-sm">{message}</Typography>
-        </Snackbar>
     );
 };
 

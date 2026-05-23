@@ -10,7 +10,7 @@ export async function saveTransferToDB(transfer: FileTransfer) {
         const isSelf = transfer.upeerId === myId;
         const chatUpeerId = transfer.chatUpeerId || transfer.upeerId;
         const messageId = transfer.messageId || transfer.fileId;
-        const displayFileId = transfer.messageId || transfer.fileId;
+        const displayFileId = transfer.fileId;
 
         // Skip duplicates for self-transfers
         if (isSelf && transfer.direction === 'receiving') return;
