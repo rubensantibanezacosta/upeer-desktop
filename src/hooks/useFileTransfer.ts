@@ -5,14 +5,26 @@ import type { FileTransfer, SaveFileParams, StartTransferParams, TransferProgres
 
 export type { FileTransfer, SaveFileParams, StartTransferParams, TransferProgress, TransferStateUpdate } from './fileTransferTypes.js';
 
-export function useFileTransfer(onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void) {
+type TransferStartedUpdate = TransferStateUpdate & {
+  upeerId?: string;
+  chatUpeerId?: string;
+};
+
+export function useFileTransfer(
+  onTransferStateChange?: (fileId: string, updates: TransferStateUpdate) => void,
+  onTransferStarted?: (transfer: TransferStartedUpdate) => void,
+) {
   const [transfers, setTransfers] = useState<FileTransfer[]>([]);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
   const [selectedUpeerId, setSelectedUpeerId] = useState<string>('');
 
   const onTransferStateChangeRef = useRef(onTransferStateChange);
+  const onTransferStartedRef = useRef(onTransferStarted);
   useEffect(() => {
     onTransferStateChangeRef.current = onTransferStateChange;
+  });
+  useEffect(() => {
+    onTransferStartedRef.current = onTransferStarted;
   });
 
   const allTransfers = useMemo(() => {
@@ -69,14 +81,20 @@ export function useFileTransfer(onTransferStateChange?: (fileId: string, updates
       });
       return updated;
     });
-  }, []);
+  }, [loadTransfers]);
 
   useEffect(() => {
     void loadTransfers();
   }, [loadTransfers]);
 
   useEffect(() => {
-    return registerFileTransferListeners({ loadTransfers, updateTransferProgress, setTransfers, onTransferStateChangeRef });
+    return registerFileTransferListeners({
+      loadTransfers,
+      updateTransferProgress,
+      setTransfers,
+      onTransferStateChangeRef,
+      onTransferStartedRef,
+    });
   }, [loadTransfers, updateTransferProgress]);
 
   const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string }> => {

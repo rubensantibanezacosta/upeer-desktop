@@ -6,6 +6,7 @@ interface RegisterFileTransferListenersParams {
     updateTransferProgress: (progress: TransferProgress) => void;
     setTransfers: Dispatch<SetStateAction<FileTransfer[]>>;
     onTransferStateChangeRef: MutableRefObject<((fileId: string, updates: TransferStateUpdate) => void) | undefined>;
+    onTransferStartedRef: MutableRefObject<((transfer: TransferStateUpdate & { upeerId?: string; chatUpeerId?: string }) => void) | undefined>;
 }
 
 export const registerFileTransferListeners = ({
@@ -13,9 +14,16 @@ export const registerFileTransferListeners = ({
     updateTransferProgress,
     setTransfers,
     onTransferStateChangeRef,
+    onTransferStartedRef,
 }: RegisterFileTransferListenersParams) => {
-    const unsubscribeStarted = window.upeer.onFileTransferStarted(() => {
+    const unsubscribeStarted = window.upeer.onFileTransferStarted((data) => {
         void loadTransfers();
+        onTransferStartedRef.current?.({
+            direction: data.direction === 'receiving' || data.direction === 'sending' ? data.direction : undefined,
+            upeerId: typeof data.upeerId === 'string' ? data.upeerId : undefined,
+            chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
+            transferState: 'active',
+        });
     }) || (() => undefined);
 
     const unsubscribeProgress = window.upeer.onFileTransferProgress((data) => {

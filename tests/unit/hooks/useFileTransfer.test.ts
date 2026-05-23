@@ -61,6 +61,33 @@ describe('useFileTransfer hook', () => {
         expect(mockUpeer.onFileTransferFailed).toHaveBeenCalled();
     });
 
+    it('should notify the started callback for incoming transfers', async () => {
+        const onTransferStarted = vi.fn();
+
+        renderHook(() => useFileTransfer(undefined, onTransferStarted));
+
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
+
+        const startedHandler = mockUpeer.onFileTransferStarted.mock.calls[0][0];
+
+        await act(async () => {
+            startedHandler({
+                fileId: 'recv-started',
+                direction: 'receiving',
+                upeerId: 'peer-1'
+            });
+        });
+
+        expect(onTransferStarted).toHaveBeenCalledWith({
+            direction: 'receiving',
+            upeerId: 'peer-1',
+            chatUpeerId: undefined,
+            transferState: 'active'
+        });
+    });
+
     it('should update progress correctly from IPC events', async () => {
         const initialTransfer = {
             fileId: 'f1',

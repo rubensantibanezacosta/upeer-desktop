@@ -8,7 +8,7 @@ import { useFilePersistence } from './hooks/useFilePersistence.js';
 import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
-import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
+import { StartupRecoveryOverlay, VaultRecoverySnackbar } from './components/layout/mainLayoutHelpers.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
 import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
@@ -17,6 +17,23 @@ const YGGSTACK_STATUSES: YggNetworkStatus[] = ['connecting', 'up', 'down', 'reco
 
 const isYggNetworkStatus = (status: string): status is YggNetworkStatus => YGGSTACK_STATUSES.includes(status as YggNetworkStatus);
 
+export function shouldReloadHistoryForIncomingTransfer(
+    transfer: { direction?: 'sending' | 'receiving'; upeerId?: string; chatUpeerId?: string },
+    activeGroupId: string,
+    targetUpeerId: string,
+) {
+    if (transfer.direction !== 'receiving') {
+        return false;
+    }
+
+    const isActiveGroupTransfer = !!transfer.chatUpeerId && transfer.chatUpeerId === activeGroupId;
+    const isActiveDirectTransfer = !!targetUpeerId
+        && transfer.chatUpeerId === targetUpeerId
+        && !transfer.chatUpeerId.startsWith('grp-');
+
+    return isActiveGroupTransfer || isActiveDirectTransfer;
+}
+
 export default function App() {
     const navigation = useNavigationStore();
     const appStore = useAppStore();
@@ -24,12 +41,29 @@ export default function App() {
     const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
     const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
-    const [isStartupVaultRecoveryOpen, setIsStartupVaultRecoveryOpen] = useState(false);
     const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
+    const [isVaultRecoverySnackbarOpen, setIsVaultRecoverySnackbarOpen] = useState(false);
+    const [vaultRecoveryMessage, setVaultRecoveryMessage] = useState('Recuperando mensajes vaulted…');
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
-    const { initListeners, refreshData, refreshContacts, refreshGroups } = chatStore;
+    const {
+        activeGroupId,
+        initListeners,
+        refreshData,
+        refreshContacts,
+        refreshGroups,
+        reloadLatestHistory,
+        targetUpeerId,
+    } = chatStore;
 
-    const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage);
+    const handleIncomingTransferStarted = React.useCallback((transfer: { direction?: 'sending' | 'receiving'; upeerId?: string; chatUpeerId?: string }) => {
+        if (!shouldReloadHistoryForIncomingTransfer(transfer, activeGroupId, targetUpeerId)) {
+            return;
+        }
+
+        void reloadLatestHistory();
+    }, [activeGroupId, reloadLatestHistory, targetUpeerId]);
+
+    const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage, handleIncomingTransferStarted);
 
     const {
         handleAttachFile, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave, handleSendVoiceNote
@@ -94,10 +128,13 @@ export default function App() {
             }
         }) || (() => undefined);
         const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {
-            setIsStartupVaultRecoveryOpen(payload.startupActive);
             if (payload.startupActive) {
-                setStartupRecoveryMessage(payload.message);
+                setVaultRecoveryMessage(payload.message);
+                setIsVaultRecoverySnackbarOpen(true);
+                return;
             }
+
+            setIsVaultRecoverySnackbarOpen(false);
         }) || (() => undefined);
 
         return () => {
@@ -229,7 +266,8 @@ export default function App() {
                     editingMessage={editingMessage}
                     setEditingMessage={setEditingMessage}
                 />
-                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && (isStartupRecoveryOpen || isStartupVaultRecoveryOpen)} message={startupRecoveryMessage} />
+                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
+                <VaultRecoverySnackbar open={!isAppLocked && appStore.isAuthenticated === true && isVaultRecoverySnackbarOpen} message={vaultRecoveryMessage} />
             </div>
         </CssVarsProvider>
     );

@@ -1,4 +1,4 @@
-import App from '../../src/App.js';
+import App, { shouldReloadHistoryForIncomingTransfer } from '../../src/App.js';
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock minimal de upeer para evitar errores de compilación/ejecución
@@ -11,8 +11,22 @@ vi.stubGlobal('upeer', {
 
 describe('App Smoke Test', () => {
     it('debe renderizar sin errores de sintaxis', () => {
-        // Solo verificamos que el componente se pueda importar y procesar por Vite/Vitest
-        // Esto previene fallos como el "Unexpected reserved word 'await'"
         expect(App).toBeDefined();
+    });
+
+    it('recarga historial para adjuntos directos del chat activo aunque lleguen con chatUpeerId', () => {
+        expect(shouldReloadHistoryForIncomingTransfer(
+            { direction: 'receiving', upeerId: 'peer-1', chatUpeerId: 'peer-1' },
+            '',
+            'peer-1'
+        )).toBe(true);
+    });
+
+    it('no recarga historial para transferencias de otra conversacion', () => {
+        expect(shouldReloadHistoryForIncomingTransfer(
+            { direction: 'receiving', upeerId: 'peer-2', chatUpeerId: 'peer-2' },
+            '',
+            'peer-1'
+        )).toBe(false);
     });
 });
