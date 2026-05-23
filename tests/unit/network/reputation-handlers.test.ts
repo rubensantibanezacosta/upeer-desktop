@@ -37,7 +37,7 @@ describe('Reputation Handlers', () => {
             }));
         });
 
-        it('should push our IDs if peer is missing them', () => {
+        it('should not bounce gossip back when peer is missing our IDs', () => {
             const ourIds = ['id1', 'id2'];
             const theirIds = ['id1'];
 
@@ -45,20 +45,15 @@ describe('Reputation Handlers', () => {
 
             handleReputationGossip(mockPeerId, { ids: theirIds }, mockSendResponse, mockRinfo);
 
-            expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
-                type: 'REPUTATION_GOSSIP',
-                ids: expect.any(Array)
-            }));
-            const sentIds = mockSendResponse.mock.calls[0][1].ids;
-            expect(sentIds.length).toBeLessThanOrEqual(100);
-        });
-
-        it('should handle missing data.ids gracefully', () => {
-            vi.mocked(vouches.getGossipIds).mockReturnValue(['id1']);
-            handleReputationGossip(mockPeerId, {}, mockSendResponse, mockRinfo);
-            expect(mockSendResponse).toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
+            expect(mockSendResponse).not.toHaveBeenCalledWith(mockRinfo.address, expect.objectContaining({
                 type: 'REPUTATION_GOSSIP'
             }));
+        });
+
+        it('should handle missing data.ids gracefully without gossip bounce', () => {
+            vi.mocked(vouches.getGossipIds).mockReturnValue(['id1']);
+            handleReputationGossip(mockPeerId, {}, mockSendResponse, mockRinfo);
+            expect(mockSendResponse).not.toHaveBeenCalled();
         });
 
         it('should limit ourMissing to 50 IDs', () => {

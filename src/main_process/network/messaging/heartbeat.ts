@@ -24,6 +24,8 @@ type HeartbeatContact = {
     dhtSignature?: string | null;
     dhtExpiresAt?: number | null;
     dhtSeq?: number | null;
+    deviceId?: string | null;
+    deviceMeta?: string | null;
     renewalToken?: string | null;
     lastSeen?: string | Date | null;
 };
@@ -40,12 +42,27 @@ type RenewableBlock = {
     publicKey: string;
     locationBlock: {
         address: string;
+        addresses?: string[];
         dhtSeq: number;
         signature: string;
         expiresAt?: number;
+        deviceId?: string;
+        deviceMeta?: unknown;
         renewalToken?: unknown;
     };
 };
+
+function parseJsonValue<T>(value: string | null | undefined, fallback?: T): T | undefined {
+    if (!value) {
+        return fallback;
+    }
+
+    try {
+        return JSON.parse(value) as T;
+    } catch {
+        return fallback;
+    }
+}
 
 /**
  * Helper to get all verified addresses for a contact (primary + known)
@@ -210,9 +227,12 @@ function getLocationBlocksForRenewal(): RenewableBlock[] {
             publicKey: c.publicKey || '',
             locationBlock: {
                 address: c.address || '',
+                addresses: parseJsonValue<string[]>(typeof c.knownAddresses === 'string' ? c.knownAddresses : undefined, c.address ? [c.address] : undefined),
                 dhtSeq: c.dhtSeq || 0,
                 signature: c.dhtSignature,
                 expiresAt: c.dhtExpiresAt,
+                deviceId: c.deviceId ?? undefined,
+                deviceMeta: parseJsonValue<unknown>(c.deviceMeta ?? undefined),
                 renewalToken: c.renewalToken
                     ? (() => { try { return JSON.parse(c.renewalToken); } catch { return undefined; } })()
                     : undefined

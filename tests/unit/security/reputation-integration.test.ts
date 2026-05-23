@@ -73,6 +73,7 @@ describe('Reputation - Vouches Integration', () => {
         vi.mocked(identity.getMyUPeerId).mockReturnValue(mockMyId);
         vi.mocked(storage.vouchExists).mockReturnValue(false);
         vi.mocked(identity.sign).mockReturnValue(Buffer.from('signature'));
+        vi.mocked(storage.insertVouch).mockReturnValue(true);
 
         const vouch = await issueVouch(targetId, VouchType.HANDSHAKE);
 
@@ -267,6 +268,32 @@ describe('Reputation - Vouches Integration', () => {
             vi.mocked(storage.vouchExists).mockReturnValue(true);
             const result = await issueVouch('target', VouchType.HANDSHAKE);
             expect(result).toBeNull();
+        });
+
+        it('should dedupe integrity_fail within the cooldown window', async () => {
+            const storedIds = new Set<string>();
+            const nowSpy = vi.spyOn(Date, 'now');
+            let currentNow = 3_600_100;
+
+            vi.mocked(identity.getMyUPeerId).mockReturnValue('me');
+            vi.mocked(identity.sign).mockReturnValue(Buffer.from('signature'));
+            vi.mocked(storage.vouchExists).mockImplementation((id) => storedIds.has(id));
+            vi.mocked(storage.insertVouch).mockImplementation((vouch) => {
+                storedIds.add(vouch.id);
+                return true;
+            });
+
+            nowSpy.mockImplementation(() => currentNow);
+
+            const first = await issueVouch('target', VouchType.INTEGRITY_FAIL);
+            currentNow = 3_600_500;
+            const second = await issueVouch('target', VouchType.INTEGRITY_FAIL);
+
+            expect(first).not.toBeNull();
+            expect(second).toBeNull();
+            expect(storage.insertVouch).toHaveBeenCalledTimes(1);
+
+            nowSpy.mockRestore();
         });
 
         it('should return null if exception occurs', async () => {

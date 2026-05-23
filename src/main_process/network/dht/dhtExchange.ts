@@ -22,6 +22,8 @@ type NetworkContactRecord = {
     dhtSignature?: string | null;
     dhtSeq?: number | null;
     dhtExpiresAt?: number | null;
+    deviceId?: string | null;
+    deviceMeta?: string | null;
     renewalToken?: string | null;
     expiresAt?: number | null;
 };
@@ -140,6 +142,8 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                         dhtSeq: contact.dhtSeq,
                         signature: contact.dhtSignature,
                         expiresAt: dbContact?.dhtExpiresAt ?? undefined,
+                        deviceId: dbContact?.deviceId ?? undefined,
+                        deviceMeta: parseJsonValue(dbContact?.deviceMeta),
                         renewalToken,
                     },
                 };
@@ -159,9 +163,12 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
             publicKey: contact.publicKey || '',
             locationBlock: {
                 address: contact.address || '',
+                addresses: parseJsonValue<string[]>(contact.knownAddresses, contact.address ? [contact.address] : undefined),
                 dhtSeq: contact.dhtSeq || 0,
                 signature: contact.dhtSignature,
                 expiresAt: contact.dhtExpiresAt ?? undefined,
+                deviceId: contact.deviceId ?? undefined,
+                deviceMeta: parseJsonValue(contact.deviceMeta),
                 renewalToken: parseJsonValue<RenewalToken>(contact.renewalToken),
             },
             dist: distanceXor(contact.upeerId, targetUpeerId),

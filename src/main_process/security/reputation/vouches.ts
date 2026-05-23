@@ -36,6 +36,18 @@ export {
 // ── Constantes locales ────────────────────────────────────────────────────────
 /** Límite de vouches almacenados por emisor por día (anti-flood en DB) */
 const MAX_VOUCHES_PER_SENDER_PER_DAY = 200;
+const INTEGRITY_FAIL_WINDOW_MS = 60 * 60 * 1000;
+const pendingIssuedVouchIds = new Set<string>();
+
+function getIssuedVouchTimestamp(type: VouchType, now: number): number {
+    if (type === VouchType.HANDSHAKE) {
+        return Math.floor(now / ONE_DAY_MS) * ONE_DAY_MS;
+    }
+    if (type === VouchType.INTEGRITY_FAIL) {
+        return Math.floor(now / INTEGRITY_FAIL_WINDOW_MS) * INTEGRITY_FAIL_WINDOW_MS;
+    }
+    return now;
+}
 
 // ── Emisión ───────────────────────────────────────────────────────────────────
 
@@ -52,25 +64,32 @@ export async function issueVouch(
         const fromId = getMyUPeerId();
         if (!fromId) return null;
 
-        const timestamp = type === VouchType.HANDSHAKE
-            ? Math.floor(Date.now() / ONE_DAY_MS) * ONE_DAY_MS
-            : Date.now();
+        const timestamp = getIssuedVouchTimestamp(type, Date.now());
         const positive = VOUCH_POSITIVE[type];
         const id = computeVouchId(fromId, toId, type, timestamp);
 
         // Idempotente: no re-emitir el mismo evento
-        if (vouchExists(id)) return null;
+        if (pendingIssuedVouchIds.has(id) || vouchExists(id)) return null;
 
-        const vouchBody: Omit<ReputationVouch, 'signature'> = {
-            id, fromId, toId, type, positive, timestamp,
-        };
+        pendingIssuedVouchIds.add(id);
+        try {
+            const vouchBody: Omit<ReputationVouch, 'signature'> = {
+                id, fromId, toId, type, positive, timestamp,
+            };
 
-        const signature = sign(buildSignBody(vouchBody)).toString('hex');
-        const vouch: ReputationVouch = { ...vouchBody, signature };
+            const signature = sign(buildSignBody(vouchBody)).toString('hex');
+            const vouch: ReputationVouch = { ...vouchBody, signature };
 
-        insertVouch({ ...vouch, receivedAt: timestamp });
-        info('Vouch emitido', { fromId, toId, type, positive }, 'reputation');
-        return vouch;
+            const inserted = insertVouch({ ...vouch, receivedAt: timestamp });
+            if (!inserted) {
+                return null;
+            }
+
+            info('Vouch emitido', { fromId, toId, type, positive }, 'reputation');
+            return vouch;
+        } finally {
+            pendingIssuedVouchIds.delete(id);
+        }
     } catch (e) {
         error('issueVouch falló', e, 'reputation');
         return null;
