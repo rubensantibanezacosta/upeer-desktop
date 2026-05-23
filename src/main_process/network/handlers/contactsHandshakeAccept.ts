@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import { VaultManager } from '../vault/manager.js';
 import {
     getContactByUpeerId,
     deleteContact,
@@ -56,9 +57,7 @@ type HandshakeAcceptPayload = {
 type HandshakeSendResponse = (ip: string, data: Record<string, unknown>) => void;
 
 function queryOwnVaultsAfterHandshake(senderUpeerId: string, label: string): void {
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.queryOwnVaults();
-    }).catch((err) => {
+    void VaultManager.queryOwnVaults().catch((err) => {
         warn(`Failed to query own vaults after ${label}`, { upeerId: senderUpeerId, err: String(err) }, 'vault');
     });
 }

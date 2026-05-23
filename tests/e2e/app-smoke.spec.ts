@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
             'onFileTransferCompleted',
             'onFileTransferCancelled',
             'onFileTransferFailed',
+            'onVaultRecoveryStatus',
             'onYggstackAddress',
             'onYggstackStatus',
         ]);

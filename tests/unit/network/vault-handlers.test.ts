@@ -4,6 +4,7 @@ import * as contactsOps from '../../../src/main_process/storage/contacts/operati
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as vouches from '../../../src/main_process/security/reputation/vouches.js';
 import { fileTransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
+import * as fileTransferSignature from '../../../src/main_process/network/file-transfer/signature.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as validation from '../../../src/main_process/security/validation.js';
 
@@ -37,6 +38,10 @@ vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', (
         handleMessage: vi.fn(),
         tryRecoverVaultTransferByFileHash: vi.fn()
     }
+}));
+
+vi.mock('../../../src/main_process/network/file-transfer/signature.js', () => ({
+    verifyFileTransferPacketSignature: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
@@ -87,6 +92,9 @@ describe('Vault Delivery Handler', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
+        vi.mocked(fileTransferSignature.verifyFileTransferPacketSignature).mockReturnValue(true);
     });
 
     it('should discard non-array entries (DoS protection)', async () => {
@@ -115,7 +123,7 @@ describe('Vault Delivery Handler', () => {
         };
 
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
-        vi.mocked(identity.verify).mockReturnValue(false);
+        vi.mocked(identity.verify).mockReturnValueOnce(false);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -301,6 +309,35 @@ describe('Vault Delivery Handler', () => {
 
         expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_PROPOSAL' }));
         expect(fileTransferManager.tryRecoverVaultTransferByFileHash).toHaveBeenCalledWith('a'.repeat(64));
+    });
+
+    it('should verify FILE_PROPOSAL vault entries with the file transfer signature rules', async () => {
+        const innerPacket = {
+            type: 'FILE_PROPOSAL',
+            fileId: 'file-2',
+            fileName: 'doc.bin',
+            fileSize: 12,
+            mimeType: 'application/octet-stream',
+            totalChunks: 1,
+            chunkSize: 12,
+            fileHash: 'b'.repeat(64),
+            senderUpeerId: 'origin-id',
+            signature: 'sig'
+        };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(identity.verify).mockReturnValue(false);
+        vi.mocked(fileTransferSignature.verifyFileTransferPacketSignature).mockReturnValue(true);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(fileTransferSignature.verifyFileTransferPacketSignature).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'FILE_PROPOSAL', fileId: 'file-2' }),
+            'origin-pubkey'
+        );
+        expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_PROPOSAL' }));
+        expect(vouches.issueVouch).not.toHaveBeenCalledWith(custodianSid, 'INTEGRITY_FAIL');
     });
 
     it('should process GROUP_MSG, GROUP_INVITE, GROUP_UPDATE and GROUP_LEAVE entries', async () => {

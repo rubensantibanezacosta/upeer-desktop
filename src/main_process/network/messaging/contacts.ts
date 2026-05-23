@@ -5,6 +5,7 @@ import { updateContactPublicKey } from '../../storage/contacts/keys.js';
 import { updateContactStatus } from '../../storage/contacts/status.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { getMainWindow } from '../../core/windowManager.js';
+import { VaultManager } from '../vault/manager.js';
 
 export async function sendContactRequest(targetIp: string) {
     // Generate PoW proof for Sybil resistance (light proof for mobile compatibility)
@@ -44,7 +45,5 @@ export async function acceptContactRequest(upeerId: string, publicKey: string) {
     };
     sendSecureUDPMessage(contact.address, data);
 
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.queryOwnVaults();
-    }).catch(() => { });
+    void VaultManager.queryOwnVaults().catch(() => undefined);
 }

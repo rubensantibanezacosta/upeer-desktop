@@ -24,6 +24,7 @@ export default function App() {
     const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
     const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
+    const [isStartupVaultRecoveryOpen, setIsStartupVaultRecoveryOpen] = useState(false);
     const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
     const { initListeners, refreshData, refreshContacts, refreshGroups } = chatStore;
@@ -92,11 +93,18 @@ export default function App() {
                 if (_addr) setYggAddress(_addr);
             }
         }) || (() => undefined);
+        const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {
+            setIsStartupVaultRecoveryOpen(payload.startupActive);
+            if (payload.startupActive) {
+                setStartupRecoveryMessage(payload.message);
+            }
+        }) || (() => undefined);
 
         return () => {
             cancelled = true;
             unsubscribeAddress();
             unsubscribeStatus();
+            unsubscribeVaultRecovery();
         };
     }, [checkAuth, hydrateInitialShell, initListeners, setFirstConnect, setNetworkStatus, setYggAddress]);
 
@@ -221,7 +229,7 @@ export default function App() {
                     editingMessage={editingMessage}
                     setEditingMessage={setEditingMessage}
                 />
-                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
+                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && (isStartupRecoveryOpen || isStartupVaultRecoveryOpen)} message={startupRecoveryMessage} />
             </div>
         </CssVarsProvider>
     );

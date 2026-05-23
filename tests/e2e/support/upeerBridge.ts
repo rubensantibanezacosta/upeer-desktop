@@ -377,6 +377,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             onFileTransferCompleted: register('onFileTransferCompleted'),
             onFileTransferCancelled: register('onFileTransferCancelled'),
             onFileTransferFailed: register('onFileTransferFailed'),
+            onVaultRecoveryStatus: register('onVaultRecoveryStatus'),
             onYggstackAddress: register('onYggstackAddress'),
             onYggstackStatus: register('onYggstackStatus'),
         };

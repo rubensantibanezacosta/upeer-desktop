@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { getKademliaInstance } from '../dht/shared.js';
 import { createVaultPointerKey } from '../dht/kademlia/store.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
+import { beginVaultRecoverySource, type VaultRecoveryContext, completeVaultRecoverySource } from './recoveryTracker.js';
 
 type VaultReplicatedPacket = {
     type?: string;
@@ -40,10 +41,12 @@ export class VaultManager {
     private static MAX_REPLICATION_FACTOR = 12;
     private static MIN_REPLICATION_FACTOR = 3;
 
-    private static async sendVaultQuery(address: string, packet: VaultReplicatedPacket, source: string): Promise<void> {
+    private static async sendVaultQuery(address: string, packet: VaultReplicatedPacket, source: string, context: VaultRecoveryContext = 'background'): Promise<void> {
+        beginVaultRecoverySource(address, source, context);
         try {
             await sendSecureUDPMessage(address, packet);
         } catch (err) {
+            completeVaultRecoverySource(address);
             warn(`Failed to send VAULT_QUERY to ${source}`, err, 'vault');
         }
     }
@@ -177,7 +180,7 @@ export class VaultManager {
         return custodianIds.length;
     }
 
-    static async queryOwnVaults() {
+    static async queryOwnVaults(context: VaultRecoveryContext = 'background') {
         const allContacts = await getContacts();
         const myId = getMyUPeerId();
         const knownPeers = allContacts.filter((contact) =>
@@ -211,7 +214,7 @@ export class VaultManager {
                         try {
                             const addr = await kademlia.findLocationBlock(custodianId);
                             if (addr && addr.address) {
-                                await this.sendVaultQuery(addr.address, queryPacket, `custodian ${custodianId}`);
+                                await this.sendVaultQuery(addr.address, queryPacket, `custodian ${custodianId}`, context);
                             }
                         } catch (err) {
                             debug('Could not find self-custodian location', { custodianId }, 'vault');
@@ -225,14 +228,14 @@ export class VaultManager {
 
         for (const friend of onlineFriends) {
             queriedAddresses.add(friend.address);
-            await this.sendVaultQuery(friend.address, queryPacket, `online friend ${friend.upeerId ?? friend.address}`);
+            await this.sendVaultQuery(friend.address, queryPacket, `online friend ${friend.upeerId ?? friend.address}`, context);
         }
 
         for (const peer of fallbackSinglePeer) {
             if (queriedAddresses.has(peer.address)) {
                 continue;
             }
-            await this.sendVaultQuery(peer.address, queryPacket, `single known peer ${peer.upeerId ?? peer.address}`);
+            await this.sendVaultQuery(peer.address, queryPacket, `single known peer ${peer.upeerId ?? peer.address}`, context);
         }
     }
 }

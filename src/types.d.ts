@@ -120,6 +120,7 @@ declare global {
             onFileTransferCompleted: (callback: (data: UpeerTransferUpdate) => void) => UpeerUnsubscribe;
             onFileTransferCancelled: (callback: (data: UpeerTransferUpdate) => void) => UpeerUnsubscribe;
             onFileTransferFailed: (callback: (data: UpeerTransferUpdate) => void) => UpeerUnsubscribe;
+            onVaultRecoveryStatus: (callback: (data: { active: boolean; startupActive: boolean; pendingSources: number; pendingStartupSources: number; message: string }) => void) => UpeerUnsubscribe;
             /** Estadísticas de red: peers activos, latencias, reintentos */
             getNetworkStats: () => Promise<{
                 peerCount: number;

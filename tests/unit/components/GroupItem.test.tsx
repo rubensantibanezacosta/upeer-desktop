@@ -18,6 +18,7 @@ vi.mock('@mui/icons-material/ExitToApp', () => ({ default: () => <div data-testi
 vi.mock('@mui/icons-material/WarningRounded', () => ({ default: () => <div data-testid="WarningRoundedIcon" /> }));
 vi.mock('@mui/icons-material/Done', () => ({ default: () => <div data-testid="DoneIcon" /> }));
 vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => <div data-testid="DoneAllIcon" /> }));
+vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => <div data-testid="ErrorOutlineIcon" /> }));
 vi.mock('@mui/icons-material/Mic', () => ({ default: () => <div data-testid="MicIcon" /> }));
 vi.mock('../../../src/utils/fileIcons.js', () => ({ getFileIcon: () => <div data-testid="FileIcon" /> }));
 

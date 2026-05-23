@@ -139,7 +139,7 @@ export function startUDPServer(win: BrowserWindow) {
 
                 // Consultar mensajes offline almacenados en vaults de amigos
                 import('../vault/manager.js').then(({ VaultManager }) => {
-                    VaultManager.queryOwnVaults();
+                    VaultManager.queryOwnVaults('startup');
                 }).catch(err => error('Failed to query vaults on start', err, 'vault'));
 
                 // Arrancar worker de reparación de vault (lazy mode)

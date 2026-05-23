@@ -11,9 +11,11 @@ import { validateMessage } from '../../security/validation.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { debug, security, warn, error } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../file-transfer/transfer-manager.js';
+import { verifyFileTransferPacketSignature } from '../file-transfer/signature.js';
 import { saveVaultEntry } from '../../storage/vault/operations.js';
 import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
 import { SHARD_TTL_MS } from '../vault/manager.js';
+import { completeVaultRecoverySource, touchVaultRecoverySource } from '../vault/recoveryTracker.js';
 
 type VaultSendResponse = (ip: string, data: Record<string, unknown>) => void;
 
@@ -62,15 +64,20 @@ export async function handleVaultDelivery(
     sendResponse: VaultSendResponse,
     fromAddress: string
 ) {
+    const recoverySourceKey = typeof fromAddress === 'string' && fromAddress.length > 0 ? fromAddress : senderSid;
+
     // BUG AJ fix: custodio malicioso podría enviar data.entries = null o un array
     // de 100 000 entradas, reventando el for-of o saturando CPU/mem en el loop.
     // Validar tipo y aplicar límite duro antes de iterar.
     if (!Array.isArray(data.entries)) {
+        completeVaultRecoverySource(recoverySourceKey);
         security('VAULT_DELIVERY: entries no es un array', { from: senderSid }, 'vault');
         return;
     }
     const MAX_DELIVERY_ENTRIES = 50; // igual que la paginación del custodio
     const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES).filter(isVaultEntry);
+
+    touchVaultRecoverySource(recoverySourceKey, senderSid);
 
     debug('Handling vault delivery', { count: entries.length, from: senderSid }, 'vault');
 
@@ -105,13 +112,17 @@ export async function handleVaultDelivery(
                         innerPacket.isInternalSync = true;
                     }
                     const { signature: innerSig, senderUpeerId: _senderUpeerId, ...innerData } = innerPacket;
+                    const isFileTransferPacket = innerPacket.type === 'FILE_DATA_SMALL'
+                        || (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_'));
 
-                    // End-to-End Integrity Verification
-                    const isInnerValid = verify(
-                        Buffer.from(canonicalStringify(innerData)),
-                        Buffer.from(innerSig, 'hex'),
-                        Buffer.from(originalContact.publicKey, 'hex')
-                    );
+                    // End-to-end integrity verification must mirror the packet family.
+                    const isInnerValid = isFileTransferPacket
+                        ? verifyFileTransferPacketSignature(innerPacket, originalContact.publicKey)
+                        : verify(
+                            Buffer.from(canonicalStringify(innerData)),
+                            Buffer.from(innerSig, 'hex'),
+                            Buffer.from(originalContact.publicKey, 'hex')
+                        );
 
                     if (!isInnerValid) {
                         security('Vault delivery integrity failure!', { originalSender: entry.senderSid, custodian: senderSid }, 'vault');
@@ -262,6 +273,10 @@ export async function handleVaultDelivery(
             requesterSid: myId,
             offset: data.nextOffset,
         });
+        touchVaultRecoverySource(recoverySourceKey, senderSid);
         debug('Vault delivery: requesting next page', { offset: data.nextOffset, from: senderSid }, 'vault');
+        return;
     }
+
+    completeVaultRecoverySource(recoverySourceKey);
 }

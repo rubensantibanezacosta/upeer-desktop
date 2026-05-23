@@ -34,7 +34,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
         publicKey: 'pubkey',
         status: 'connected'
     })),
-    getContacts: vi.fn(async () => []),
+    getContacts: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({

@@ -73,6 +73,14 @@ type GroupMessageDeliveredPayload = {
     upeerId: string;
 };
 
+type VaultRecoveryStatusPayload = {
+    active: boolean;
+    startupActive: boolean;
+    pendingSources: number;
+    pendingStartupSources: number;
+    message: string;
+};
+
 const subscribe = <Args extends unknown[]>(channel: string, callback: (...args: Args) => void) => {
     const listener = (_event: unknown, ...args: unknown[]) => callback(...args as Args);
     ipcRenderer.on(channel, listener);
@@ -217,6 +225,7 @@ const eventApi = {
     onFileTransferCompleted: (callback: (data: TransferMessageUpdates) => void) => subscribe<[TransferMessageUpdates]>('file-transfer-completed', callback),
     onFileTransferCancelled: (callback: (data: TransferMessageUpdates) => void) => subscribe<[TransferMessageUpdates]>('file-transfer-cancelled', callback),
     onFileTransferFailed: (callback: (data: TransferMessageUpdates) => void) => subscribe<[TransferMessageUpdates]>('file-transfer-failed', callback),
+    onVaultRecoveryStatus: (callback: (data: VaultRecoveryStatusPayload) => void) => subscribe<[VaultRecoveryStatusPayload]>('vault-recovery-status', callback),
     onYggstackAddress: (callback: (address: string) => void) => subscribe('yggstack-address', (address: string) => callback(address)),
     onYggstackStatus: (callback: (status: string, address?: string) => void) => subscribe('yggstack-status', (status: string, address?: string) => callback(status, address)),
 };
