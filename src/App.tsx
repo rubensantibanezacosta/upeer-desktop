@@ -42,13 +42,6 @@ export default function App() {
     const navigation = useNavigationStore();
     const appStore = useAppStore();
     const chatStore = useChatStore();
-    const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
-    const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
-    const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
-    const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
-    const [isVaultRecoverySnackbarOpen, setIsVaultRecoverySnackbarOpen] = useState(false);
-    const [vaultRecoveryMessage, setVaultRecoveryMessage] = useState('Recuperando mensajes vaulted…');
-    const previousVaultRecoveryActiveRef = React.useRef(false);
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
     const {
         activeGroupId,
@@ -59,6 +52,18 @@ export default function App() {
         reloadLatestHistory,
         targetUpeerId,
     } = chatStore;
+    const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+    const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
+    const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
+    const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
+    const [isVaultRecoverySnackbarOpen, setIsVaultRecoverySnackbarOpen] = useState(false);
+    const [vaultRecoveryMessage, setVaultRecoveryMessage] = useState('Recuperando mensajes vaulted…');
+    const previousVaultRecoveryActiveRef = React.useRef(false);
+    const activeGroupIdRef = React.useRef(activeGroupId);
+    const targetUpeerIdRef = React.useRef(targetUpeerId);
+    const refreshContactsRef = React.useRef(refreshContacts);
+    const refreshGroupsRef = React.useRef(refreshGroups);
+    const reloadLatestHistoryRef = React.useRef(reloadLatestHistory);
 
     const handleIncomingTransferStarted = React.useCallback((transfer: { direction?: 'sending' | 'receiving'; upeerId?: string; chatUpeerId?: string }) => {
         if (!shouldReloadHistoryForIncomingTransfer(transfer, activeGroupId, targetUpeerId)) {
@@ -92,6 +97,14 @@ export default function App() {
             setIsStartupRecoveryOpen(false);
         }
     }, [refreshContacts, refreshData, refreshGroups]);
+
+    useEffect(() => {
+        activeGroupIdRef.current = activeGroupId;
+        targetUpeerIdRef.current = targetUpeerId;
+        refreshContactsRef.current = refreshContacts;
+        refreshGroupsRef.current = refreshGroups;
+        reloadLatestHistoryRef.current = reloadLatestHistory;
+    }, [activeGroupId, refreshContacts, refreshGroups, reloadLatestHistory, targetUpeerId]);
 
     useEffect(() => {
         initListeners();
@@ -132,6 +145,15 @@ export default function App() {
                 if (_addr) setYggAddress(_addr);
             }
         }) || (() => undefined);
+
+        return () => {
+            cancelled = true;
+            unsubscribeAddress();
+            unsubscribeStatus();
+        };
+    }, [checkAuth, hydrateInitialShell, initListeners, setFirstConnect, setNetworkStatus, setYggAddress]);
+
+    useEffect(() => {
         const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {
             const shouldResync = shouldResyncAfterVaultRecoveryTransition(previousVaultRecoveryActiveRef.current, payload.active);
             previousVaultRecoveryActiveRef.current = payload.active;
@@ -145,21 +167,18 @@ export default function App() {
             setIsVaultRecoverySnackbarOpen(false);
 
             if (shouldResync) {
-                void refreshContacts();
-                void refreshGroups();
-                if (activeGroupId || targetUpeerId) {
-                    void reloadLatestHistory();
+                void refreshContactsRef.current();
+                void refreshGroupsRef.current();
+                if (activeGroupIdRef.current || targetUpeerIdRef.current) {
+                    void reloadLatestHistoryRef.current();
                 }
             }
         }) || (() => undefined);
 
         return () => {
-            cancelled = true;
-            unsubscribeAddress();
-            unsubscribeStatus();
             unsubscribeVaultRecovery();
         };
-    }, [activeGroupId, checkAuth, hydrateInitialShell, initListeners, refreshContacts, refreshGroups, reloadLatestHistory, setFirstConnect, setNetworkStatus, setYggAddress, targetUpeerId]);
+    }, []);
 
     const handleMediaClick = (media: PreviewableMedia) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
