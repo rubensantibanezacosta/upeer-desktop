@@ -124,6 +124,25 @@ describe('Vault Delivery Handler', () => {
         expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
     });
 
+    it('should emit a single integrity failure vouch per delivery batch', async () => {
+        const invalidEntryA = {
+            senderSid: 'origin-id',
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', text: 'a', senderUpeerId: 'origin-id', signature: 'sig-a' })).toString('hex')
+        };
+        const invalidEntryB = {
+            senderSid: 'origin-id',
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', text: 'b', senderUpeerId: 'origin-id', signature: 'sig-b' })).toString('hex')
+        };
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(identity.verify).mockReturnValue(false);
+
+        await handleVaultDelivery(custodianSid, { entries: [invalidEntryA, invalidEntryB] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(vouches.issueVouch).toHaveBeenCalledTimes(1);
+        expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'INTEGRITY_FAIL');
+    });
+
     it('should validate structural integrity of inner packets (validateMessage)', async () => {
         const innerPacket = { type: 'CHAT', text: 'hello', senderUpeerId: 'origin-id', signature: 'inner-sig' };
         const entry = {

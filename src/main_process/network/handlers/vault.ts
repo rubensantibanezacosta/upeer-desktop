@@ -78,6 +78,7 @@ export async function handleVaultDelivery(
     // Entradas corrompidas o manipuladas NO se ACKên → el custodio las conserva.
     const validatedHashes: string[] = [];
     let processedEntries = 0;
+    let reportedIntegrityFailure = false;
     try {
         for (const entry of entries) {
             try {
@@ -114,9 +115,12 @@ export async function handleVaultDelivery(
 
                     if (!isInnerValid) {
                         security('Vault delivery integrity failure!', { originalSender: entry.senderSid, custodian: senderSid }, 'vault');
-                        issueVouch(senderSid, VouchType.INTEGRITY_FAIL).catch((err) => {
-                            warn('Failed to issue integrity failure vouch', { senderSid, err: String(err) }, 'reputation');
-                        });
+                        if (!reportedIntegrityFailure) {
+                            reportedIntegrityFailure = true;
+                            issueVouch(senderSid, VouchType.INTEGRITY_FAIL).catch((err) => {
+                                warn('Failed to issue integrity failure vouch', { senderSid, err: String(err) }, 'reputation');
+                            });
+                        }
                         continue;
                     }
 
