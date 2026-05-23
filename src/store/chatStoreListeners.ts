@@ -2,7 +2,7 @@ import { useNavigationStore } from './useNavigationStore.js';
 import { useNotificationStore } from './useNotificationStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
-import { applyReactionUpdate, formatMessageTimestamp } from './chatStoreSupport.js';
+import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
 import type { ChatMessage, IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, KeyChangeAlert, UntrustworthyInfo } from '../types/chat.js';
 
 export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
@@ -40,7 +40,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                         date: data.timestamp || Date.now(),
                     };
                     return {
-                        chatHistory: [...state.chatHistory, nextMessage],
+                        chatHistory: insertMessageChronologically(state.chatHistory, nextMessage),
                     };
                 });
                 return;
@@ -155,22 +155,23 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                         return state;
                     }
                     const sender = data.isMine ? myIdentity : contacts.find((contact) => contact.upeerId === data.senderUpeerId);
+                    const nextMessage: ChatMessage = {
+                        id: data.id,
+                        upeerId: data.groupId,
+                        groupId: data.groupId,
+                        isMine: !!data.isMine,
+                        message: data.message,
+                        isSystem: data.isSystem || undefined,
+                        status: data.status || 'delivered',
+                        timestamp: formatMessageTimestamp(data.timestamp),
+                        replyTo: data.replyTo,
+                        senderUpeerId: data.senderUpeerId,
+                        senderName: sender?.name || sender?.alias || data.senderName || 'Usuario desconocido',
+                        senderAvatar: sender?.avatar ?? undefined,
+                        date: data.timestamp || Date.now(),
+                    };
                     return {
-                        groupChatHistory: [...state.groupChatHistory, {
-                            id: data.id,
-                            upeerId: data.groupId,
-                            groupId: data.groupId,
-                            isMine: !!data.isMine,
-                            message: data.message,
-                            isSystem: data.isSystem || undefined,
-                            status: data.status || 'delivered',
-                            timestamp: formatMessageTimestamp(data.timestamp),
-                            replyTo: data.replyTo,
-                            senderUpeerId: data.senderUpeerId,
-                            senderName: sender?.name || sender?.alias || data.senderName || 'Usuario desconocido',
-                            senderAvatar: sender?.avatar ?? undefined,
-                            date: data.timestamp || Date.now(),
-                        }],
+                        groupChatHistory: insertMessageChronologically(state.groupChatHistory, nextMessage),
                     };
                 });
             }

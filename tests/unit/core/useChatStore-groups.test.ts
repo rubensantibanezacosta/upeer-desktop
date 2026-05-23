@@ -8,6 +8,22 @@ type MockUpeer = {
     clearChat: ReturnType<typeof vi.fn>;
     getContacts: ReturnType<typeof vi.fn>;
     getGroups: ReturnType<typeof vi.fn>;
+    sendReadReceipt: ReturnType<typeof vi.fn>;
+    onReceive: ReturnType<typeof vi.fn>;
+    onContactRequest: ReturnType<typeof vi.fn>;
+    onHandshakeFinished: ReturnType<typeof vi.fn>;
+    onContactUntrustworthy: ReturnType<typeof vi.fn>;
+    onKeyChangeAlert: ReturnType<typeof vi.fn>;
+    onTyping: ReturnType<typeof vi.fn>;
+    onGroupMessage: ReturnType<typeof vi.fn>;
+    onGroupInvite: ReturnType<typeof vi.fn>;
+    onGroupUpdated: ReturnType<typeof vi.fn>;
+    onMessageDelivered: ReturnType<typeof vi.fn>;
+    onMessageRead: ReturnType<typeof vi.fn>;
+    onMessageStatusUpdated: ReturnType<typeof vi.fn>;
+    onGroupMessageDelivered: ReturnType<typeof vi.fn>;
+    onMessageReactionUpdated: ReturnType<typeof vi.fn>;
+    onMessageUpdated: ReturnType<typeof vi.fn>;
     sendChatUpdate?: ReturnType<typeof vi.fn>;
 };
 
@@ -39,6 +55,7 @@ vi.mock('../../../src/utils/notificationSound.js', () => ({
 describe('useChatStore groups integration', () => {
     beforeEach(async () => {
         vi.resetModules();
+        delete (window as Window & { __chat_listeners_initialized?: boolean }).__chat_listeners_initialized;
         getWindowWithUpeer().upeer = {
             sendGroupMessage: vi.fn().mockResolvedValue({ id: 'msg-1', timestamp: 1710000000000 }),
             inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
@@ -46,7 +63,66 @@ describe('useChatStore groups integration', () => {
             clearChat: vi.fn().mockResolvedValue({ success: true }),
             getContacts: vi.fn().mockResolvedValue([]),
             getGroups: vi.fn().mockResolvedValue([]),
+            sendReadReceipt: vi.fn(),
+            onReceive: vi.fn(),
+            onContactRequest: vi.fn(),
+            onHandshakeFinished: vi.fn(),
+            onContactUntrustworthy: vi.fn(),
+            onKeyChangeAlert: vi.fn(),
+            onTyping: vi.fn(),
+            onGroupMessage: vi.fn(),
+            onGroupInvite: vi.fn(),
+            onGroupUpdated: vi.fn(),
+            onMessageDelivered: vi.fn(),
+            onMessageRead: vi.fn(),
+            onMessageStatusUpdated: vi.fn(),
+            onGroupMessageDelivered: vi.fn(),
+            onMessageReactionUpdated: vi.fn(),
+            onMessageUpdated: vi.fn(),
         };
+    });
+
+    it('keeps recovered direct messages ordered by sent timestamp', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            chatHistory: [
+                {
+                    id: 'msg-100',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'primero',
+                    status: 'read',
+                    timestamp: '10:00',
+                    date: 100,
+                },
+                {
+                    id: 'msg-300',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'tercero',
+                    status: 'read',
+                    timestamp: '10:03',
+                    date: 300,
+                }
+            ],
+        });
+
+        useChatStore.getState().initListeners();
+        const onReceive = getWindowWithUpeer().upeer.onReceive.mock.calls[0]?.[0] as ((data: Record<string, unknown>) => void);
+
+        onReceive({
+            id: 'msg-200',
+            upeerId: 'peer-1',
+            isMine: false,
+            message: 'segundo',
+            status: 'delivered',
+            timestamp: 200,
+        });
+
+        expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-100', 'msg-200', 'msg-300']);
     });
 
     it('passes replyTo when sending a group message', async () => {

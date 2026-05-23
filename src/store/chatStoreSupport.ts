@@ -10,6 +10,10 @@ export const formatMessageTimestamp = (timestamp?: number) => {
     }).format(new Date(safeTimestamp));
 };
 
+export const insertMessageChronologically = (messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] => {
+    return [...messages, nextMessage].sort((left, right) => left.date - right.date);
+};
+
 export const mapContactMessage = (message: RawChatMessage): ChatMessage => ({
     id: message.id,
     upeerId: message.chatUpeerId,
