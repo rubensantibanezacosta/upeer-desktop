@@ -8,6 +8,7 @@ import { useFilePersistence } from './hooks/useFilePersistence.js';
 import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
+import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
 import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
@@ -22,8 +23,10 @@ export default function App() {
     const chatStore = useChatStore();
     const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
+    const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);
+    const [startupRecoveryMessage, setStartupRecoveryMessage] = useState('Recuperando conversaciones…');
     const { checkAuth, setYggAddress, setNetworkStatus, setFirstConnect } = appStore;
-    const { initListeners, refreshData, refreshGroups } = chatStore;
+    const { initListeners, refreshData, refreshContacts, refreshGroups } = chatStore;
 
     const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage);
 
@@ -31,12 +34,45 @@ export default function App() {
         handleAttachFile, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave, handleSendVoiceNote
     } = useFilePersistence(fileTransfer);
 
+    const hydrateInitialShell = React.useCallback(async () => {
+        const startedAt = Date.now();
+        setStartupRecoveryMessage('Recuperando conversaciones…');
+        setIsStartupRecoveryOpen(true);
+        try {
+            await refreshData();
+            setStartupRecoveryMessage('Recuperando contactos y mensajes…');
+            await refreshContacts();
+            setStartupRecoveryMessage('Sincronizando grupos…');
+            await refreshGroups();
+        } finally {
+            const remainingMs = Math.max(0, 450 - (Date.now() - startedAt));
+            if (remainingMs > 0) {
+                await new Promise((resolve) => window.setTimeout(resolve, remainingMs));
+            }
+            setIsStartupRecoveryOpen(false);
+        }
+    }, [refreshContacts, refreshData, refreshGroups]);
+
     useEffect(() => {
-        window.upeer.isPinEnabled().then((enabled: boolean) => setIsAppLocked(enabled));
-        checkAuth();
         initListeners();
-        refreshData();
-        refreshGroups();
+
+        let cancelled = false;
+        const bootstrap = async () => {
+            const pinEnabled = await window.upeer.isPinEnabled().catch(() => false);
+            if (cancelled) {
+                return;
+            }
+            setIsAppLocked((current) => current === false ? false : pinEnabled);
+
+            const authenticated = await checkAuth();
+            if (cancelled || !authenticated) {
+                return;
+            }
+
+            await hydrateInitialShell();
+        };
+
+        void bootstrap();
 
         window.upeer.getMyNetworkAddress().then((addr: string) => {
             if (addr && addr !== 'No detectado') {
@@ -58,10 +94,11 @@ export default function App() {
         }) || (() => undefined);
 
         return () => {
+            cancelled = true;
             unsubscribeAddress();
             unsubscribeStatus();
         };
-    }, [checkAuth, initListeners, refreshData, refreshGroups, setFirstConnect, setNetworkStatus, setYggAddress]);
+    }, [checkAuth, hydrateInitialShell, initListeners, setFirstConnect, setNetworkStatus, setYggAddress]);
 
     const handleMediaClick = (media: PreviewableMedia) => {
         const history = chatStore.activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory;
@@ -184,6 +221,7 @@ export default function App() {
                     editingMessage={editingMessage}
                     setEditingMessage={setEditingMessage}
                 />
+                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
             </div>
         </CssVarsProvider>
     );

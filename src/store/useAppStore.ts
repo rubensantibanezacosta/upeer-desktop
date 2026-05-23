@@ -13,9 +13,7 @@ interface AppActions {
     setNetworkStatus: (status: YggNetworkStatus) => void;
     setFirstConnect: (first: boolean) => void;
     setYggAddress: (address: string | undefined) => void;
-
-    // Auth check logic
-    checkAuth: () => Promise<void>;
+    checkAuth: () => Promise<boolean>;
 }
 
 export type AppStore = AppState & AppActions;
@@ -34,9 +32,12 @@ export const useAppStore = create<AppStore>((set) => ({
     checkAuth: async () => {
         try {
             const status = await window.upeer.identityStatus();
-            set({ isAuthenticated: !status.isLocked });
+            const isAuthenticated = !status.isLocked;
+            set({ isAuthenticated });
+            return isAuthenticated;
         } catch (error) {
             set({ isAuthenticated: false });
+            return false;
         }
     }
 }));

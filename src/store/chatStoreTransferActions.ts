@@ -1,5 +1,5 @@
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
-import { formatMessageTimestamp, updateTransferMessageContent } from './chatStoreSupport.js';
+import { formatMessageTimestamp, insertMessageChronologically, updateTransferMessageContent } from './chatStoreSupport.js';
 import type { LinkPreview, PendingFile, TransferMessageUpdates } from '../types/chat.js';
 
 export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
@@ -55,6 +55,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
         filePath?: string,
         isVoiceNote?: boolean,
     ) => {
+        const timestamp = Date.now();
         const messageContent = JSON.stringify({
             type: 'file',
             transferId: fileId,
@@ -72,32 +73,32 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
         const replyTo = replyByConversation[upeerId];
         const isGroup = activeGroupId === upeerId;
         set((state) => isGroup ? {
-            groupChatHistory: [...state.groupChatHistory, {
+            groupChatHistory: insertMessageChronologically(state.groupChatHistory, {
                 id: fileId,
                 upeerId,
                 groupId: upeerId,
                 isMine,
                 message: messageContent,
                 status: 'sent',
-                timestamp: formatMessageTimestamp(Date.now()),
+                timestamp: formatMessageTimestamp(timestamp),
                 replyTo: replyTo?.id,
                 senderUpeerId: isMine ? myIdentity?.upeerId : undefined,
                 senderName: isMine ? (myIdentity?.alias || myIdentity?.name || 'Yo') : undefined,
                 senderAvatar: isMine ? (myIdentity?.avatar ?? undefined) : undefined,
-                date: Date.now(),
-            }],
+                date: timestamp,
+            }),
             replyByConversation: { ...state.replyByConversation, [upeerId]: null },
         } : {
-            chatHistory: [...state.chatHistory, {
+            chatHistory: insertMessageChronologically(state.chatHistory, {
                 id: fileId,
                 upeerId,
                 isMine,
                 message: messageContent,
                 status: isMine && upeerId === get().myIdentity?.upeerId ? 'read' : 'sent',
-                timestamp: formatMessageTimestamp(Date.now()),
+                timestamp: formatMessageTimestamp(timestamp),
                 replyTo: replyTo?.id,
-                date: Date.now(),
-            }],
+                date: timestamp,
+            }),
             replyByConversation: { ...state.replyByConversation, [upeerId]: null },
         });
     },

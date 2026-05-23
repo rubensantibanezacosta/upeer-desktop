@@ -105,7 +105,8 @@ function mediaScenario(): Parameters<typeof installUpeerBridge>[1] {
 
 async function openAliceChat(page: Page) {
     await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
-    await expect(page.getByText('Alice').first()).toBeVisible();
+    await expect(page.getByText('Bienvenido a uPeer')).toHaveCount(0);
+    await expect(page.getByLabel('Abrir info del contacto Alice')).toBeVisible();
 }
 
 async function sendChatMessage(page: Page, text: string) {

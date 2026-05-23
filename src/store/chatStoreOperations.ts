@@ -1,4 +1,4 @@
-import { applyReactionUpdate, formatMessageTimestamp } from './chatStoreSupport.js';
+import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import type { LinkPreview } from '../types/chat.js';
 
@@ -67,7 +67,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         const sendResult = await window.upeer.sendMessage(targetUpeerId, message, replyTo?.id, linkPreview ?? undefined);
         if (sendResult) {
             set((state) => ({
-                chatHistory: [...state.chatHistory, {
+                chatHistory: insertMessageChronologically(state.chatHistory, {
                     id: sendResult.id,
                     upeerId: targetUpeerId,
                     isMine: true,
@@ -76,7 +76,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
                     timestamp: formatMessageTimestamp(sendResult.timestamp),
                     replyTo: replyTo?.id,
                     date: sendResult.timestamp,
-                }],
+                }),
                 messagesByConversation: { ...state.messagesByConversation, [targetUpeerId]: '' },
                 replyByConversation: { ...state.replyByConversation, [targetUpeerId]: null },
             }));
@@ -108,7 +108,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         const sendResult = await window.upeer.sendGroupMessage(activeGroupId, message, replyTo?.id, linkPreview ?? undefined);
         if (sendResult) {
             set((state) => ({
-                groupChatHistory: [...state.groupChatHistory, {
+                groupChatHistory: insertMessageChronologically(state.groupChatHistory, {
                     id: sendResult.id,
                     upeerId: activeGroupId,
                     groupId: activeGroupId,
@@ -121,7 +121,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
                     senderName: myIdentity?.alias || myIdentity?.name || 'Yo',
                     senderAvatar: myIdentity?.avatar ?? undefined,
                     date: sendResult.timestamp,
-                }],
+                }),
                 messagesByConversation: { ...state.messagesByConversation, [activeGroupId]: '' },
                 replyByConversation: { ...state.replyByConversation, [activeGroupId]: null },
             }));

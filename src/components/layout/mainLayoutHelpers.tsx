@@ -7,6 +7,65 @@ export const LayoutLoader: React.FC = () => (
     </Box>
 );
 
+interface StartupRecoveryOverlayProps {
+    open: boolean;
+    message: string;
+}
+
+export const StartupRecoveryOverlay: React.FC<StartupRecoveryOverlayProps> = ({ open, message }) => {
+    if (!open) {
+        return null;
+    }
+
+    return (
+        <Box
+            data-testid="startup-recovery-overlay"
+            sx={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'background.body',
+                px: 3,
+            }}
+        >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2.5, textAlign: 'center', maxWidth: 360 }}>
+                <Box sx={{
+                    width: 84,
+                    height: 84,
+                    borderRadius: '24px',
+                    backgroundColor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                }}>
+                    <Box component="img" src="/logo.svg" sx={{ width: 42, height: 42, opacity: 0.92 }} />
+                    <Box sx={{
+                        position: 'absolute',
+                        inset: -10,
+                        borderRadius: '28px',
+                        border: '3px solid',
+                        borderColor: 'primary.700',
+                        borderTopColor: 'primary.400',
+                        animation: 'spin 0.9s linear infinite',
+                        '@keyframes spin': { to: { transform: 'rotate(360deg)' } },
+                    }} />
+                </Box>
+                <Box>
+                    <Typography level="h4" sx={{ fontWeight: 700, mb: 0.75 }}>uPeer</Typography>
+                    <Typography level="body-md" sx={{ color: 'text.secondary', mb: 0.5 }}>{message}</Typography>
+                    <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Preparando tus chats, contactos y grupos…</Typography>
+                </Box>
+            </Box>
+        </Box>
+    );
+};
+
 interface DragOverlayProps {
     isDragging: boolean;
 }

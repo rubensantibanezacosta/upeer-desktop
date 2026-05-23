@@ -12,6 +12,7 @@ app.log
 coverage/
 coverage_report/
 test-results.json
+test-results/
 test-encrypted.db
 .agents/
 .deepseek/

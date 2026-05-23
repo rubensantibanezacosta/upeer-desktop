@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage, LinkPreview, MyIdentity } from '../../../src/types/chat.js';
 
 type MockUpeer = {
+    sendMessage: ReturnType<typeof vi.fn>;
     sendGroupMessage: ReturnType<typeof vi.fn>;
     inviteToGroup: ReturnType<typeof vi.fn>;
     leaveGroup: ReturnType<typeof vi.fn>;
@@ -57,6 +58,7 @@ describe('useChatStore groups integration', () => {
         vi.resetModules();
         delete (window as Window & { __chat_listeners_initialized?: boolean }).__chat_listeners_initialized;
         getWindowWithUpeer().upeer = {
+            sendMessage: vi.fn().mockResolvedValue({ id: 'msg-direct', savedMessage: 'intermedio', timestamp: 200 }),
             sendGroupMessage: vi.fn().mockResolvedValue({ id: 'msg-1', timestamp: 1710000000000 }),
             inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
             leaveGroup: vi.fn().mockResolvedValue({ success: true }),
@@ -161,6 +163,43 @@ describe('useChatStore groups integration', () => {
         expect(state.replyByConversation['grp-1']).toBeNull();
     });
 
+    it('keeps local direct sends ordered by sent timestamp', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            myIdentity,
+            chatHistory: [
+                {
+                    id: 'msg-100',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'primero',
+                    status: 'read',
+                    timestamp: '10:00',
+                    date: 100,
+                },
+                {
+                    id: 'msg-300',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'tercero',
+                    status: 'read',
+                    timestamp: '10:03',
+                    date: 300,
+                }
+            ],
+            messagesByConversation: { 'peer-1': 'intermedio' },
+            replyByConversation: { 'peer-1': null },
+        });
+
+        await useChatStore.getState().handleSend();
+
+        expect(window.upeer.sendMessage).toHaveBeenCalledWith('peer-1', 'intermedio', undefined, undefined);
+        expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-100', 'msg-direct', 'msg-300']);
+    });
+
     it('clears active group state when leaving the open group', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
 
@@ -248,5 +287,42 @@ describe('useChatStore groups integration', () => {
 
         expect(window.upeer.sendChatUpdate).toHaveBeenCalledWith('peer-1', 'msg-1', 'hola https://example.com', preview);
         expect(useChatStore.getState().chatHistory[0].message).toBe(JSON.stringify({ text: 'hola https://example.com', linkPreview: preview }));
+    });
+
+    it('keeps local file transfer messages ordered by timestamp', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(200);
+
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            myIdentity,
+            chatHistory: [
+                {
+                    id: 'msg-100',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'primero',
+                    status: 'read',
+                    timestamp: '10:00',
+                    date: 100,
+                },
+                {
+                    id: 'msg-300',
+                    upeerId: 'peer-1',
+                    isMine: false,
+                    message: 'tercero',
+                    status: 'read',
+                    timestamp: '10:03',
+                    date: 300,
+                }
+            ],
+            replyByConversation: { 'peer-1': null },
+        });
+
+        useChatStore.getState().addFileTransferMessage('peer-1', 'file-200', 'demo.txt', 1, 'text/plain', 'f'.repeat(64));
+
+        expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-100', 'file-200', 'msg-300']);
+        nowSpy.mockRestore();
     });
 });
