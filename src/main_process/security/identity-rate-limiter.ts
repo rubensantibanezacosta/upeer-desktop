@@ -91,7 +91,9 @@ export class IdentityRateLimiter extends RateLimiter {
     private getAdjustedRule(upeerId: string, _messageType: string, baseRule: RateLimitConfig): RateLimitConfig {
         const directIds = _cachedDirectIds;
         const vouchScore = directIds.size > 0 ? computeScore(upeerId, directIds) : 50;
-        const reputationMultiplier = this.calculateReputationMultiplier(vouchScore);
+        const reputationMultiplier = directIds.has(upeerId)
+            ? Math.max(1, this.calculateReputationMultiplier(vouchScore))
+            : this.calculateReputationMultiplier(vouchScore);
 
         const adjustedMaxTokens = Math.max(1, Math.floor(baseRule.maxTokens * reputationMultiplier));
 
