@@ -8,7 +8,7 @@ import {
     verify
 } from '../security/identity.js';
 
-import { debug, error, security } from '../security/secure-logger.js';
+import { debug, error, security, warn } from '../security/secure-logger.js';
 import { validateMessage } from '../security/validation.js';
 import {
     getContactByUpeerId,
@@ -32,6 +32,14 @@ const rateLimiter = new IdentityRateLimiter();
 /** BUG AP fix: exponer cleanup para que server.ts lo llame cada hora. */
 export function cleanupRateLimiter(): void {
     rateLimiter.cleanup();
+}
+
+function queryOwnVaultsOnReconnect(upeerId: string): void {
+    import('./vault/manager.js').then(({ VaultManager }) => {
+        VaultManager.queryOwnVaults();
+    }).catch((err) => {
+        warn('Failed to query own vaults after reconnect', { upeerId, err: String(err) }, 'vault');
+    });
 }
 
 export async function handlePacket(
@@ -233,6 +241,7 @@ export async function handlePacket(
         const nowIso = new Date().toISOString();
         if (contact.status === 'offline') {
             updateContactStatus(upeerId, 'connected');
+            queryOwnVaultsOnReconnect(upeerId);
         }
         updateLastSeen(upeerId);
         win?.webContents.send('contact-presence', {

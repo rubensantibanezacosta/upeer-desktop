@@ -39,6 +39,11 @@ vi.mock('../../../src/main_process/network/vault/protocol/handlers.js', () => ({
     handleVaultRenew: vi.fn(),
     handleVaultStore: vi.fn()
 }));
+vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
+    VaultManager: {
+        queryOwnVaults: vi.fn()
+    }
+}));
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
     handleDhtPacket: vi.fn()
 }));
@@ -286,6 +291,30 @@ describe('network/handlers.ts - handlePacket', () => {
 
         expect(contactStatus.updateContactStatus).toHaveBeenCalledWith('peer1', 'connected');
         expect(contactStatus.updateLastSeen).toHaveBeenCalledWith('peer1');
+    });
+
+    it('should query own vaults when an offline contact reconnects through CHAT traffic', async () => {
+        const vaultManager = await import('../../../src/main_process/network/vault/manager.js');
+
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            publicKey: '00'.repeat(32),
+            status: 'offline'
+        } as NonNullable<KnownContact>);
+
+        const packet = {
+            type: 'CHAT',
+            senderUpeerId: 'peer1',
+            signature: '00'.repeat(64),
+            content: 'hola backlog'
+        };
+
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(contactStatus.updateContactStatus).toHaveBeenCalledWith('peer1', 'connected');
+        expect(vaultManager.VaultManager.queryOwnVaults).toHaveBeenCalledTimes(1);
+        expect(chatHandlers.handleChatMessage).toHaveBeenCalled();
     });
 
     it('should handle DHT_ packet and delegate to handleDhtPacket', async () => {
