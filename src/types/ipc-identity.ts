@@ -18,10 +18,9 @@ export interface GetVaultStatsResponse {
 }
 
 export interface IdentityStatusResponse {
-    isUnlocked: boolean;
-    hasIdentity: boolean;
-    alias?: string;
-    avatar?: string;
+    isMnemonicMode: boolean;
+    isLocked: boolean;
+    upeerId: string | null;
 }
 
 export interface GenerateMnemonicResponse {

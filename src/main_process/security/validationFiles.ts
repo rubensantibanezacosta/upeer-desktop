@@ -35,12 +35,17 @@ export function validateFileProposal(data: FileProposalPayload): ValidationResul
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (!data.fileName || typeof data.fileName !== 'string') return { valid: false, error: 'Invalid fileName' };
     if (typeof data.fileSize !== 'number' || data.fileSize < 0) return { valid: false, error: 'Invalid fileSize' };
-    if (typeof data.totalChunks !== 'number' || data.totalChunks <= 0) return { valid: false, error: 'Invalid totalChunks' };
+    if (typeof data.totalChunks !== 'number' || data.totalChunks < 0) return { valid: false, error: 'Invalid totalChunks' };
     if (typeof data.chunkSize !== 'number' || data.chunkSize <= 0 || data.chunkSize > DEFAULT_CONFIG.maxChunkSize) {
         return { valid: false, error: 'Invalid chunkSize' };
     }
-    if (Math.ceil(data.fileSize / data.chunkSize) !== data.totalChunks) {
-        return { valid: false, error: 'Inconsistent totalChunks' };
+    if (data.fileSize === 0) {
+        if (data.totalChunks !== 0) return { valid: false, error: 'Empty file must have totalChunks=0' };
+    } else {
+        if (data.totalChunks === 0) return { valid: false, error: 'Non-empty file must have totalChunks>0' };
+        if (Math.ceil(data.fileSize / data.chunkSize) !== data.totalChunks) {
+            return { valid: false, error: 'Inconsistent totalChunks' };
+        }
     }
     if (data.encryptedKey !== undefined && (typeof data.encryptedKey !== 'string' || ![96, 160].includes(data.encryptedKey.length))) {
         return { valid: false, error: 'Invalid encryptedKey (expected 96 or 160 hex chars)' };

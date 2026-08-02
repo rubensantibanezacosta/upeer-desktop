@@ -144,7 +144,7 @@ export async function sendUDPMessage(
 
 export async function sendTypingIndicator(upeerId: string): Promise<void> {
     if (upeerId.startsWith('grp-')) {
-        const group = getGroupById(upeerId) as GroupRecordLike | null;
+        const group = await getGroupById(upeerId) as GroupRecordLike | null;
         if (!group || group.status !== 'active') return;
         const myId = getMyUPeerId();
         const data = { type: 'TYPING', groupId: upeerId };

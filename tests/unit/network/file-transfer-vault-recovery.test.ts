@@ -49,6 +49,14 @@ vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
     getVaultEntryByHash: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
+    saveFileMessage: vi.fn(async () => ({ changes: 1 })),
+    getMessageById: vi.fn(async () => ({ message: JSON.stringify({ type: 'file', transferId: '550e8400-e29b-41d4-a716-4466554400dd' }) })),
+    updateMessageContent: vi.fn(async () => ({ changes: 1 })),
+    saveMessage: vi.fn(async () => ({ changes: 1 })),
+    getMessages: vi.fn(() => []),
+}));
+
 import { TransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
 import { TransferPhase } from '../../../src/main_process/network/file-transfer/types.js';
 import { ErasureCoder } from '../../../src/main_process/network/vault/redundancy/erasure.js';
@@ -120,7 +128,8 @@ describe('file transfer vault recovery', () => {
 
         const recoveredPath = transfer?.tempPath;
         expect(recoveredPath).toBeTruthy();
-        const recoveredData = await fs.readFile(recoveredPath!);
+        if (!recoveredPath) return;
+        const recoveredData = await fs.readFile(recoveredPath);
         expect(recoveredData.equals(plaintext)).toBe(true);
 
         await fs.rm(path.join(os.tmpdir(), 'chat-p2p-tests'), { recursive: true, force: true });

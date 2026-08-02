@@ -10,7 +10,7 @@ interface RecordingBarProps {
     onSend: () => void;
     disabled: boolean;
     isSending: boolean;
-    canvasRef: React.RefObject<HTMLCanvasElement>;
+    canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
 function formatDuration(sec: number) {

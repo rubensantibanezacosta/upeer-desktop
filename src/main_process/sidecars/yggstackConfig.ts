@@ -22,7 +22,14 @@ export function updatePeersInConfig(confPath: string, peers: string[]): void {
     }
 
     const peersHjson = peers.map(peer => `    "${peer}"`).join('\n');
-    const updatedConf = fs.readFileSync(confPath, 'utf8').replace(/(Peers:\s*\[)([\s\S]*?)(\])/, `$1\n${peersHjson}\n  $3`);
+    const content = fs.readFileSync(confPath, 'utf8');
+    const updatedConf = content.replace(/(Peers:\s*\[)([\s\S]*?)(\])/, `$1\n${peersHjson}\n  $3`);
+    if (updatedConf === content) {
+        info('Peers section not found in config, appending', undefined, 'yggstack');
+        const withPeers = content.replace(/(Peers:\s*\[)\s*\]/, `$1\n${peersHjson}\n  ]`);
+        fs.writeFileSync(confPath, withPeers, 'utf8');
+        return;
+    }
     fs.writeFileSync(confPath, updatedConf, 'utf8');
     info(`Peers updated in config (${peers.length} nodes) — effective on next restart`, undefined, 'yggstack');
 }

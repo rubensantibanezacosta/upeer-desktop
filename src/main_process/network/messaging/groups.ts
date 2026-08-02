@@ -4,7 +4,7 @@ import {
     getMyUPeerId,
     sign,
 } from '../../security/identity.js';
-import type { LinkPreview } from '../../types/chat.js';
+import type { LinkPreview } from '../../../types/chat.js';
 import {
     getContactByUpeerId,
 } from '../../storage/contacts/operations.js';
@@ -90,7 +90,8 @@ export async function sendGroupMessage(
         // if (memberUpeerId === myId) continue; // <-- Eliminado para habilitar Self-Sync
 
         const isSelf = memberUpeerId === myId;
-        const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
+        const rawContact = await getContactByUpeerId(memberUpeerId);
+        const contact = rawContact || (isSelf
             ? {
                 upeerId: myId,
                 publicKey: getMyPublicKeyHex(),
@@ -103,7 +104,7 @@ export async function sendGroupMessage(
 
         // Identificar direcciones IP para este UPeerId (Fan-out multicanal)
         const addresses: string[] = [];
-        if (contact.address) addresses.push(contact.address);
+        if (rawContact?.address) addresses.push(rawContact.address);
 
         // Si somos nosotros, buscamos nuestras otras IPs vía DHT
         if (memberUpeerId === myId) {

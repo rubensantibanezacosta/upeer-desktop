@@ -241,9 +241,10 @@ describe('IdentityManager', () => {
         // Obtenemos la PK del SPK en Buffer
         const spkInfo = getSpkBySpkId(spk.spkId);
         expect(spkInfo).not.toBeNull();
+        if (!spkInfo) return;
 
         const ciphertext = Buffer.alloc(msg.length + sodium.crypto_box_MACBYTES);
-        sodium.crypto_box_easy(ciphertext, msg, nonce, spkInfo!.spkPk, senderSk);
+        sodium.crypto_box_easy(ciphertext, msg, nonce, spkInfo.spkPk, senderSk);
 
         // Decrypt con SPK actual
         const decrypted = decryptX3DH(nonce, ciphertext, senderPk, spk.spkId);

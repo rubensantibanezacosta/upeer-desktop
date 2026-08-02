@@ -17,6 +17,7 @@ export const aggregateTransfers = (transfersList: FileTransfer[]): FileTransfer[
             return {
                 ...base,
                 fileId: base.messageId || base.fileId,
+                sessionFileId: base.sessionFileId || base.fileId,
             };
         }
 
@@ -42,6 +43,7 @@ export const aggregateTransfers = (transfersList: FileTransfer[]): FileTransfer[
         return {
             ...base,
             fileId: base.messageId || base.fileId,
+            sessionFileId: base.sessionFileId || base.fileId,
             progress,
             bytesTransferred,
             totalBytes,

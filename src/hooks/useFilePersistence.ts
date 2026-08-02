@@ -49,7 +49,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
                 : (window.upeer?.getPathForFile ? window.upeer.getPathForFile(f) : f.path);
             const type = f.type || getMimeType(f.name);
             return { path: filePath, name: f.name, size: f.size, type, lastModified: f.lastModified };
-        }))).filter(f => !!f.path);
+        }))).filter((f): f is { path: string; name: string; size: number; type: string; lastModified: number } => !!f.path);
 
         if (mappedFiles.length > 0) {
             setPreparingAttachments(true);

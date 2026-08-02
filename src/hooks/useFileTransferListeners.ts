@@ -35,7 +35,7 @@ export const registerFileTransferListeners = ({
             transfer.fileId === data.fileId ? { ...transfer, state: 'completed', progress: 100 } : transfer,
         ));
         void loadTransfers();
-        onTransferStateChangeRef.current?.(data.messageId || data.fileId, {
+        onTransferStateChangeRef.current?.(data.sessionFileId || data.fileId, {
             fileHash: data.fileHash,
             transferState: 'completed',
             savedPath: data.direction === 'receiving' ? data.tempPath : undefined,
@@ -44,12 +44,12 @@ export const registerFileTransferListeners = ({
 
     const unsubscribeCancelled = window.upeer.onFileTransferCancelled((data) => {
         void loadTransfers();
-        onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'cancelled' });
+        onTransferStateChangeRef.current?.(data.sessionFileId || data.fileId, { transferState: 'cancelled' });
     }) || (() => undefined);
 
     const unsubscribeFailed = window.upeer.onFileTransferFailed((data) => {
         void loadTransfers();
-        onTransferStateChangeRef.current?.(data.messageId || data.fileId, { transferState: 'failed' });
+        onTransferStateChangeRef.current?.(data.sessionFileId || data.fileId, { transferState: 'failed' });
     }) || (() => undefined);
 
     return () => {

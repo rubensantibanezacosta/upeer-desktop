@@ -71,9 +71,10 @@ export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
                 onReact={(item: MediaItem, emoji: string) => { if (item.messageId) handleReaction(item.messageId, emoji, false); }}
                 onForward={() => undefined}
                 onGoToMessage={(item: MediaItem) => {
-                    if (item.messageId) {
+                    const messageId = item.messageId;
+                    if (messageId) {
                         navigation.closeMediaViewer();
-                        setTimeout(() => handleScrollToMessage(item.messageId), 200);
+                        setTimeout(() => handleScrollToMessage(messageId), 200);
                     }
                 }}
             />

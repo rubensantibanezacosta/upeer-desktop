@@ -9,6 +9,7 @@ import { ContactInfoCipherView } from './ContactInfoCipherView.js';
 import { ContactInfoDeleteDialog } from './ContactInfoDeleteDialog.js';
 import { ContactInfoPanelMainView } from './ContactInfoPanelMainView.js';
 import { buildContactInfoActions, SlidingPanelView, useSharedMediaItems } from './contactInfoPanelSupport.js';
+import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 
 interface MediaClickPayload {
     url: string;
@@ -51,6 +52,13 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [currentView, setCurrentView] = useState<'main' | 'media' | 'cipher'>('main');
     const [now, setNow] = useState(() => Date.now());
+    const toggleContact = useChatActionsStore((state) => state.toggleContact);
+    const archiveFallback = () => toggleContact(contact.upeerId, 'archived');
+    const muteFallback = () => toggleContact(contact.upeerId, 'muted');
+    const favoriteFallback = () => toggleContact(contact.upeerId, 'pinned');
+    const effectiveArchive = onArchive ?? archiveFallback;
+    const effectiveMute = onMute ?? muteFallback;
+    const effectiveFavorite = onFavorite ?? favoriteFallback;
 
     useEffect(() => {
         const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -64,9 +72,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     const { utilityActions, dangerActions } = buildContactInfoActions({
         contact,
         onShare,
-        onArchive,
-        onMute,
-        onFavorite,
+        onArchive: effectiveArchive,
+        onMute: effectiveMute,
+        onFavorite: effectiveFavorite,
         onClearChat,
         onBlockContact,
         onDeleteRequest: () => setConfirmDeleteOpen(true),

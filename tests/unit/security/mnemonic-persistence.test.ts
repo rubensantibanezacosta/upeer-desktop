@@ -20,13 +20,11 @@ describe('Identity Mnemonic Persistence (TDD)', () => {
         identity.initIdentity(tempDir);
         identity.unlockSession(mnemonic);
 
-        console.log('Mnemonic in memory after unlock:', identity.getMnemonic());
         expect(identity.getMnemonic()).toBe(mnemonic);
 
         // 2. Simular reinicio de la aplicación (nueva inicialización sobre el mismo directorio)
         identity.initIdentity(tempDir);
 
-        console.log('Mnemonic in memory after "restart":', identity.getMnemonic());
         const recoveredMnemonic = identity.getMnemonic();
         expect(recoveredMnemonic).toBe(mnemonic);
     });

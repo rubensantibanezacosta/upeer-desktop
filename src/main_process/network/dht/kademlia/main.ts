@@ -23,7 +23,7 @@ export class KademliaDHT {
 
     constructor(
         upeerId: string,
-        sendMessage: (address: string, data: unknown) => void,
+        sendMessage: (address: string, data: Record<string, unknown>) => void,
         getContacts?: () => KademliaContact[],
         userDataPath?: string
     ) {
@@ -154,7 +154,7 @@ export class KademliaDHT {
 
     // Handle incoming DHT message
     async handleMessage(senderUpeerId: string, data: unknown, senderAddress: string): Promise<unknown> {
-        return this.protocolHandler.handleMessage(senderUpeerId, data, senderAddress);
+        return this.protocolHandler.handleMessage(senderUpeerId, data as Parameters<typeof this.protocolHandler.handleMessage>[1], senderAddress);
     }
 
     // Periodic maintenance

@@ -11,7 +11,11 @@ export const formatMessageTimestamp = (timestamp?: number) => {
 };
 
 export const insertMessageChronologically = (messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] => {
-    return [...messages, nextMessage].sort((left, right) => left.date - right.date);
+    return [...messages, nextMessage].sort((left, right) => {
+        const leftDate = typeof left.date === 'number' ? left.date : 0;
+        const rightDate = typeof right.date === 'number' ? right.date : 0;
+        return leftDate - rightDate;
+    });
 };
 
 export const mapContactMessage = (message: RawChatMessage): ChatMessage => ({

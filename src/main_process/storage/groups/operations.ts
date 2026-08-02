@@ -127,10 +127,14 @@ export function getGroups(): GroupRecord[] {
             .where(eq(schema.messages.chatUpeerId, g.groupId))
             .orderBy(desc(schema.messages.timestamp))
             .limit(1).get() as LastGroupMessageRow | undefined;
+        // BUG DB-GRP-TMP fix: el timestamp en schema es integer, no string.
+        // El cast a string causaba que el sorting numérico fallara cuando el
+        // timestamp era un número grande interpretado como string corto.
+        const lastMessageTime = lastMsgObj?.timestamp !== undefined ? Number(lastMsgObj.timestamp) : undefined;
         return {
             ...g,
             lastMessage: lastMsgObj?.message as string | undefined,
-            lastMessageTime: lastMsgObj?.timestamp as string | undefined,
+            lastMessageTime: lastMessageTime?.toString() ?? undefined,
             lastMessageStatus: lastMsgObj?.status as string | undefined,
             lastMessageIsMine: !!lastMsgObj?.isMine
         };
@@ -149,7 +153,7 @@ export function getGroupById(groupId: string): GroupRecord | null {
     const result = db.select().from(schema.groups)
         .where(eq(schema.groups.groupId, groupId))
         .get();
-    return result ? parseGroup(result) : null;
+    return result ? parseGroup(result as unknown as GroupRow) : null;
 }
 
 export function updateGroupMembers(groupId: string, members: string[]): void {

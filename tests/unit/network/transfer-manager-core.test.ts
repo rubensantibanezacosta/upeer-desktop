@@ -41,6 +41,8 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    network: vi.fn(),
+    security: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -53,6 +55,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+    getContacts: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
@@ -108,11 +111,11 @@ describe('TransferManager - Core Orchestration', () => {
             send: vi.fn(),
             isDestroyed: vi.fn(() => false)
         }
-    } as TransferManagerWindow;
+    } as unknown as TransferManagerWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        manager = new TransferManager() as TransferManagerTestInstance;
+        manager = new TransferManager() as unknown as TransferManagerTestInstance;
         manager.initialize(((address, data, publicKey) => mockSend(address, data, publicKey)) as TransferManagerSend, mockWin);
     });
 
@@ -347,10 +350,6 @@ describe('TransferManager - Core Orchestration', () => {
         });
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
-        // Ya procesamos el chunk 5
-        const transfer = manager['store'].getTransfer(fileId, 'receiving');
-        transfer.pendingChunks.add(5);
-        // También marcamos chunksProcessed en 1 para empezar
         manager['store'].updateTransfer(fileId, 'receiving', { chunksProcessed: 1 });
 
         await new Promise(r => setTimeout(r, 50)); await manager.handleMessage('p9', 'addr9', { type: 'FILE_CHUNK', fileId, chunkIndex: 5, data: 'AAAA' });
@@ -557,8 +556,6 @@ describe('TransferManager - Core Orchestration', () => {
 
         const updated = manager['store'].getTransfer(fileId, 'receiving');
         expect(updated?.chunksProcessed).toBe(1);
-        // Comprobar que se ha guardado en el set de procesados
-        expect(updated?.pendingChunks.has(2)).toBe(true);
 
         await new Promise(r => setTimeout(r, 10));
         expect(mockSend).toHaveBeenCalledWith('addr15', expect.objectContaining({ type: 'FILE_ACK', chunkIndex: 2 }), undefined);

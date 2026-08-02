@@ -11,6 +11,7 @@ import { ITransferManager } from './interfaces.js';
 
 // Import refactored logic
 import * as sender from './sender-logic.js';
+import { cleanupReceivedChunks } from './receiver-logic.js';
 import * as receiver from './receiver-logic.js';
 import * as vaultRecovery from './receiverVaultRecovery.js';
 
@@ -352,6 +353,31 @@ export class TransferManager implements ITransferManager {
         this.finalizingTransfers.add(guardKey);
 
         try {
+            // BUG FT-FINALIZE fix: verificar hash ANTES de marcar como completado.
+            // El orden anterior causaba que si el hash fallaba, la transferencia ya
+            // estaba marcada como 'completed' y la cancelación posterior creaba un
+            // estado inconsistente en el store (completed + cancelled).
+            const pre_check = this.store.getTransfer(fileId, direction);
+            if (!pre_check) return;
+            let updated = pre_check;
+
+            if (updated.direction === 'receiving') {
+                try {
+                    const { validator } = this;
+                    if (updated.fileHash) {
+                        await validator.verifyFileHash(updated, updated.fileHash);
+                    }
+                } catch (err) {
+                    error('Error validating file hash', err, 'file-transfer');
+                    this.cancelTransfer(updated.fileId, 'receiving', 'hash_mismatch');
+                    const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
+                    const contact = await getContactByUpeerId(updated.upeerId);
+                    const freshAddress = contact?.address || updated.peerAddress;
+                    this.send(freshAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
+                    return;
+                }
+            }
+
             debug('Finalizing transfer', {
                 fileId,
                 direction,
@@ -378,47 +404,59 @@ export class TransferManager implements ITransferManager {
                 this.fileHandles.delete(fileId);
             }
 
-            const updated_initial = this.store.getTransfer(fileId, direction);
-            if (!updated_initial) return;
-            let updated = updated_initial;
+            const updated_post = this.store.getTransfer(fileId, direction);
+            if (!updated_post) return;
+            updated = updated_post;
 
-            if (updated.direction === 'receiving') {
+            if (updated.direction === 'receiving' && updated.tempPath) {
                 try {
-                    const { validator } = this;
-                    await validator.verifyFileHash(updated, updated.fileHash!);
-                } catch (err) {
-                    error('Error validating file hash', err, 'file-transfer');
-                    this.cancelTransfer(updated.fileId, 'receiving', 'hash_mismatch');
-                    const { getContactByUpeerId } = await import('../../storage/contacts/operations.js');
-                    const contact = await getContactByUpeerId(updated.upeerId);
-                    const freshAddress = contact?.address || updated.peerAddress;
-                    this.send(freshAddress, { type: 'FILE_CANCEL', fileId: updated.fileId, reason: 'hash_mismatch' }, contact?.publicKey);
-                    return;
-                }
-
-                if (updated.tempPath) {
-                    try {
-                        const fs = await import('node:fs/promises');
-                        const path = await import('node:path');
-                        const { app } = await import('electron');
-                        const assetsDir = path.join(app.getPath('userData'), 'assets', 'received');
-                        await fs.mkdir(assetsDir, { recursive: true });
-                        const ext = path.extname(updated.fileName) || '';
-                        const permanentPath = path.join(assetsDir, `${updated.fileId}${ext}`);
-                        await fs.rename(updated.tempPath, permanentPath).catch(() =>
-                            fs.copyFile(updated.tempPath!, permanentPath)
+                    const fs = await import('node:fs/promises');
+                    const path = await import('node:path');
+                    const { app } = await import('electron');
+                    const assetsDir = path.join(app.getPath('userData'), 'assets', 'received');
+                    await fs.mkdir(assetsDir, { recursive: true });
+                    const ext = path.extname(updated.fileName) || '';
+                    const permanentPath = path.join(assetsDir, `${updated.fileId}${ext}`);
+                    const src = updated.tempPath;
+                    if (src) {
+                        await fs.rename(src, permanentPath).catch(() =>
+                            fs.copyFile(src, permanentPath)
                         );
-                        this.store.updateTransfer(fileId, 'receiving', { tempPath: permanentPath });
-                        updated = this.store.getTransfer(fileId, 'receiving')!;
-                    } catch (err) {
-                        error('Failed to move received file to assets', err, 'file-transfer');
                     }
+                    this.store.updateTransfer(fileId, 'receiving', { tempPath: permanentPath });
+                    const refetched = this.store.getTransfer(fileId, 'receiving');
+                    if (refetched) updated = refetched;
+                } catch (err) {
+                    error('Failed to move received file to assets', err, 'file-transfer');
                 }
             }
 
             this.ui.notifyCompleted(updated);
             const { saveTransferToDB } = await import('./db-helper.js');
             await saveTransferToDB(updated);
+
+            if (updated.direction === 'receiving' && updated.tempPath) {
+                const messageId = updated.messageId || fileId;
+                try {
+                    const { getMessageById } = await import('../../storage/messages/operations.js');
+                    const { getDb, getSchema, eq } = await import('../../storage/shared.js');
+                    const existing = await getMessageById(messageId) as { message?: string } | undefined;
+                    if (existing?.message) {
+                        const parsed = JSON.parse(existing.message);
+                        if (parsed.type === 'file') {
+                            parsed.savedPath = updated.tempPath;
+                            const db = getDb();
+                            const schema = getSchema();
+                            db.update(schema.messages)
+                                .set({ message: JSON.stringify(parsed) })
+                                .where(eq(schema.messages.id, messageId))
+                                .run();
+                        }
+                    }
+                } catch (err) {
+                    error('Failed to persist savedPath in DB for completed transfer', err, 'file-transfer');
+                }
+            }
 
             if (updated.direction === 'sending') {
                 const { updateTransferMessageStatus } = await import('./db-helper.js');
@@ -548,7 +586,15 @@ export class TransferManager implements ITransferManager {
             else if (receiving) direction = 'receiving';
             else {
                 const grouped = this.findTransfersByMessageId(fileId);
-                if (grouped.length === 0) return;
+                if (grouped.length === 0) {
+                    // Fallback: busca en todos los transfers por fileId real (no messageId)
+                    const allTransfers = this.store.getAllTransfers();
+                    const match = allTransfers.find(t => t.fileId === fileId || t.messageId === fileId);
+                    if (match) {
+                        this.cancelTransfer(match.fileId, match.direction, typeof directionOrReason === 'string' ? directionOrReason : reason);
+                    }
+                    return;
+                }
                 for (const groupedTransfer of grouped) {
                     this.cancelTransfer(groupedTransfer.fileId, groupedTransfer.direction, typeof directionOrReason === 'string' ? directionOrReason : reason);
                 }
@@ -576,6 +622,7 @@ export class TransferManager implements ITransferManager {
             this.fileHandles.delete(fileId);
         }
 
+        cleanupReceivedChunks(fileId);
         this.ui.notifyCancelled(transfer, reason);
     }
 }

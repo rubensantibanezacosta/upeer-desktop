@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+type RediscoveryPacket = 
+    | { type: 'PING' }
+    | { type: 'PONG' }
+    | { type: 'DHT_QUERY'; targetId: string }
+    | { type: 'DHT_QUERY_RESPONSE'; address?: string }
+    | { type: 'BEACON_ENHANCED'; upeerId: string; publicKey: string; seekingContacts: true; timestamp: number };
+type OnRediscoveryPacket = (handler: (ip: string, data: RediscoveryPacket) => void) => (() => void);
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(() => []),
@@ -42,7 +49,13 @@ describe('dhtRediscovery phase edges', () => {
         ] as never);
 
         const sendSecureUDPMessage = vi.fn();
-        const rediscoveryPromise = aggressiveRediscovery('target-id', sendSecureUDPMessage);
+        // onPacket debe devolver una cleanup function y registrar el handler
+        let registeredHandler: ((ip: string, data: RediscoveryPacket) => void) | null = null;
+        const onPacket: OnRediscoveryPacket = vi.fn((handler) => {
+            registeredHandler = handler;
+            return () => { registeredHandler = null; };
+        });
+        const rediscoveryPromise = aggressiveRediscovery('target-id', sendSecureUDPMessage, onPacket);
 
         await vi.advanceTimersByTimeAsync(5_000);
         const result = await rediscoveryPromise;
@@ -50,6 +63,8 @@ describe('dhtRediscovery phase edges', () => {
         expect(result).toBeNull();
         expect(sendSecureUDPMessage).toHaveBeenCalledWith('200::recent', { type: 'PING' });
         expect(sendSecureUDPMessage).not.toHaveBeenCalledWith('200::stale', { type: 'PING' });
+        // Verificar que se registró el handler de paquetes
+        expect(registeredHandler).toBeDefined();
 
         await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
         await Promise.resolve();

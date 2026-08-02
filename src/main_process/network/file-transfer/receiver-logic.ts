@@ -92,7 +92,7 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         }
 
         try {
-            this.validator.validateIncomingFile(data);
+            this.validator.validateIncomingFile(data as Parameters<typeof this.validator.validateIncomingFile>[0]);
         } catch (e: unknown) {
             warn('Invalid file proposal received', { upeerId, fileId: data.fileId, error: e instanceof Error ? e.message : String(e) }, 'file-transfer');
             return;
@@ -114,18 +114,16 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
             }
         }
 
-        let thumbnail = data.thumbnail;
+        let thumbnail = typeof data.thumbnail === 'string' ? data.thumbnail : undefined;
         const aesKey = this.transferKeys.get(data.fileId);
-        if (thumbnail && typeof thumbnail === 'object' && thumbnail.iv && aesKey) {
+        if (data.thumbnail && typeof data.thumbnail === 'object' && data.thumbnail.iv && aesKey) {
             try {
-                const raw = decryptChunk(thumbnail.data, thumbnail.iv, thumbnail.tag, aesKey);
+                const raw = decryptChunk(data.thumbnail.data, data.thumbnail.iv, data.thumbnail.tag, aesKey);
                 const mime = data.mimeType?.startsWith('image/') ? data.mimeType : 'image/jpeg';
                 thumbnail = `data:${mime};base64,${raw.toString('base64')}`;
             } catch {
                 thumbnail = undefined;
             }
-        } else if (thumbnail && typeof thumbnail === 'object') {
-            thumbnail = undefined;
         }
 
         const transfer = existing
@@ -207,7 +205,13 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
     }
 }
 
-export async function handleFileChunk(this: TransferManager, _upeerId: string, address: string, data: FileChunkPacket) {
+const _receivedChunks = new Map<string, Set<number>>();
+
+export function cleanupReceivedChunks(fileId: string): void {
+    _receivedChunks.delete(fileId);
+}
+
+export async function handleFileChunk(this: TransferManager, upeerId: string, address: string, data: FileChunkPacket) {
     await this.withTransferLock(data.fileId, async () => {
         try {
             debug('handleFileChunk entered', {
@@ -218,6 +222,16 @@ export async function handleFileChunk(this: TransferManager, _upeerId: string, a
 
             const transfer = this.store.getTransfer(data.fileId, 'receiving');
             if (!transfer) return;
+
+            if (transfer.upeerId !== upeerId) {
+                warn('Ignoring FILE_CHUNK from unexpected peer', {
+                    fileId: data.fileId,
+                    expectedUpeerId: transfer.upeerId,
+                    actualUpeerId: upeerId,
+                    chunkIndex: data.chunkIndex
+                }, 'security');
+                return;
+            }
 
             if (transfer.state === 'completed') {
                 this.send(address, { type: 'FILE_DONE_ACK', fileId: data.fileId });
@@ -231,7 +245,12 @@ export async function handleFileChunk(this: TransferManager, _upeerId: string, a
                 return;
             }
 
-            if (transfer.pendingChunks.has(data.chunkIndex)) {
+            let receivedSet = _receivedChunks.get(data.fileId);
+            if (!receivedSet) {
+                receivedSet = new Set<number>();
+                _receivedChunks.set(data.fileId, receivedSet);
+            }
+            if (receivedSet.has(data.chunkIndex)) {
                 this.send(address, { type: 'FILE_ACK', fileId: data.fileId, chunkIndex: data.chunkIndex });
                 return;
             }
@@ -279,8 +298,8 @@ export async function handleFileChunk(this: TransferManager, _upeerId: string, a
 
             await writeAll(handle, chunkData, chunkStart);
 
-            transfer.pendingChunks.add(data.chunkIndex);
-            const received = transfer.pendingChunks.size;
+            receivedSet.add(data.chunkIndex);
+            const received = receivedSet.size;
 
             const updated = this.store.updateTransfer(data.fileId, 'receiving', { chunksProcessed: received });
 
@@ -298,6 +317,7 @@ export async function handleFileChunk(this: TransferManager, _upeerId: string, a
             if (updated) this.ui.notifyProgress(updated);
 
             if (received === transfer.totalChunks) {
+                _receivedChunks.delete(data.fileId);
                 await this.finalizeTransfer(data.fileId, 'receiving');
             }
         } catch (err) {

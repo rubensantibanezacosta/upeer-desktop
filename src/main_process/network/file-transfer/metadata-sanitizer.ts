@@ -6,6 +6,7 @@ import { debug, warn, error as logError } from '../../security/secure-logger.js'
 import {
     canSanitizeMime,
     checkFfmpegAvailable,
+    getExtensionFromMime,
     isImageMime,
     isVideoOrAudioMime,
 } from './metadataSanitizerSupport.js';
@@ -88,7 +89,7 @@ export class MetadataSanitizer {
         await this.ensureTempDir();
 
         const fileId = crypto.randomUUID();
-        const ext = path.extname(filePath) || this.getExtensionFromMime(normalizedMime);
+        const ext = path.extname(filePath) || getExtensionFromMime(normalizedMime);
         const sanitizedPath = path.join(this.tempDir, `${fileId}${ext}`);
 
         try {
@@ -151,10 +152,6 @@ export class MetadataSanitizer {
 
     private async stripMediaMetadata(inputPath: string, outputPath: string): Promise<string[]> {
         return stripMediaMetadata(inputPath, outputPath);
-    }
-
-    private getExtensionFromMime(mimeType: string): string {
-        return MIME_TO_EXTENSION[mimeType.toLowerCase()] || path.extname(mimeType) || '.bin';
     }
 
     async cleanup(sanitizedPath: string): Promise<void> {

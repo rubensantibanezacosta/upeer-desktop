@@ -85,7 +85,7 @@ export class IdentityRateLimiter extends RateLimiter {
     }
 
     checkIdentity(ip: string, upeerId: string, messageType: string): boolean {
-        return this.checkIdentityOnly(upeerId, messageType);
+        return super.check(ip, messageType) && this.checkIdentityOnly(upeerId, messageType);
     }
 
     private getAdjustedRule(upeerId: string, _messageType: string, baseRule: RateLimitConfig): RateLimitConfig {

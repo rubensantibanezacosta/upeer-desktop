@@ -1,26 +1,32 @@
 import React from 'react';
-import { Box } from '@mui/joy';
+import { Avatar, Box } from '@mui/joy';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import GroupsIcon from '@mui/icons-material/Groups';
 import MicIcon from '@mui/icons-material/Mic';
 import { Group } from '../../types/chat.js';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
+import { formatMessageTime } from '../../utils/dateTime.js';
 
-export const formatGroupItemTime = (iso?: string) => {
-    if (!iso) {
-        return '';
-    }
-    const date = new Date(iso);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    if (diff < 86400000 && now.getDate() === date.getDate()) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString();
-};
+export const formatGroupItemTime = (iso?: string | number | null) => formatMessageTime(iso);
+
+export const GroupAvatar: React.FC<{ avatar?: string | null; size?: 'sm' | 'md' | 'lg' }> = ({ avatar, size = 'lg' }) => (
+    <Avatar
+        size={size}
+        src={avatar || undefined}
+        color="primary"
+        variant="soft"
+        sx={{
+            borderRadius: 'md',
+            ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}),
+        }}
+    >
+        {!avatar && <GroupsIcon sx={{ fontSize: size === 'lg' ? 24 : 20, color: 'white' }} />}
+    </Avatar>
+);
 
 export const GroupItemStatusIcon: React.FC<{ group: Group }> = ({ group }) => {
     if (!group.lastMessageIsMine || !group.lastMessage) {

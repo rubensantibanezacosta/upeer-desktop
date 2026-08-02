@@ -3,6 +3,7 @@ import { Box } from '@mui/joy';
 import { Group, Contact, ChatMessage } from '../../types/chat.js';
 import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
+import { messageTimestampValue } from '../../utils/dateTime.js';
 import { SubViewHeader } from './sidebar/SubViewHeader.js';
 import { AddContactForm } from './sidebar/AddContactForm.js';
 import { CreateGroupForm } from './sidebar/CreateGroupForm.js';
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         sidebarFilter,
         newChatSearch,
         sidebarSearch,
+        sidebarSearchFocusToken,
         setSidebarView,
         setSidebarFilter,
         setNewChatSearch,
@@ -79,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 .map(g => ({
                     kind: 'group' as const,
                     data: g,
-                    time: g.lastMessageTime ? new Date(g.lastMessageTime).getTime() : 0,
+                    time: messageTimestampValue(g.lastMessageTime),
                 })),
             ...contacts
                 .filter(c => c.status !== 'blocked')
@@ -88,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 .map(c => ({
                     kind: 'contact' as const,
                     data: c,
-                    time: c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0,
+                    time: messageTimestampValue(c.lastMessageTime),
                 })),
         ];
         return entries.sort((a, b) => b.time - a.time);
@@ -175,12 +177,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onToggleFavorite={onToggleFavorite}
                     onToggleFavoriteGroup={onToggleFavoriteGroup}
                     onClearChat={onClearChat}
+                    onClearGroupChat={(groupId) => void onClearChat(groupId)}
                     onLeaveGroup={onLeaveGroup}
                     onOpenNew={handleOpenNew}
                     onFilterChange={setSidebarFilter}
                     onSearchChange={setSidebarSearch}
                     onSelectMessage={handleSelectMessage}
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
+                    searchFocusToken={sidebarSearchFocusToken}
                 />
             </Box>
 

@@ -20,7 +20,7 @@ interface ForwardModalProps {
     open: boolean;
     onClose: () => void;
     contacts: { upeerId: string; name: string; avatar?: string; status?: string; lastMessage?: string }[];
-    groups: { groupId: string; name: string; avatar?: string; members?: string[]; lastMessage?: string }[];
+    groups: { groupId: string; name: string; avatar?: string | null; members?: string[]; lastMessage?: string }[];
     onSend: (targets: { id: string; isGroup: boolean }[]) => void;
 }
 

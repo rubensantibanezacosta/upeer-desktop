@@ -8,7 +8,6 @@ import {
     Dropdown,
     MenuButton,
 } from '@mui/joy';
-import type { IconButtonProps } from '@mui/joy';
 import ReplyIcon from '@mui/icons-material/Reply';
 
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -29,7 +28,8 @@ interface MessageContextMenuProps {
     onDelete: () => void;
     onEdit?: () => void;
     onForward?: () => void;
-    sx?: IconButtonProps['sx'];
+    onDownload?: () => void;
+    sx?: React.CSSProperties;
 }
 
 export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
@@ -41,6 +41,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     onDelete,
     onEdit,
     onForward,
+    onDownload,
     sx,
 }) => {
     return (
@@ -54,7 +55,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                         variant: 'plain' as const,
                         color: 'neutral' as const,
                         size: 'sm' as const,
-                        sx: [{
+                        sx: {
                             '--IconButton-size': '26px',
                             borderRadius: 'sm',
                             flexShrink: 0,
@@ -67,7 +68,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                             '&:active': {
                                 backgroundColor: 'background.level2',
                             },
-                        }, sx]
+                            ...sx,
+                        }
                     }
                 }}
             >
@@ -89,8 +91,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     <ListItemDecorator sx={{ color: 'inherit' }}><ReplyIcon /></ListItemDecorator>
                     Responder
                 </MenuItem>
-                {isFile && fileCompleted && (
-                    <MenuItem>
+                {isFile && fileCompleted && onDownload && (
+                    <MenuItem onClick={onDownload}>
                         <ListItemDecorator sx={{ color: 'inherit' }}><DownloadOutlinedIcon /></ListItemDecorator>
                         Descargar
                     </MenuItem>

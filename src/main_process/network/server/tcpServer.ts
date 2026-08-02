@@ -72,17 +72,23 @@ export function startUDPServer(win: BrowserWindow) {
                 const msg = frameBuf.subarray(4, 4 + msgLen);
                 frameBuf = frameBuf.subarray(4 + msgLen);
                 const rinfo = { address: peerHint, port: socket.remotePort || 0 };
-                await handlePacket(
-                    msg,
-                    rinfo,
-                    getMainWindow(),
-                    sendSecureUDPMessage,
-                    (rid) => startDhtSearch(rid, sendSecureUDPMessage)
-                );
+                try {
+                    await handlePacket(
+                        msg,
+                        rinfo,
+                        getMainWindow(),
+                        sendSecureUDPMessage,
+                        (rid) => startDhtSearch(rid, sendSecureUDPMessage)
+                    );
+                } catch (err) {
+                    error('TCP: handlePacket fallo', { peer: peerHint, error: err instanceof Error ? err.message : String(err) }, 'network');
+                }
             }
         });
 
-        socket.on('error', () => { /* conexiones cerradas abruptamente son normales en P2P */ });
+        socket.on('error', (err) => {
+            error('TCP: socket de entrada cerrado con error', { peer: peerHint, error: err.message }, 'network');
+        });
     });
 
     tcpServer.on('error', (err) => {
@@ -94,7 +100,16 @@ export function startUDPServer(win: BrowserWindow) {
 
     // Initialize Kademlia DHT
     const userDataPath = app.getPath('userData');
-    const kademliaDHT = new KademliaDHT(getMyUPeerId(), sendSecureUDPMessage, getContacts, userDataPath);
+    const kademliaContacts = () => getContacts()
+        .filter(c => !!c.address && !!c.publicKey)
+        .map(c => ({
+            nodeId: Buffer.from(c.upeerId, 'hex').subarray(0, 20),
+            upeerId: c.upeerId,
+            address: c.address || '',
+            publicKey: c.publicKey || '',
+            lastSeen: Date.now(),
+        }));
+    const kademliaDHT = new KademliaDHT(getMyUPeerId(), sendSecureUDPMessage, kademliaContacts, userDataPath);
     setKademliaDHT(kademliaDHT);
     setKademliaInstance(kademliaDHT);
 
@@ -119,7 +134,9 @@ export function startUDPServer(win: BrowserWindow) {
         // El cleanup() elimina entradas sin actividad en la última hora.
         import('../handlers.js').then(({ cleanupRateLimiter }) => {
             cleanupRateLimiter();
-        }).catch(() => { });
+        }).catch((err) => {
+            error('Rate limiter cleanup error', err, 'network');
+        });
     }, 3600000);
     setDhtMaintenanceTimer(dhtMaintenanceTimer);
 

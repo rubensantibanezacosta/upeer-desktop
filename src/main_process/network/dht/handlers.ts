@@ -20,23 +20,23 @@ type DhtFindNodePacket = {
 };
 
 export async function publishLocationBlock(locationBlock: LocationBlock): Promise<void> {
-    await publishLocationBlockInternal(locationBlock, getKademliaInstance);
+    await publishLocationBlockInternal(locationBlock, () => getKademliaInstance() as unknown as Parameters<typeof publishLocationBlockInternal>[1] extends () => infer R ? R : never);
 }
 
 export async function performAutoRenewal(): Promise<void> {
-    await performAutoRenewalInternal(getKademliaInstance);
+    await performAutoRenewalInternal(() => getKademliaInstance() as unknown as Parameters<typeof performAutoRenewalInternal>[0] extends () => infer R ? R : never);
 }
 
 export async function findNodeLocation(upeerId: string): Promise<LocationBlock | null> {
-    return await findNodeLocationInternal(upeerId, getKademliaInstance);
+    return await findNodeLocationInternal(upeerId, () => getKademliaInstance() as unknown as Parameters<typeof findNodeLocationInternal>[1] extends () => infer R ? R : never);
 }
 
 export async function iterativeFindNode(upeerId: string, sendMessage: (address: string, data: DhtFindNodePacket) => void): Promise<string | null> {
-    return await iterativeFindNodeInternal(upeerId, sendMessage, getKademliaInstance);
+    return await iterativeFindNodeInternal(upeerId, sendMessage, () => getKademliaInstance() as unknown as Parameters<typeof iterativeFindNodeInternal>[2] extends () => infer R ? R : never);
 }
 
 export async function performDhtMaintenance(): Promise<void> {
-    await performDhtMaintenanceInternal(getKademliaInstance);
+    await performDhtMaintenanceInternal(() => getKademliaInstance() as unknown as Parameters<typeof performDhtMaintenanceInternal>[0] extends () => infer R ? R : never);
 }
 
 export function handleDhtFoundNodes(data: DhtFoundNodes & { queryId?: string }, senderAddress: string): void {

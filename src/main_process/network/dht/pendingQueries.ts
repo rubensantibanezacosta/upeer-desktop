@@ -43,6 +43,7 @@ export function cleanupPendingQueries(): void {
     const timeout = 30_000;
     for (const [queryId, query] of pendingQueries.entries()) {
         if (now - query.timestamp > timeout) {
+            if (query.timeoutId) clearTimeout(query.timeoutId);
             query.reject(new Error('Query timeout'));
             pendingQueries.delete(queryId);
         }

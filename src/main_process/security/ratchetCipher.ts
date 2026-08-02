@@ -96,7 +96,14 @@ export function ratchetDecrypt(
     ciphertextHex: string,
     nonceHex: string
 ): Buffer | null {
-    if (ciphertextHex.length < 32) return null;
+    if (ciphertextHex.length < 32 || ciphertextHex.length % 2 !== 0) return null;
+    if (nonceHex.length !== sodium.crypto_secretbox_NONCEBYTES * 2) return null;
+    if (header.dh.length !== sodium.crypto_scalarmult_BYTES * 2) return null;
+    if (
+        !/^[0-9a-fA-F]+$/.test(header.dh) ||
+        !/^[0-9a-fA-F]+$/.test(nonceHex) ||
+        !/^[0-9a-fA-F]+$/.test(ciphertextHex)
+    ) return null;
 
     const skippedResult = trySkippedKey(state, header, ciphertextHex, nonceHex);
     if (skippedResult) return skippedResult;

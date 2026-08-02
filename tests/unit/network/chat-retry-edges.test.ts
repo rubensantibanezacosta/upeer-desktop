@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
@@ -11,8 +11,14 @@ vi.mock('../../../src/main_process/network/messaging/chatDirectDelivery.js', () 
 describe('chatRetry edge cases', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
+        vi.useFakeTimers();
+        vi.setSystemTime(3000);
         const { resetPendingDirectMessages } = await import('../../../src/main_process/network/messaging/chatRetry.js');
         resetPendingDirectMessages();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('continúa con mensajes posteriores si un reintento falla', async () => {

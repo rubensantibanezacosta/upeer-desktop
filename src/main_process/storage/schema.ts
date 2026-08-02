@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -181,5 +181,5 @@ export const devices = sqliteTable('devices', {
 }, (table) => ({
     upeerIdx: index('devices_upeer_idx').on(table.upeerId),
     deviceIdx: index('devices_id_idx').on(table.deviceId),
-    uniqueConstraint: index('devices_unique_idx').on(table.upeerId, table.deviceId)
+    uniqueConstraint: uniqueIndex('devices_unique_idx').on(table.upeerId, table.deviceId),
 }));

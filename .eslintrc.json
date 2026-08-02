@@ -39,7 +39,7 @@
     "import/no-duplicates": "off",
     "import/order": "off",
     "import/no-unused-modules": "off",
-    "no-console": ["warn", { "allow": ["warn", "error", "debug"] }]
+    "no-console": ["warn", { "allow": ["warn", "error", "debug", "info"] }]
   },
   "settings": {
     "import/resolver": {

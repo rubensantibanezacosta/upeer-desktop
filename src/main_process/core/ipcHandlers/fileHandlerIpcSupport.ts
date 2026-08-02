@@ -19,7 +19,7 @@ export interface OpenFileDialogArgs {
     multiSelect?: boolean;
 }
 
-export const buildOpenDialogOptions = ({ title, filters, defaultPath, multiSelect }: OpenFileDialogArgs) => ({
+export const buildOpenDialogOptions = ({ title, filters, defaultPath, multiSelect }: OpenFileDialogArgs): Electron.OpenDialogOptions => ({
     title: title || 'Seleccionar archivo',
     defaultPath: defaultPath || app.getPath('downloads'),
     filters: filters || [

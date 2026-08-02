@@ -68,7 +68,15 @@ export function handleReputationDeliver(
 ) {
     const received = Array.isArray(data.vouches) ? data.vouches as ReputationDeliverVouch[] : [];
     if (received.length === 0) return;
-    Promise.all(received.map(v => saveIncomingVouch(v))).then((results) => {
+    Promise.all(received.map(v => saveIncomingVouch({
+        id: v.id || '',
+        fromId: v.fromId || '',
+        toId: v.toId || '',
+        type: (v.type || '') as Parameters<typeof saveIncomingVouch>[0]['type'],
+        positive: !!v.positive,
+        timestamp: v.timestamp || 0,
+        signature: v.signature || '',
+    }))).then((results) => {
         const saved = results.filter(Boolean).length;
         if (saved > 0) {
             getMainWindow()?.webContents.send('reputation-updated');

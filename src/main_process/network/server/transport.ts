@@ -169,6 +169,10 @@ async function flushConnection(ip: string): Promise<void> {
 
 function enqueueForSend(ip: string, framedBuf: Buffer, isFileTransfer: boolean, isProbeTraffic: boolean): void {
     const entry = connectionPool.get(ip) || { queue: [], flushing: false };
+    if (entry.queue.length >= MAX_QUEUE_SIZE) {
+        error(`TCP send queue llena para ${ip}, frame descartado`, undefined, 'network');
+        return;
+    }
     entry.queue.push({ framedBuf, isFileTransfer, isProbeTraffic });
     connectionPool.set(ip, entry);
     void flushConnection(ip);
@@ -196,7 +200,7 @@ onYggstackAddress(() => {
     drainSendQueue();
 });
 
-export function sendSecureUDPMessage(ip: string, data: TransportPacket, recipientPubKeyHex?: string, isInternalSync = false): void {
+export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, recipientPubKeyHex?: string, isInternalSync = false): void {
     if (!getTcpServer()) return;
     if (!isYggdrasilAddress(ip)) return;
 
@@ -224,10 +228,10 @@ export function sendSecureUDPMessage(ip: string, data: TransportPacket, recipien
     };
 
     let packetToSend: TransportPacket | SignedTransportPacket;
-    if (recipientPubKeyHex && SEALED_TYPES.has(data.type)) {
+    if (recipientPubKeyHex && typeof data.type === 'string' && SEALED_TYPES.has(data.type)) {
         packetToSend = sealPacket(signedInner, recipientPubKeyHex);
     } else {
-        packetToSend = signedInner;
+        packetToSend = signedInner as SignedTransportPacket;
     }
 
     const rawBuf = Buffer.from(JSON.stringify(packetToSend));

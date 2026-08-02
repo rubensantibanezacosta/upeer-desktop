@@ -5,14 +5,12 @@ import {
     ListItem,
     ListItemButton,
     ListItemDecorator,
-    Avatar,
 } from '@mui/joy';
-import GroupsIcon from '@mui/icons-material/Groups';
 import { Group } from '../../types/chat.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { GroupItemActions } from './GroupItemActions.js';
 import { GroupItemLeaveDialog } from './GroupItemLeaveDialog.js';
-import { formatGroupItemTime, GroupItemStatusIcon, renderGroupLastMessage } from './groupItemSupport.js';
+import { formatGroupItemTime, GroupAvatar, GroupItemStatusIcon, renderGroupLastMessage } from './groupItemSupport.js';
 
 interface GroupItemProps {
     group: Group;
@@ -20,10 +18,11 @@ interface GroupItemProps {
     onSelect: (groupId: string) => void;
     onToggleFavorite: (groupId: string) => void;
     onLeaveGroup?: (groupId: string) => void;
+    onClearChat?: (groupId: string) => void;
     highlight?: string;
 }
 
-export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onToggleFavorite, onLeaveGroup, highlight = '' }) => {
+export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onToggleFavorite, onLeaveGroup, onClearChat, highlight = '' }) => {
     const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
     const timeStr = formatGroupItemTime(group.lastMessageTime);
 
@@ -41,18 +40,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                 }}
             >
                 <ListItemDecorator sx={{ mr: 2 }}>
-                    <Avatar
-                        size="lg"
-                        src={group.avatar || undefined}
-                        color="primary"
-                        variant="soft"
-                        sx={{
-                            borderRadius: 'md',
-                            ...(!group.avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {})
-                        }}
-                    >
-                        {!group.avatar && <GroupsIcon sx={{ fontSize: 24, color: 'white' }} />}
-                    </Avatar>
+                    <GroupAvatar avatar={group.avatar} size="lg" />
                 </ListItemDecorator>
                 <Box sx={{
                     flexGrow: 1,
@@ -112,7 +100,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                         </Typography>
                     </Box>
 
-                    <GroupItemActions groupId={group.groupId} isFavorite={group.isFavorite} onToggleFavorite={onToggleFavorite} onLeaveRequest={() => setConfirmLeaveOpen(true)} />
+                    <GroupItemActions groupId={group.groupId} isFavorite={group.isFavorite} onToggleFavorite={onToggleFavorite} onLeaveRequest={() => setConfirmLeaveOpen(true)} onClearChat={onClearChat ? () => onClearChat(group.groupId) : undefined} />
                 </Box>
             </ListItemButton>
 

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { like, gte, lte } from 'drizzle-orm';
-import { getDb, getSchema, getSqlite, eq, desc, and, runTransaction } from '../shared.js';
+import { getDb, getSchema, eq, desc, and, runTransaction, sql } from '../shared.js';
 import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
 
 export { updateMessageStatus, getMessageStatus };
@@ -168,7 +168,6 @@ export function deleteMessageLocally(id: string, _timestamp?: number) {
 
 export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: number) {
     const db = getDb();
-    const sqlite = getSqlite();
     const schema = getSchema();
     const timestamp = clearTimestamp || Date.now();
     let deletedMessages = 0;
@@ -187,8 +186,13 @@ export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: num
                 .run();
         }
 
-        deletedReactions = sqlite.prepare('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_upeer_id = ?)').run(chatUpeerId).changes;
-        deletedMessages = sqlite.prepare('DELETE FROM messages WHERE chat_upeer_id = ?').run(chatUpeerId).changes;
+        const reactionsResult = db.select().from(schema.reactions)
+            .where(sql`message_id IN (SELECT id FROM messages WHERE chat_upeer_id = ${chatUpeerId})`)
+            .all();
+        deletedReactions = reactionsResult.length;
+        deletedMessages = db.delete(schema.messages)
+            .where(eq(schema.messages.chatUpeerId, chatUpeerId))
+            .run().changes;
     });
 
     return { deletedMessages, deletedReactions, timestamp };
@@ -249,7 +253,13 @@ export function getMessagesAround(chatUpeerId: string, targetMsgId: string, cont
 export function searchMessages(query: string, limit = 25) {
     const db = getDb();
     const schema = getSchema();
-    const q = `%${query}%`;
+    // BUG DB-SEARCH fix: escapar % y _ en el query de búsqueda.
+    // LIKE trata % y _ como comodines, no como caracteres literales.
+    // Sin escape, buscar "100%" coincidiría con cualquier mensaje que
+    // contenga "100" seguido de cualquier secuencia, o "_test" con
+    // cualquier carácter seguido de "test".
+    const escaped = query.replace(/[%_]/g, '\\$&');
+    const q = `%${escaped}%`;
     return db.select()
         .from(schema.messages)
         .where(

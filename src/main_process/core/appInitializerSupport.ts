@@ -82,7 +82,9 @@ const resolveMediaPath = (requestUrl: string) => {
     return normalized.startsWith('/') ? normalized : `/${normalized}`;
 };
 
-const validateMediaPath = (filePath: string) => {
+type MediaPathValidation = { ok: true } | { ok: false; response: Response };
+
+const validateMediaPath = (filePath: string): MediaPathValidation => {
     const normalizeForGrant = (currentPath: string) => {
         const normalized = path.normalize(currentPath);
         return normalized.endsWith(path.sep) ? normalized : normalized + path.sep;
@@ -111,7 +113,7 @@ const validateMediaPath = (filePath: string) => {
 };
 
 export const registerMediaProtocol = async () => {
-    protocol.handle('media', async (request) => {
+    protocol.handle('media', async (request): Promise<Response> => {
         try {
             const filePath = resolveMediaPath(request.url);
             const validation = validateMediaPath(filePath);

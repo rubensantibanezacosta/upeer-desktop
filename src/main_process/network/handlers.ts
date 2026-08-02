@@ -46,6 +46,8 @@ function isReconnectState(status: unknown): boolean {
     return status === 'offline' || status === 'disconnected';
 }
 
+type PacketRecord = Record<string, unknown>;
+
 export async function handlePacket(
     msg: Buffer,
     rinfo: { address: string; port: number },
@@ -61,7 +63,7 @@ export async function handlePacket(
             return;
         }
 
-        const fullPacket = fullPacketRaw as NetworkPacket;
+        const fullPacket = fullPacketRaw as PacketRecord;
 
         // ── Sealed Sender: desempaquetar antes de cualquier otro procesamiento ──
         // El paquete SEALED no tiene senderUpeerId en claro.
@@ -73,7 +75,7 @@ export async function handlePacket(
             if (!rateLimiter.checkIp(rinfo.address, 'SEALED')) {
                 return;
             }
-            const inner = unsealPacket(fullPacket, (ct) => decryptSealed(ct));
+            const inner = unsealPacket(fullPacket as { ciphertext: string }, (ct) => decryptSealed(ct));
             if (!inner) {
                 security('SEALED: failed to decrypt', { ip: rinfo.address }, 'network');
                 return;
@@ -82,20 +84,23 @@ export async function handlePacket(
             return handlePacket(Buffer.from(JSON.stringify(inner)), rinfo, win, sendResponse, startDhtSearch);
         }
 
-        const { signature, senderUpeerId, senderYggAddress, ...data } = fullPacket;
+        const signature = typeof fullPacket.signature === 'string' ? fullPacket.signature : undefined;
+        const senderUpeerId = typeof fullPacket.senderUpeerId === 'string' ? fullPacket.senderUpeerId : undefined;
+        const senderYggAddress = typeof fullPacket.senderYggAddress === 'string' ? fullPacket.senderYggAddress : undefined;
+        const rawType = typeof fullPacket.type === 'string' ? fullPacket.type : '';
 
-        const dataPacket = { ...data, type: fullPacket.type } as NetworkPacket;
+        const data: PacketRecord = {};
+        for (const key of Object.keys(fullPacket)) {
+            if (key !== 'signature' && key !== 'senderUpeerId' && key !== 'senderYggAddress') {
+                data[key] = fullPacket[key];
+            }
+        }
+        data.type = rawType;
 
         // BUG CM fix: guardar la IP de transporte TCP real ANTES del override.
-        // El rate-limiter IP debe usar la dirección real (no la declarada por el peer).
-        // senderYggAddress no está verificado en este punto; un contacto conectado
-        // podría falsificarla para evadir su propio límite o degradar el de otra IP.
         const tcpSourceAddress = rinfo.address;
 
         // ── Anti-Spoofing & Proxy Detection ──
-        // Si el tráfico viene de localhost, es un forward de yggstack. Usamos senderYggAddress.
-        // Si viene de una IP remota, preferimos responder a la IP de transporte real 
-        // para evitar ataques de reflexión (hacer que enviemos PONG/ACCEPT a una víctima).
         const isLocalSource = tcpSourceAddress === '127.0.0.1' || tcpSourceAddress === '::1';
         if (senderYggAddress && /^[23][0-9a-f]{2}:/i.test(senderYggAddress)) {
             if (isLocalSource) {
@@ -103,63 +108,62 @@ export async function handlePacket(
             }
         }
 
-        // Special logging for FILE_CHUNK to debug missing chunk 0
-        if (data.type === 'FILE_CHUNK') {
+        const pktType = String(data.type);
+
+        // Special logging for FILE_CHUNK
+        if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK received', {
                 fileId: data.fileId,
                 chunkIndex: data.chunkIndex,
                 totalChunks: data.totalChunks,
-                dataSize: data.data?.length
+                dataSize: (data as { data?: { length?: number } }).data?.length
             }, 'file-transfer');
         }
 
-        // Rate limiting check — usar tcpSourceAddress (no la senderYggAddress no verificada)
-        if (!data.type || typeof data.type !== 'string') {
+        // Rate limiting check
+        if (!pktType) {
             security('Packet missing type', { ip: tcpSourceAddress }, 'network');
             return;
         }
-
-        if (!rateLimiter.checkIp(tcpSourceAddress, data.type)) {
-            // Silently drop packet when rate limited
+        if (!rateLimiter.checkIp(tcpSourceAddress, pktType)) {
             return;
         }
 
         // Input validation
-        const validation = validateMessage(dataPacket.type, dataPacket);
+        const validation = validateMessage(pktType, data as NetworkPacket);
         if (!validation.valid) {
-            if (dataPacket.type === 'FILE_CHUNK' || dataPacket.type === 'FILE_ACK' || dataPacket.type === 'FILE_PROPOSAL') {
+            if (pktType === 'FILE_CHUNK' || pktType === 'FILE_ACK' || pktType === 'FILE_PROPOSAL' || pktType === 'FILE_START') {
                 debug('FILE_* validation rejected', {
-                    type: dataPacket.type,
-                    fileId: (dataPacket as { fileId?: string }).fileId,
-                    chunkIndex: (dataPacket as { chunkIndex?: number }).chunkIndex,
+                    type: pktType,
+                    fileId: data.fileId as string | undefined,
+                    chunkIndex: data.chunkIndex as number | undefined,
                     error: validation.error
                 }, 'file-transfer');
             }
-            security('Invalid message', { ip: rinfo.address, type: dataPacket.type, error: validation.error }, 'network');
+            security('Invalid message', { ip: rinfo.address, type: pktType, error: validation.error }, 'network');
             return;
         }
 
-        // 1. HANDSHAKE (Discovery & Connection) with signature verification
-        if (data.type === 'HANDSHAKE_REQ') {
-            await handleHandshakeReq(data, signature, senderUpeerId, senderYggAddress, rinfo, win, sendResponse, tcpSourceAddress);
+        // 1. HANDSHAKE
+        if (pktType === 'HANDSHAKE_REQ') {
+            await handleHandshakeReq(data as NetworkPacket, signature ?? '', senderUpeerId ?? '', senderYggAddress ?? '', rinfo, win, sendResponse as (ip: string, data: Record<string, unknown>) => void, tcpSourceAddress);
             return;
         }
 
-        if (data.type === 'HANDSHAKE_ACCEPT') {
-            await handleHandshakeAccept(data, signature, senderUpeerId, senderYggAddress, rinfo, win, sendResponse, tcpSourceAddress);
+        if (pktType === 'HANDSHAKE_ACCEPT') {
+            await handleHandshakeAccept(data as NetworkPacket, signature ?? '', senderUpeerId ?? '', senderYggAddress ?? '', rinfo, win, sendResponse as (ip: string, data: Record<string, unknown>) => void, tcpSourceAddress);
             return;
         }
 
-        // 1b. DHT — infraestructura de red abierta, no requiere contacto conectado.
-        // El handler DHT tiene su propia validación de firmas y secuencias internamente.
-        if (data.type.startsWith('DHT_') && senderUpeerId) {
+        // 1b. DHT
+        if (pktType.startsWith('DHT_') && senderUpeerId) {
             const kademliaHandled = await handleDhtPacket(
-                data.type,
-                data,
+                pktType,
+                data as NetworkPacket,
                 senderUpeerId,
                 rinfo.address,
                 win,
-                sendResponse
+                sendResponse as any
             );
             if (kademliaHandled) return;
         }
@@ -168,33 +172,29 @@ export async function handlePacket(
         const upeerId = senderUpeerId;
         if (!upeerId) return;
 
-        const contact = await getContactByUpeerId(upeerId);
+        const contact = await getContactByUpeerId(upeerId) as { publicKey?: string; status?: string; address?: string } | undefined;
         if (!contact || !contact.publicKey || contact.status === 'blocked') {
-            security('Origin unknown, blocked or missing key', { upeerId, ip: rinfo.address, type: data.type }, 'network');
+            security('Origin unknown, blocked or missing key', { upeerId, ip: rinfo.address, type: pktType }, 'network');
             return;
         }
 
         // Debug logging for FILE_CHUNK
-        if (data.type === 'FILE_CHUNK') {
+        if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK pre-verify', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
         }
 
-        // Exclude fields that are not part of the signature
+        // Exclude fields not part of signature
         const fieldsToExclude = ['contactCache', 'renewalToken'];
-        const dataForVerification = { ...data };
-        fieldsToExclude.forEach(field => {
-            if (field in dataForVerification) {
-                delete dataForVerification[field];
-            }
-        });
-        // senderUpeerId y senderYggAddress se incluyen en la firma para evitar address spoofing.
-        const payloadForVerification: NetworkPacket = { ...dataForVerification as NetworkPacket, senderUpeerId };
+        const dataForVerification: PacketRecord = { ...data };
+        fieldsToExclude.forEach(field => { delete dataForVerification[field]; });
+
+        const payloadForVerification: PacketRecord = { ...dataForVerification, senderUpeerId };
         if (senderYggAddress !== undefined) {
             payloadForVerification.senderYggAddress = senderYggAddress;
         }
 
         if (!signature || typeof signature !== 'string') {
-            security('Packet missing signature', { ip: rinfo.address, upeerId, type: data.type }, 'network');
+            security('Packet missing signature', { ip: rinfo.address, upeerId, type: pktType }, 'network');
             return;
         }
 
@@ -204,8 +204,7 @@ export async function handlePacket(
             Buffer.from(contact.publicKey, 'hex')
         );
         if (!verified && senderYggAddress !== undefined) {
-            // Fallback: maybe it was signed without senderYggAddress despite being present
-            const legacyPayload = { ...dataForVerification, senderUpeerId };
+            const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
             verified = verify(
                 Buffer.from(canonicalStringify(legacyPayload)),
                 Buffer.from(signature, 'hex'),
@@ -217,26 +216,21 @@ export async function handlePacket(
             security('Invalid signature', {
                 upeerId,
                 ip: rinfo.address,
-                type: data.type,
+                type: pktType,
                 payload: canonicalStringify(payloadForVerification),
                 fullPacket
             }, 'network');
             return;
-        }
-        else if (data.type === 'FILE_CHUNK') {
+        } else if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
         }
 
         // Apply identity-based rate limiting
-        if (!rateLimiter.checkIdentity(rinfo.address, upeerId, data.type)) {
-            // Silently drop packet when rate limited (already logged by rate limiter)
+        if (!rateLimiter.checkIdentity(rinfo.address, upeerId, pktType)) {
             return;
         }
 
         // 3. SOVEREIGN ROAMING
-        // Solo actualizamos la dirección si viene una IPv6 Yggdrasil real (200::/7).
-        // Esto evita que el forward de yggstack (127.0.0.1) sobreescriba la dirección
-        // almacenada del contacto cuando no viene senderYggAddress en el paquete.
         const YGG_ADDR_RE = /^[23][0-9a-f]{2}:/i;
         if (contact.address !== rinfo.address && YGG_ADDR_RE.test(rinfo.address)) {
             updateContactLocation(upeerId, rinfo.address);
@@ -251,18 +245,18 @@ export async function handlePacket(
         win?.webContents.send('contact-presence', {
             upeerId,
             lastSeen: nowIso,
-            alias: data.alias ?? undefined,
-            avatar: data.avatar ?? undefined,
+            alias: data.alias as string | undefined,
+            avatar: data.avatar as string | undefined,
         });
 
         await routeVerifiedPacket({
             upeerId,
-            contact,
-            data,
+            contact: contact as { publicKey: string; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
+            data: data as NetworkPacket,
             signature,
             rinfo,
             win,
-            sendResponse,
+            sendResponse: sendResponse as (ip: string, data: Record<string, unknown>) => void,
         });
     } catch (e) {
         error('UDP Packet Error', e, 'network');

@@ -358,8 +358,14 @@ export function validateChatDelete(data: ChatDeletePayload): ValidationResult {
 }
 
 export function validateChatClear(data: ChatClearPayload): ValidationResult {
-    if (!isValidHexId(data.chatUpeerId)) {
+    if (data.chatUpeerId === undefined || data.chatUpeerId === null) {
+        return { valid: false, error: 'Missing chatUpeerId' };
+    }
+    if (typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length > 128) {
         return { valid: false, error: 'Invalid chatUpeerId' };
+    }
+    if (!data.chatUpeerId.startsWith('grp-') && !isValidHexId(data.chatUpeerId)) {
+        return { valid: false, error: 'Invalid chatUpeerId (must be hex ID or grp- UUID)' };
     }
     if (data.timestamp !== undefined && (typeof data.timestamp !== 'number' || data.timestamp < 0)) {
         return { valid: false, error: 'Invalid timestamp' };

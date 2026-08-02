@@ -30,10 +30,12 @@ describe('Kademlia ProtocolHandler', () => {
     it('should handle DHT_PING', async () => {
         const sender = 'abcdefabcdef0123456789abcdef0123';
         const response = await handler.handleMessage(sender, { type: 'DHT_PING' }, '1.2.3.4');
+        expect(response).not.toBeNull();
+        if (!response) return;
         expect(response.type).toBe('DHT_PONG');
+        if (response.type !== 'DHT_PONG') return;
         expect(response.nodeId).toBe(nodeId.toString('hex'));
 
-        // Should have added sender to routing table
         expect(routingTable.findContact(sender)).toBeDefined();
     });
 
@@ -43,10 +45,13 @@ describe('Kademlia ProtocolHandler', () => {
             type: 'DHT_STORE',
             key: Buffer.alloc(20, 2).toString('hex'),
             value: 'secret-data',
-            publisher: alice
-        };
+            publisher: alice,
+            timestamp: Date.now(),
+        } as const;
 
         const response = await handler.handleMessage(alice, data, '127.0.0.1');
+        expect(response).not.toBeNull();
+        if (!response) return;
         expect(response.type).toBe('DHT_STORE_ACK');
 
         const stored = valueStore.get(Buffer.alloc(20, 2));
@@ -59,13 +64,15 @@ describe('Kademlia ProtocolHandler', () => {
         const key = Buffer.alloc(20, 3);
         valueStore.set(key, 'found-me', bob);
 
-        const data = {
+        const response = await handler.handleMessage(charlie, {
             type: 'DHT_FIND_VALUE',
-            key: key.toString('hex')
-        };
-
-        const response = await handler.handleMessage(charlie, data, '4.5.6.7');
+            key: key.toString('hex'),
+            queryId: 'q1',
+        }, '4.5.6.7');
+        expect(response).not.toBeNull();
+        if (!response) return;
         expect(response.type).toBe('DHT_FOUND_VALUE');
+        if (response.type !== 'DHT_FOUND_VALUE') return;
         expect(response.value).toBe('found-me');
     });
 
@@ -74,23 +81,23 @@ describe('Kademlia ProtocolHandler', () => {
         const charlie = 'ffffeeeeaaaabbbbccccdddd22223333';
         const key = Buffer.alloc(20, 4);
 
-        // Add some contacts to routing table
-        const contact1 = {
+        routingTable.addContact({
             nodeId: Buffer.alloc(20, 5),
             upeerId: peer1,
             address: '1.1.1.1',
             publicKey: 'pub1',
             lastSeen: Date.now()
-        };
-        routingTable.addContact(contact1);
+        });
 
-        const data = {
+        const response = await handler.handleMessage(charlie, {
             type: 'DHT_FIND_VALUE',
-            key: key.toString('hex')
-        };
-
-        const response = await handler.handleMessage(charlie, data, '4.5.6.7');
+            key: key.toString('hex'),
+            queryId: 'q2',
+        }, '4.5.6.7');
+        expect(response).not.toBeNull();
+        if (!response) return;
         expect(response.type).toBe('DHT_FOUND_NODES');
+        if (response.type !== 'DHT_FOUND_NODES') return;
         expect(response.nodes.length).toBeGreaterThan(0);
         expect(response.nodes[0].upeerId).toBe(peer1);
     });
@@ -113,7 +120,7 @@ describe('Kademlia ProtocolHandler', () => {
         await handler.handleMessage(senderId, { type: 'DHT_PING' }, '1.1.1.1');
 
         const updatedContact = routingTable.findContact(senderId);
-        expect(updatedContact?.lastSeen).toBeGreaterThan(initialLastSeen!);
+        expect(updatedContact?.lastSeen).toBeGreaterThan(initialLastSeen ?? 0);
     });
 
     it('should handle DHT_STORE with replication', async () => {
@@ -121,7 +128,6 @@ describe('Kademlia ProtocolHandler', () => {
         const alice = 'aliceAliceAliceAliceAliceAlice0';
         const bob = 'bobBobBobBobBobBobBobBobBobBo0';
 
-        // Add a contact to replicate to
         routingTable.addContact({
             nodeId: Buffer.alloc(20, 11),
             upeerId: bob,
@@ -140,7 +146,7 @@ describe('Kademlia ProtocolHandler', () => {
     });
 
     it('should handle unknown message types gracefully', async () => {
-        const response = await handler.handleMessage('sender', { type: 'UNKNOWN' }, '1.1.1.1');
+        const response = await handler.handleMessage('sender', { type: 'UNKNOWN' } as never, '1.1.1.1');
         expect(response).toBeNull();
     });
 
@@ -148,25 +154,27 @@ describe('Kademlia ProtocolHandler', () => {
         const qId = 'query-123';
         const key = Buffer.alloc(20, 12).toString('hex');
 
-        // FIND_NODE with queryId
         const resNode = await handler.handleMessage('sender', { type: 'DHT_FIND_NODE', targetId: key, queryId: qId }, '1.1.1.1');
+        expect(resNode).not.toBeNull();
+        if (!resNode) return;
         expect(resNode.queryId).toBe(qId);
 
-        // FIND_VALUE with queryId (when found)
         valueStore.set(Buffer.from(key, 'hex'), 'val', 'pub');
         const resVal = await handler.handleMessage('sender', { type: 'DHT_FIND_VALUE', key, queryId: qId }, '1.1.1.1');
+        expect(resVal).not.toBeNull();
+        if (!resVal) return;
         expect(resVal.queryId).toBe(qId);
     });
 
     it('should handle findValue locally and remotely', async () => {
         const key = Buffer.alloc(20, 15);
 
-        // Test local hit
         valueStore.set(key, 'local-val', 'me');
         const localRes = await handler.findValue(key);
+        expect(localRes).not.toBeNull();
+        if (!localRes) return;
         expect(localRes.value).toBe('local-val');
 
-        // Test remote query (via mock)
         const remoteKey = Buffer.alloc(20, 16);
         routingTable.addContact({
             nodeId: Buffer.alloc(20, 17),
@@ -178,13 +186,9 @@ describe('Kademlia ProtocolHandler', () => {
 
         void handler.findValue(remoteKey);
 
-        // Ensure message was sent
         expect(mockSendMessage).toHaveBeenCalledWith('3.3.3.3', expect.objectContaining({
             type: 'DHT_FIND_VALUE',
             key: remoteKey.toString('hex')
         }));
-
-        // Simular respuesta exitosa inyectando en pendingQueries (esto requeriría mockear pendingQueries o usar el handler real)
-        // Por ahora, cubrimos la ruta de envío.
     });
 });

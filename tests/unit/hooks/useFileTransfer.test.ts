@@ -171,6 +171,34 @@ describe('useFileTransfer hook', () => {
         });
     });
 
+    it('uses sessionFileId instead of messageId when updating a received attachment message', async () => {
+        const onStateChange = vi.fn();
+        const initialTransfer = { fileId: 'msg-offline-1', direction: 'receiving', state: 'active', progress: 99 };
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: [initialTransfer] });
+
+        renderHook(() => useFileTransfer(onStateChange));
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+        const completionHandler = mockUpeer.onFileTransferCompleted.mock.calls[0][0];
+
+        await act(async () => {
+            completionHandler({
+                fileId: 'msg-offline-1',
+                sessionFileId: 'file-offline-1',
+                messageId: 'msg-offline-1',
+                fileHash: 'hash-offline-1',
+                direction: 'receiving',
+                tempPath: '/tmp/file-offline-1.bin'
+            });
+        });
+
+        expect(onStateChange).toHaveBeenCalledWith('file-offline-1', {
+            fileHash: 'hash-offline-1',
+            transferState: 'completed',
+            savedPath: '/tmp/file-offline-1.bin'
+        });
+    });
+
     it('does NOT pass savedPath to callback when sending side completes', async () => {
         const onStateChange = vi.fn();
         const initialTransfer = { fileId: 'send-1', direction: 'sending', state: 'active', progress: 99 };

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { info, warn, error } from '../security/secure-logger.js';
+import { getSqlite } from './shared.js';
 
 /**
  * Backup automático de la base de datos cifrada.
@@ -35,6 +36,16 @@ export function performDatabaseBackup(userDataPath: string, maxBackupsDays = 7):
     }
 
     try {
+        // Forzar WAL checkpoint antes de copiar para garantizar consistencia
+        const sqlite = getSqlite();
+        if (sqlite) {
+            try {
+                sqlite.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+            } catch (_e) {
+                // Ignorar error de checkpoint, intentar copiar igual
+            }
+        }
+
         // Copiar archivo de base de datos
         fs.copyFileSync(dbPath, backupPath);
 
@@ -111,8 +122,8 @@ function cleanupOldBackups(userDataPath: string, maxDays: number): void {
 export function scheduleBackups(userDataPath: string, intervalHours = 24): () => void {
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
-    // Realizar backup inmediato al programar (opcional)
-    // performDatabaseBackup(userDataPath);
+    // Realizar backup inmediato al programar
+    performDatabaseBackup(userDataPath);
 
     const interval = setInterval(() => {
         performDatabaseBackup(userDataPath);

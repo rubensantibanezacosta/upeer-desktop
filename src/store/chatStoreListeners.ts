@@ -46,7 +46,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                 return;
             }
             const { msgNotif, sound } = useNotificationStore.getState();
-            if (msgNotif && sound && !document.hidden) {
+            if (msgNotif && sound && document.hidden) {
                 playNotificationSound();
             }
         });
@@ -68,7 +68,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     },
                 }));
                 const { reqNotif, sound } = useNotificationStore.getState();
-                if (reqNotif && sound && !document.hidden) {
+                if (reqNotif && sound && document.hidden) {
                     playNotificationSound();
                 }
             }
@@ -145,7 +145,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             const { activeGroupId, contacts, myIdentity } = get();
             if (data.groupId !== activeGroupId) {
                 const { msgNotif, sound } = useNotificationStore.getState();
-                if (msgNotif && sound && !document.hidden) {
+                if (msgNotif && sound && document.hidden) {
                     playNotificationSound();
                 }
             }

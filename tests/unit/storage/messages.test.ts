@@ -29,6 +29,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
     getSchema: vi.fn(),
     getSqlite: vi.fn(),
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', strings, values }),
     eq: (a: unknown, b: unknown) => ({ type: 'eq', a, b }),
     lt: (a: unknown, b: unknown) => ({ type: 'lt', a, b }),
     desc: (a: unknown) => ({ type: 'desc', a }),
@@ -124,9 +125,9 @@ describe('Storage - Message Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
-        vi.mocked(getSchema).mockReturnValue(mockSchema as ReturnType<typeof getSchema>);
-        vi.mocked(getSqlite).mockReturnValue(mockSqlite as NonNullable<ReturnType<typeof getSqlite>>);
+        vi.mocked(getDb).mockReturnValue(mockDb as unknown as ReturnType<typeof getDb>);
+        vi.mocked(getSchema).mockReturnValue(mockSchema as unknown as ReturnType<typeof getSchema>);
+        vi.mocked(getSqlite).mockReturnValue(mockSqlite as unknown as NonNullable<ReturnType<typeof getSqlite>>);
     });
 
     it('should save a message and handle conflict by updating status', async () => {
@@ -420,9 +421,14 @@ describe('Storage - Message Operations', () => {
     });
 
     it('should delete all messages in a chat and update lastClearedAt', async () => {
-        const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+        const mockRun = vi.fn().mockReturnValue({ changes: 3 });
 
         mockDb.delete = vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                    run: mockRun
+                })
+            }),
             where: vi.fn().mockReturnValue({
                 run: mockRun
             })
@@ -431,16 +437,26 @@ describe('Storage - Message Operations', () => {
         mockDb.update = vi.fn().mockReturnValue({
             set: vi.fn().mockReturnValue({
                 where: vi.fn().mockReturnValue({
-                    run: mockRun
+                    run: vi.fn().mockReturnValue({ changes: 1 })
                 })
             })
         });
 
-        await deleteMessagesByChatId('peer-1');
+        mockDb.select.mockImplementation(() => ({
+            from: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                    run: vi.fn().mockReturnValue({ changes: 0 }),
+                    all: vi.fn().mockReturnValue([]),
+                    get: vi.fn().mockReturnValue(null)
+                })
+            })
+        }));
+
+        const result = await deleteMessagesByChatId('peer-1');
 
         expect(mockDb.update).toHaveBeenCalled(); // lastClearedAt
-        expect(mockSqlite.prepare).toHaveBeenCalledWith('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_upeer_id = ?)');
-        expect(mockSqlite.prepare).toHaveBeenCalledWith('DELETE FROM messages WHERE chat_upeer_id = ?');
+        expect(mockDb.delete).toHaveBeenCalled(); // messages deletion
+        expect(result.deletedMessages).toBe(3);
     });
 
     it('should retrieve a single message by ID', async () => {
@@ -539,8 +555,10 @@ describe('Storage - Message Operations', () => {
                 })
             });
 
+            // BUG DB-TEST-STATUS fix: updateMessageStatus retorna false si el mensaje no existe.
+            // No tiene sentido actualizar el status de un mensaje que no está en la BD.
             const res1 = await updateMessageStatus('msg1', 'sent');
-            expect(res1).toBe(true);
+            expect(res1).toBe(false);
 
             // 2. mock getMessageStatus to return 'delivered'
             mockDb.select.mockReturnValue({

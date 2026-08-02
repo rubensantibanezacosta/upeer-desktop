@@ -55,7 +55,18 @@ vi.mock('../../../src/main_process/network/utils', () => ({
     isYggdrasilAddress: (addr: string) => /^[23][0-9a-f]{2}:/i.test(addr)
 }));
 vi.mock('../../../src/main_process/network/dht/handlers');
-vi.mock('../../../src/main_process/security/secure-logger');
+vi.mock('../../../src/main_process/security/secure-logger', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../src/main_process/security/secure-logger')>();
+    return {
+        ...actual,
+        network: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        debug: vi.fn(),
+        error: vi.fn(),
+        security: vi.fn(),
+    };
+});
 
 describe('DHT Core', () => {
     const sendSecureUDPMessage = vi.fn();
@@ -220,7 +231,11 @@ describe('DHT Core', () => {
 
     describe('aggressiveRediscovery', () => {
         it('should return cached location if found via DHT lookup', async () => {
-            vi.mocked(handlers.findNodeLocation).mockResolvedValue('found-ip');
+            vi.mocked(handlers.findNodeLocation).mockResolvedValue({
+                address: 'found-ip',
+                dhtSeq: 1,
+                signature: 'sig',
+            } as LocationBlock);
             const result = await aggressiveRediscovery('my-id', sendSecureUDPMessage);
             expect(result).toBe('found-ip');
         });

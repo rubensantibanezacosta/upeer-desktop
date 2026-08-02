@@ -23,11 +23,16 @@ export function playNotificationSound(): void {
     try {
         if (!audioCtx) audioCtx = new AudioContext();
         if (audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => triggerBeep(audioCtx!));
+            audioCtx.resume().then(() => {
+                if (audioCtx) triggerBeep(audioCtx);
+            });
             return;
         }
         triggerBeep(audioCtx);
     } catch (err) {
-        console.warn('[notification-sound]', err);
+        const logger = (window as { logger?: { warn?: (...args: unknown[]) => void } }).logger;
+        if (logger?.warn) {
+            logger.warn('[notification-sound]', err);
+        }
     }
 }

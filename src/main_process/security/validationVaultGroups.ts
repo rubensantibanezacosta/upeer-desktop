@@ -97,7 +97,7 @@ type ReputationDeliverPayload = {
 };
 
 export function validateVaultStore(data: VaultStorePayload): ValidationResult {
-    if (!data.payloadHash || typeof data.payloadHash !== 'string' || data.payloadHash.length > 200) {
+    if (!data.payloadHash || typeof data.payloadHash !== 'string' || data.payloadHash.length < 1 || data.payloadHash.length > 200) {
         return { valid: false, error: 'Invalid payloadHash' };
     }
     if (!data.recipientSid || typeof data.recipientSid !== 'string' || data.recipientSid.length > 64) {
@@ -127,7 +127,7 @@ export function validateVaultAck(data: VaultAckPayload): ValidationResult {
         return { valid: false, error: 'Too many payloadHashes' };
     }
     for (const payloadHash of data.payloadHashes) {
-        if (typeof payloadHash !== 'string' || payloadHash.length > 200) {
+        if (typeof payloadHash !== 'string' || payloadHash.length < 1 || payloadHash.length > 200) {
             return { valid: false, error: 'Invalid payloadHash in payloadHashes' };
         }
     }
@@ -148,7 +148,7 @@ export function validateVaultDelivery(data: VaultDeliveryPayload): ValidationRes
         if (typeof entry.senderSid !== 'string' || entry.senderSid.length > 128) {
             return { valid: false, error: 'Invalid vault entry senderSid' };
         }
-        if (typeof entry.payloadHash !== 'string' || entry.payloadHash.length > 200) {
+        if (typeof entry.payloadHash !== 'string' || entry.payloadHash.length < 1 || entry.payloadHash.length > 200) {
             return { valid: false, error: 'Invalid vault entry payloadHash' };
         }
         if (typeof entry.data !== 'string' || entry.data.length > 20_000_000) {

@@ -75,13 +75,19 @@ export const useAudioRecorder = () => {
     }, []);
 
     const cancelRecording = useCallback(() => {
-        if (!mediaRecorderRef.current) return;
+        const mr = mediaRecorderRef.current;
+        if (!mr) return;
 
-        mediaRecorderRef.current.onstop = null;
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        mr.onstop = null;
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+        if (mr.state !== 'inactive') {
+            mr.stop();
+        }
+        mr.stream.getTracks().forEach(track => track.stop());
 
-        if (timerRef.current) clearInterval(timerRef.current);
         setState({ isRecording: false, duration: 0, error: null, stream: null });
         chunksRef.current = [];
     }, []);

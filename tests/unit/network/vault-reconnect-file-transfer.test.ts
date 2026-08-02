@@ -168,8 +168,9 @@ describe('vault reconnect file transfer integration', () => {
         expect(completedTransfer?.state).toBe('completed');
         expect(completedTransfer?.phase).toBe(TransferPhase.DONE);
         expect(completedTransfer?.tempPath).toBeTruthy();
+        if (!completedTransfer?.tempPath) return;
 
-        const recovered = await fs.readFile(completedTransfer!.tempPath!);
+        const recovered = await fs.readFile(completedTransfer.tempPath);
         expect(recovered.equals(plaintext)).toBe(true);
     });
 
@@ -232,8 +233,9 @@ describe('vault reconnect file transfer integration', () => {
         expect(completedTransfer?.state).toBe('completed');
         expect(completedTransfer?.phase).toBe(TransferPhase.DONE);
         expect(completedTransfer?.tempPath).toBeTruthy();
+        if (!completedTransfer?.tempPath) return;
 
-        const recovered = await fs.readFile(completedTransfer!.tempPath!);
+        const recovered = await fs.readFile(completedTransfer.tempPath);
         expect(recovered.equals(plaintext)).toBe(true);
     });
 
@@ -298,7 +300,8 @@ describe('vault reconnect file transfer integration', () => {
         expect(transfer?.chunksProcessed).toBe(Math.ceil(VAULT_SEGMENT_SIZE / (64 * 1024)));
         expect(transfer?.tempPath).toBeTruthy();
 
-        const recovered = await fs.readFile(transfer!.tempPath!);
+        if (!transfer?.tempPath) return;
+        const recovered = await fs.readFile(transfer.tempPath);
         expect(recovered.length).toBe(VAULT_SEGMENT_SIZE);
         expect(recovered.equals(firstSegment)).toBe(true);
     });
@@ -375,8 +378,9 @@ describe('vault reconnect file transfer integration', () => {
         expect(completedTransfer?.state).toBe('completed');
         expect(completedTransfer?.phase).toBe(TransferPhase.DONE);
         expect(completedTransfer?.tempPath).toBeTruthy();
+        if (!completedTransfer?.tempPath) return;
 
-        const recovered = await fs.readFile(completedTransfer!.tempPath!);
+        const recovered = await fs.readFile(completedTransfer.tempPath);
         expect(recovered.equals(plaintext)).toBe(true);
     });
 
@@ -457,14 +461,14 @@ describe('vault reconnect file transfer integration', () => {
             } as never);
 
             vi.mocked(identity.getMyUPeerId).mockImplementation(() => peerState.selfId);
-            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((async (upeerId: string) => {
                 if (peerState.selfId === 'self-id') {
                     return {
                         upeerId,
                         address: '200::peer-2',
                         publicKey: 'a'.repeat(64),
                         status: 'connected'
-                    } as never;
+                    };
                 }
 
                 return {
@@ -472,21 +476,21 @@ describe('vault reconnect file transfer integration', () => {
                     address: '200::sender',
                     publicKey: 'a'.repeat(64),
                     status: 'connected'
-                } as never;
-            });
-            vi.mocked(contactsOps.getContacts).mockImplementation(async () => {
+                };
+            }) as never);
+            vi.mocked(contactsOps.getContacts).mockImplementation((async () => {
                 if (peerState.selfId === 'self-id') {
                     return [
                         { upeerId: 'self-id', address: '200::sender', status: 'connected' },
                         { upeerId: 'peer-2', address: '200::peer-2', status: 'connected' }
-                    ] as never;
+                    ];
                 }
 
                 return [
                     { upeerId: 'peer-2', address: '200::peer-2', status: 'connected' },
                     { upeerId: 'self-id', address: '200::sender', status: 'connected' }
-                ] as never;
-            });
+                ];
+            }) as never);
             vi.mocked(transport.sendSecureUDPMessage).mockImplementation(async (address: string, packet: { type?: string }) => {
                 if (!peerState.recipientOnline && address === '200::peer-2' && packet?.type === 'VAULT_STORE') {
                     throw new Error('peer-2-offline');
@@ -504,6 +508,7 @@ describe('vault reconnect file transfer integration', () => {
 
             const sendingTransfer = senderManager.getTransfer(fileId, 'sending');
             expect(sendingTransfer?.phase).toBe(TransferPhase.REPLICATING);
+            if (!sendingTransfer) return;
 
             const storedProposalEntry = [...vaultEntries.values()].find((entry) => {
                 const decoded = JSON.parse(Buffer.from(entry.data, 'hex').toString());
@@ -536,9 +541,9 @@ describe('vault reconnect file transfer integration', () => {
                     fileName: 'false-online-large.bin',
                     fileSize: plaintext.length,
                     mimeType: 'application/octet-stream',
-                    totalChunks: sendingTransfer!.totalChunks,
-                    chunkSize: sendingTransfer!.chunkSize,
-                    fileHash: sendingTransfer!.fileHash,
+                    totalChunks: sendingTransfer.totalChunks,
+                    chunkSize: sendingTransfer.chunkSize,
+                    fileHash: sendingTransfer.fileHash,
                     encryptedKey: 'ff',
                     signature: 'sig'
                 })).toString('hex'),
@@ -546,12 +551,12 @@ describe('vault reconnect file transfer integration', () => {
             const deliveredShardEntries = [
                 ...firstShards.slice(0, 4).map((shard, index) => ({
                     senderSid: 'self-id',
-                    payloadHash: `shard:${sendingTransfer!.fileHash}:0:${index}`,
+                    payloadHash: `shard:${sendingTransfer.fileHash}:0:${index}`,
                     data: shard.toString('hex'),
                 })),
                 ...secondShards.slice(0, 4).map((shard, index) => ({
                     senderSid: 'self-id',
-                    payloadHash: `shard:${sendingTransfer!.fileHash}:1:${index}`,
+                    payloadHash: `shard:${sendingTransfer.fileHash}:1:${index}`,
                     data: shard.toString('hex'),
                 }))
             ];
@@ -586,8 +591,9 @@ describe('vault reconnect file transfer integration', () => {
             expect(recoveredTransfer?.state).toBe('completed');
             expect(recoveredTransfer?.phase).toBe(TransferPhase.DONE);
             expect(recoveredTransfer?.tempPath).toBeTruthy();
+            if (!recoveredTransfer?.tempPath) return;
 
-            const recovered = await fs.readFile(recoveredTransfer!.tempPath!);
+            const recovered = await fs.readFile(recoveredTransfer.tempPath);
             expect(recovered.equals(plaintext)).toBe(true);
         } finally {
             vi.useRealTimers();

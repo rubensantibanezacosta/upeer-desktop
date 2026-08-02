@@ -77,7 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
                     onUnlocked();
                     return;
                 }
-                setIsLocked(status.isMnemonicMode);
+                setIsLocked(status.isLocked);
                 setInitializing(false);
             })
             .catch(() => {

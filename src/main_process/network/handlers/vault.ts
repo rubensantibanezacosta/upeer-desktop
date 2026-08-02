@@ -152,7 +152,7 @@ export async function handleVaultDelivery(
                     // Import handlers dynamically to avoid circular dependencies
                     if (innerPacket.type === 'CHAT') {
                         const { handleChatMessage } = await import('./chat.js');
-                        await handleChatMessage(entry.senderSid, originalContact, innerPacket, win, innerSig, fromAddress, sendResponse);
+                        await handleChatMessage(entry.senderSid, originalContact, innerPacket as unknown as Parameters<typeof handleChatMessage>[2], win, innerSig, fromAddress, sendResponse);
                     } else if (innerPacket.type === 'CHAT_CLEAR_ALL') {
                         const { handleChatClear } = await import('./chat.js');
                         await handleChatClear(entry.senderSid, innerPacket, win);
@@ -177,31 +177,31 @@ export async function handleVaultDelivery(
                             'delivered'
                         );
                     } else if (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_')) {
-                        await fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket);
+                        await fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket as unknown as Parameters<typeof fileTransferManager.handleMessage>[2]);
                         if (innerPacket.type === 'FILE_PROPOSAL' && typeof innerPacket.fileHash === 'string') {
                             await fileTransferManager.tryRecoverVaultTransferByFileHash(innerPacket.fileHash);
                         }
                     } else if (innerPacket.type === 'GROUP_MSG') {
                         const { handleGroupMessage } = await import('./groups.js');
-                        await handleGroupMessage(entry.senderSid, originalContact, innerPacket, win);
+                        await handleGroupMessage(entry.senderSid, { name: entry.senderSid.slice(0, 8) }, innerPacket as unknown as Parameters<typeof handleGroupMessage>[2], win);
                     } else if (innerPacket.type === 'CHAT_DELETE') {
                         const { handleChatDelete } = await import('./chat.js');
                         await handleChatDelete(entry.senderSid, innerPacket, win);
                     } else if (innerPacket.type === 'ACK') {
                         const { handleChatAck } = await import('./chat.js');
-                        await handleChatAck(entry.senderSid, innerPacket, win);
+                        await handleChatAck(entry.senderSid, innerPacket as unknown as Parameters<typeof handleChatAck>[1], win);
                     } else if (innerPacket.type === 'READ') {
                         const { handleChatAck } = await import('./chat.js');
-                        await handleChatAck(entry.senderSid, { ...innerPacket, status: 'read' }, win);
+                        await handleChatAck(entry.senderSid, { ...innerPacket, status: 'read' } as unknown as Parameters<typeof handleChatAck>[1], win);
                     } else if (innerPacket.type === 'GROUP_INVITE') {
                         const { handleGroupInvite } = await import('./groups.js');
-                        await handleGroupInvite(entry.senderSid, innerPacket, win);
+                        await handleGroupInvite(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupInvite>[1], win);
                     } else if (innerPacket.type === 'GROUP_UPDATE') {
                         const { handleGroupUpdate } = await import('./groups.js');
-                        await handleGroupUpdate(entry.senderSid, innerPacket, win);
+                        await handleGroupUpdate(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupUpdate>[1], win);
                     } else if (innerPacket.type === 'GROUP_LEAVE') {
                         const { handleGroupLeave } = await import('./groups.js');
-                        await handleGroupLeave(entry.senderSid, innerPacket, win);
+                        await handleGroupLeave(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupLeave>[1], win);
                     } else if (innerPacket.type === 'CHAT_REACTION') {
                         const { handleChatReaction } = await import('./chat.js');
                         await handleChatReaction(entry.senderSid, innerPacket, win);
@@ -238,8 +238,14 @@ export async function handleVaultDelivery(
                 }
                 // Llegamos aquí sin 'continue' ni excepción → entrada procesada correctamente.
                 processedEntries += 1;
-                if (typeof entry.payloadHash === 'string') {
-                    validatedHashes.push(entry.payloadHash);
+                // Usar payloadHash si existe, o calcular hash del data como fallback.
+                // Esto asegura que incluso entradas sin payloadHash explícito (como CHAT
+                // packets) reciban ACK y no sean retransmitidas infinitamente por el custodio.
+                const ackHash = typeof entry.payloadHash === 'string' && entry.payloadHash.length > 0
+                    ? entry.payloadHash
+                    : (typeof entry.data === 'string' ? entry.data.slice(0, 64) : '');
+                if (ackHash.length > 0) {
+                    validatedHashes.push(ackHash);
                 }
             } catch (err) {
                 error('Failed to process delivered vault entry', err, 'vault');

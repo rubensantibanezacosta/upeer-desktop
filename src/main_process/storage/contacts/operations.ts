@@ -12,6 +12,8 @@ type StoredContact = Omit<Contact, 'knownAddresses'> & {
     deviceId?: string | null;
     deviceMeta?: string | null;
     renewalToken?: string | null;
+    signedPreKey?: string | null;
+    signedPreKeyId?: number | null;
 };
 
 type MessageSummaryRow = {
@@ -71,7 +73,7 @@ export function getContacts() {
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        };
+        } as ContactWithLastMessage;
     });
 
     const knownUpeerIds = new Set(result.map(contact => contact.upeerId));
@@ -88,7 +90,7 @@ export function getContacts() {
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        });
+        } as ContactWithLastMessage);
     }
 
     result.sort((a, b) => {

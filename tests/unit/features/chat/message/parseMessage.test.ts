@@ -25,7 +25,7 @@ describe('MessageItem: parseMessage logic', () => {
         const outgoing = parseMessage(rawMessage, true, []);
         expect(outgoing.fileData.direction).toBe('sending');
         // El emisor debe tener acceso a su archivo original aunque no haya savedPath
-        expect(outgoing.fileData.savedPath).toBe(savedPath); 
+        expect(outgoing.fileData.savedPath).toBe(savedPath);
 
         // Caso 2: Emisor sin savedPath aún (recién enviado)
         const rawNoSaved = JSON.stringify({
@@ -41,7 +41,7 @@ describe('MessageItem: parseMessage logic', () => {
 
         // Caso 3: Soy el receptor. Debe usar savedPath si existe, o tempPath. Sin nada, undefined.
         const incoming = parseMessage(rawMessage, false, []);
-        expect(incoming.fileData.direction).toBe( 'receiving');
+        expect(incoming.fileData.direction).toBe('receiving');
         expect(incoming.fileData.savedPath).toBe(savedPath);
 
         // Caso 4: Receptor sin savedPath aún (solo tempPath)
@@ -95,5 +95,31 @@ describe('MessageItem: parseMessage logic', () => {
         expect(parsed.fileData.transferState).toBe('active');
         expect(parsed.fileData.progress).toBe(45);
         expect(parsed.fileData.savedPath).toBe('/original/active.jpg');
+    });
+
+    it('should match incoming offline attachments against sessionFileId when fileId is a logical message id', () => {
+        const rawMessage = JSON.stringify({
+            type: 'file',
+            transferId: 'session-file-1',
+            fileId: 'session-file-1',
+            fileName: 'offline.pdf',
+            fileSize: 2048,
+            mimeType: 'application/pdf'
+        });
+
+        const activeTransfers = [
+            {
+                fileId: 'message-file-1',
+                sessionFileId: 'session-file-1',
+                direction: 'receiving',
+                state: 'completed',
+                progress: 100,
+                tempPath: '/vault/recovered/offline.pdf'
+            }
+        ];
+
+        const parsed = parseMessage(rawMessage, false, activeTransfers);
+        expect(parsed.fileData.transferState).toBe('completed');
+        expect(parsed.fileData.savedPath).toBe('/vault/recovered/offline.pdf');
     });
 });

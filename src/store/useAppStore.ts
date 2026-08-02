@@ -32,6 +32,7 @@ export const useAppStore = create<AppStore>((set) => ({
     checkAuth: async () => {
         try {
             const status = await window.upeer.identityStatus();
+            // isLocked es booleano del handler IPC: true = bloqueada, false = disponible
             const isAuthenticated = !status.isLocked;
             set({ isAuthenticated });
             return isAuthenticated;

@@ -1,7 +1,7 @@
 import { getContacts, getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getMyUPeerId, incrementMyDhtSeq } from '../../security/identity.js';
 import type { KademliaContact } from './kademlia/types.js';
-import type { LocationBlock, RenewalToken } from '../types.js';
+import type { DeviceMetadata, LocationBlock, RenewalToken } from '../types.js';
 import {
     generateSignedLocationBlock,
     getDhtNetworkAddresses,
@@ -139,8 +139,8 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                     locationBlock: {
                         address: contact.address,
                         addresses: knownAddresses || [contact.address],
-                        dhtSeq: contact.dhtSeq,
-                        signature: contact.dhtSignature,
+                        dhtSeq: contact.dhtSeq || 0,
+                        signature: contact.dhtSignature || '',
                         expiresAt: dbContact?.dhtExpiresAt ?? undefined,
                         deviceId: dbContact?.deviceId ?? undefined,
                         deviceMeta: parseJsonValue(dbContact?.deviceMeta),
@@ -165,10 +165,10 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
                 address: contact.address || '',
                 addresses: parseJsonValue<string[]>(contact.knownAddresses, contact.address ? [contact.address] : undefined),
                 dhtSeq: contact.dhtSeq || 0,
-                signature: contact.dhtSignature,
+                signature: contact.dhtSignature || '',
                 expiresAt: contact.dhtExpiresAt ?? undefined,
                 deviceId: contact.deviceId ?? undefined,
-                deviceMeta: parseJsonValue(contact.deviceMeta),
+                deviceMeta: parseJsonValue<DeviceMetadata>(contact.deviceMeta),
                 renewalToken: parseJsonValue<RenewalToken>(contact.renewalToken),
             },
             dist: distanceXor(contact.upeerId, targetUpeerId),
@@ -194,7 +194,7 @@ export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: Send
     const kademlia = getKademliaInstance();
     if (kademlia) {
         network('Starting iterative search', undefined, { upeerId }, 'kademlia');
-        iterativeFindNode(upeerId, sendSecureUDPMessage).catch(err => {
+        iterativeFindNode(upeerId, sendSecureUDPMessage as unknown as Parameters<typeof iterativeFindNode>[1]).catch(err => {
             warn('Iterative search failed', err, 'kademlia');
         });
         return;

@@ -6,8 +6,8 @@ interface ContactInfoHeroProps {
     contactName: string;
     contactId: string;
     isOnline: boolean;
-    status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
-    lastSeenText: string;
+    status: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked' | 'disconnected';
+    lastSeenText: string | null;
     trust?: {
         label: string;
         Icon: React.ElementType;

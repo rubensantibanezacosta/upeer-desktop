@@ -48,6 +48,9 @@ export const SEALED_TYPES = new Set([
  */
 export function sealPacket(signedPacket: Record<string, unknown>, recipientEdPkHex: string): Record<string, unknown> {
     const recipientEdPk = Buffer.from(recipientEdPkHex, 'hex');
+    if (recipientEdPk.length !== sodium.crypto_sign_PUBLICKEYBYTES) {
+        return signedPacket;
+    }
     const recipientCurvePk = Buffer.alloc(sodium.crypto_box_PUBLICKEYBYTES);
     sodium.crypto_sign_ed25519_pk_to_curve25519(recipientCurvePk, recipientEdPk);
 

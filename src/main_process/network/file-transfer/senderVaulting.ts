@@ -18,12 +18,12 @@ export async function startVaultingFailover(
     upeerId: string,
     peerPublicKey: string | undefined,
     aesKey: Buffer | undefined,
-    encThumb: string | undefined,
+    encThumb: unknown,
     options?: { allowDuringTransfer?: boolean }
 ) {
     const currentTransfer = this.store.getTransfer(fileId, 'sending');
     if (!currentTransfer || currentTransfer.state !== 'active') return;
-    if ((currentTransfer.phase === TransferPhase.TRANSFERRING && !options?.allowDuringTransfer) || currentTransfer.state === 'completed') return;
+    if (currentTransfer.phase === TransferPhase.TRANSFERRING && !options?.allowDuringTransfer) return;
 
     if (aesKey) {
         if (currentTransfer.fileSize > 10 * 1024 * 1024) {

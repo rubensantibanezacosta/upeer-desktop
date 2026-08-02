@@ -153,7 +153,11 @@ export function useFileTransfer(
   };
 
   const getTransfer = (fileId: string): FileTransfer | undefined => {
-    return transfers.find(t => t.fileId === fileId);
+    return transfers.find(t =>
+      t.fileId === fileId
+      || t.sessionFileId === fileId
+      || t.messageId === fileId
+    );
   };
 
   const getTransfersForContact = (upeerId: string): FileTransfer[] => {

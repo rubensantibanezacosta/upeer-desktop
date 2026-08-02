@@ -85,6 +85,9 @@ export function registerIdentityHandlers(): void {
 
   ipcMain.handle('set-my-alias', async (event, { alias }) => {
     // BUG DS fix: limitar longitud del alias para evitar consumo excesivo de memoria/disco
+    if (alias !== undefined && typeof alias !== 'string') {
+      return { success: false, error: 'Alias must be a string' };
+    }
     const sanitized = typeof alias === 'string' ? alias.slice(0, 100) : '';
     setMyAlias(sanitized);
 
@@ -101,10 +104,9 @@ export function registerIdentityHandlers(): void {
     const { getKademliaInstance } = await import('../../network/dht/handlers.js');
     const kademlia = getKademliaInstance();
     if (kademlia) {
-      kademlia.storeLocationBlock(myId, { ...payload, publicKey: myPk, signature });
-
       // 2. Fan-out UDP a dispositivos propios online
       const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
+      kademlia.storeLocationBlock(myId, { ...payload, publicKey: myPk, signature, address: myYggAddress || '', dhtSeq: Date.now() });
       const selfNodes = kademlia.findClosestContacts(myId, 20)
         .filter(n => n.upeerId === myId && n.address !== myYggAddress);
 

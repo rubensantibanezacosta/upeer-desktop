@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CssVarsProvider } from '@mui/joy';
+import { useColorScheme } from '@mui/joy/styles';
+import { useAppearanceStore, FONT_SIZE_PX } from './store/useAppearanceStore.js';
 import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
@@ -36,6 +38,26 @@ export function shouldReloadHistoryForIncomingTransfer(
 
 export function shouldResyncAfterVaultRecoveryTransition(previousStartupActive: boolean, nextStartupActive: boolean) {
     return previousStartupActive && !nextStartupActive;
+}
+
+function AppearanceController({ children }: { children: React.ReactNode }) {
+    const theme = useAppearanceStore((s) => s.theme);
+    const fontSize = useAppearanceStore((s) => s.fontSize);
+    const { setMode } = useColorScheme();
+
+    useEffect(() => {
+        if (theme === 'system') {
+            setMode('system');
+        } else {
+            setMode(theme);
+        }
+    }, [setMode, theme]);
+
+    useEffect(() => {
+        document.documentElement.style.fontSize = `${FONT_SIZE_PX[fontSize]}px`;
+    }, [fontSize]);
+
+    return <>{children}</>;
 }
 
 export default function App() {
@@ -244,7 +266,8 @@ export default function App() {
 
     return (
         <CssVarsProvider defaultMode="dark">
-            <div data-testid="app-shell">
+            <AppearanceController>
+                <div data-testid="app-shell">
                 <MainLayout
                     isAppLocked={isAppLocked}
                     setIsAppLocked={setIsAppLocked}
@@ -291,8 +314,9 @@ export default function App() {
                     editingMessage={editingMessage}
                     setEditingMessage={setEditingMessage}
                 />
-                <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
-            </div>
+                    <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
+                </div>
+            </AppearanceController>
         </CssVarsProvider>
     );
 }

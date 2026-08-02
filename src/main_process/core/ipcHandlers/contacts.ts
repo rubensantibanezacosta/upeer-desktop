@@ -115,11 +115,20 @@ export function registerContactHandlers(): void {
   });
 
   ipcMain.handle('accept-contact-request', async (event, { upeerId, publicKey }) => {
+    if (typeof upeerId !== 'string' || !upeerId || upeerId.length > 128) {
+      return { success: false, error: 'Invalid upeerId' };
+    }
+    if (typeof publicKey !== 'string' || publicKey.length !== 64 || !/^[0-9a-f]+$/i.test(publicKey)) {
+      return { success: false, error: 'Invalid publicKey (expected 64 hex chars)' };
+    }
     await acceptContactRequest(upeerId, publicKey);
     return { success: true };
   });
 
   ipcMain.handle('delete-contact', (event, { upeerId }) => {
+    if (typeof upeerId !== 'string' || !upeerId || upeerId.length > 128) {
+      return { success: false, error: 'Invalid upeerId' };
+    }
     return deleteContact(upeerId);
   });
 

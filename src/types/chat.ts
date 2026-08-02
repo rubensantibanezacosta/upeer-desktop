@@ -90,15 +90,13 @@ export interface IncomingContactRequestEvent {
     vouchScore?: number;
 }
 
-export interface IncomingDirectMessageEvent extends RawChatMessage {
+export interface IncomingDirectMessageEvent extends Omit<RawChatMessage, 'chatUpeerId'> {
     upeerId: string;
-    timestamp?: number;
 }
 
-export interface IncomingGroupMessageEvent extends RawChatMessage {
+export interface IncomingGroupMessageEvent extends Omit<RawChatMessage, 'chatUpeerId'> {
     groupId: string;
     isSystem?: boolean;
-    timestamp?: number;
 }
 
 export interface PendingFile {

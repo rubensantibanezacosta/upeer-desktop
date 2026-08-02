@@ -55,18 +55,29 @@ export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId
     signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
 });
 
-export const resolveGroupContact = async (targetUpeerId: string) => {
+export const resolveGroupContact = async (targetUpeerId: string): Promise<GroupDeliveryContact | null> => {
     const myId = getMyUPeerId();
-    const mySignedPreKey = getMySignedPreKey();
-    return await getContactByUpeerId(targetUpeerId) || (targetUpeerId === myId
-        ? {
+    if (targetUpeerId === myId) {
+        const mySignedPreKey = getMySignedPreKey();
+        return {
             upeerId: myId,
             publicKey: getMyPublicKeyHex(),
             status: 'disconnected',
             signedPreKey: mySignedPreKey.spkPub,
             signedPreKeyId: mySignedPreKey.spkId,
-        }
-        : null);
+        };
+    }
+    const contact = await getContactByUpeerId(targetUpeerId);
+    if (!contact) return null;
+    return {
+        upeerId: contact.upeerId,
+        publicKey: contact.publicKey || '',
+        status: contact.status || 'offline',
+        address: contact.address || undefined,
+        knownAddresses: contact.knownAddresses ?? undefined,
+        signedPreKey: contact.signedPreKey ?? undefined,
+        signedPreKeyId: contact.signedPreKeyId ?? undefined,
+    };
 };
 
 export const buildEncryptedGroupPacket = async (

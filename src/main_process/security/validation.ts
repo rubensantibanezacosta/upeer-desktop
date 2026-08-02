@@ -60,7 +60,7 @@ import {
 } from './validationVaultGroups.js';
 import type { ValidationResult } from './validationShared.js';
 
-const VALIDATORS: Record<string, (data: unknown) => ValidationResult> = {
+const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     HANDSHAKE_REQ: validateHandshakeReq,
     HANDSHAKE_ACCEPT: validateHandshakeAccept,
     CHAT: validateChat,

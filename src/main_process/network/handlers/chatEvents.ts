@@ -15,7 +15,7 @@ import {
     getMyUPeerId,
 } from '../../security/identity.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
-import { warn } from '../../security/secure-logger.js';
+import { warn, security } from '../../security/secure-logger.js';
 import { clearPendingDirectMessage } from '../messaging/chatRetry.js';
 import { isValidMessageId } from './chatShared.js';
 import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
@@ -123,7 +123,17 @@ export async function handleChatClear(
 ): Promise<void> {
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
-    const chatUpeerId = isInternalSync && data.chatUpeerId ? data.chatUpeerId : upeerId;
+
+    // BUG SEGURIDAD: verificar que quien solicita el borrado es el propietario
+    // del chat o es una sincronización interna. Sin esto, cualquier contacto
+    // puede borrar nuestro historial completo de chat.
+    const targetChat = isInternalSync && data.chatUpeerId ? data.chatUpeerId : upeerId;
+    if (!isInternalSync && targetChat !== upeerId) {
+        security('Chat clear from non-owner rejected', { from: upeerId, targetChat }, 'security');
+        return;
+    }
+
+    const chatUpeerId = targetChat;
     deleteMessagesByChatId(chatUpeerId, data.clearTimestamp ?? data.timestamp);
     win?.webContents.send('chat-cleared', { upeerId: chatUpeerId });
 }
@@ -196,8 +206,16 @@ export async function handleChatDelete(
     const chatUpeerId = data.chatUpeerId || upeerId;
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
+
+    // BUG SEGURIDAD: verificar que el mensaje pertenece al chat del remitente
+    // o viene de una sincronización interna. Sin esto un contacto podría borrar
+    // mensajes en chats ajenos si conoce el msgId.
     const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
+    if (!isInternalSync && msg.chatUpeerId !== upeerId) {
+        security('Chat delete from non-owner rejected', { from: upeerId, targetMsg: messageId, targetChat: chatUpeerId }, 'security');
+        return;
+    }
 
     const { extractLocalAttachmentInfo, cleanupLocalAttachmentFile } = await import('../../utils/localAttachmentCleanup.js');
     const attachment = typeof msg.message === 'string' ? extractLocalAttachmentInfo(msg.message) : null;

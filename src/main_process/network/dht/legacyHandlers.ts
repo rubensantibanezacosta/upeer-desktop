@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
-import { getContactByUpeerId } from '../../storage/contacts/operations.ts';
-import { updateContactDhtLocation } from '../../storage/contacts/location.ts';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { updateContactDhtLocation } from '../../storage/contacts/location.js';
 import { verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock } from '../utils.js';
 import { network, security, error } from '../../security/secure-logger.js';
 import { AdaptivePow } from '../../security/pow.js';

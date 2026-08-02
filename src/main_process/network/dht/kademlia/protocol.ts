@@ -195,7 +195,7 @@ export class ProtocolHandler {
                     resolve: (value) => {
                         clearTimeout(timeout);
                         pendingQueries.delete(queryId);
-                        resolve(value);
+                        resolve(value as unknown as { value: DhtFoundValueResponse | PendingFoundValueResult; senderAddress: string });
                     },
                     reject: (error) => {
                         clearTimeout(timeout);

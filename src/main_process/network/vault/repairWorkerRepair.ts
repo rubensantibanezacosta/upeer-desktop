@@ -24,7 +24,7 @@ export async function repairVaultAsset(
         const db = getDb();
         const trackedShards = await db.select()
             .from(distributedAssets)
-            .where(eq(distributedAssets.fileHash, fileHash)) as Array<DistributedShard & { cid?: string }>;
+            .where(eq(distributedAssets.fileHash, fileHash)) as unknown as Array<DistributedShard & { cid?: string }>;
 
         const shardsWithData = (await Promise.all(trackedShards.map(async (shard) => {
             const cid = typeof shard.cid === 'string' ? shard.cid : undefined;

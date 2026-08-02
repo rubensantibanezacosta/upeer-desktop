@@ -66,6 +66,10 @@ describe('Storage Init Unit Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // BUG DB-TEST fix: transaction() debe devolver una función ejecutable.
+        // Sin esto, el mock devuelve undefined y cualquier test que llame
+        // a sqlite.transaction(fn)() falla con "is not a function".
+        const mockTransaction = vi.fn((fn: () => void) => fn);
         mockSqlite = {
             prepare: vi.fn().mockReturnValue({
                 get: vi.fn(),
@@ -73,7 +77,7 @@ describe('Storage Init Unit Tests', () => {
             }),
             pragma: vi.fn(),
             close: vi.fn(),
-            transaction: vi.fn(),
+            transaction: mockTransaction,
             exec: vi.fn(),
         };
         vi.mocked(BetterSqlite3).mockImplementation(function () {

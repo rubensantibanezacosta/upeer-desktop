@@ -1,6 +1,7 @@
 import { getDb, getSchema, and, lt, eq } from "../../storage/shared.js";
+import { getContactByUpeerId } from "../../storage/contacts/operations.js";
 import { sql } from "drizzle-orm";
-import { info, error, network, warn } from "../../security/secure-logger.js";
+import { info, error, network, warn, security } from "../../security/secure-logger.js";
 import {
     generateSignedLocationBlock,
     AUTO_RENEW_THRESHOLD_MS,
@@ -9,7 +10,7 @@ import {
 import { publishLocationBlock } from "./handlers.js";
 
 type RenewableContact = {
-    upeerId: string;
+    upeerId: string | null;
     deviceId?: string | null;
     renewalToken?: string | null;
     knownAddresses?: string | null;
@@ -59,6 +60,7 @@ async function checkAndRenewBlocks() {
             .from(schema.contacts)
             .where(
                 and(
+                    sql`${schema.contacts.dhtExpiresAt} IS NOT NULL`,
                     lt(schema.contacts.dhtExpiresAt, now + threshold),
                     sql`${schema.contacts.renewalToken} IS NOT NULL`
                 )
@@ -75,8 +77,30 @@ async function checkAndRenewBlocks() {
 
 async function attemptBlockRenewal(contact: RenewableContact) {
     try {
+        if (!contact.upeerId) return;
+        if (!contact.renewalToken) return;
         const token = JSON.parse(contact.renewalToken);
         if (!token || !token.signature) return;
+
+        const contactRecord = await getContactByUpeerId(contact.upeerId) as { publicKey?: string } | null;
+        if (!contactRecord?.publicKey) return;
+        const { verifyRenewalToken } = await import("../renewalTokens.js");
+        if (!verifyRenewalToken(token, contactRecord.publicKey)) {
+            security("Delegated block renewal rejected: invalid renewal token", { upeerId: contact.upeerId }, "dht");
+            return;
+        }
+        if (token.targetId && token.targetId !== contact.upeerId) {
+            security("Delegated block renewal rejected: token target mismatch", { upeerId: contact.upeerId }, "dht");
+            return;
+        }
+        if (token.allowedUntil <= Date.now()) {
+            security("Delegated block renewal rejected: token expired", { upeerId: contact.upeerId }, "dht");
+            return;
+        }
+        if (token.renewalsUsed >= token.maxRenewals) {
+            security("Delegated block renewal rejected: max renewals reached", { upeerId: contact.upeerId }, "dht");
+            return;
+        }
 
         network("Attempting delegated block renewal for trusted device", undefined, {
             upeerId: contact.upeerId,
@@ -86,7 +110,7 @@ async function attemptBlockRenewal(contact: RenewableContact) {
         // Obtenemos nuestras propias direcciones para ayudar al dispositivo 
         // (En el futuro, el dispositivo podría haber enviado sus IPs en el token, 
         // pero por ahora usamos las actuales si no hay cambios)
-        const rawAddresses = contact.knownAddresses ? JSON.parse(contact.knownAddresses) : [contact.address];
+        const rawAddresses = contact.knownAddresses ? JSON.parse(contact.knownAddresses) : (contact.address ? [contact.address] : []);
         const addresses = (Array.isArray(rawAddresses) ? rawAddresses : [contact.address]).filter(isYggdrasilAddress);
         if (addresses.length === 0) {
             return;
@@ -100,11 +124,17 @@ async function attemptBlockRenewal(contact: RenewableContact) {
 
         const deviceMeta = contact.deviceMeta ? JSON.parse(contact.deviceMeta) : undefined;
 
+        token.renewalsUsed += 1;
+        const updatedToken = {
+            ...token,
+            renewalsUsed: token.renewalsUsed,
+        };
+
         const updatedBlock = generateSignedLocationBlock(
             addresses,
             newSeq,
             undefined, // Default TTL
-            token,     // Pasamos el token original
+            updatedToken,
             deviceMeta
         );
 
@@ -117,7 +147,8 @@ async function attemptBlockRenewal(contact: RenewableContact) {
         db.update(schema.contacts)
             .set({
                 dhtExpiresAt: Math.floor(updatedBlock.expiresAt / 1000),
-                dhtSeq: newSeq
+                dhtSeq: newSeq,
+                renewalToken: JSON.stringify(updatedToken)
             })
             .where(eq(schema.contacts.upeerId, contact.upeerId))
             .run();

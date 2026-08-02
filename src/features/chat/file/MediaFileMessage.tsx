@@ -114,7 +114,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                 {thumbnail || (isTransferComplete && savedPath) ? (
                     <Box
                         component="img"
-                        src={thumbnail || toMediaUrl(savedPath!)}
+                        src={thumbnail || toMediaUrl(savedPath || '')}
                         alt={fileName}
                         sx={{
                             width: '100%',

@@ -30,11 +30,12 @@ interface TopHeaderProps {
     onUpdateGroup?: (fields: { name?: string; avatar?: string | null }) => Promise<void>;
     onInviteMembers?: () => void;
     onOpenInfo?: () => void;
+    onSearch?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
     contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
-    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo
+    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo, onSearch
 }) => {
     const avatarFileRef = useRef<HTMLInputElement>(null);
     const [editingName, setEditingName] = useState(false);
@@ -161,7 +162,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 </Box>
             </Box>
 
-            <TopHeaderActions status={status} onAccept={onAccept} contactName={contactName} isGroup={isGroup} isAdmin={isAdmin} onInviteMembers={onInviteMembers} />
+            <TopHeaderActions status={status} onAccept={onAccept} contactName={contactName} isGroup={isGroup} isAdmin={isAdmin} onInviteMembers={onInviteMembers} onSearch={onSearch} />
         </Box>
     );
 };

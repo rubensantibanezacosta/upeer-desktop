@@ -92,7 +92,13 @@ describe('Reputation - Vouches Integration', () => {
 
         vi.mocked(storage.vouchExists).mockReturnValue(false);
         vi.mocked(storage.countRecentVouchesByFrom).mockReturnValue(0);
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pubkey' });
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'sender',
+            address: '200::1',
+            name: 'Sender',
+            status: 'connected',
+            publicKey: 'pubkey',
+        });
         vi.mocked(identity.verify).mockReturnValue(false);
 
         const result = await saveIncomingVouch(fakeVouch);
@@ -102,7 +108,7 @@ describe('Reputation - Vouches Integration', () => {
     it('should reject incoming vouch from unknown contact', async () => {
         const fakeVouch = buildIncomingVouch({ fromId: 'unknown' });
 
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
 
         const result = await saveIncomingVouch(fakeVouch);
         expect(result).toBe(false);
@@ -140,7 +146,7 @@ describe('Reputation - Vouches Integration', () => {
         it('should fail if type is invalid', async () => {
             vi.mocked(storage.vouchExists).mockReturnValue(false);
             const result = await saveIncomingVouch(toIncomingVouch({
-                id: 'id', fromId: 'f', toId: 't', type: 'INVALID', signature: 's'
+                id: 'id', fromId: 'f', toId: 't', type: 'INVALID', signature: 's', positive: true
             } as LooseIncomingVouch));
             expect(result).toBe(false);
         });
@@ -160,7 +166,7 @@ describe('Reputation - Vouches Integration', () => {
             const id = computeVouchId('f', 't', VouchType.HANDSHAKE, futureTs);
 
             const result = await saveIncomingVouch(toIncomingVouch({
-                id, fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, signature: 's', timestamp: futureTs
+                id, fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, signature: 's', timestamp: futureTs, positive: true
             }));
             expect(result).toBe(false);
         });
@@ -171,7 +177,7 @@ describe('Reputation - Vouches Integration', () => {
             const id = computeVouchId('f', 't', VouchType.HANDSHAKE, tooOldTs);
 
             const result = await saveIncomingVouch(toIncomingVouch({
-                id, fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, signature: 's', timestamp: tooOldTs
+                id, fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, signature: 's', timestamp: tooOldTs, positive: true
             }));
             expect(result).toBe(false);
         });
@@ -201,8 +207,8 @@ describe('Reputation - Vouches Integration', () => {
         it('should get score with direct contacts from DB', async () => {
             const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
             vi.mocked(contactsOps.getContacts).mockResolvedValue([
-                { upeerId: 'peer1', status: 'connected' },
-                { upeerId: 'peer2', status: 'pending' },
+                { upeerId: 'peer1', address: '200::1', name: 'Peer 1', status: 'connected' },
+                { upeerId: 'peer2', address: '200::2', name: 'Peer 2', status: 'pending' },
             ]);
             vi.mocked(storage.getVouchesForNode).mockReturnValue(toStoredVouches([
                 { id: 'v1', fromId: 'peer1', toId: 'target', type: VouchType.HANDSHAKE, positive: true, timestamp: 1, signature: 'sig', receivedAt: 1 },
@@ -249,16 +255,34 @@ describe('Reputation - Vouches Integration', () => {
             const { getGossipIds, getVouchesForDelivery } = await import('../../../src/main_process/security/reputation/vouches.js');
             const mockIds = ['id1', 'id2'];
             vi.mocked(storage.getVouchIds).mockReturnValue(mockIds);
-            vi.mocked(storage.getVouchesByIds).mockReturnValue([{ id: 'v1' }] as ReturnType<typeof storage.getVouchesByIds>);
+            const mockVouch = {
+                id: 'v1',
+                fromId: 'p1',
+                toId: 't',
+                type: 'handshake',
+                positive: true,
+                timestamp: 100,
+                signature: 'sig',
+                receivedAt: 100,
+            };
+            vi.mocked(storage.getVouchesByIds).mockReturnValue([mockVouch] as ReturnType<typeof storage.getVouchesByIds>);
 
             expect(getGossipIds()).toEqual(mockIds);
-            expect(getVouchesForDelivery(['id1'])).toEqual([{ id: 'v1' }]);
+            expect(getVouchesForDelivery(['id1'])).toEqual([{
+                id: 'v1',
+                fromId: 'p1',
+                toId: 't',
+                type: mockVouch.type,
+                positive: true,
+                timestamp: 100,
+                signature: 'sig',
+            }]);
         });
     });
 
     describe('issueVouch - edge cases', () => {
         it('should return null if fromId is missing', async () => {
-            vi.mocked(identity.getMyUPeerId).mockReturnValue(null);
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(null as unknown as string);
             const result = await issueVouch('target', VouchType.HANDSHAKE);
             expect(result).toBeNull();
         });

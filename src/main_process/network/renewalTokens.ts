@@ -42,7 +42,7 @@ export function canRenewLocationBlock(block: { expiresAt?: number; renewalToken?
     return verifyRenewalToken(block.renewalToken, publicKeyHex);
 }
 
-export function renewLocationBlock(block: { address: string; dhtSeq: number; signature: string; expiresAt?: number; renewalToken?: RenewalToken }, publicKeyHex: string): { address: string; dhtSeq: number; expiresAt: number; signature: string; renewalToken?: RenewalToken } | null {
+export function renewLocationBlock(block: { address: string; addresses?: string[]; dhtSeq: number; signature: string; expiresAt?: number; renewalToken?: RenewalToken }, publicKeyHex: string): { address: string; addresses?: string[]; dhtSeq: number; expiresAt: number; signature: string; renewalToken?: RenewalToken } | null {
     if (!canRenewLocationBlock(block, publicKeyHex) || !block.renewalToken) {
         return null;
     }
@@ -54,6 +54,7 @@ export function renewLocationBlock(block: { address: string; dhtSeq: number; sig
 
     return {
         address: block.address,
+        addresses: block.addresses,
         dhtSeq: block.dhtSeq,
         expiresAt: block.expiresAt ?? 0,
         signature: block.signature,

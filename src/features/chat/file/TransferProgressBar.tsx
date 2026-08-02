@@ -15,6 +15,7 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import { FileTransfer } from '../../../hooks/useFileTransfer.js';
+import { useTransferSpeed, formatSpeed, formatEta } from './transferSpeed.js';
 
 
 interface TransferProgressBarProps {
@@ -41,6 +42,7 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
         totalChunks = 0
     } = transfer;
     const phase = transfer.phase;
+    const { speedBps, etaSeconds } = useTransferSpeed(transfer);
 
     const formatFileSize = (bytes?: number): string => {
         const num = bytes || 0;
@@ -260,10 +262,10 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
 
                         <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
                             <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                                Velocidad: calculando...
+                                Velocidad: {formatSpeed(speedBps)}
                             </Typography>
                             <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                                Tiempo restante: calculando...
+                                Tiempo restante: {formatEta(etaSeconds)}
                             </Typography>
                         </Stack>
                     </>

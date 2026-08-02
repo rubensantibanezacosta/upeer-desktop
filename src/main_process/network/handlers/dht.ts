@@ -35,6 +35,7 @@ type DhtExchangeData = {
 };
 
 type DhtQueryData = {
+    type?: 'DHT_QUERY';
     targetId: string;
 };
 
@@ -64,6 +65,7 @@ function parseRenewalToken(value?: string | null): RenewalToken | undefined {
 export async function handleDhtUpdate(upeerId: string, contact: ContactRecord, data: DhtUpdateData) {
     const block = data.locationBlock;
     if (!block || typeof block.dhtSeq !== 'number' || !block.address || !block.signature) return;
+    if (!contact.publicKey) return;
 
     const isValid = verifyLocationBlock(upeerId, block, contact.publicKey);
     if (!isValid) {
@@ -99,6 +101,7 @@ export async function handleDhtExchange(upeerId: string, data: DhtExchangeData) 
 
         const block = peer.locationBlock;
         if (typeof block.dhtSeq !== 'number' || !block.address || !block.signature) continue;
+        if (!existing.publicKey) continue;
 
         const isValid = verifyLocationBlock(peer.upeerId, block, existing.publicKey);
         if (!isValid) {
@@ -131,7 +134,7 @@ export async function handleDhtQuery(upeerId: string, data: DhtQueryData, fromAd
         // él (todos los modernos lo son) y la respuesta no lo incluye, la verificación falla.
         // BUG CG fix: incluir renewalToken para que el receptor pueda auto-renovar al expirar.
         responseData.locationBlock = {
-            address: target.address,
+            address: target.address || '',
             dhtSeq: target.dhtSeq || 0,
             signature: target.dhtSignature,
             expiresAt: target.dhtExpiresAt ?? undefined,
@@ -145,7 +148,7 @@ export async function handleDhtQuery(upeerId: string, data: DhtQueryData, fromAd
             catch { return BigInt(0); }
         };
 
-        const closest = allContacts
+        const closest: DhtResponseNeighbor[] = allContacts
             .filter(c => c.status === 'connected' && c.upeerId !== upeerId)
             .map(c => ({
                 upeerId: c.upeerId,
@@ -154,7 +157,7 @@ export async function handleDhtQuery(upeerId: string, data: DhtQueryData, fromAd
                 // pueda verificar correctamente bloques firmados con expiresAt.
                 // BUG CG fix: incluir renewalToken para auto-renovación al expirar.
                 locationBlock: {
-                    address: c.address,
+                    address: c.address || '',
                     dhtSeq: c.dhtSeq || 0,
                     signature: c.dhtSignature,
                     expiresAt: c.dhtExpiresAt ?? undefined,
@@ -164,7 +167,7 @@ export async function handleDhtQuery(upeerId: string, data: DhtQueryData, fromAd
             }))
             .sort((a, b) => (a.dist < b.dist ? -1 : a.dist > b.dist ? 1 : 0))
             .slice(0, 5)
-            .map(({ dist: _dist, ...d }) => d);
+            .map(({ dist: _dist, ...d }) => d as DhtResponseNeighbor);
 
         responseData.neighbors = closest;
     }
@@ -177,7 +180,9 @@ export async function handleDhtResponse(upeerId: string, data: DhtResponseData, 
         const existing = await getContactByUpeerId(data.targetId) as ContactRecord | null;
         if (!existing) return;
 
-        const isValid = verifyLocationBlock(data.targetId, block, existing.publicKey || data.publicKey);
+        const publicKeyHex = existing.publicKey || data.publicKey;
+        if (!publicKeyHex) return;
+        const isValid = verifyLocationBlock(data.targetId, block, publicKeyHex);
         if (isValid && block.dhtSeq > (existing.dhtSeq || 0)) {
             network('DHT search found', undefined, { target: data.targetId, address: block.address }, 'dht');
             // BUG CG fix: pasar block.renewalToken
@@ -188,13 +193,14 @@ export async function handleDhtResponse(upeerId: string, data: DhtResponseData, 
         for (const peer of data.neighbors) {
             if (peer.upeerId === getMyUPeerId()) continue;
             const existing = await getContactByUpeerId(peer.upeerId) as ContactRecord | null;
+            const loc = peer.locationBlock;
             if (!existing) {
-                if (peer.locationBlock?.address) {
-                    sendResponse(peer.locationBlock.address, { type: 'DHT_QUERY', targetId: data.targetId });
+                if (loc?.address) {
+                    sendResponse(loc.address, { type: 'DHT_QUERY', targetId: data.targetId });
                 }
-            } else if (peer.locationBlock?.dhtSeq > (existing.dhtSeq || 0)) {
-                updateContactDhtLocation(peer.upeerId, peer.locationBlock.address, peer.locationBlock.dhtSeq, peer.locationBlock.signature, peer.locationBlock.expiresAt);
-                sendResponse(peer.locationBlock.address, { type: 'DHT_QUERY', targetId: data.targetId });
+            } else if (loc && loc.dhtSeq > (existing.dhtSeq || 0)) {
+                updateContactDhtLocation(peer.upeerId, loc.address, loc.dhtSeq, loc.signature, loc.expiresAt);
+                sendResponse(loc.address, { type: 'DHT_QUERY', targetId: data.targetId });
             }
         }
     }

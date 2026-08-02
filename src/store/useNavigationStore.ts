@@ -20,6 +20,7 @@ interface NavigationState {
     sidebarFilter: SidebarFilter;
     newChatSearch: string;
     sidebarSearch: string; // Búsqueda en la lista principal
+    sidebarSearchFocusToken: number;
 
     // Modals
     isAddModalOpen: boolean;
@@ -55,6 +56,7 @@ interface NavigationActions {
     setSidebarFilter: (filter: SidebarFilter) => void;
     setNewChatSearch: (q: string) => void;
     setSidebarSearch: (q: string) => void;
+    focusSidebarSearch: () => void;
     openNewChat: () => void;           // list → new (limpia búsqueda)
     backToList: () => void;            // cualquier vista → list
 
@@ -87,6 +89,7 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     sidebarFilter: 'all',
     newChatSearch: '',
     sidebarSearch: '',
+    sidebarSearchFocusToken: 0,
 
     isAddModalOpen: false,
     isShareModalOpen: false,
@@ -129,6 +132,12 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     setSidebarFilter: (filter) => set({ sidebarFilter: filter }),
     setNewChatSearch: (q) => set({ newChatSearch: q }),
     setSidebarSearch: (q) => set({ sidebarSearch: q }),
+    focusSidebarSearch: () => set((state) => ({
+        appView: 'chat',
+        sidebarView: 'list',
+        newChatSearch: '',
+        sidebarSearchFocusToken: state.sidebarSearchFocusToken + 1,
+    })),
 
     openNewChat: () => set({ sidebarView: 'new', newChatSearch: '' }),
     backToList: () => set({ sidebarView: 'list', newChatSearch: '', sidebarSearch: '' }),

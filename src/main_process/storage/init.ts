@@ -127,23 +127,36 @@ import type BetterSqlite3Type from 'better-sqlite3-multiple-ciphers';
 function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {
     sqlite.exec(`CREATE TABLE IF NOT EXISTS _app_flags (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
 
+    // BUG DB-MIG fix: envolver cada migración one-time en una transacción SQLite.
+    // Si el proceso falla entre DELETE e INSERT, el flag quedaba marcado sin los
+    // datos limpios, y la migración no se volvía a ejecutar nunca más — dejando
+    // material criptográfico obsoleto en la BD.
     const sealedFixed = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'sealed_crypto_fixed'`).get() as { value: string } | undefined;
     if (!sealedFixed) {
-        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
-        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('sealed_crypto_fixed', '1')`).run();
+        const migrateSealed = sqlite.transaction(() => {
+            sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+            sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('sealed_crypto_fixed', '1')`).run();
+        });
+        migrateSealed();
     }
 
     const drRecoveryV2 = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'dr_recovery_v2'`).get() as { value: string } | undefined;
     if (!drRecoveryV2) {
-        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
-        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('dr_recovery_v2', '1')`).run();
+        const migrateDr = sqlite.transaction(() => {
+            sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+            sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('dr_recovery_v2', '1')`).run();
+        });
+        migrateDr();
     }
 
     const spkRotationFix = sqlite.prepare(`SELECT value FROM _app_flags WHERE key = 'spk_rotation_fix'`).get() as { value: string } | undefined;
     if (!spkRotationFix) {
-        sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
-        sqlite.prepare(`UPDATE contacts SET signed_pre_key = NULL, signed_pre_key_sig = NULL, signed_pre_key_id = NULL`).run();
-        sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('spk_rotation_fix', '1')`).run();
+        const migrateSPK = sqlite.transaction(() => {
+            sqlite.prepare(`DELETE FROM ratchet_sessions`).run();
+            sqlite.prepare(`UPDATE contacts SET signed_pre_key = NULL, signed_pre_key_sig = NULL, signed_pre_key_id = NULL`).run();
+            sqlite.prepare(`INSERT INTO _app_flags (key, value) VALUES ('spk_rotation_fix', '1')`).run();
+        });
+        migrateSPK();
     }
 }
 

@@ -54,7 +54,9 @@ export async function handleChatContact(
 
     const content = serializeContactCardMessage(data);
     const saved = await saveMessage(msgId, upeerId, false, content, undefined, signature, 'delivered', upeerId, data.timestamp);
-    const isNew = typeof (saved as SaveMessageResult)?.changes === 'number' && (saved as SaveMessageResult)!.changes! > 0;
+    const savedResult = saved as SaveMessageResult;
+    const changes = savedResult?.changes;
+    const isNew = typeof changes === 'number' && changes > 0;
 
     if (isNew) {
         win?.webContents.send('receive-p2p-message', {

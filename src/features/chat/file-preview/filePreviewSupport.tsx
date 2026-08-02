@@ -141,12 +141,15 @@ export const useFilesPreview = (files: FileInfo[]) => {
                     previewUrl = toMediaUrl(assetPath);
                     thumbnail = await generateThumbnail(previewUrl);
                 } else if (effectiveType.startsWith('video/')) {
-                    previewUrl = toMediaUrl(assetPath);
-                    try {
-                        const result = await window.upeer.generateVideoThumbnail(assetPath);
-                        thumbnail = result.success ? result.dataUrl : await generateVideoThumbnail(previewUrl);
-                    } catch {
-                        thumbnail = await generateVideoThumbnail(previewUrl);
+                    const mediaUrl = toMediaUrl(assetPath);
+                    previewUrl = mediaUrl || '';
+                    if (mediaUrl) {
+                        try {
+                            const result = await window.upeer.generateVideoThumbnail(assetPath);
+                            thumbnail = result.success && result.dataUrl ? result.dataUrl : await generateVideoThumbnail(mediaUrl);
+                        } catch {
+                            thumbnail = await generateVideoThumbnail(mediaUrl);
+                        }
                     }
                 } else if (isPdfFile(effectiveType, file.name)) {
                     previewUrl = toMediaUrl(assetPath);

@@ -64,7 +64,7 @@ export class SecureLogger {
             };
         }
 
-        const redacted: unknown[] | RedactableRecord = Array.isArray(data) ? [...data] : { ...(data as RedactableRecord) };
+        const redacted: Record<string, unknown> = Array.isArray(data) ? { ...data as unknown[] } : { ...(data as RedactableRecord) };
 
         for (const key in redacted) {
             if (this.redactedFields.has(key)) {
@@ -77,6 +77,11 @@ export class SecureLogger {
             } else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
                 redacted[key] = this.redactSensitiveData(redacted[key]);
             }
+        }
+
+        if (Array.isArray(data)) {
+            const keys = Object.keys(redacted).filter((k) => !/^\d+$/.test(k));
+            for (const k of keys) delete redacted[k];
         }
 
         return redacted;

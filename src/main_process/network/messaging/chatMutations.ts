@@ -113,7 +113,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     };
 
     if (isGroup) {
-        const group = getGroupById(upeerId) as GroupRecordLike | null;
+        const group = await getGroupById(upeerId) as GroupRecordLike | null;
         if (!group) return;
         for (const memberId of group.members) {
             if (memberId === myId) continue;
@@ -202,7 +202,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
     };
 
     if (isGroup) {
-        const group = getGroupById(upeerId) as GroupRecordLike | null;
+        const group = await getGroupById(upeerId) as GroupRecordLike | null;
         if (group) {
             for (const memberId of group.members) {
                 if (memberId === myId) continue;
@@ -217,9 +217,10 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
     for (const address of selfAddresses) {
         sendSecureUDPMessage(address, signedData, myPublicKey, true);
     }
-    import('../vault/manager.js').then(({ VaultManager }) => {
+    (async () => {
+        const { VaultManager } = await import('../vault/manager.js');
         VaultManager.replicateToVaults(myId, signedData);
-    });
+    })();
 
     const allContacts = await getContacts();
     const trustedFriends = (allContacts as ChatContactRecord[]).filter((contact) => contact.status === 'connected' && contact.upeerId !== myId && contact.upeerId !== upeerId);
@@ -260,12 +261,13 @@ export async function sendChatClear(upeerId: string, customTimestamp?: number): 
     const { deleteMessagesByChatId } = await import('../../storage/messages/operations.js');
     deleteMessagesByChatId(upeerId, timestamp);
 
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(myId, vaultPacket);
-        const allContacts = getContacts();
+    (async () => {
+        const { VaultManager } = await import('../vault/manager.js');
+        await VaultManager.replicateToVaults(myId, vaultPacket);
+        const allContacts = await getContacts();
         const trustedFriends = (allContacts as ChatContactRecord[]).filter((contact) => contact && contact.upeerId !== myId);
         for (const friend of trustedFriends.slice(0, 3)) {
-            VaultManager.replicateToVaults(friend.upeerId, vaultPacket);
+            await VaultManager.replicateToVaults(friend.upeerId, vaultPacket);
         }
-    });
+    })();
 }

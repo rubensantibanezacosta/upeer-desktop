@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { getContactByUpeerId } from '../../storage/contacts/operations.ts';
-import { updateContactDhtLocation } from '../../storage/contacts/location.ts';
+import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { updateContactDhtLocation } from '../../storage/contacts/location.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { verifyRenewalToken } from '../utils.js';
 import { network, security, error } from '../../security/secure-logger.js';

@@ -6,6 +6,13 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
     const db = getDb();
     const schema = getSchema();
 
+    // BUG DB-STATUS fix: si el mensaje no existe, no hacer update silencioso.
+    // El código anterior caía hasta el db.update incluso cuando currentStatus
+    // era null (mensaje inexistente), actualizando 0 filas pero retornando
+    // result.changes > 0 como false sin indicar por qué.
+    const currentStatus = getMessageStatus(id);
+    if (!currentStatus) return false;
+
     const statusOrder: Record<string, number> = {
         'failed': 0,
         'sent': 1,
@@ -14,24 +21,30 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
         'read': 4
     };
 
-    const currentStatus = getMessageStatus(id);
-    if (currentStatus) {
-        if (status === 'failed') {
-            if (currentStatus !== 'sent') return false;
-        } else if (currentStatus === 'failed' && status === 'sent') {
-            const result = db.update(schema.messages)
-                .set({ status })
-                .where(eq(schema.messages.id, id))
-                .run();
-
-            return result.changes > 0;
-        } else {
-            const currentRank = statusOrder[currentStatus] ?? 0;
-            const newRank = statusOrder[status] ?? 0;
-
-            if (newRank <= currentRank) return false;
-        }
+    if (status === 'failed') {
+        // Solo se puede pasar a 'failed' desde 'sent'
+        if (currentStatus !== 'sent') return false;
+        const result = db.update(schema.messages)
+            .set({ status })
+            .where(eq(schema.messages.id, id))
+            .run();
+        return result.changes > 0;
     }
+
+    if (currentStatus === 'failed' && status === 'sent') {
+        // Permitir 'failed' → 'sent' (retry)
+        const result = db.update(schema.messages)
+            .set({ status })
+            .where(eq(schema.messages.id, id))
+            .run();
+        return result.changes > 0;
+    }
+
+    const currentRank = statusOrder[currentStatus] ?? 0;
+    const newRank = statusOrder[status] ?? 0;
+
+    // Degradación: 'vaulted' → 'sent', 'delivered' → 'vaulted', etc.
+    if (newRank <= currentRank) return false;
 
     const result = db.update(schema.messages)
         .set({ status })

@@ -98,12 +98,12 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
         const growthFactor = newSrtt < 150 ? 2.0 : 1.0;
 
         if (windowSize < ssthresh) {
-            windowSize = Math.min(ssthresh, windowSize + Math.floor(growthFactor));
+            windowSize = Math.min(ssthresh, windowSize + growthFactor);
         } else {
             windowSize += (1.0 / windowSize) * growthFactor;
         }
 
-        updates.windowSize = Math.min(this.config.maxWindowSize, Math.floor(windowSize));
+        updates.windowSize = Math.min(this.config.maxWindowSize, windowSize);
         transfer._chunksSentTimes?.delete(data.chunkIndex);
     }
 
@@ -117,7 +117,7 @@ export async function handleAck(this: TransferManager, upeerId: string, address:
             const doneMsg = { type: 'FILE_DONE', fileId: data.fileId };
             this.send(freshAddress, doneMsg, contact?.publicKey);
             this.startDoneRetry(data.fileId, upeerId, doneMsg);
-        } else if ((updated.nextChunkIndex || 0) < updated.totalChunks) {
+        } else if (typeof updated.nextChunkIndex === 'number' && updated.nextChunkIndex < updated.totalChunks) {
             await this.sendNextChunks(updated);
         }
     }

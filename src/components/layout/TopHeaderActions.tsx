@@ -14,6 +14,7 @@ interface TopHeaderActionsProps {
     isGroup?: boolean;
     isAdmin?: boolean;
     onInviteMembers?: () => void;
+    onSearch?: () => void;
 }
 
 export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
@@ -23,6 +24,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
     isGroup,
     isAdmin,
     onInviteMembers,
+    onSearch,
 }) => (
     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
         {status === 'incoming' && onAccept && (
@@ -34,7 +36,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
         {contactName && (
             <>
                 <Tooltip title="Buscar en el chat" variant="soft">
-                    <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral"><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
+                    <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral" onClick={onSearch}><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
                 <Tooltip title="Llamada de voz" variant="soft">
                     <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral"><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>

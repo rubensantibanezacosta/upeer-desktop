@@ -17,6 +17,7 @@ vi.mock('@mui/material/utils', () => ({
 }));
 
 vi.mock('@mui/icons-material/HourglassEmpty', () => ({ default: () => <div data-testid="HourglassEmptyIcon" /> }));
+vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => <div data-testid="ErrorOutlineIcon" /> }));
 vi.mock('@mui/icons-material/Done', () => ({ default: () => <div data-testid="DoneIcon" /> }));
 vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => <div data-testid="DoneAllIcon" /> }));
 vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <div data-testid="KeyboardArrowDownIcon" /> }));

@@ -117,7 +117,7 @@ export async function rotateGroupAfterMemberRemoval(groupId: string, removedUpee
         {
             members: updatedGroup.members,
             epoch: updatedGroup.epoch,
-            senderKey: updatedGroup.senderKey,
+            senderKey: updatedGroup.senderKey ?? undefined,
         },
         updatedGroup.members
     );
@@ -168,7 +168,7 @@ export async function inviteToGroup(groupId: string, upeerId: string): Promise<v
         {
             members: updatedGroup.members,
             epoch: updatedGroup.epoch,
-            senderKey: updatedGroup.senderKey,
+            senderKey: updatedGroup.senderKey ?? undefined,
         },
         updatedGroup.members.filter((member) => member !== upeerId)
     );

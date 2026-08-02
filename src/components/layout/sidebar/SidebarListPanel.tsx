@@ -33,12 +33,14 @@ interface SidebarListPanelProps {
     onToggleFavorite: (id: string) => void;
     onToggleFavoriteGroup: (groupId: string) => void;
     onClearChat: (id: string) => void;
+    onClearGroupChat?: (groupId: string) => void;
     onLeaveGroup?: (groupId: string) => void;
     onOpenNew: () => void;
     onFilterChange: (filter: SidebarFilter) => void;
     onSearchChange: (value: string) => void;
     onSelectMessage: (msg: ChatMessage) => void;
     onOpenCreateGroup?: () => void;
+    searchFocusToken?: number;
 }
 
 export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
@@ -57,16 +59,18 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
     onToggleFavorite,
     onToggleFavoriteGroup,
     onClearChat,
+    onClearGroupChat,
     onLeaveGroup,
     onOpenNew,
     onFilterChange,
     onSearchChange,
     onSelectMessage,
     onOpenCreateGroup,
+    searchFocusToken,
 }) => (
     <>
         <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} />
-        <SidebarSearch value={sidebarSearch} onChange={onSearchChange} activeFilter={sidebarFilter} onFilterChange={(filter) => onFilterChange(filter as SidebarFilter)} />
+        <SidebarSearch value={sidebarSearch} onChange={onSearchChange} activeFilter={sidebarFilter} onFilterChange={(filter) => onFilterChange(filter as SidebarFilter)} autoFocus={searchFocusToken !== undefined && searchFocusToken > 0} focusKey={searchFocusToken ? `search-${searchFocusToken}` : undefined} />
         <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {(sidebarFilter === 'all' || sidebarFilter === 'favorites') && (
                 <>
@@ -88,7 +92,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                             )}
                             {mergedList.map((entry) =>
                                 entry.kind === 'group'
-                                    ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => undefined)} onToggleFavorite={onToggleFavoriteGroup} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
+                                    ? <GroupItem key={entry.data.groupId} group={entry.data} isSelected={selectedGroupId === entry.data.groupId} onSelect={onSelectGroup || (() => undefined)} onToggleFavorite={onToggleFavoriteGroup} onLeaveGroup={onLeaveGroup} onClearChat={onClearGroupChat} highlight={sidebarSearch} />
                                     : <ContactItem key={entry.data.upeerId} contact={entry.data} isSelected={selectedId === entry.data.upeerId} onSelect={onSelectContact} onToggleFavorite={onToggleFavorite} onClear={onClearChat} isTyping={!!typingStatus[entry.data.upeerId]} highlight={sidebarSearch} />,
                             )}
 
@@ -153,7 +157,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                 ) : (
                     <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
                         {filteredGroups.map((group) => (
-                            <GroupItem key={group.groupId} group={group} isSelected={selectedGroupId === group.groupId} onSelect={onSelectGroup || (() => undefined)} onLeaveGroup={onLeaveGroup} highlight={sidebarSearch} />
+                            <GroupItem key={group.groupId} group={group} isSelected={selectedGroupId === group.groupId} onSelect={onSelectGroup || (() => undefined)} onToggleFavorite={onToggleFavoriteGroup} onLeaveGroup={onLeaveGroup} onClearChat={onClearGroupChat} highlight={sidebarSearch} />
                         ))}
                     </List>
                 )

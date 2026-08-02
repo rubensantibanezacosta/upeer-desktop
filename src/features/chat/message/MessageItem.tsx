@@ -230,7 +230,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                             <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px', opacity: 0.8 }}>
                                                 {msg.timestamp}
                                             </Typography>
-                                            {isMe ? <MessageStatus status={msg.status} onRetry={msg.id && msg.status === 'failed' ? () => onRetryMessage?.(msg.id!) : undefined} /> : null}
+                                            {isMe ? <MessageStatus status={msg.status} onRetry={msg.id && msg.status === 'failed' ? () => onRetryMessage?.(msg.id as string) : undefined} /> : null}
                                         </Box>
                                     </Box>
                                 )}
@@ -258,6 +258,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             onEdit={onEdit ? () => onEdit(msg) : undefined}
                             onForward={!msg.isDeleted && onForward ? () => onForward(msg) : undefined}
                             onDelete={() => msg.id && onDelete(msg.id)}
+                            onDownload={isFile && fileData?.transferState === 'completed' && fileData.fileId ? async () => {
+                                const result = await window.upeer.showSaveDialog({
+                                    defaultPath: fileData.fileName,
+                                });
+                                if (!result.canceled && result.filePath) {
+                                    const saveResult = await window.upeer.saveTransferredFile(fileData.fileId, result.filePath);
+                                    if (saveResult.success) {
+                                        onTransferStateChange?.(fileData.fileId, { savedPath: result.filePath });
+                                    }
+                                }
+                            } : undefined}
                         />
                     </Box>
                 </Box>

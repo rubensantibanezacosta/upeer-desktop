@@ -21,7 +21,7 @@ import { ContactInfoDangerAction, ContactInfoUtilityAction } from './contactInfo
 interface ContactInfoPanelMainViewProps {
     contact: Contact;
     isOnline: boolean;
-    lastSeenText: string;
+    lastSeenText: string | null;
     trust: ReturnType<typeof import('./contactInfoHelpers.js').getTrustMeta>;
     sharedMedia: SharedMediaItem[];
     utilityActions: ContactInfoUtilityAction[];

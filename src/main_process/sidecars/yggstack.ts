@@ -190,7 +190,10 @@ function tryExtractAddress(text: string): void {
         yggstackState.detectedAddress = match[1];
         yggstackState.restartAttempts = 0;
         info(`Yggdrasil IPv6 address assigned: ${yggstackState.detectedAddress}`, undefined, 'yggstack');
-        yggstackState.addressCallbacks.forEach(cb => cb(yggstackState.detectedAddress!));
-        emitStatus('up', yggstackState.detectedAddress);
+        const addr = yggstackState.detectedAddress;
+        if (addr) {
+            yggstackState.addressCallbacks.forEach(cb => cb(addr));
+            emitStatus('up', addr);
+        }
     }
 }

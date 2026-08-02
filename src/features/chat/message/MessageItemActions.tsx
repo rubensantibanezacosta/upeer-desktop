@@ -20,6 +20,7 @@ interface MessageItemActionsProps {
     onEdit?: () => void;
     onForward?: () => void;
     onDelete: () => void;
+    onDownload?: () => void;
 }
 
 export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
@@ -37,6 +38,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
     onEdit,
     onForward,
     onDelete,
+    onDownload,
 }) => {
     if (msg.isDeleted) {
         return null;
@@ -88,6 +90,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
                 onEdit={canEdit ? onEdit : undefined}
                 onForward={onForward}
                 onDelete={onDelete}
+                onDownload={onDownload}
                 sx={{ position: 'static' }}
             />
         </Box>

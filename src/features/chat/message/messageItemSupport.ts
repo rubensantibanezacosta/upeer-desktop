@@ -73,13 +73,18 @@ export const parseMessage = (message: string, isMe: boolean, activeTransfers: Fi
         } else if (parsed?.type === 'file') {
             isJSONFile = true;
             const direction = parsed.direction || (isMe ? 'sending' : 'receiving');
-            const activeTransfer = activeTransfers.find((transfer) =>
-                (transfer.fileId === parsed.transferId || transfer.fileId === parsed.fileId) && transfer.direction === direction,
-            );
+            const activeTransfer = activeTransfers.find((transfer) => {
+                const tfId = transfer.fileId;
+                const sfId = transfer.sessionFileId;
+                const matchFile = tfId === parsed.transferId || tfId === parsed.fileId;
+                const matchSession = sfId === parsed.transferId || sfId === parsed.fileId;
+                const matchMessageId = (transfer.messageId ?? undefined) === parsed.transferId || (transfer.messageId ?? undefined) === parsed.fileId;
+                return (matchFile || matchSession || matchMessageId) && transfer.direction === direction;
+            });
             const phase = activeTransfer?.phase;
             const isFinished = activeTransfer ? (
                 (typeof phase === 'number' && (phase === 4 || phase === 5 || phase === 6 || phase === 8)) ||
-                phase === 'verifying' || phase === 'completing' || phase === 'done' || activeTransfer.state === 'completed'
+                activeTransfer.state === 'completed'
             ) : false;
             const transferState = activeTransfer ? (isFinished ? 'completed' : activeTransfer.state) : (parsed.state || 'completed');
             fileData = {

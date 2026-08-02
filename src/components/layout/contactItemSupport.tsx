@@ -15,6 +15,7 @@ import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
+import { formatMessageTime } from '../../utils/dateTime.js';
 
 const parseJsonMessage = (message: string) => {
     try {
@@ -63,18 +64,7 @@ export const getTrustIndicator = (contact: Contact, showTooltip = true) => {
     );
 };
 
-export const formatContactTime = (iso?: string) => {
-    if (!iso) {
-        return '';
-    }
-    const date = new Date(iso);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    if (diff < 86400000 && now.getDate() === date.getDate()) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString();
-};
+export const formatContactTime = (iso?: string | number | null) => formatMessageTime(iso);
 
 export const renderPendingLabel = (contact: Contact) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>

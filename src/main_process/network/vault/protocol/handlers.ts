@@ -17,17 +17,17 @@ type VaultResponsePacket = {
 
 type VaultSendResponse = (ip: string, data: VaultResponsePacket) => void;
 
-async function getDirectIdsForVaultScoring(): Promise<string[]> {
+async function getDirectIdsForVaultScoring(): Promise<Set<string>> {
     try {
         const vouchesModule = await import('../../../security/reputation/vouches.js');
         if (typeof vouchesModule.getDirectContactIds === 'function') {
             return await vouchesModule.getDirectContactIds();
         }
-    } catch {
-        return [];
+    } catch (err) {
+        warn('Failed to get direct contact IDs for vault scoring', { err: String(err) }, 'vault');
     }
 
-    return [];
+    return new Set();
 }
 
 /**
@@ -184,20 +184,20 @@ export async function handleVaultAck(senderSid: string, data: { payloadHashes: s
         // de la entrada antes de borrarla. Sin esta comprobación, cualquier peer
         // autenticado podía enviar VAULT_ACK con el hash de mensajes ajenos y borrarlos
         // del custodio, impidiendo que el destinatario real los recuperara.
-        const entry = await (await import('../../../storage/vault/operations.js')).getVaultEntryByHash(hash);
+        const entry = await getVaultEntryByHash(hash);
         if (!entry) {
             debug('Received VAULT_ACK for unknown entry, ignoring', { hash, sender: senderSid }, 'vault');
             continue;
         }
         if (entry.recipientSid !== senderSid) {
             security('VAULT_ACK de no-destinatario — ignorado', { hash, sender: senderSid, recipient: entry.recipientSid }, 'vault');
-            issueVouch(senderSid, VouchType.MALICIOUS).catch(() => { });
+            issueVouch(senderSid, VouchType.MALICIOUS).catch((err) => warn('Failed to issue malicious vouch from vault ACK', { senderSid, err: String(err) }, 'vault'));
             continue;
         }
         const deleted = await deleteVaultEntry(hash);
         if (deleted) {
             debug('Vault entry cleared after delivery ACK', { hash, from: senderSid }, 'vault');
-            issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch(() => { });
+            issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => warn('Failed to issue vault retrieved vouch from ACK', { senderSid, err: String(err) }, 'vault'));
         }
     }
 }

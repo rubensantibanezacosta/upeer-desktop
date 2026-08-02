@@ -109,8 +109,8 @@ describe('Reputation Handlers', () => {
     describe('handleReputationDeliver', () => {
         it('should save received vouches', async () => {
             const receivedVouches = [
-                { id: 'v1', fromId: 'p1', toId: 'p2' },
-                { id: 'v2', fromId: 'p3', toId: 'p4' }
+                { id: 'v1', fromId: 'p1', toId: 'p2', type: 'handshake', positive: true, timestamp: 100, signature: 'sig1' },
+                { id: 'v2', fromId: 'p3', toId: 'p4', type: 'spam', positive: false, timestamp: 200, signature: 'sig2' }
             ];
 
             handleReputationDeliver(mockPeerId, { vouches: receivedVouches });

@@ -166,20 +166,22 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
+                                            onSearch={() => navigation.focusSidebarSearch()}
                                         />
                                     ) : (
                                         <TopHeader
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
-                                            isOnline={activeContact?.lastSeen && (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000}
+                                            isOnline={activeContact?.lastSeen ? (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000 : undefined}
                                             isTyping={!!chatStore.typingStatus[targetUpeerId]}
                                             status={activeContact?.status}
                                             lastSeen={activeContact?.lastSeen}
                                             vouchScore={effectiveVouchScore}
                                             onDelete={() => handleClearChat(targetUpeerId)}
                                             onShare={() => navigation.setShareModalOpen(true)}
-                                            onAccept={isIncomingRequest ? undefined : () => handleAcceptContact(targetUpeerId)}
+                                            onAccept={isIncomingRequest ? undefined : handleAcceptContact}
                                             onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
+                                            onSearch={() => navigation.focusSidebarSearch()}
                                         />
                                     )}
 
@@ -188,7 +190,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
                                             receivedAt={incomingRequest?.receivedAt}
-                                            onAccept={() => handleAcceptContact(targetUpeerId)}
+                                            onAccept={handleAcceptContact}
                                             onReject={handleBlockContact}
                                             untrustworthyInfo={untrustworthyInfo}
                                             vouchScore={effectiveVouchScore}

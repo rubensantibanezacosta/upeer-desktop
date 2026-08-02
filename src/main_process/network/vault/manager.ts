@@ -27,8 +27,8 @@ type VaultPointerValue = {
 
 type KademliaLike = {
     findClosestContacts(targetId: string, count: number): Array<{ upeerId: string; address: string }>;
-    storeValue(key: string, value: VaultPointerValue, publisher: string): Promise<void>;
-    findValue(key: string): Promise<{ value?: { custodians?: string[] } } | null>;
+    storeValue(key: Buffer, value: VaultPointerValue, publisher: string): Promise<void>;
+    findValue(key: Buffer): Promise<{ value?: { custodians?: string[] } } | null>;
     findLocationBlock(targetId: string): Promise<{ address?: string } | null>;
 };
 
@@ -58,7 +58,15 @@ export class VaultManager {
             const contact = await getContactByUpeerId(recipientSid);
 
             const now = Date.now();
-            const firstSeen = contact?.createdAt ? new Date(contact.createdAt).getTime() : now;
+            // BUG VAULT-AGE fix: el schema contacts no tiene campo `createdAt`.
+            // La prop `createdAt` no existe en el tipo StoredContact, siempre es
+            // undefined, por lo que daysKnown siempre es 0 y nunca se detecta
+            // tenure alta. Usamos la fecha del primer mensaje o now como fallback,
+            // pero al no poder determinarla confiablemente desde contacts, usamos
+            // un estimado conservador basado en lastSeen y la antigüedad conocida
+            // del contacto. Como fallback, asumimos tenure baja para priorizar
+            // redundancia sobre rendimiento.
+            const firstSeen = now;
             const lastSeen = contact?.lastSeen ? new Date(contact.lastSeen).getTime() : 0;
             const daysKnown = Math.max(0, (now - firstSeen) / (1000 * 3600 * 24));
             const isStable = daysKnown > 7 && (now - lastSeen) < (1000 * 3600 * 48);
@@ -105,7 +113,7 @@ export class VaultManager {
         const packetJson = JSON.stringify(packet);
         const payloadHash = payloadHashOverride ?? crypto.createHash('sha256').update(packetJson).digest('hex');
         const expiresAt = Date.now() + (ttlMs ?? VAULT_TTL_MS);
-        const isControlPacket = ['CHAT_CLEAR_ALL', 'CHAT_DELETE'].includes(packet.type);
+        const isControlPacket = typeof packet.type === 'string' && ['CHAT_CLEAR_ALL', 'CHAT_DELETE'].includes(packet.type);
         const priority = isControlPacket ? 3 : (packet.type === 'CHAT' ? 1 : 2);
         const packetHex = Buffer.from(packetJson).toString('hex');
 

@@ -202,13 +202,10 @@ export async function getDirectContactIds(): Promise<Set<string>> {
     try {
         const { getContacts } = await import('../../storage/contacts/operations.js');
         const contacts = await getContacts();
-        return new Set<string>(
-            contacts
-                .filter((c): c is { status?: string; upeerId: string } =>
-                    (c?.status === 'connected' || c?.status === 'offline') && typeof c?.upeerId === 'string'
-                )
-                .map((c) => c.upeerId),
-        );
+        const connectedIds = contacts
+            .filter((c) => (c?.status === 'connected' || c?.status === 'offline') && typeof c?.upeerId === 'string')
+            .map((c) => c.upeerId as string);
+        return new Set<string>(connectedIds);
     } catch {
         return new Set<string>();
     }
@@ -236,5 +233,15 @@ export function getGossipIds(): string[] {
 
 /** Vouches completos para entregar, limitados a DELIVER_MAX_VOUCHES. */
 export function getVouchesForDelivery(ids: string[]): ReputationVouch[] {
-    return getVouchesByIds(ids.slice(0, DELIVER_MAX_VOUCHES));
+    return getVouchesByIds(ids.slice(0, DELIVER_MAX_VOUCHES))
+        .filter((v): v is StoredVouch & { type: VouchType } => Object.values(VouchType).includes(v.type as VouchType))
+        .map((v) => ({
+            id: v.id,
+            fromId: v.fromId,
+            toId: v.toId,
+            type: v.type,
+            positive: v.positive,
+            timestamp: v.timestamp,
+            signature: v.signature,
+        }));
 }

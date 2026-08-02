@@ -19,6 +19,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import type { Contact, Group } from '../../types/chat.js';
 import { getTrustMeta } from './contactInfoHelpers.js';
+import { GroupAvatar } from './groupItemSupport.js';
 
 interface ContactsPanelDetailsProps {
     activeContact: Contact | null;
@@ -174,9 +175,7 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                                             <ListItem key={group.groupId} sx={{ p: 0 }}>
                                                 <ListItemButton sx={{ p: 2 }}>
                                                     <ListItemDecorator sx={{ mr: 2 }}>
-                                                        <Avatar src={group.avatar || undefined} size="lg" sx={{ borderRadius: 'md' }}>
-                                                            {group.name.charAt(0).toUpperCase()}
-                                                        </Avatar>
+                                                        <GroupAvatar avatar={group.avatar} size="lg" />
                                                     </ListItemDecorator>
                                                     <ListItemContent>
                                                         <Typography level="title-sm" sx={{ fontWeight: 600, mb: 0.5 }}>{group.name}</Typography>

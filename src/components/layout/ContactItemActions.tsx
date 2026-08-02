@@ -26,6 +26,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import type { Contact } from '../../types/chat.js';
+import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 
 interface ContactItemActionsProps {
     contact: Contact;
@@ -41,7 +42,14 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
     setConfirmClearOpen,
     onToggleFavorite,
     onClear,
-}) => (
+}) => {
+    const prefs = useChatActionsStore((state) => state.contactPrefs[contact.upeerId]);
+    const toggleContact = useChatActionsStore((state) => state.toggleContact);
+    const archived = prefs?.archived ?? false;
+    const muted = prefs?.muted ?? false;
+    const pinned = prefs?.pinned ?? false;
+    const unread = prefs?.unread ?? false;
+    return (
     <>
         <Box className="chat-options-btn" sx={{ display: 'none', position: 'absolute', right: 0, top: '65%', transform: 'translateY(-50%)', zIndex: 2 }}>
             <Dropdown>
@@ -60,11 +68,23 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
                     <KeyboardArrowDownIcon sx={{ fontSize: '20px' }} />
                 </MenuButton>
                 <Menu placement="bottom-end" size="sm" sx={{ minWidth: 180, borderRadius: 'lg', '--ListItem-radius': '8px', boxShadow: 'lg', zIndex: 1000 }}>
-                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator> Archivar chat</MenuItem>
-                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator> Silenciar notificaciones</MenuItem>
-                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator> Fijar chat</MenuItem>
+                    <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'archived'); }}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator>
+                        {archived ? 'Desarchivar chat' : 'Archivar chat'}
+                    </MenuItem>
+                    <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'muted'); }}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator>
+                        {muted ? 'Reactivar notificaciones' : 'Silenciar notificaciones'}
+                    </MenuItem>
+                    <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'pinned'); }}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator>
+                        {pinned ? 'Desfijar chat' : 'Fijar chat'}
+                    </MenuItem>
                     <ListDivider />
-                    <MenuItem disabled><ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator> Marcar como no leído</MenuItem>
+                    <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'unread'); }}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator>
+                        {unread ? 'Marcar como leído' : 'Marcar como no leído'}
+                    </MenuItem>
                     <MenuItem onClick={(event) => { event.stopPropagation(); onToggleFavorite(contact.upeerId); }}>
                         <ListItemDecorator sx={{ color: 'inherit' }}>{contact.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}</ListItemDecorator>
                         {contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
@@ -112,4 +132,5 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
             </ModalDialog>
         </Modal>
     </>
-);
+    );
+};

@@ -58,7 +58,7 @@ export class TransferValidator {
 
     validateIncomingFile(data: FileStartData): void {
         // Required fields check
-        const requiredFields = ['fileId', 'fileName', 'fileSize', 'mimeType', 'totalChunks', 'fileHash', 'chunkSize'];
+        const requiredFields: (keyof FileStartData)[] = ['fileId', 'fileName', 'fileSize', 'mimeType', 'totalChunks', 'fileHash', 'chunkSize'];
         for (const field of requiredFields) {
             if (data[field] === undefined || data[field] === null) {
                 throw new Error(`Missing required field: ${field}`);

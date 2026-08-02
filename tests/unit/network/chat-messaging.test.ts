@@ -365,7 +365,8 @@ describe('network/messaging/chat.ts', () => {
         const result = await sendUDPMessage('peer-offline', 'sin custodios');
 
         expect(result).toBeDefined();
-        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
+        if (!result) return;
+        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result.id, 'failed');
     });
 
     it('fails fast when a connected contact lacks Double Ratchet bootstrap material', async () => {
@@ -840,7 +841,8 @@ describe('network/messaging/chat.ts', () => {
         await vi.advanceTimersByTimeAsync(2600);
 
         expect(result).toBeDefined();
-        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result!.id, 'failed');
+        if (!result) return;
+        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(result.id, 'failed');
     });
 
     it('vaults the original encrypted packet after direct ack timeout instead of re-encrypting it', async () => {
@@ -967,7 +969,7 @@ describe('network/messaging/chat.ts', () => {
             status: 'active',
             members: ['self-id', 'peer-online', 'peer-offline']
         } as GroupRecord);
-        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((async (upeerId: string) => {
             if (upeerId === 'peer-online') {
                 return {
                     upeerId,
@@ -988,8 +990,8 @@ describe('network/messaging/chat.ts', () => {
                 } as ContactRecord;
             }
 
-            return null;
-        });
+            return undefined;
+        }) as never);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },

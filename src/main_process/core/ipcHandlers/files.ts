@@ -51,7 +51,7 @@ export function registerFileHandlers(): void {
     }
   });
 
-  ipcMain.handle('read-file-as-base64', async (event, { filePath, maxSizeMB = 5 }) => {
+  ipcMain.handle('read-file-as-base64', async (event, { filePath, maxSizeMB }) => {
     try {
       if (typeof filePath !== 'string' || !filePath) {
         return { success: false, error: 'Invalid file path' };
@@ -61,11 +61,12 @@ export function registerFileHandlers(): void {
         return { success: false, error: 'File must be within home directory' };
       }
 
+      const clampedMaxSizeMB = Math.min(Math.max(typeof maxSizeMB === 'number' ? maxSizeMB : 5, 1), 20);
       const stats = await fs.stat(resolvedPath);
-      const maxSizeBytes = maxSizeMB * 1024 * 1024;
+      const maxSizeBytes = clampedMaxSizeMB * 1024 * 1024;
 
       if (stats.size > maxSizeBytes) {
-        return { success: false, error: `File too large for preview. Max size: ${maxSizeMB}MB` };
+        return { success: false, error: `File too large for preview. Max size: ${clampedMaxSizeMB}MB` };
       }
 
       const buffer = await fs.readFile(resolvedPath);
@@ -153,11 +154,18 @@ export function registerFileHandlers(): void {
 
   ipcMain.handle('save-buffer-to-temp', async (event, { base64, fileName }) => {
     try {
+      if (typeof base64 !== 'string' || !base64 || base64.length > 50_000_000) {
+        return { success: false, error: 'Invalid or too large base64 payload' };
+      }
       const tempDir = path.join(app.getPath('temp'), 'upeer-voicemail');
       await fs.mkdir(tempDir, { recursive: true });
       const safeFileName = sanitizeOutputFileName(typeof fileName === 'string' ? fileName : 'archivo');
       const filePath = path.join(tempDir, safeFileName);
       const buffer = Buffer.from(base64, 'base64');
+      if (buffer.length > 30_000_000) {
+        await fs.unlink(filePath).catch(() => {});
+        return { success: false, error: 'Decoded file too large (max 30 MB)' };
+      }
       await fs.writeFile(filePath, buffer);
       return { success: true, path: filePath };
     } catch (err) {

@@ -122,14 +122,14 @@ export function registerFileTransferHandlers(): void {
   ipcMain.handle('get-file-transfers', () => {
     try {
       const transfers = fileTransferManager.getAllTransfers().map((t) => {
-        const { fileBuffer: _fileBuffer, pendingChunks, timers: _timers, _retryTimer, _chunksSentTimes, ...serializableTransfer } = t;
+        const { pendingChunks, _ackedChunks, _chunksSentTimes, ...serializableTransfer } = t;
         return {
           ...serializableTransfer,
           fileId: t.messageId || t.fileId,
           sessionFileId: t.fileId,
           messageId: t.messageId || t.fileId,
           pendingChunks: pendingChunks ? Array.from(pendingChunks) : [],
-          progress: (t.chunksProcessed / t.totalChunks) * 100
+          progress: t.totalChunks > 0 ? (t.chunksProcessed / t.totalChunks) * 100 : 0
         };
       });
       return { success: true, transfers };
@@ -159,7 +159,10 @@ export function registerFileTransferHandlers(): void {
       }
 
       const transfer = fileTransferManager.getTransfer(fileId, 'receiving')
-        || fileTransferManager.findTransfersByMessageId(fileId, 'receiving')[0];
+        || fileTransferManager.findTransfersByMessageId(fileId, 'receiving')[0]
+        || fileTransferManager.getAllTransfers().find(
+            t => t.direction === 'receiving' && (t.fileId === fileId || t.messageId === fileId)
+          );
       if (!transfer || !transfer.tempPath) {
         return { success: false, error: 'Transfer not found or no temporary file' };
       }

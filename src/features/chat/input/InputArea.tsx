@@ -77,7 +77,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     return (
         <Box sx={{ borderTop: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
             {replyToMessage && (
-                <ReplyBar replyToMessage={replyToMessage} onCancel={onCancelReply!} onScrollTo={onScrollToMessage} />
+                <ReplyBar replyToMessage={replyToMessage} onCancel={onCancelReply ?? (() => {})} onScrollTo={onScrollToMessage} />
             )}
 
             {editingMessage && (

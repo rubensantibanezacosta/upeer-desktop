@@ -64,12 +64,21 @@ export async function flushPendingOutbox(
     const { canonicalStringify } = await import('../network/utils.js');
     const { VaultManager } = await import('../network/vault/manager.js');
     const myId = getMyUPeerId();
-    const contact = await getContactByUpeerId(recipientSid);
+    const contact = await getContactByUpeerId(recipientSid) as (ReturnType<typeof getContactByUpeerId> & { signedPreKey?: string | null; signedPreKeyId?: number | null }) | undefined;
 
     for (const entry of messages) {
         try {
+            const contactPubKey = contact?.publicKey ?? recipientPublicKeyHex;
+            if (!contactPubKey) {
+                warn('Pending outbox: no public key available, deleting stuck message', { id: entry.id, recipientSid }, 'vault');
+                if (entry.id) {
+                    await deletePendingOutboxMessage(entry.id);
+                }
+                continue;
+            }
+
             const encryptedPayload = await encryptChatPayload(recipientSid, entry.plaintext, {
-                publicKey: contact?.publicKey ?? recipientPublicKeyHex,
+                publicKey: contactPubKey,
                 signedPreKey: contact?.signedPreKey,
                 signedPreKeyId: contact?.signedPreKeyId,
             });
@@ -97,13 +106,27 @@ export async function flushPendingOutbox(
             };
 
             await VaultManager.replicateToVaults(recipientSid, innerPacket);
-            if (entry.id) {
+            // Eliminar solo si existe el id (siempre debería existir, pero por seguridad)
+            if (typeof entry.id === 'number') {
                 await deletePendingOutboxMessage(entry.id);
             }
 
             debug('Pending outbox: message vaulted and removed', { id: entry.id, recipientSid }, 'vault');
         } catch (err) {
-            warn('Pending outbox: failed to flush message', { id: entry.id, error: err }, 'vault');
+            // Si el error es por criptografía (falta clave), eliminar el mensaje
+            // para evitar reintentos infinitos. Otros errores (red, vault) se reintentan.
+            const isCryptoError = err !== null && err !== undefined && typeof err === 'object' && 'name' in err && (
+                err.name === 'DoubleRatchetUnavailableError' ||
+                (typeof err.constructor?.name === 'string' && err.constructor.name === 'DoubleRatchetUnavailableError')
+            );
+            if (isCryptoError) {
+                warn('Pending outbox: crypto unavailable for message, deleting stuck entry', { id: entry.id, recipientSid, error: err }, 'vault');
+                if (typeof entry.id === 'number') {
+                    await deletePendingOutboxMessage(entry.id);
+                }
+            } else {
+                warn('Pending outbox: failed to flush message, will retry', { id: entry.id, error: err }, 'vault');
+            }
         }
     }
 }
