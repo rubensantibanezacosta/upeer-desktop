@@ -14,6 +14,7 @@ import {
 } from '../../storage/groups/operations.js';
 import { buildGroupInvitePayload, buildGroupUpdatePayload } from '../groupPayload.js';
 import { rotateGroupSenderState, generateGroupSenderState } from '../groupState.js';
+import { warn } from '../../security/secure-logger.js';
 import {
     buildEncryptedGroupPacket,
     buildSignedPacket,
@@ -77,26 +78,30 @@ async function broadcastGroupUpdatePacket(
     });
 
     await runWithConcurrencyMap(targetMembers, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
-        const contact = await resolveGroupContact(memberUpeerId);
-        if (!contact?.publicKey) return;
+        try {
+            const contact = await resolveGroupContact(memberUpeerId);
+            if (!contact?.publicKey) return;
 
-        const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact);
-        const signedPacket = buildSignedPacket(packet, myId);
-        await deliverGroupPacket({
-            targetUpeerId: memberUpeerId,
-            packet,
-            signedPacket,
-            contact,
-            vaultSeed: `group-update:${group.groupId}:${memberUpeerId}:${signedPacket.signature}`,
-            warnMessage: 'GROUP_UPDATE vaulted for offline member',
-            skipVault: options?.skipVault,
-            warnContext: { memberUpeerId, groupId: group.groupId },
-        });
-
-        if (contact.status === 'connected' && options?.registerRetry !== false) {
-            registerEncryptedOperationRetry(memberUpeerId, `group-update:${group.groupId}:${signedPacket.signature}`, async () => {
-                await broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false });
+            const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact);
+            const signedPacket = buildSignedPacket(packet, myId);
+            await deliverGroupPacket({
+                targetUpeerId: memberUpeerId,
+                packet,
+                signedPacket,
+                contact,
+                vaultSeed: `group-update:${group.groupId}:${memberUpeerId}:${signedPacket.signature}`,
+                warnMessage: 'GROUP_UPDATE vaulted for offline member',
+                skipVault: options?.skipVault,
+                warnContext: { memberUpeerId, groupId: group.groupId },
             });
+
+            if (contact.status === 'connected' && options?.registerRetry !== false) {
+                registerEncryptedOperationRetry(memberUpeerId, `group-update:${group.groupId}:${signedPacket.signature}`, async () => {
+                    await broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false });
+                });
+            }
+        } catch (err) {
+            warn('Failed to deliver GROUP_UPDATE to member', { groupId: group.groupId, memberUpeerId, err: String(err) }, 'network');
         }
     });
 }
@@ -204,20 +209,24 @@ export async function leaveGroup(groupId: string): Promise<void> {
     }, myId);
 
     await runWithConcurrencyMap(group.members, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
-        const isSelf = memberUpeerId === myId;
-        const contact = await resolveGroupContact(memberUpeerId);
-        if (!contact?.publicKey) return;
+        try {
+            const isSelf = memberUpeerId === myId;
+            const contact = await resolveGroupContact(memberUpeerId);
+            if (!contact?.publicKey) return;
 
-        await deliverGroupPacket({
-            targetUpeerId: memberUpeerId,
-            packet,
-            signedPacket: packet,
-            contact,
-            vaultSeed: `group-leave:${groupId}:${memberUpeerId}:${packet.signature}`,
-            warnMessage: 'GROUP_LEAVE vaulted for offline member',
-            warnContext: { memberUpeerId, groupId },
-            skipDirectSend: isSelf,
-        });
+            await deliverGroupPacket({
+                targetUpeerId: memberUpeerId,
+                packet,
+                signedPacket: packet,
+                contact,
+                vaultSeed: `group-leave:${groupId}:${memberUpeerId}:${packet.signature}`,
+                warnMessage: 'GROUP_LEAVE vaulted for offline member',
+                warnContext: { memberUpeerId, groupId },
+                skipDirectSend: isSelf,
+            });
+        } catch (err) {
+            warn('Failed to deliver GROUP_LEAVE to member', { groupId, memberUpeerId, err: String(err) }, 'network');
+        }
     });
 
     deleteMessagesByChatId(groupId);

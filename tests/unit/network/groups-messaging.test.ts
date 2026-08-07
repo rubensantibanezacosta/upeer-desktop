@@ -239,6 +239,48 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
+    it('continues broadcasting GROUP_UPDATE when one member vaulting fails', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const logger = await import('../../../src/main_process/security/secure-logger.js');
+        const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-robust',
+            members: ['self-id', 'peer-a', 'peer-b'],
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-a',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 10,
+            address: '200::a',
+            knownAddresses: '[]'
+        } as ContactRecord);
+        vi.mocked(VaultManager.replicateToVaults).mockImplementation(async (upeerId: string) => {
+            if (upeerId === 'peer-a') throw new Error('vault-a-failed');
+            return 1;
+        });
+
+        await expect(updateGroup('grp-robust', { name: 'Robusto' })).resolves.toBeUndefined();
+
+        expect(logger.warn).toHaveBeenCalledWith(
+            'Failed to deliver GROUP_UPDATE to member',
+            expect.objectContaining({ memberUpeerId: 'peer-a', err: 'Error: vault-a-failed' }),
+            'network'
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::a',
+            expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-robust' }),
+            'aa'.repeat(32)
+        );
+    });
+
     it('retries pending encrypted group updates after DR_RESET', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
