@@ -10,10 +10,12 @@ type MockUpeer = {
     getMyIdentity: ReturnType<typeof vi.fn>;
 };
 
-type WindowWithUpeer = Window & { upeer: MockUpeer };
+function getUpeerMock(): MockUpeer {
+    return (window as unknown as { upeer: MockUpeer }).upeer;
+}
 
-function getWindowWithUpeer(): WindowWithUpeer {
-    return window as WindowWithUpeer;
+function setUpeerMock(mock: MockUpeer): void {
+    (window as unknown as { upeer: MockUpeer }).upeer = mock;
 }
 
 vi.mock('../../../src/utils/notificationSound.js', () => ({
@@ -24,7 +26,7 @@ describe('loadOlderHistory', () => {
     beforeEach(async () => {
         vi.resetModules();
         delete (window as Window & { __chat_listeners_initialized?: boolean }).__chat_listeners_initialized;
-        getWindowWithUpeer().upeer = {
+        setUpeerMock({
             getMessages: vi.fn().mockResolvedValue([]),
             getMessagesAround: vi.fn().mockResolvedValue([]),
             getOlderMessages: vi.fn().mockResolvedValue([]),
@@ -32,7 +34,7 @@ describe('loadOlderHistory', () => {
             getGroups: vi.fn().mockResolvedValue([]),
             getMyNetworkAddress: vi.fn().mockResolvedValue('200::me'),
             getMyIdentity: vi.fn().mockResolvedValue({ upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' }),
-        } as unknown as MockUpeer;
+        });
     });
 
     it('antepone los mensajes más antiguos al historial actual de un contacto', async () => {
@@ -47,13 +49,13 @@ describe('loadOlderHistory', () => {
             ],
         });
 
-        getWindowWithUpeer().upeer.getOlderMessages.mockResolvedValue([
+        getUpeerMock().getOlderMessages.mockResolvedValue([
             { id: 'msg-50', chatUpeerId: 'peer-1', message: 'mas viejo', timestamp: 50, isMine: false, senderUpeerId: 'peer-1' },
         ]);
 
         await useChatStore.getState().loadOlderHistory();
 
-        expect(getWindowWithUpeer().upeer.getOlderMessages).toHaveBeenCalledWith('peer-1', 100);
+        expect(getUpeerMock().getOlderMessages).toHaveBeenCalledWith('peer-1', 100);
         expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-50', 'msg-100', 'msg-200']);
     });
 
@@ -64,11 +66,11 @@ describe('loadOlderHistory', () => {
             targetUpeerId: '',
             activeGroupId: 'grp-1',
             groupChatHistory: [
-                { id: 'g-100', groupId: 'grp-1', isMine: false, message: 'viejo', status: 'read', timestamp: '10:00', date: 100 },
+                { id: 'g-100', upeerId: 'grp-1', groupId: 'grp-1', isMine: false, message: 'viejo', status: 'read', timestamp: '10:00', date: 100 },
             ],
         });
 
-        getWindowWithUpeer().upeer.getOlderMessages.mockResolvedValue([
+        getUpeerMock().getOlderMessages.mockResolvedValue([
             { id: 'g-50', chatUpeerId: 'grp-1', message: 'mas viejo', timestamp: 50, isMine: false, senderUpeerId: 'peer-1' },
         ]);
 
@@ -88,10 +90,11 @@ describe('loadOlderHistory', () => {
             ],
         });
 
-        getWindowWithUpeer().upeer.getOlderMessages.mockResolvedValue([]);
+        getUpeerMock().getOlderMessages.mockResolvedValue([]);
 
         await useChatStore.getState().loadOlderHistory();
 
         expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-100']);
     });
 });
+
