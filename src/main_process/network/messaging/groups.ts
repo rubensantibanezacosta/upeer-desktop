@@ -22,6 +22,7 @@ import { encryptGroupMessage } from '../groupState.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { VaultManager } from '../vault/manager.js';
 import { runWithConcurrencyMap } from '../concurrency.js';
 export { createGroup, inviteToGroup, updateGroup, leaveGroup } from './groupControl.js';
 
@@ -152,7 +153,7 @@ export async function sendGroupMessage(
     // Vault for offline members (we have their pubkey from previous handshake).
     // Incluirnos a nosotros mismos para la sincronización si no hay otros dispositivos online.
     const offlineTargetMembers = [...uniqueMembers];
-    for (const memberUpeerId of offlineTargetMembers) {
+    await runWithConcurrencyMap(offlineTargetMembers, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
         const isSelf = memberUpeerId === myId;
         const contact = await getContactByUpeerId(memberUpeerId) || (isSelf
             ? {
@@ -161,15 +162,11 @@ export async function sendGroupMessage(
                 status: 'connected',
             }
             : null);
-        // Skip si el contacto está conectado (ya se envió por UDP).
-        // PERO si somos nosotros, siempre intentamos vaultear una copia si no hay otros "self-nodes" online.
 
-        // Determinar si debemos vaultear para este miembro
-        if (!contact || !contact.publicKey) continue;
+        if (!contact || !contact.publicKey) return;
 
         let shouldVault = false;
         if (isSelf) {
-            // Para nosotros mismos: vaultear si no detectamos otras IPs propias activas
             try {
                 const { getKademliaInstance } = await import('../dht/handlers.js');
                 const kademlia = getKademliaInstance();
@@ -177,21 +174,20 @@ export async function sendGroupMessage(
                 const otherSelfOnline = kademlia ? kademlia.findClosestContacts(myId, 20)
                     .some(n => n.upeerId === myId && n.address !== myYggAddress) : false;
                 if (!otherSelfOnline) shouldVault = true;
-            } catch { shouldVault = true; }
+            } catch (err) {
+                warn('Failed to check self-sync for group vaulting', { groupId, memberUpeerId, err: String(err) }, 'network');
+                shouldVault = true;
+            }
         } else {
-            // Para otros miembros: vaultear si no están conectados
             if (contact.status !== 'connected') shouldVault = true;
         }
 
-        if (!shouldVault) continue;
+        if (!shouldVault) return;
 
-        const { VaultManager } = await import('../vault/manager.js');
-        // CID determinista: group:msgId:memberUpeerId
         const payloadHashOverride = crypto.createHash('sha256')
             .update(`group:${msgId}:${memberUpeerId}`)
             .digest('hex');
 
-        // Replicar al vault del miembro (o al nuestro propio si isSelf)
         const nodes = await VaultManager.replicateToVaults(memberUpeerId, signedPacket, undefined, payloadHashOverride);
 
         if (!isSelf && nodes > 0) {
@@ -200,7 +196,7 @@ export async function sendGroupMessage(
                 BrowserWindow.getAllWindows()[0]?.webContents.send('message-status-updated', { id: msgId, status: 'vaulted' });
             }
         }
-    }
+    });
 
     return { id: msgId, timestamp, savedMessage: payload };
 }

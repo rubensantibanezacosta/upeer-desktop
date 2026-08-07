@@ -131,4 +131,43 @@ describe('group fan-out concurrency', () => {
             expect.any(String)
         );
     });
+
+    it('vaultea a N miembros offline en paralelo sin perder ninguno', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        const members = ['self-id'];
+        const offlineCount = 40;
+        for (let i = 0; i < offlineCount; i += 1) {
+            members.push(`off-${i}`);
+        }
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-all-off',
+            name: 'Grupo todo offline',
+            status: 'active',
+            members,
+            epoch: 4,
+            senderKey: 'cc'.repeat(32),
+        } as never);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => {
+            if (upeerId === 'self-id') return { upeerId, status: 'connected', publicKey: '11'.repeat(32), knownAddresses: '[]' } as never;
+            return { upeerId, status: 'disconnected', publicKey: 'bb'.repeat(32), knownAddresses: '[]' } as never;
+        });
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
+
+        await sendGroupMessage('grp-all-off', 'offline a todos');
+
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(offlineCount + 1);
+        for (let i = 0; i < offlineCount; i += 1) {
+            expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+                `off-${i}`,
+                expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-all-off' }),
+                undefined,
+                expect.any(String)
+            );
+        }
+    });
 });
