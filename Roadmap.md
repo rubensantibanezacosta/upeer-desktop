@@ -140,6 +140,19 @@ _Última actualización: 12 Marzo 2026_
 - [ ] Sincronización diferencial de historial — actualizaciones incrementales
 - [ ] Soporte móvil / empaquetado multiplataforma — macOS, Windows instaladores firmados
 
+### Escalabilidad (prioridad: fanout de grupos)
+
+**Problema:** el fanout de mensajes y control de grupos es secuencial O(N): `sendGroupMessage`, `broadcastGroupUpdatePacket` y `leaveGroup` hacen `await` por cada miembro (resolver contacto + import + entregar), por lo que un grupo de N miembros serializa N operaciones.
+
+- [x] Pool de fanout con concurrencia limitada (`runWithConcurrency`) reutilizable — reduce latencia a O(N/concurrency) sin saturar la red
+- [x] Aplicar el pool a `sendGroupMessage` (groups.ts)
+- [x] Aplicar el pool a `broadcastGroupUpdatePacket` y `leaveGroup` (groupControl.ts)
+- [x] Tests unit del pool (límite de concurrencia y ejecución completa)
+- [x] Tests unit del fanout de mensajes con N miembros
+- [x] Tests de integración del fanout (multi-miembro, online + offline)
+- [x] Tests e2e de envío de mensaje a grupo con varios miembros
+- [x] Revalidar `pnpm run lint`, `pnpm test`, `pnpm run test:integration` y `pnpm run test:e2e`
+
 ---
 
 ## 🔧 Principios de desarrollo

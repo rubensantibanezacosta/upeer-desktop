@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {
+    getMyPublicKey,
     getMyPublicKeyHex,
     getMyUPeerId,
     sign,
@@ -21,7 +22,10 @@ import { encryptGroupMessage } from '../groupState.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { runWithConcurrencyMap } from '../concurrency.js';
 export { createGroup, inviteToGroup, updateGroup, leaveGroup } from './groupControl.js';
+
+const GROUP_FANOUT_CONCURRENCY = 8;
 
 /**
  * Send a text message to a group (fan-out to each member).
@@ -85,10 +89,7 @@ export async function sendGroupMessage(
     // Asegurar que no duplicamos el ID pero permitimos el fan-out de IPs adicionales
     const uniqueMembers = Array.from(new Set(membersWithSelf));
 
-    for (const memberUpeerId of uniqueMembers) {
-        // En grupos, el emisor (yo) también quiere recibir una copia en sus otros dispositivos
-        // if (memberUpeerId === myId) continue; // <-- Eliminado para habilitar Self-Sync
-
+    await runWithConcurrencyMap(uniqueMembers, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
         const isSelf = memberUpeerId === myId;
         const rawContact = await getContactByUpeerId(memberUpeerId);
         const contact = rawContact || (isSelf
@@ -99,14 +100,11 @@ export async function sendGroupMessage(
                 knownAddresses: '[]'
             }
             : null);
-        // Si somos nosotros mismos, el "contacto" es nuestra propia info (status connected)
-        if (!contact || (memberUpeerId !== myId && contact.status !== 'connected') || !contact.publicKey) continue;
+        if (!contact || (memberUpeerId !== myId && contact.status !== 'connected') || !contact.publicKey) return;
 
-        // Identificar direcciones IP para este UPeerId (Fan-out multicanal)
         const addresses: string[] = [];
         if (rawContact?.address) addresses.push(rawContact.address);
 
-        // Si somos nosotros, buscamos nuestras otras IPs vía DHT
         if (memberUpeerId === myId) {
             try {
                 const { getKademliaInstance } = await import('../dht/handlers.js');
@@ -124,7 +122,6 @@ export async function sendGroupMessage(
             }
         }
 
-        // Añadir todas las direcciones conocidas del contacto
         try {
             const knownAddressesValue = contact.knownAddresses ?? '[]';
             let knownAddresses: string[] = [];
@@ -145,14 +142,12 @@ export async function sendGroupMessage(
             warn('Failed to parse knownAddresses for group fan-out', { groupId, memberUpeerId, err: String(err) }, 'network');
         }
 
-        // Enviar a todas las direcciones conocidas del miembro (o de nosotros mismos)
-        const myPublicKey = (await import('../../security/identity.js')).getMyPublicKey().toString('hex');
+        const myPublicKey = getMyPublicKey().toString('hex');
         for (const addr of addresses) {
-            // Si el destino es una dirección de otro dispositivo mío, mandarlo con mi propia pubkey para Sealed Sender
             const targetSealedKey = isSelf ? myPublicKey : contact.publicKey;
             sendSecureUDPMessage(addr, packet, targetSealedKey, isSelf);
         }
-    }
+    });
 
     // Vault for offline members (we have their pubkey from previous handshake).
     // Incluirnos a nosotros mismos para la sincronización si no hay otros dispositivos online.

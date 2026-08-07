@@ -137,3 +137,20 @@ test('elimina un grupo desde sus acciones laterales', async ({ page }) => {
     }).toBe(false);
     await expect(page.getByRole('button', { name: 'Abrir grupo Infra' })).toHaveCount(0);
 });
+
+test('envía un mensaje a un grupo con varios miembros y aparece en el historial', async ({ page }) => {
+    await mount(page, groupScenario());
+    await openGroup(page, 'Equipo QA');
+
+    const editor = page.locator('[contenteditable="true"]').first();
+    await editor.click();
+    await editor.pressSequentially('Mensaje de escalabilidad');
+    await page.getByRole('button', { name: 'Enviar mensaje' }).click();
+
+    await expect(page.locator('#msg-e2e-msg-1, [id^="msg-"]', { hasText: 'Mensaje de escalabilidad' }).first()).toBeVisible();
+
+    await expect.poll(async () => {
+        const state = await readBridgeState(page);
+        return (state.messagesByChat?.['team-1'] ?? []).some((message) => message.message === 'Mensaje de escalabilidad');
+    }).toBe(true);
+});

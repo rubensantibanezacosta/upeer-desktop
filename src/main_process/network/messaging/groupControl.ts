@@ -21,6 +21,9 @@ import {
     resolveGroupContact,
 } from './groupControlSupport.js';
 import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
+import { runWithConcurrencyMap } from '../concurrency.js';
+
+const GROUP_FANOUT_CONCURRENCY = 8;
 
 async function sendGroupInvitePacket(
     group: GroupRecord,
@@ -73,9 +76,9 @@ async function broadcastGroupUpdatePacket(
         ...(fields.senderKey !== undefined ? { senderKey: fields.senderKey } : {}),
     });
 
-    for (const memberUpeerId of targetMembers) {
+    await runWithConcurrencyMap(targetMembers, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
         const contact = await resolveGroupContact(memberUpeerId);
-        if (!contact?.publicKey) continue;
+        if (!contact?.publicKey) return;
 
         const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact);
         const signedPacket = buildSignedPacket(packet, myId);
@@ -95,7 +98,7 @@ async function broadcastGroupUpdatePacket(
                 await broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false });
             });
         }
-    }
+    });
 }
 
 export async function rotateGroupAfterMemberRemoval(groupId: string, removedUpeerId: string): Promise<void> {
@@ -200,10 +203,10 @@ export async function leaveGroup(groupId: string): Promise<void> {
         timestamp: Date.now(),
     }, myId);
 
-    for (const memberUpeerId of group.members) {
+    await runWithConcurrencyMap(group.members, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
         const isSelf = memberUpeerId === myId;
         const contact = await resolveGroupContact(memberUpeerId);
-        if (!contact?.publicKey) continue;
+        if (!contact?.publicKey) return;
 
         await deliverGroupPacket({
             targetUpeerId: memberUpeerId,
@@ -215,7 +218,7 @@ export async function leaveGroup(groupId: string): Promise<void> {
             warnContext: { memberUpeerId, groupId },
             skipDirectSend: isSelf,
         });
-    }
+    });
 
     deleteMessagesByChatId(groupId);
     deleteGroup(groupId);

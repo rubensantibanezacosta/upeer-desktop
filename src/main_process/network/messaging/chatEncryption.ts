@@ -2,6 +2,8 @@ import {
     getMyIdentitySkBuffer,
     getMyPublicKeyHex,
 } from '../../security/identity.js';
+import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
+import { x3dhInitiator, ratchetEncrypt, ratchetInitAlice } from '../../security/ratchet.js';
 
 type RatchetEncryptHeader = {
     dh: string;
@@ -54,8 +56,6 @@ export async function encryptChatPayload(
         throw new DoubleRatchetUnavailableError('missing-public-key');
     }
 
-    const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
-    const { x3dhInitiator, ratchetEncrypt, ratchetInitAlice } = await import('../../security/ratchet.js');
     const sessionResult = getRatchetSession(upeerId);
     let session = sessionResult?.state;
     let usedSpkId = sessionResult?.spkIdUsed;

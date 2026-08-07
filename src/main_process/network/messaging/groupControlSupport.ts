@@ -10,6 +10,7 @@ import { warn } from '../../security/secure-logger.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
 import { encryptChatPayload } from './chatEncryption.js';
+import { VaultManager } from '../vault/manager.js';
 
 export interface GroupDeliveryContact {
     upeerId: string;
@@ -44,7 +45,6 @@ export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, 
 };
 
 export const vaultPacket = async (targetUpeerId: string, packet: Record<string, unknown>, seed: string): Promise<void> => {
-    const { VaultManager } = await import('../vault/manager.js');
     const payloadHashOverride = crypto.createHash('sha256').update(seed).digest('hex');
     await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride);
 };
