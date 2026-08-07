@@ -699,15 +699,16 @@ describe('network/messaging/chat.ts', () => {
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
-                { upeerId: 'self-id', address: '200::self' }
+                { upeerId: 'self-id', address: '200::tablet' }
             ])
         } as unknown as KademliaInstance);
 
         await sendUDPMessage('peer-online', 'hola sync');
 
-        expect(ratchet.x3dhInitiator).toHaveBeenCalledTimes(3);
-        expect(ratchet.ratchetEncrypt).toHaveBeenCalledTimes(3);
-        expect(saveRatchetSession).toHaveBeenCalledTimes(3);
+        expect(ratchet.x3dhInitiator).toHaveBeenCalledTimes(2);
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalledTimes(2);
+        expect(saveRatchetSession).toHaveBeenCalledTimes(2);
+        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(3);
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
