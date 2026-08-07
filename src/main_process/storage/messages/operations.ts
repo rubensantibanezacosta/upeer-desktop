@@ -20,6 +20,7 @@ type MessageRow = {
     timestamp: number;
     message: string;
     isMine?: boolean;
+    senderUpeerId?: string | null;
     status?: MessageDeliveryStatus | string | null;
 };
 
@@ -291,4 +292,98 @@ export async function saveFileMessage(id: string, chatUpeerId: string, isMine: b
     });
 
     return saveMessage(id, chatUpeerId, isMine, messageJson, undefined, signature, status, senderUpeerId, timestamp);
+}
+
+export type FileHistoryCategory = 'image' | 'video' | 'audio' | 'document' | 'other';
+
+export interface FileHistoryEntry {
+    fileId: string;
+    messageId: string;
+    chatUpeerId: string;
+    senderUpeerId?: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    savedPath?: string;
+    thumbnail?: string;
+    caption?: string;
+    isMine: boolean;
+    isVoiceNote: boolean;
+    timestamp: number;
+    category: FileHistoryCategory;
+}
+
+export function getFileHistory(limit = 200): FileHistoryEntry[] {
+    const db = getDb();
+    const schema = getSchema();
+
+    const rows = db.select()
+        .from(schema.messages)
+        .where(eq(schema.messages.isDeleted, false))
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(limit)
+        .all() as MessageRow[];
+
+    const entries: FileHistoryEntry[] = [];
+
+    for (const row of rows) {
+        if (!row.message.startsWith('{')) continue;
+
+        let parsed: {
+            type?: unknown;
+            fileId?: unknown;
+            fileName?: unknown;
+            fileSize?: unknown;
+            mimeType?: unknown;
+            savedPath?: unknown;
+            thumbnail?: unknown;
+            caption?: unknown;
+            isVoiceNote?: unknown;
+        };
+        try {
+            parsed = JSON.parse(row.message);
+        } catch {
+            continue;
+        }
+
+        if (parsed?.type !== 'file') continue;
+        if (typeof parsed.fileId !== 'string' || !parsed.fileId) continue;
+        if (typeof parsed.fileName !== 'string' || !parsed.fileName) continue;
+
+        const mimeType = typeof parsed.mimeType === 'string' ? parsed.mimeType : 'application/octet-stream';
+        const fileName = parsed.fileName;
+        const category = categorizeFile(mimeType, fileName);
+        const isVoiceNote = parsed.isVoiceNote === true;
+
+        entries.push({
+            fileId: parsed.fileId,
+            messageId: row.id,
+            chatUpeerId: row.chatUpeerId,
+            senderUpeerId: row.senderUpeerId ?? undefined,
+            fileName,
+            fileSize: typeof parsed.fileSize === 'number' ? parsed.fileSize : 0,
+            mimeType,
+            savedPath: typeof parsed.savedPath === 'string' ? parsed.savedPath : undefined,
+            thumbnail: typeof parsed.thumbnail === 'string' ? parsed.thumbnail : undefined,
+            caption: typeof parsed.caption === 'string' ? parsed.caption : undefined,
+            isMine: row.isMine !== false,
+            isVoiceNote,
+            timestamp: row.timestamp,
+            category: isVoiceNote ? 'audio' : category,
+        });
+    }
+
+    return entries;
+}
+
+export function categorizeFile(mimeType: string, fileName: string): FileHistoryCategory {
+    const mime = mimeType.toLowerCase();
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/') || ext === 'mkv') return 'video';
+    if (mime.startsWith('audio/') || ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus'].includes(ext)) return 'audio';
+    if (mime.includes('pdf') || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'document';
+
+    return 'other';
 }

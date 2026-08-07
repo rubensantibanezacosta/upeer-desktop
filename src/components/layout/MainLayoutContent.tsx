@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box } from '@mui/joy';
 import { Sidebar } from './Sidebar.js';
 import { ChatArea } from '../../features/chat/ChatArea.js';
+import { ChatSearchBar } from '../../features/chat/ChatSearchBar.js';
 import { IncomingRequestChat } from '../../features/chat/IncomingRequestChat.js';
 import { TopHeader } from './TopHeader.js';
 import { InputArea } from '../../features/chat/input/InputArea.js';
@@ -116,6 +117,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
     const keyChangeAlert = chatStore.keyChangeAlerts[targetUpeerId];
+    const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
 
     return (
         <Box sx={{ display: 'flex', flexGrow: 1, minWidth: 0, width: '100%', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
@@ -166,7 +168,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
-                                            onSearch={() => navigation.focusSidebarSearch()}
+                                            onSearch={() => setIsChatSearchOpen(true)}
                                         />
                                     ) : (
                                         <TopHeader
@@ -181,7 +183,14 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onShare={() => navigation.setShareModalOpen(true)}
                                             onAccept={isIncomingRequest ? undefined : handleAcceptContact}
                                             onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
-                                            onSearch={() => navigation.focusSidebarSearch()}
+                                            onSearch={() => setIsChatSearchOpen(true)}
+                                        />
+                                    )}
+
+                                    {isChatSearchOpen && (
+                                        <ChatSearchBar
+                                            conversationKey={activeGroupId || targetUpeerId}
+                                            onClose={() => setIsChatSearchOpen(false)}
                                         />
                                     )}
 

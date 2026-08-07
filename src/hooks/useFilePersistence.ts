@@ -105,8 +105,10 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
                 fileName: file.name
             });
             if (result.success && result.fileId) {
-                const tempHash = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const tempHash = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                 addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, tempHash, thumbnails?.[i] || '', captions?.[i] || '', true);
+            } else {
+                console.error('Error al iniciar la transferencia de archivo', { file: file.name, error: result });
             }
         }
         setFilePickerOpen(false);

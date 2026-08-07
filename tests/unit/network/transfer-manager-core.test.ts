@@ -142,6 +142,37 @@ describe('TransferManager - Core Orchestration', () => {
         expect(transfer?.phase).toBe(TransferPhase.PROPOSED);
     });
 
+    it('should reject a 4th transfer when maxConcurrentTransfers is reached', async () => {
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-1',
+            publicKey: 'a'.repeat(64),
+            status: 'connected'
+        } as KnownContact);
+
+        await manager.startSend('peer-1', 'ygg-addr-1', '/path/a');
+        await manager.startSend('peer-1', 'ygg-addr-2', '/path/b');
+        await manager.startSend('peer-1', 'ygg-addr-3', '/path/c');
+
+        await expect(manager.startSend('peer-1', 'ygg-addr-4', '/path/d')).rejects.toThrow('Límite de transferencias simultáneas');
+    });
+
+    it('should release a transfer slot when a transfer is cancelled', async () => {
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-1',
+            publicKey: 'a'.repeat(64),
+            status: 'connected'
+        } as KnownContact);
+
+        const fileId = await manager.startSend('peer-1', 'ygg-addr-1', '/path/a');
+        await manager.startSend('peer-1', 'ygg-addr-2', '/path/b');
+        await manager.startSend('peer-1', 'ygg-addr-3', '/path/c');
+
+        manager.cancelTransfer(fileId, 'sending');
+
+        const fourthId = await manager.startSend('peer-1', 'ygg-addr-4', '/path/d');
+        expect(fourthId).toBeDefined();
+    });
+
     it('should retry proposal if no acceptance is received', async () => {
         vi.useFakeTimers();
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'peer-1', status: 'connected' } as KnownContact);

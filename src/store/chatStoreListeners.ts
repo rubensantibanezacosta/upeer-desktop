@@ -1,5 +1,6 @@
 import { useNavigationStore } from './useNavigationStore.js';
 import { useNotificationStore } from './useNotificationStore.js';
+import { usePrivacyStore } from './usePrivacyStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
@@ -21,7 +22,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     if (data.id && state.chatHistory.some((message) => message.id === data.id)) {
                         return state;
                     }
-                    if (data.id) {
+                    if (data.id && usePrivacyStore.getState().readReceipts) {
                         window.upeer.sendReadReceipt(targetUpeerId, data.id);
                     }
                     const nextMessage: ChatMessage = {

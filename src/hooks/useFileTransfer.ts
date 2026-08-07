@@ -40,8 +40,8 @@ export function useFileTransfer(
           : Object.values(result.transfers);
         setTransfers(aggregateTransfers(transfersList as FileTransfer[]));
       }
-    } catch {
-      setTransfers((prev) => prev);
+    } catch (error) {
+      console.error('Error al cargar las transferencias', error);
     }
   }, []);
 

@@ -1,18 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Stack, Button, LinearProgress } from '@mui/joy';
+import { Box, Typography, Stack, Button, LinearProgress, Divider } from '@mui/joy';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import { FileHistoryExplorer } from './FileHistoryExplorer.js';
 
 export const SectionAlmacenamiento: React.FC = () => {
     const [vaultStats, setVaultStats] = useState<{ count: number; sizeBytes: number } | null>(null);
+    const [freeing, setFreeing] = useState(false);
+
+    const refreshStats = () => {
+        window.upeer?.getVaultStats?.().then(setVaultStats).catch((err) => console.error('Error al obtener estadísticas del vault', err));
+    };
 
     useEffect(() => {
-        window.upeer?.getVaultStats?.().then(setVaultStats).catch(() => { });
+        refreshStats();
     }, []);
+
+    const handleFreeSpace = async () => {
+        setFreeing(true);
+        try {
+            await window.upeer.cleanupVaultExpired();
+            refreshStats();
+        } catch (err) {
+            console.error('Error al liberar espacio del vault', err);
+        } finally {
+            setFreeing(false);
+        }
+    };
 
     const fmt = (b: number) => {
         if (b === 0) return '0 B';
-        const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(b) / Math.log(k));
+        const k = 1024, s = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.min(Math.floor(Math.log(b) / Math.log(k)), s.length - 1);
         return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
     };
 
@@ -45,10 +63,14 @@ export const SectionAlmacenamiento: React.FC = () => {
                 <Button
                     size="sm" variant="plain" color="danger" sx={{ px: 0 }}
                     startDecorator={<DeleteForeverIcon sx={{ fontSize: '16px' }} />}
+                    onClick={handleFreeSpace}
+                    disabled={freeing || !vaultStats}
                 >
-                    Liberar espacio
+                    {freeing ? 'Liberando...' : 'Liberar espacio'}
                 </Button>
             </Box>
+            <Divider sx={{ mx: 1.5 }} />
+            <FileHistoryExplorer />
         </Box>
     );
 };

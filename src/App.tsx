@@ -61,6 +61,7 @@ function AppearanceController({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+    const appearanceTheme = useAppearanceStore((s) => s.theme);
     const navigation = useNavigationStore();
     const appStore = useAppStore();
     const chatStore = useChatStore();
@@ -265,7 +266,7 @@ export default function App() {
     const activeGroup = chatStore.groups.find((group) => group.groupId === chatStore.activeGroupId);
 
     return (
-        <CssVarsProvider defaultMode="dark">
+        <CssVarsProvider defaultMode={appearanceTheme === 'system' ? 'system' : appearanceTheme}>
             <AppearanceController>
                 <div data-testid="app-shell">
                 <MainLayout

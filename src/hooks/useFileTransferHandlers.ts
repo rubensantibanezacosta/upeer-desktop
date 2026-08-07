@@ -94,7 +94,7 @@ export const useFileTransferHandlers = ({
 
                 if (result.success && result.fileId) {
                     // Add a file transfer message to the chat
-                    const tempHash = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    const tempHash = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                     addFileTransferMessage(
                         targetUpeerId,
                         result.fileId,

@@ -119,12 +119,12 @@ _Última actualización: 12 Marzo 2026_
 
 - [ ] Ajustes de Privacidad — los toggles (confirmaciones de lectura, última vez visto, estado online) no persisten ni envían señales al backend
 - [ ] Ajustes de Notificaciones — los toggles (mensajes, solicitudes, sonido) son locales y sin efecto real
-- [ ] Ajustes de Apariencia — el selector de tema no aplica el modo claro/oscuro, el tamaño de fuente no se propaga
-- [ ] "Liberar espacio" en Almacenamiento — botón sin handler implementado
-- [ ] Búsqueda de mensajes en chat — icono presente en `TopHeader`, sin funcionalidad
+- [x] Ajustes de Apariencia — tema claro/oscuro/sistema aplicado en vivo y tamaño de fuente propagado
+- [x] "Liberar espacio" en Almacenamiento — handler `cleanupVaultExpired` y refresco de estadísticas
+- [x] Búsqueda de mensajes en chat — buscador en `TopHeader` con resultados y salto al mensaje
 - [ ] Llamadas de voz / vídeo — botones presentes en `TopHeader`, sin implementar
-- [ ] Archivar chat, silenciar, fijar, favoritos — opciones en menú contextual sin efecto
-- [ ] Marcar como no leído — sin handler
+- [x] Archivar chat, silenciar, fijar, favoritos — acciones en menú contextual persistentes (`useChatActionsStore`)
+- [x] Marcar como no leído — handler en menú contextual persistente
 - [ ] Velocidad y tiempo restante en `TransferProgressBar` — muestra "calculando…"
 
 ### Próximas funcionalidades
@@ -132,8 +132,8 @@ _Última actualización: 12 Marzo 2026_
 - [ ] Mensajes de voz — grabación y envío de audio comprimido
 - [ ] Vídeo streaming — reproducción mientras se transfiere
 - [ ] Cifrado E2EE para archivos — integración con claves efímeras del ratchet
-- [ ] Transferencias simultáneas — límite configurable (máx. 3 concurrentes)
-- [ ] Historial de archivos compartidos — búsqueda y organización por tipo
+- [x] Transferencias simultáneas — límite configurable `maxConcurrentTransfers` (máx. 3 por defecto)
+- [x] Historial de archivos compartidos — búsqueda y organización por tipo (Ajustes → Almacenamiento)
 - [ ] Compresión de mensajes — reducir overhead para mensajes largos
 - [ ] Notificaciones de rotación de claves — aviso a contactos cuando cambia la clave estática
 - [ ] Renewal tokens basados en confianza — nodos con alta reputación pueden renovar más

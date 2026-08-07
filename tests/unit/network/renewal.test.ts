@@ -3,6 +3,7 @@ import { startRenewalService, stopRenewalService } from '../../../src/main_proce
 import * as sharedStorage from '../../../src/main_process/storage/shared.js';
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 import * as handlers from '../../../src/main_process/network/dht/handlers.js';
+import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 
 type MockRenewalDb = {
     select: ReturnType<typeof vi.fn>;
@@ -44,6 +45,14 @@ vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
     publishLocationBlock: vi.fn(async () => { })
 }));
 
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
+    getContactByUpeerId: vi.fn(async () => ({ publicKey: 'pk-1' }))
+}));
+
+vi.mock('../../../src/main_process/network/renewalTokens.js', () => ({
+    verifyRenewalToken: vi.fn(() => true)
+}));
+
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -66,6 +75,7 @@ describe('DHT Renewal Service', () => {
             run: vi.fn()
         };
         vi.mocked(sharedStorage.getDb).mockReturnValue(mockDb as never);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pk-1' } as never);
     });
 
     afterEach(() => {

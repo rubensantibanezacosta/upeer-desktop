@@ -89,6 +89,7 @@ export interface TransferConfig {
     cleanupInterval: number;
     initialWindowSize: number;
     maxWindowSize: number;
+    maxConcurrentTransfers: number;
 }
 
 export const DEFAULT_CONFIG: TransferConfig = {
@@ -98,5 +99,6 @@ export const DEFAULT_CONFIG: TransferConfig = {
     maxRetries: 5,
     cleanupInterval: 60000,
     initialWindowSize: 16,
-    maxWindowSize: 128
+    maxWindowSize: 128,
+    maxConcurrentTransfers: 3
 };

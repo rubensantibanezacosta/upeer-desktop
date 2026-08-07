@@ -67,8 +67,8 @@ export const formatTransferFileSize = (bytes?: number): string => {
         return '0 Bytes';
     }
     const base = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const index = Math.floor(Math.log(num) / Math.log(base));
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const index = Math.min(Math.floor(Math.log(num) / Math.log(base)), sizes.length - 1);
     return parseFloat((num / Math.pow(base, index)).toFixed(2)) + ' ' + sizes[index];
 };
 

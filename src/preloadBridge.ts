@@ -111,6 +111,7 @@ const identityApi = {
     getMyNetworkAddress: () => ipcRenderer.invoke('get-ygg-ip'),
     getMyIdentity: () => ipcRenderer.invoke('get-my-identity'),
     getVaultStats: () => ipcRenderer.invoke('get-vault-stats'),
+    cleanupVaultExpired: () => ipcRenderer.invoke('cleanup-vault-expired'),
     identityStatus: () => ipcRenderer.invoke('identity-status'),
     generateMnemonic: () => ipcRenderer.invoke('generate-mnemonic'),
     getMnemonic: (pin: string) => ipcRenderer.invoke('get-mnemonic', { pin }),
@@ -145,6 +146,7 @@ const messagingApi = {
     getMessages: (upeerId: string) => ipcRenderer.invoke('get-messages', upeerId),
     searchMessages: (query: string) => ipcRenderer.invoke('search-messages', { query }),
     getMessagesAround: (chatUpeerId: string, targetMsgId: string) => ipcRenderer.invoke('get-messages-around', { chatUpeerId, targetMsgId }),
+    getFileHistory: (limit?: number) => ipcRenderer.invoke('get-file-history', { limit }),
 };
 
 const deviceApi = {

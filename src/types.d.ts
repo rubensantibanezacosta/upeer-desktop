@@ -7,6 +7,22 @@ declare global {
     type UpeerContact = import('./types/chat.js').Contact;
     type UpeerGroup = import('./types/chat.js').GroupRecord;
     type UpeerTransfer = import('./hooks/fileTransferTypes.js').FileTransfer;
+    type UpeerFileHistoryEntry = {
+        fileId: string;
+        messageId: string;
+        chatUpeerId: string;
+        senderUpeerId?: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
+        savedPath?: string;
+        thumbnail?: string;
+        caption?: string;
+        isMine: boolean;
+        isVoiceNote: boolean;
+        timestamp: number;
+        category: 'image' | 'video' | 'audio' | 'document' | 'other';
+    };
     type UpeerTransferUpdate = import('./hooks/fileTransferTypes.js').TransferProgress & {
         fileId: string;
         direction: 'sending' | 'receiving';
@@ -26,6 +42,7 @@ declare global {
             getMessages: (upeerId: string) => Promise<UpeerChatMessage[]>;
             searchMessages: (query: string) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
+            getFileHistory: (limit?: number) => Promise<UpeerFileHistoryEntry[]>;
             getContacts: () => Promise<UpeerContact[]>;
             addContact: (address: string, name: string) => Promise<{ success: boolean; upeerId?: string; error?: string; alreadyExists?: boolean }>;
             acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;
@@ -45,6 +62,7 @@ declare global {
             getMyIdentity: () => Promise<{ address: string | null, upeerId: string, publicKey: string, alias?: string | null, avatar?: string | null }>;
             getMyReputation: () => Promise<{ vouchScore: number; connectionCount: number } | null>;
             getVaultStats: () => Promise<{ count: number, sizeBytes: number }>;
+            cleanupVaultExpired: () => Promise<void>;
             setMyAlias: (alias: string) => Promise<{ success: boolean }>;
             setMyAvatar: (dataUrl: string) => Promise<{ success: boolean }>;
             // Identity / Wallet Auth

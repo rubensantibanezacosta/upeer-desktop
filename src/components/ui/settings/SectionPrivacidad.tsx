@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { List } from '@mui/joy';
 import { ToggleRow } from './shared.js';
+import { usePrivacyStore } from '../../../store/usePrivacyStore.js';
 
 export const SectionPrivacidad: React.FC = () => {
-    const [readReceipts, setReadReceipts] = useState(true);
-    const [onlineStatus, setOnlineStatus] = useState(true);
-    const [lastSeen, setLastSeen] = useState(true);
+    const readReceipts = usePrivacyStore((s) => s.readReceipts);
+    const onlineStatus = usePrivacyStore((s) => s.onlineStatus);
+    const lastSeen = usePrivacyStore((s) => s.lastSeen);
+    const setReadReceipts = usePrivacyStore((s) => s.setReadReceipts);
+    const setOnlineStatus = usePrivacyStore((s) => s.setOnlineStatus);
+    const setLastSeen = usePrivacyStore((s) => s.setLastSeen);
 
     return (
         <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>

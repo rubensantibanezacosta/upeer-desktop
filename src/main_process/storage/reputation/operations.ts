@@ -1,5 +1,6 @@
 import { getDb, getSchema } from '../shared.js';
 import { eq, and, gte, inArray } from 'drizzle-orm';
+import { warn } from '../../security/secure-logger.js';
 
 export interface StoredVouch {
     id: string;
@@ -30,7 +31,8 @@ export function insertVouch(vouch: StoredVouch): boolean {
             .onConflictDoNothing()
             .run();
         return true;
-    } catch {
+    } catch (err) {
+        warn('Failed to insert vouch', { id: vouch.id, error: err }, 'storage');
         return false;
     }
 }
@@ -43,7 +45,8 @@ export function vouchExists(id: string): boolean {
             .from(schema.reputationVouches)
             .where(eq(schema.reputationVouches.id, id))
             .get();
-    } catch {
+    } catch (err) {
+        warn('Failed to check vouch existence', { id, error: err }, 'storage');
         return false;
     }
 }
@@ -57,7 +60,8 @@ export function getVouchIds(since = 0): string[] {
             .where(gte(schema.reputationVouches.timestamp, since))
             .all()
             .map(r => r.id);
-    } catch {
+    } catch (err) {
+        warn('Failed to get vouch ids', { error: err }, 'storage');
         return [];
     }
 }
@@ -81,7 +85,8 @@ export function getVouchesByIds(ids: string[]): StoredVouch[] {
                 signature: row.signature,
                 receivedAt: row.receivedAt,
             }));
-    } catch {
+    } catch (err) {
+        warn('Failed to get vouches by ids', { error: err }, 'storage');
         return [];
     }
 }
@@ -107,7 +112,8 @@ export function getVouchesForNode(toId: string, since = 0): StoredVouch[] {
                 signature: row.signature,
                 receivedAt: row.receivedAt,
             }));
-    } catch {
+    } catch (err) {
+        warn('Failed to get vouches for node', { toId, error: err }, 'storage');
         return [];
     }
 }
@@ -123,7 +129,8 @@ export function countRecentVouchesByFrom(fromId: string, since: number): number 
                 gte(schema.reputationVouches.timestamp, since)
             ))
             .all().length;
-    } catch {
+    } catch (err) {
+        warn('Failed to count recent vouches', { fromId, error: err }, 'storage');
         return 0;
     }
 }

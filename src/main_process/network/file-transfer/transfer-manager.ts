@@ -63,6 +63,7 @@ export class TransferManager implements ITransferManager {
     private dhtSearchTimestamps = new Map<string, number>(); // upeerId -> last DHT search ts
     public transferLocks = new Map<string, Promise<void>>(); // fileId -> active lock promise
     private activeSendBatches = new Set<string>();
+    private activeSendingTransfers = new Set<string>(); // fileIds with in-flight send slots
 
     constructor(config: Partial<TransferConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -223,6 +224,16 @@ export class TransferManager implements ITransferManager {
 
     public finishSendBatch(fileId: string): void {
         this.activeSendBatches.delete(fileId);
+    }
+
+    public tryReserveTransferSlot(fileId: string): boolean {
+        if (this.activeSendingTransfers.size >= this.config.maxConcurrentTransfers) return false;
+        this.activeSendingTransfers.add(fileId);
+        return true;
+    }
+
+    public releaseTransferSlot(fileId: string): void {
+        this.activeSendingTransfers.delete(fileId);
     }
 
     public setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer) {
@@ -396,6 +407,7 @@ export class TransferManager implements ITransferManager {
             this.clearDoneRetry(fileId);
             this.transferLocks.delete(fileId);
             this.activeSendBatches.delete(fileId);
+            this.activeSendingTransfers.delete(fileId);
             this.dhtSearchTimestamps.delete(transfer.upeerId);
 
             const handle = this.fileHandles.get(fileId);
@@ -516,6 +528,7 @@ export class TransferManager implements ITransferManager {
                 this.clearDoneRetry(transfer.fileId);
                 this.transferLocks.delete(transfer.fileId);
                 this.activeSendBatches.delete(transfer.fileId);
+                this.activeSendingTransfers.delete(transfer.fileId);
                 this.dhtSearchTimestamps.delete(transfer.upeerId);
 
                 import('../../storage/contacts/operations.js')
@@ -542,6 +555,7 @@ export class TransferManager implements ITransferManager {
             this.store.updateTransfer(transfer.fileId, transfer.direction, { state: 'failed' });
             this.clearRetryTimer(transfer.fileId);
             this.transferKeys.delete(transfer.fileId);
+            this.activeSendingTransfers.delete(transfer.fileId);
 
             const handle = this.fileHandles.get(transfer.fileId);
             if (handle) {
@@ -614,6 +628,7 @@ export class TransferManager implements ITransferManager {
         this.transferKeys.delete(fileId);
         this.transferLocks.delete(fileId);
         this.activeSendBatches.delete(fileId);
+        this.activeSendingTransfers.delete(fileId);
         this.dhtSearchTimestamps.delete(transfer.upeerId);
 
         const handle = this.fileHandles.get(fileId);

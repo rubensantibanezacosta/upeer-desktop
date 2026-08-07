@@ -44,6 +44,11 @@ export async function startSend(
     fileName?: string,
     options?: { chatUpeerId?: string; persistMessage?: boolean; messageId?: string }
 ): Promise<string> {
+    const slotReservationId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    if (!this.tryReserveTransferSlot(slotReservationId)) {
+        throw new Error(`Límite de transferencias simultáneas alcanzado (${this.config.maxConcurrentTransfers})`);
+    }
+    let reservedFileId: string | null = null;
     try {
         const preliminaryMime = this.validator.detectMimeType(filePath);
         let effectivePath = filePath;
@@ -120,6 +125,11 @@ export async function startSend(
             filePath,
             sanitizedPath: sanitizationResult?.wasProcessed ? effectivePath : undefined
         });
+        this.releaseTransferSlot(slotReservationId);
+        if (!this.tryReserveTransferSlot(transfer.fileId)) {
+            throw new Error(`Límite de transferencias simultáneas alcanzado (${this.config.maxConcurrentTransfers})`);
+        }
+        reservedFileId = transfer.fileId;
 
         if (sendHandle) {
             this.setFileHandle(transfer.fileId, sendHandle);
@@ -225,6 +235,10 @@ export async function startSend(
 
         return transfer.fileId;
     } catch (err) {
+        this.releaseTransferSlot(slotReservationId);
+        if (reservedFileId) {
+            this.releaseTransferSlot(reservedFileId);
+        }
         error('Error starting file transfer', err, 'file-transfer');
         throw err;
     }
