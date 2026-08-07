@@ -24,9 +24,9 @@ describe('IPC Security Handlers (Bridge Layer Integration)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         handlers = {};
-        vi.mocked(ipcMain.handle).mockImplementation((channel: string, callback: RegisteredHandler) => {
+        vi.mocked(ipcMain.handle).mockImplementation(((channel: string, callback: RegisteredHandler) => {
             handlers[channel] = callback;
-        });
+        }) as never);
         registerSecurityHandlers();
     });
 

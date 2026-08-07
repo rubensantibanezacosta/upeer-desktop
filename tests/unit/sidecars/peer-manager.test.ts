@@ -75,7 +75,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return createGetHandle();
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         vi.spyOn(https, 'request').mockImplementation(((opts: RequestOptionsLike, cb?: ResponseCallback) => {
             const req = createRequest();
@@ -92,7 +92,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return req;
-        }) as typeof https.request);
+        }) as unknown as typeof https.request);
 
         vi.spyOn(net.Socket.prototype, 'connect').mockImplementation(function (this: net.Socket) {
             setImmediate(() => this.emit('connect'));
@@ -132,7 +132,7 @@ describe('PeerManager Hardening', () => {
                 return req;
             }) as MockRequest['on'];
             return req;
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
         await peerManager.initPeerManager(tempCacheDir);
         expect(peerManager.getPeerPool()).toBeDefined();
     });
@@ -149,7 +149,7 @@ describe('PeerManager Hardening', () => {
         `;
 
         let callCount = 0;
-        vi.spyOn(https, 'get').mockImplementation(((url: unknown, opts: unknown, cb?: ResponseCallback) => {
+        vi.spyOn(https, 'get').mockImplementation(((url: string | URL, opts: unknown, cb?: ResponseCallback) => {
             const resolvedCallback = resolveCallback(opts, cb);
             const res = createResponse();
             res.statusCode = 200;
@@ -164,7 +164,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return createRequest();
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         await peerManager.initPeerManager(tempCacheDir);
         const pool = peerManager.getPeerPool();
@@ -202,7 +202,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return createGetHandle();
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         let reqCount = 0;
         vi.spyOn(https, 'request').mockImplementation(((_opts: RequestOptionsLike, cb?: ResponseCallback) => {
@@ -220,7 +220,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return req;
-        }) as typeof https.request);
+        }) as unknown as typeof https.request);
 
         await peerManager.initPeerManager(tempCacheDir);
     });
@@ -246,7 +246,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return createGetHandle();
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         vi.mocked(dns.promises.lookup).mockResolvedValue({ address: '1.2.3.4' } as LookupResult);
 
@@ -260,7 +260,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return req;
-        }) as typeof https.request);
+        }) as unknown as typeof https.request);
 
         await peerManager.initPeerManager(tempCacheDir);
 
@@ -274,7 +274,7 @@ describe('PeerManager Hardening', () => {
             const req = createRequest();
             setImmediate(() => req.emit('error', new Error('post fail')));
             return req;
-        }) as typeof https.request);
+        }) as unknown as typeof https.request);
 
         vi.spyOn(fs, 'existsSync').mockReturnValue(false);
         vi.mocked(dns.promises.lookup).mockResolvedValue({ address: '1.2.3.4' } as LookupResult);
@@ -289,7 +289,7 @@ describe('PeerManager Hardening', () => {
                 res.emit('end');
             });
             return createGetHandle();
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         await peerManager.initPeerManager(tempCacheDir);
     });
@@ -306,7 +306,7 @@ describe('PeerManager Hardening', () => {
                 return req;
             }) as MockRequest['on'];
             return req;
-        }) as typeof https.get);
+        }) as unknown as typeof https.get);
 
         await peerManager.initPeerManager(tempCacheDir);
     });

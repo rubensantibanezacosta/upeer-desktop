@@ -62,8 +62,8 @@ describe('Contacts Storage Keys', () => {
                 status: 'status'
             }
         };
-        vi.mocked(shared.getDb).mockReturnValue(mockDb as ReturnType<typeof shared.getDb>);
-        vi.mocked(shared.getSchema).mockReturnValue(mockSchema as ReturnType<typeof shared.getSchema>);
+        vi.mocked(shared.getDb).mockReturnValue(mockDb as unknown as ReturnType<typeof shared.getDb>);
+        vi.mocked(shared.getSchema).mockReturnValue(mockSchema as unknown as ReturnType<typeof shared.getSchema>);
     });
 
     describe('computeKeyFingerprint', () => {

@@ -7,8 +7,7 @@ import * as messagesOpsModule from '../../../src/main_process/storage/messages/o
 type GroupRecord = NonNullable<ReturnType<typeof groupsOpsModule.getGroupById>>;
 type ContactRecord = NonNullable<Awaited<ReturnType<typeof contactOpsModule.getContactByUpeerId>>>;
 type SaveMessageResult = Awaited<ReturnType<typeof messagesOpsModule.saveMessage>>;
-type KademliaNode = { upeerId: string; address: string };
-type KademliaInstance = { findClosestContacts: (upeerId: string, limit: number) => KademliaNode[] };
+type KademliaInstance = import('../../../src/main_process/network/dht/kademlia/main.js').KademliaDHT;
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
@@ -109,7 +108,7 @@ describe('network/messaging/groups.ts', () => {
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { createGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-new',
             name: 'Grupo nuevo',
@@ -159,7 +158,7 @@ describe('network/messaging/groups.ts', () => {
             publicKey: 'aa'.repeat(32),
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 9,
-        } as ContactRecord);
+        } as unknown as ContactRecord);
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
@@ -289,7 +288,7 @@ describe('network/messaging/groups.ts', () => {
             groupId: 'grp-1',
             members: ['self-id', 'peer-online', 'peer-offline'],
         } as GroupRecord);
-        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (upeerId: string) => {
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => {
             if (upeerId === 'peer-online') {
                 return {
                     upeerId,
@@ -297,16 +296,16 @@ describe('network/messaging/groups.ts', () => {
                     publicKey: 'aa'.repeat(32),
                     address: '200::10',
                     knownAddresses: '[]'
-                } as ContactRecord;
+                } as unknown as ContactRecord;
             }
             if (upeerId === 'peer-offline') {
                 return {
                     upeerId,
                     status: 'disconnected',
                     publicKey: 'bb'.repeat(32)
-                } as ContactRecord;
+                } as unknown as ContactRecord;
             }
-            return null;
+            return undefined;
         });
 
         await leaveGroup('grp-1');
@@ -473,13 +472,13 @@ describe('network/messaging/groups.ts', () => {
             epoch: 1,
             senderKey: 'cc'.repeat(32),
         } as GroupRecord);
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as KademliaInstance);
+        } as unknown as KademliaInstance);
 
         await sendGroupMessage('grp-1', 'hola grupo sync');
 

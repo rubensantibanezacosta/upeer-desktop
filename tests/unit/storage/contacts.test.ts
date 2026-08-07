@@ -171,7 +171,7 @@ describe('Contacts Operations', () => {
         contactsOps.addOrUpdateContact('peer1', 'new-addr', 'Alice');
 
         expect(mockDb.insert).toHaveBeenCalled();
-        const callArgs = vi.mocked(mockDb.values).mock.calls[0][0] as { knownAddresses: string };
+        const callArgs = (vi.mocked(mockDb.values).mock.calls as unknown as unknown[][])[0]?.[0] as unknown as { knownAddresses: string };
         const known = JSON.parse(callArgs.knownAddresses);
         expect(known[0]).toBe('new-addr');
 

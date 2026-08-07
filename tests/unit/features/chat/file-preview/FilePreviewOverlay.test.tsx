@@ -4,8 +4,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { FilePreviewOverlay } from '../../../../../src/features/chat/file-preview/FilePreviewOverlay';
 
 type FilePreviewUpeer = Pick<Window['upeer'], 'persistInternalAsset' | 'generateVideoThumbnail'>;
-type FilePreviewWindow = Window & { upeer: FilePreviewUpeer };
-const previewWindow = window as FilePreviewWindow;
+type FilePreviewWindow = { upeer: FilePreviewUpeer };
+const previewWindow = window as unknown as FilePreviewWindow;
 
 vi.mock('../../../../../src/features/chat/file/pdfThumbnail.js', () => ({
     generatePdfThumbnail: vi.fn().mockResolvedValue('data:image/jpeg;base64,pdf-thumb'),

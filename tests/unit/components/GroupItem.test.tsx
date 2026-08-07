@@ -51,7 +51,7 @@ describe('GroupItem Component', () => {
     });
 
     it('shows member count if no last message', () => {
-        const groupNoMsg = { ...mockGroup, lastMessage: null };
+        const groupNoMsg = { ...mockGroup, lastMessage: undefined };
         render(<GroupItem {...defaultProps} group={groupNoMsg} />);
         expect(screen.getByText('3 miembros')).toBeDefined();
     });

@@ -101,7 +101,7 @@ describe('Identity Deep Coverage & Bug Hunting', () => {
         identity.lockSession();
 
         expect(() => identity.sign(Buffer.from('test'))).toThrow('Identity is locked');
-        expect(identity.decryptSealed(Buffer.alloc(32), Buffer.alloc(24), Buffer.alloc(100))).toBeNull();
+        expect(identity.decryptSealed(Buffer.alloc(100))).toBeNull();
     });
 
     it('should correctly convert Ed25519 to Curve25519 in decryptSealed', () => {

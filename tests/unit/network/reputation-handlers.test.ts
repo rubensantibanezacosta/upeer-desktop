@@ -84,7 +84,7 @@ describe('Reputation Handlers', () => {
     describe('handleReputationRequest', () => {
         it('should deliver requested vouches', () => {
             const requestedIds = ['id1'];
-            const mockVouches = [{ id: 'id1', fromId: 'a', toId: 'b' }];
+            const mockVouches = [{ id: 'id1', fromId: 'a', toId: 'b' }] as unknown as Awaited<ReturnType<typeof vouches.getVouchesForDelivery>>;
 
             vi.mocked(vouches.getVouchesForDelivery).mockReturnValue(mockVouches);
 

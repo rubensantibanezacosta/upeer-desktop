@@ -107,7 +107,7 @@ describe('Database Backup Unit Tests', () => {
             oldBackupFile,
             recentBackupFile,
             'other-file.txt'
-        ]);
+        ] as unknown as ReturnType<typeof fs.readdirSync>);
 
         performDatabaseBackup(userDataPath, 7);
 
@@ -129,7 +129,7 @@ describe('Database Backup Unit Tests', () => {
         vi.mocked(fs.readdirSync).mockReturnValue([
             `p2p-chat.db.backup-${today}`,
             'random.txt'
-        ]);
+        ] as unknown as ReturnType<typeof fs.readdirSync>);
         vi.mocked(fs.statSync).mockReturnValue(createStats(1234) as fs.Stats);
 
         const list = listBackups(userDataPath);
@@ -175,7 +175,7 @@ describe('Database Backup Unit Tests', () => {
             const oldDateStr = '2000-01-01';
             const oldFile = `p2p-chat.db.backup-${oldDateStr}`;
 
-            vi.mocked(fs.readdirSync).mockReturnValue([oldFile]);
+            vi.mocked(fs.readdirSync).mockReturnValue([oldFile] as unknown as ReturnType<typeof fs.readdirSync>);
             vi.mocked(fs.unlinkSync).mockImplementation(() => {
                 throw new Error('Permission denied');
             });
@@ -186,7 +186,7 @@ describe('Database Backup Unit Tests', () => {
 
         it('should handle invalid date strings in backup files', () => {
             vi.mocked(fs.existsSync).mockImplementation((p: PathLike) => p === dbPath);
-            vi.mocked(fs.readdirSync).mockReturnValue(['p2p-chat.db.backup-not-a-date']);
+            vi.mocked(fs.readdirSync).mockReturnValue(['p2p-chat.db.backup-not-a-date'] as unknown as ReturnType<typeof fs.readdirSync>);
 
             performDatabaseBackup(userDataPath, 1);
             expect(fs.unlinkSync).not.toHaveBeenCalled();

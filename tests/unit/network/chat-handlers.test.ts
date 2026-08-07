@@ -91,7 +91,7 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as ChatWindow;
+} as unknown as ChatWindow;
 
 describe('Chat Handlers', () => {
     const senderId = 'sender-id';
@@ -115,7 +115,7 @@ describe('Chat Handlers', () => {
             };
 
             vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
-            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -255,7 +255,7 @@ describe('Chat Handlers', () => {
             };
 
             vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
-            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
             await handleChatMessage(myId, { upeerId: myId, publicKey: 'b'.repeat(64) } as ChatContact, data, mockWin, 'sig', '127.0.0.1', mockSendResponse);
 
@@ -271,7 +271,7 @@ describe('Chat Handlers', () => {
                 ephemeralPublicKey: 'a'.repeat(64)
             };
 
-            vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
             const keysOps = await import('../../../src/main_process/storage/contacts/keys.js');
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
@@ -319,8 +319,8 @@ describe('Chat Handlers', () => {
             const data: ChatMessageData = {
                 id: '12345678-1234-1234-1234-123456789012',
                 content: 'bad-dr',
-                ratchetHeader: {},
-                x3dhInit: { spkId: 404 }
+                ratchetHeader: { dh: 'a'.repeat(64), pn: 0, n: 0 },
+                x3dhInit: { ikPub: 'b'.repeat(64), ekPub: 'c'.repeat(64), spkId: 404 }
             };
 
             vi.mocked(identity.getSpkBySpkId).mockReturnValue(null);

@@ -21,7 +21,7 @@ export interface ITransferManager {
     send(address: string, data: FileTransferPacket, publicKey?: string): void;
     getFileHandle(fileId: string): FileHandle | undefined;
     setFileHandle(fileId: string, handle: FileHandle): void;
-    setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer, address: string): void;
+    setRetryTimer(fileId: string, chunkIndex: number, transfer: FileTransfer): void;
     clearRetryTimer(fileId: string, chunkIndex?: number): void;
     finalizeTransfer(fileId: string, direction: 'sending' | 'receiving'): Promise<void>;
     cancelTransfer(fileId: string, directionOrReason?: 'sending' | 'receiving' | string, reasonText?: string): void;
@@ -34,7 +34,7 @@ export interface ITransferManager {
         options?: { allowDuringTransfer?: boolean }
     ): Promise<void>;
     notifyVaultProgress(fileId: string, processed: number, total: number): void;
-    sendNextChunks(transfer: FileTransfer, address: string): Promise<void>;
+    sendNextChunks(transfer: FileTransfer): Promise<void>;
     findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving'): FileTransfer[];
     tryRecoverVaultTransferByFileHash(fileHash: string): Promise<void>;
 }

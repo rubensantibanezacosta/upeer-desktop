@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-type MockCanvasElement = Pick<HTMLCanvasElement, 'width' | 'height' | 'getContext' | 'toDataURL'>;
+type MockCanvasElement = {
+    width: number;
+    height: number;
+    getContext: ReturnType<typeof vi.fn>;
+    toDataURL: () => string;
+};
 
 const getPage = vi.fn();
 const destroy = vi.fn().mockResolvedValue(undefined);
@@ -19,18 +24,19 @@ describe('generatePdfThumbnail', () => {
     beforeEach(() => {
         getPage.mockReset();
         destroy.mockClear();
-        vi.spyOn(document, 'createElement').mockImplementation((tagName: string): HTMLElement => {
+        const mockCreateElement = ((tagName: string): HTMLElement => {
             if (tagName === 'canvas') {
                 const canvas: MockCanvasElement = {
                     width: 0,
                     height: 0,
-                    getContext: vi.fn(() => ({})),
+                    getContext: vi.fn(() => ({}) as CanvasRenderingContext2D | null),
                     toDataURL: vi.fn(() => 'data:image/jpeg;base64,pdf-thumb'),
                 };
-                return canvas as HTMLCanvasElement;
+                return canvas as unknown as HTMLCanvasElement;
             }
             return document.createElementNS('http://www.w3.org/1999/xhtml', tagName);
         });
+        vi.spyOn(document, 'createElement').mockImplementation(mockCreateElement as never);
     });
 
     it('renders the first pdf page to a jpeg thumbnail', async () => {

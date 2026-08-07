@@ -81,7 +81,7 @@ describe('storage/contacts/location.ts', () => {
                 10,
                 'sig123',
                 1234567,
-                { token: 'abc' }
+                { targetId: 'peer1', allowedUntil: 1234567, maxRenewals: 3, renewalsUsed: 0, signature: 'sig-rt' }
             );
 
             expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({
@@ -89,7 +89,7 @@ describe('storage/contacts/location.ts', () => {
                 dhtSeq: 10,
                 dhtSignature: 'sig123',
                 dhtExpiresAt: 1234567,
-                renewalToken: JSON.stringify({ token: 'abc' }),
+                renewalToken: JSON.stringify({ targetId: 'peer1', allowedUntil: 1234567, maxRenewals: 3, renewalsUsed: 0, signature: 'sig-rt' }),
                 knownAddresses: JSON.stringify(['ip3', 'ip2', 'ip1'])
             }));
         });

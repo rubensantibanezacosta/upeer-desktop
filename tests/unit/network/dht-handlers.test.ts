@@ -49,10 +49,10 @@ describe('DHT Handlers', () => {
 
     describe('handleDhtUpdate', () => {
         it('should ignore if locationBlock is missing or malformed', async () => {
-            await handleDhtUpdate('peer-id', {}, {});
+            await handleDhtUpdate('peer-id', { upeerId: 'peer-id', status: 'connected' } as DhtUpdateContact, {});
             expect(locationOps.updateContactDhtLocation).not.toHaveBeenCalled();
 
-            await handleDhtUpdate('peer-id', {}, { locationBlock: { dhtSeq: 'not-a-number' } });
+            await handleDhtUpdate('peer-id', { upeerId: 'peer-id', status: 'connected' } as DhtUpdateContact, { locationBlock: { dhtSeq: 'not-a-number' } as never });
             expect(locationOps.updateContactDhtLocation).not.toHaveBeenCalled();
         });
 
@@ -73,12 +73,12 @@ describe('DHT Handlers', () => {
                     address: '1.2.3.4',
                     signature: 'valid-sig',
                     expiresAt: 123456789,
-                    renewalToken: 'token'
+                    renewalToken: { targetId: '1.2.3.4', allowedUntil: 123456789, maxRenewals: 3, renewalsUsed: 0, signature: 's' }
                 }
             };
             await handleDhtUpdate('peer-id', { dhtSeq: 5, publicKey: 'pubkey' } as DhtUpdateContact, data);
             expect(locationOps.updateContactDhtLocation).toHaveBeenCalledWith(
-                'peer-id', '1.2.3.4', 10, 'valid-sig', 123456789, 'token'
+                'peer-id', '1.2.3.4', 10, 'valid-sig', 123456789, { targetId: '1.2.3.4', allowedUntil: 123456789, maxRenewals: 3, renewalsUsed: 0, signature: 's' }
             );
         });
 
@@ -116,9 +116,9 @@ describe('DHT Handlers', () => {
 
         it('should process valid peers and skip invalid ones', async () => {
             vi.mocked(identity.getMyUPeerId).mockReturnValue('me');
-            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (id: string) => {
-                if (id === 'friend') return { upeerId: 'friend', publicKey: 'pk-friend', dhtSeq: 0 };
-                return null;
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id: string) => {
+                if (id === 'friend') return { upeerId: 'friend', publicKey: 'pk-friend', dhtSeq: 0 } as never;
+                return undefined;
             });
             vi.mocked(networkUtils.verifyLocationBlock).mockReturnValue(true);
 
@@ -164,7 +164,7 @@ describe('DHT Handlers', () => {
         });
 
         it('should return closest peers if target is not connected', async () => {
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
             vi.mocked(contactsOps.getContacts).mockReturnValue([
                 { upeerId: 'closer', status: 'connected', address: '2.2.2.2', dhtSeq: 1, dhtSignature: 's', publicKey: 'p' },
                 { upeerId: 'farther', status: 'connected', address: '3.3.3.3', dhtSeq: 1, dhtSignature: 's', publicKey: 'p' },
@@ -199,9 +199,9 @@ describe('DHT Handlers', () => {
 
         it('should process neighbors and send follow-up queries if unknown or newer', async () => {
             vi.mocked(identity.getMyUPeerId).mockReturnValue('me');
-            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation(async (id: string) => {
-                if (id === 'known-older') return { upeerId: 'known-older', dhtSeq: 1, address: '3.3.3.3' };
-                return null; // Unknown
+            vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id: string) => {
+                if (id === 'known-older') return { upeerId: 'known-older', dhtSeq: 1, address: '3.3.3.3' } as never;
+                return undefined; // Unknown
             });
 
             const neighbors = [

@@ -204,7 +204,7 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify(innerPacket)).toString('hex')
         };
 
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(identity.verify).mockReturnValue(true);
         vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
 
@@ -371,7 +371,7 @@ describe('Vault Delivery Handler', () => {
             data: Buffer.from(JSON.stringify({ type: 'GROUP_LEAVE', groupId: 'g1', senderUpeerId: 'my-id', signature: 'sig' })).toString('hex')
         };
 
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(identity.verify).mockReturnValue(true);
         vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
 
@@ -452,7 +452,7 @@ describe('Vault Delivery Handler', () => {
 
     it('should ignore unknown original sender', async () => {
         const entry = { senderSid: 'unknown-id', data: 'data' };
-        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 

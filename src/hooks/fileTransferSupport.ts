@@ -72,7 +72,7 @@ export const formatTransferFileSize = (bytes?: number): string => {
     return parseFloat((num / Math.pow(base, index)).toFixed(2)) + ' ' + sizes[index];
 };
 
-export const formatTransferProgress = (transfer: FileTransfer): string => {
+export const formatTransferProgress = (transfer: Pick<FileTransfer, 'state'> & Partial<Pick<FileTransfer, 'progress'>>): string => {
     if (transfer.state === 'completed') {
         return 'Completado';
     }

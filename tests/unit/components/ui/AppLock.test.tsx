@@ -7,9 +7,9 @@ const mockVerifyPin = vi.fn();
 const mockDeleteIdentity = vi.fn();
 const mockIsPinEnabled = vi.fn();
 type AppLockUpeer = Pick<Window['upeer'], 'verifyPin' | 'isPinEnabled' | 'deleteIdentity'>;
-type AppLockWindow = Window & { upeer: AppLockUpeer };
+type AppLockWindow = { upeer: AppLockUpeer };
 
-(window as AppLockWindow).upeer = {
+(window as unknown as AppLockWindow).upeer = {
     verifyPin: mockVerifyPin,
     isPinEnabled: mockIsPinEnabled,
     deleteIdentity: mockDeleteIdentity

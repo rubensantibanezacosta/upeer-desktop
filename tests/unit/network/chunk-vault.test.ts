@@ -47,7 +47,7 @@ describe('ChunkVault', () => {
         const transport = await import('../../../src/main_process/network/server/transport.js');
 
         const shards = [Buffer.from('aa', 'hex'), Buffer.from('bb', 'hex')];
-        const stored = await (ChunkVault as ChunkVaultInternals)._distributeShards('file-hash', shards, 'recipient-id');
+        const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('file-hash', shards, 'recipient-id');
 
         expect(stored).toBe(2);
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledTimes(2);
@@ -90,7 +90,7 @@ describe('ChunkVault', () => {
         ] as never);
 
         const shards = Array.from({ length: 12 }, (_, index) => Buffer.from((index + 1).toString(16).padStart(2, '0'), 'hex'));
-        const stored = await (ChunkVault as ChunkVaultInternals)._distributeShards('large-file-hash', shards, 'recipient-id');
+        const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('large-file-hash', shards, 'recipient-id');
 
         expect(stored).toBe(24);
         expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(12);
@@ -132,7 +132,7 @@ describe('ChunkVault', () => {
         vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({ storeValue } as never);
 
         const shards = Array.from({ length: 6 }, (_, index) => Buffer.from((index + 1).toString(16).padStart(2, '0'), 'hex'));
-        const stored = await (ChunkVault as ChunkVaultInternals)._distributeShards('resilient-file-hash', shards, 'recipient-id');
+        const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('resilient-file-hash', shards, 'recipient-id');
 
         expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(6);
         expect(stored).toBe(10);

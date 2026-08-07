@@ -33,7 +33,7 @@ describe('FileChunker - Unit Tests', () => {
         await chunker.createTempFile(transfer as FileTransfer);
 
         expect(transfer.tempPath).toBeDefined();
-        const stats = await fs.stat(transfer.tempPath);
+        const stats = await fs.stat(transfer.tempPath as string);
         expect(stats.size).toBe(5000);
     });
 
@@ -51,7 +51,9 @@ describe('FileChunker - Unit Tests', () => {
         const data1 = Buffer.alloc(1024, 'a');
         const hash1 = crypto.createHash('sha256').update(data1).digest('hex');
 
-        const chunkData = {
+        const chunkData: import('../../../src/main_process/network/types.js').FileChunkData = {
+            fileId: transfer.fileId,
+            totalChunks: transfer.totalChunks,
             chunkIndex: 0,
             data: data1.toString('base64'),
             chunkHash: hash1
@@ -60,7 +62,7 @@ describe('FileChunker - Unit Tests', () => {
         await chunker.writeChunk(transfer as FileTransfer, chunkData);
 
         // Verificar contenido directamente
-        const fd = await fs.open(transfer.tempPath, 'r');
+        const fd = await fs.open(transfer.tempPath as string, 'r');
         const buffer = Buffer.alloc(1024);
         await fd.read(buffer, 0, 1024, 0);
         await fd.close();
@@ -78,7 +80,9 @@ describe('FileChunker - Unit Tests', () => {
         };
         await chunker.createTempFile(transfer as FileTransfer);
 
-        const chunkData = {
+        const chunkData: import('../../../src/main_process/network/types.js').FileChunkData = {
+            fileId: transfer.fileId,
+            totalChunks: transfer.totalChunks,
             chunkIndex: 0,
             data: Buffer.from('correct data').toString('base64'),
             chunkHash: 'wrong-hash'
@@ -97,7 +101,9 @@ describe('FileChunker - Unit Tests', () => {
         };
         await chunker.createTempFile(transfer as FileTransfer);
 
-        const chunkData = {
+        const chunkData: import('../../../src/main_process/network/types.js').FileChunkData = {
+            fileId: transfer.fileId,
+            totalChunks: transfer.totalChunks,
             chunkIndex: 5, // Out of bounds
             data: Buffer.alloc(10).toString('base64'),
             chunkHash: crypto.createHash('sha256').update(Buffer.alloc(10)).digest('hex')

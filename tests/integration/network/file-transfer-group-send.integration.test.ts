@@ -69,7 +69,7 @@ describe('multi-send de archivo a grupo (integración)', () => {
             epoch: 1,
         } as never);
         vi.mocked(getContactByUpeerId).mockImplementation((id: string) =>
-            id === 'self-id' ? null : { upeerId: id, publicKey: 'aa', address: `200::${id}` } as never);
+            id === 'self-id' ? undefined : { upeerId: id, publicKey: 'aa', address: `200::${id}` } as never);
 
         const handler = getHandler('start-file-transfer');
         const result = await handler({}, {
@@ -96,7 +96,7 @@ describe('multi-send de archivo a grupo (integración)', () => {
         } as never);
         vi.mocked(getContactByUpeerId).mockImplementation((id: string) => {
             if (id === 'alice' || id === 'bob') return { upeerId: id, publicKey: 'aa', address: `200::${id}` } as never;
-            return null;
+            return undefined;
         });
 
         const handler = getHandler('start-file-transfer');

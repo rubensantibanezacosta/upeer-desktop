@@ -10,8 +10,7 @@ type GroupRecord = NonNullable<ReturnType<typeof groupsOpsModule.getGroupById>>;
 type SaveMessageResult = Awaited<ReturnType<typeof messagesOpsModule.saveMessage>>;
 type MessageRecord = Awaited<ReturnType<typeof messagesOpsModule.getMessageById>>;
 type MessageStatus = ReturnType<typeof messageStatusModule.getMessageStatus>;
-type KademliaNode = { upeerId: string; address: string };
-type KademliaInstance = { findClosestContacts: (upeerId: string, limit: number) => KademliaNode[] };
+type KademliaInstance = import('../../../src/main_process/network/dht/kademlia/main.js').KademliaDHT;
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
@@ -145,7 +144,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
             address: '200::2',
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
@@ -201,7 +200,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 42,
             address: '200::22',
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
@@ -245,7 +244,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 8,
             address: '200::2',
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
@@ -301,7 +300,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
             address: '200::77',
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
@@ -357,7 +356,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 9,
             address: '200::2',
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(0);
@@ -382,7 +381,7 @@ describe('network/messaging/chat.ts', () => {
             ephemeralPublicKeyUpdatedAt: new Date().toISOString(),
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
 
         await expect(sendUDPMessage('peer-online', 'hola legacy')).rejects.toThrow('missing-signed-prekey');
@@ -401,7 +400,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 10,
             address: '200::9',
             knownAddresses: JSON.stringify(['200::10'])
-        } as ContactRecord);
+        } as unknown as ContactRecord);
 
         registerPendingDirectMessage({
             messageId: '12345678-1234-1234-1234-123456789012',
@@ -443,7 +442,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 11,
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
 
         const preview = {
@@ -498,8 +497,8 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
             address: '200::9',
-        } as ContactRecord);
-        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
 
@@ -541,8 +540,8 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
             address: '200::9',
-        } as ContactRecord);
-        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'mensaje editado');
 
@@ -576,8 +575,8 @@ describe('network/messaging/chat.ts', () => {
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
             address: '200::9',
-        } as ContactRecord);
-        vi.mocked(messagesOps.getMessageById).mockResolvedValue(null);
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
         await sendChatUpdate('peer-online', '12345678-1234-1234-1234-123456789012', 'edit vault self');
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -615,7 +614,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 12,
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.getMessageById).mockResolvedValue({ version: 0 } as NonNullable<MessageRecord>);
 
         const preview = { url: 'https://example.com', title: 'Example' };
@@ -646,7 +645,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 14,
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
 
         const preview = {
@@ -695,14 +694,14 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 15,
             address: '200::10',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as KademliaInstance);
+        } as unknown as KademliaInstance);
 
         await sendUDPMessage('peer-online', 'hola sync');
 
@@ -757,7 +756,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 21,
             address: '200::10',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(ratchetOps.getRatchetSession).mockReturnValueOnce({ state: { rk: Buffer.alloc(32) }, spkIdUsed: 21 } as never);
         vi.mocked(ratchet.ratchetEncrypt).mockImplementationOnce(() => {
@@ -785,11 +784,11 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 16,
             address: '200::10',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [])
-        } as KademliaInstance);
+        } as unknown as KademliaInstance);
 
         await sendUDPMessage('peer-online', 'hola vault sync');
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -830,7 +829,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 17,
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as MessageStatus);
@@ -864,7 +863,7 @@ describe('network/messaging/chat.ts', () => {
             signedPreKeyId: 18,
             address: '200::9',
             knownAddresses: '[]'
-        } as ContactRecord);
+        } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
         vi.mocked(messageStatus.getMessageStatus).mockReturnValue('sent' as MessageStatus);
@@ -887,7 +886,7 @@ describe('network/messaging/chat.ts', () => {
                 signedPreKey: 'bb'.repeat(32),
                 signedPreKeyId: 18,
                 address: '200::9',
-            },
+            } as unknown as Parameters<typeof sendConnectedChatMessage>[0]['contact'],
             knownAddresses: [],
             msgId: '12345678-1234-1234-1234-123456789012',
             payload: 'hola timeout',
@@ -977,7 +976,7 @@ describe('network/messaging/chat.ts', () => {
                     publicKey: 'aa'.repeat(32),
                     address: '200::10',
                     knownAddresses: '[]'
-                } as ContactRecord;
+                } as unknown as ContactRecord;
             }
 
             if (upeerId === 'peer-offline') {
@@ -987,7 +986,7 @@ describe('network/messaging/chat.ts', () => {
                     publicKey: 'bb'.repeat(32),
                     address: '200::20',
                     knownAddresses: '[]'
-                } as ContactRecord;
+                } as unknown as ContactRecord;
             }
 
             return undefined;
@@ -997,7 +996,7 @@ describe('network/messaging/chat.ts', () => {
                 { upeerId: 'self-id', address: '200::other-device' },
                 { upeerId: 'self-id', address: '200::self' }
             ])
-        } as KademliaInstance);
+        } as unknown as KademliaInstance);
 
         await sendChatReaction('grp-1', '12345678-1234-1234-1234-123456789012', '🔥', false);
 

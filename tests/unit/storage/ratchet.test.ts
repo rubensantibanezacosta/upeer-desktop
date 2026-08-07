@@ -98,7 +98,7 @@ describe('Ratchet Storage Unit Tests', () => {
     });
 
     it('should save a ratchet session', () => {
-        saveRatchetSession(upeerId, mockState as RatchetStateArg, 101);
+        saveRatchetSession(upeerId, mockState as unknown as RatchetStateArg, 101);
         expect(mockDb.insert).toHaveBeenCalledWith(mockSchema.ratchetSessions);
         expect(mockDb.values).toHaveBeenCalledWith(expect.objectContaining({
             upeerId,

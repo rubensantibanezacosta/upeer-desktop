@@ -17,17 +17,19 @@ import * as locationOps from '../../../src/main_process/storage/contacts/locatio
 import * as networkUtils from '../../../src/main_process/network/utils.js';
 import { AdaptivePow } from '../../../src/main_process/security/pow.js';
 import type { Contact } from '../../../src/types/chat.js';
+import type { LocationBlock } from '../../../src/main_process/network/types.js';
 
-type NetworkContact = Contact & {
-    dhtSeq?: number;
-    dhtSignature?: string;
-    dhtExpiresAt?: number | string;
-    renewalToken?: string;
-    knownAddresses?: string;
+type NetworkContact = Omit<Contact, 'knownAddresses'> & {
+    knownAddresses?: string | null;
+    dhtSeq?: number | null;
+    dhtSignature?: string | null;
+    dhtExpiresAt?: number | null;
+    renewalToken?: string | null;
 };
 
 type MockKademlia = {
     handleMessage?: ReturnType<typeof vi.fn>;
+    handleQuery?: ReturnType<typeof vi.fn>;
     storeLocationBlock?: ReturnType<typeof vi.fn>;
     findLocationBlock?: ReturnType<typeof vi.fn>;
     findClosestContacts?: ReturnType<typeof vi.fn>;
@@ -39,11 +41,10 @@ type MockKademlia = {
 
 function createContact(overrides: Partial<NetworkContact> & Pick<NetworkContact, 'upeerId'>): NetworkContact {
     return {
-        upeerId: overrides.upeerId,
+        ...overrides,
         name: overrides.name ?? overrides.upeerId,
         status: overrides.status ?? 'connected',
         address: overrides.address ?? '',
-        ...overrides,
     };
 }
 
@@ -107,7 +108,7 @@ describe('network/dht/handlers.ts', () => {
             const contact = createContact({ upeerId: mockSenderUpeerId, publicKey: '00'.repeat(32), dhtSeq: 1 });
             vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(contact);
             vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
-            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true, requiresPoW: false });
 
             const data = {
                 locationBlock: {
@@ -134,7 +135,7 @@ describe('network/dht/handlers.ts', () => {
                 address: 'target-addr',
                 dhtSeq: 5,
                 dhtSignature: 'target-sig',
-                dhtExpiresAt: '2026-12-31T00:00:00Z'
+                dhtExpiresAt: Date.parse('2026-12-31T00:00:00Z')
             });
             vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(target);
 
@@ -155,7 +156,7 @@ describe('network/dht/handlers.ts', () => {
             const existingPeer = createContact({ upeerId: 'peerX', publicKey: '00'.repeat(32), dhtSeq: 1 });
             vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(existingPeer);
             vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
-            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true, requiresPoW: false });
 
             const data = {
                 peers: [{
@@ -210,10 +211,10 @@ describe('network/dht/handlers.ts', () => {
             });
 
             vi.mocked(networkUtils.verifyLocationBlockWithDHT).mockResolvedValue(true);
-            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true });
+            vi.mocked(networkUtils.validateDhtSequence).mockReturnValue({ valid: true, requiresPoW: false });
 
-            const originalBlock = { address: 'addrX', dhtSeq: 2, signature: 'sigX', renewalToken: { token: 'tok1' } };
-            const renewedBlock = { ...originalBlock, dhtSeq: 3, signature: 'sigNew', renewalToken: { token: 'tok1', renewalsUsed: 1 } };
+            const originalBlock = { address: 'addrX', dhtSeq: 2, signature: 'sigX', expiresAt: 200, renewalToken: { targetId: 'addrX', allowedUntil: 100, maxRenewals: 3, renewalsUsed: 0, signature: 's' } };
+            const renewedBlock = { ...originalBlock, dhtSeq: 3, signature: 'sigNew', renewalToken: { targetId: 'addrX', allowedUntil: 300, maxRenewals: 3, renewalsUsed: 1, signature: 's' } };
 
             vi.mocked(networkUtils.canRenewLocationBlock).mockReturnValue(true);
             vi.mocked(networkUtils.renewLocationBlock).mockReturnValue(renewedBlock);
@@ -294,8 +295,8 @@ describe('network/dht/handlers.ts', () => {
             });
             vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(null);
-            mockKademlia.findLocationBlock.mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockReturnValue(undefined);
+            mockKademlia.findLocationBlock?.mockResolvedValue(null);
 
             const data = { targetId: 'target-99', referralContext: 'search' };
             const result = await handleDhtPacket('DHT_QUERY', data, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
@@ -335,7 +336,7 @@ describe('network/dht/handlers.ts', () => {
             const mockKademlia = getKademliaMock({ handleMessage: vi.fn().mockResolvedValue({ type: 'PONG' }) });
             vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const result = await handleDhtPacket('DHT_GOSSIP', { some: 'data' }, mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
+            const result = await handleDhtPacket('DHT_GOSSIP', { some: 'data' } as unknown as Parameters<typeof handleDhtPacket>[1], mockSenderUpeerId, mockSenderAddress, mockWin, mockSendResponse);
 
             expect(result).toBe(true);
             expect(mockKademlia.handleMessage).toHaveBeenCalled();
@@ -357,7 +358,7 @@ describe('network/dht/handlers.ts', () => {
                 timestamp: Date.now()
             });
 
-            const data = { queryId, nodes: [{ upeerId: 'n1', address: 'addr1' }] };
+            const data = { queryId, nodes: [{ upeerId: 'n1', address: 'addr1', publicKey: 'pk1', nodeId: 'n1'.padEnd(40, '0') }] };
             handleDhtFoundNodes(data, mockSenderAddress);
 
             expect(resolve).toHaveBeenCalledWith({ nodes: data.nodes, senderAddress: mockSenderAddress });
@@ -379,7 +380,7 @@ describe('network/dht/handlers.ts', () => {
                 timestamp: Date.now()
             });
 
-            const data = { queryId, value: 'found-value' };
+            const data = { queryId, key: 'k', value: 'found-value', publisher: 'pub', timestamp: Date.now() };
             handleDhtFoundValue(data, mockSenderAddress);
 
             expect(resolve).toHaveBeenCalledWith({ value: 'found-value', senderAddress: mockSenderAddress });
@@ -431,7 +432,7 @@ describe('network/dht/handlers.ts', () => {
             const mockKademlia = getKademliaMock({ storeLocationBlock: vi.fn(), upeerId: 'me' });
             vi.mocked(getKademliaInstance).mockReturnValue(mockKademlia as never);
 
-            const block = { dhtSeq: 1 };
+            const block: LocationBlock = { address: 'addr1', dhtSeq: 1, signature: 'sig' };
             await publishLocationBlock(block);
             expect(mockKademlia.storeLocationBlock).toHaveBeenCalledWith('me', block);
         });
@@ -486,7 +487,7 @@ describe('network/dht/handlers.ts', () => {
                         // Return the target directly in the response
                         handleDhtFoundNodes({
                             queryId: data.queryId,
-                            nodes: [{ upeerId: 'target', address: 'target-addr', publicKey: 'target-pk' }]
+                            nodes: [{ upeerId: 'target', address: 'target-addr', publicKey: 'target-pk', nodeId: 'target'.padEnd(40, '0') }]
                         }, addr);
                     }
                 }, 10);

@@ -39,7 +39,7 @@ describe('Devices IPC Handlers', () => {
 
     it('get-devices handler should call getDevicesByUPeerId', async () => {
         const handler = getRegisteredHandler('get-devices');
-        const mockDevices = [{ deviceId: 'dev-1', clientName: 'Android' }];
+        const mockDevices = [{ deviceId: 'dev-1', clientName: 'Android' }] as unknown as Awaited<ReturnType<typeof deviceOps.getDevicesByUPeerId>>;
         vi.mocked(deviceOps.getDevicesByUPeerId).mockResolvedValue(mockDevices);
 
         const result = await handler();

@@ -31,11 +31,11 @@ function createNetworkInterface(address: string, family: 'IPv4' | 'IPv6', intern
         netmask: family === 'IPv4' ? '255.255.255.0' : 'ffff:ffff:ffff:ffff::',
         mac: '00:00:00:00:00:00',
         scopeid: 0,
-        cidr: internal ? undefined : `${address}/${family === 'IPv4' ? '24' : '64'}`
+        cidr: internal ? null : `${address}/${family === 'IPv4' ? '24' : '64'}`
     };
 }
 
-function createDhtMock(includeStoreValue = false) {
+function createDhtMock(includeStoreValue = false): KademliaInstance & { findValue: ReturnType<typeof vi.fn>; storeValue?: ReturnType<typeof vi.fn> } {
     const mock = {
         findValue: vi.fn()
     };
@@ -44,10 +44,10 @@ function createDhtMock(includeStoreValue = false) {
         return {
             ...mock,
             storeValue: vi.fn().mockResolvedValue(true)
-        } satisfies Pick<KademliaInstance, 'findValue' | 'storeValue'>;
+        } as unknown as KademliaInstance & { findValue: ReturnType<typeof vi.fn>; storeValue: ReturnType<typeof vi.fn> };
     }
 
-    return mock satisfies Pick<KademliaInstance, 'findValue'>;
+    return mock as unknown as KademliaInstance & { findValue: ReturnType<typeof vi.fn>; storeValue?: ReturnType<typeof vi.fn> };
 }
 
 const scannedNetworkInterfaces: NetworkInterfacesMap = {

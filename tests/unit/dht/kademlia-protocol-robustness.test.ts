@@ -10,14 +10,14 @@ describe('Kademlia ProtocolHandler - Edge Cases & Robustness', () => {
     let handler: ProtocolHandler;
     let routingTable: RoutingTable;
     let valueStore: ValueStore;
-    let mockSendMessage: SendMessage;
+    let mockSendMessage: ReturnType<typeof vi.fn> & SendMessage;
     const nodeId = Buffer.alloc(20, 1);
     const upeerId = '0123456789abcdef0123456789abcdef';
 
     beforeEach(() => {
         routingTable = new RoutingTable(nodeId);
         valueStore = new ValueStore();
-        mockSendMessage = vi.fn();
+        mockSendMessage = vi.fn() as ReturnType<typeof vi.fn> & SendMessage;
         handler = new ProtocolHandler(
             nodeId,
             upeerId,
@@ -36,15 +36,15 @@ describe('Kademlia ProtocolHandler - Edge Cases & Robustness', () => {
     describe('handleMessage - Corner Cases', () => {
         it('should handle unknown message types gracefully', async () => {
             const sender = 's'.repeat(32);
-            const result = await handler.handleMessage(sender, { type: 'UNKNOWN_DHT_MSG' }, '1.2.3.4');
+            const result = await handler.handleMessage(sender, { type: 'UNKNOWN_DHT_MSG' } as never, '1.2.3.4');
             expect(result).toBeNull();
             // Should still update/add the sender to routing table
             expect(routingTable.findContact(sender)).toBeDefined();
         });
 
         it('should handle DHT_PONG and DHT_STORE_ACK by returning null (already handled by update)', async () => {
-            const resultPong = await handler.handleMessage('s1'.repeat(16), { type: 'DHT_PONG' }, '1.2.3.4');
-            const resultAck = await handler.handleMessage('s2'.repeat(16), { type: 'DHT_STORE_ACK' }, '1.2.3.4');
+            const resultPong = await handler.handleMessage('s1'.repeat(16), { type: 'DHT_PONG', nodeId: 'n'.padEnd(40, '0') }, '1.2.3.4');
+            const resultAck = await handler.handleMessage('s2'.repeat(16), { type: 'DHT_STORE_ACK', key: 'k' }, '1.2.3.4');
             expect(resultPong).toBeNull();
             expect(resultAck).toBeNull();
         });
@@ -56,8 +56,8 @@ describe('Kademlia ProtocolHandler - Edge Cases & Robustness', () => {
                 targetId,
                 queryId: 'q-123'
             }, '1.1.1.1');
-            expect(result.type).toBe('DHT_FOUND_NODES');
-            expect(result.queryId).toBe('q-123');
+            expect(result?.type).toBe('DHT_FOUND_NODES');
+            expect(result?.queryId).toBe('q-123');
         });
     });
 
@@ -138,14 +138,14 @@ describe('Kademlia ProtocolHandler - Edge Cases & Robustness', () => {
             const queryIds = Array.from(pendingQueries.keys());
             const firstQueryId = queryIds[0];
             const pending = pendingQueries.get(firstQueryId);
-            pending?.resolve({ value: 'found-it', publisher: 'p-0' });
+            pending?.resolve({ value: { value: 'found-it', publisher: 'p-0' }, senderAddress: 'addr-0' });
 
             // We need to advance timers again to let the promise resolve 
             // if it's trapped in any await
             await vi.advanceTimersByTimeAsync(1);
 
             const result = await findPromise;
-            expect(result.value).toBe('found-it');
+            expect(result?.value).toBe('found-it');
         });
 
         it('should handle timeouts and failures in findValue', async () => {
@@ -185,7 +185,7 @@ describe('Kademlia ProtocolHandler - Edge Cases & Robustness', () => {
             const findPromise = handler.findValue(key);
 
             const queryId = Array.from(pendingQueries.keys())[0];
-            pendingQueries.get(queryId)?.resolve(null);
+            pendingQueries.get(queryId)?.resolve({ nodes: [], senderAddress: 'addr1' });
 
             const result = await findPromise;
             expect(result).toBeNull();

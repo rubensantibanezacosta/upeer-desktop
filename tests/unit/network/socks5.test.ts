@@ -58,7 +58,7 @@ describe('SOCKS5 Unit Tests', () => {
 
         beforeEach(() => {
             mockSocket = createMockSocket();
-            vi.mocked(net.createConnection).mockReturnValue(mockSocket);
+            vi.mocked(net.createConnection).mockReturnValue(mockSocket as unknown as net.Socket);
         });
 
         it('should complete SOCKS5 handshake successfully', async () => {

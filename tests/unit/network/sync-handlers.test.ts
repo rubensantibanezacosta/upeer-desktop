@@ -13,7 +13,7 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as SyncWindow;
+} as unknown as SyncWindow;
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'my-peer-id'),
@@ -154,7 +154,7 @@ describe('Sync Handlers', () => {
                     { upeerId: 'other-user', address: 'addr-3' }
                 ])
             } satisfies Pick<KademliaInstance, 'findClosestContacts'>;
-            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
 
             await broadcastPulse('MESSAGE_READ', { messageId: 'm1' });
 
@@ -184,7 +184,7 @@ describe('Sync Handlers', () => {
                     { upeerId: 'my-peer-id', address: 'addr-self' },
                 ])
             } satisfies Pick<KademliaInstance, 'findClosestContacts'>;
-            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+            vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
 
             await broadcastPulse('MESSAGE_DELETE', { messageId: 'm2' });
 

@@ -56,6 +56,6 @@ describe('PIN Security System', () => {
 
     it('should handle non-string values gracefully (regression test)', () => {
         const invalidPin = { pin: '1234' };
-        expect(() => disableAccessPin(invalidPin)).toThrow('PIN must be a string');
+        expect(() => disableAccessPin(invalidPin as unknown as string)).toThrow('PIN must be a string');
     });
 });

@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { MediaViewerOverlay } from '../../../../../src/features/chat/media-viewer/MediaViewerOverlay';
 
 type MediaViewerUpeer = Pick<Window['upeer'], 'openFile' | 'generateVideoThumbnail'>;
-type MediaViewerWindow = Window & { upeer: MediaViewerUpeer };
-const mediaWindow = window as MediaViewerWindow;
+type MediaViewerWindow = { upeer: MediaViewerUpeer };
+const mediaWindow = window as unknown as MediaViewerWindow;
 
 vi.mock('../../../../../src/components/ui/UnsupportedVideoFallback.js', () => ({
     UnsupportedVideoFallback: () => <div data-testid="unsupported-video" />,

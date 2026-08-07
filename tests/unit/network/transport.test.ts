@@ -124,8 +124,8 @@ describe('Transport - sendSecureUDPMessage', () => {
 
         await new Promise(resolve => setTimeout(resolve, 20));
 
-        const lastWrite = mockSocket.write.mock.calls[0][0];
-        const sentData = JSON.parse(lastWrite.toString());
+        const lastWrite = mockSocket.write.mock.calls[0]?.[0];
+        const sentData = JSON.parse(lastWrite!.toString());
         expect(sentData.sealed).toBe(true);
     });
 

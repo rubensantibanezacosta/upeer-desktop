@@ -154,7 +154,7 @@ describe('Reputation - Vouches Integration', () => {
         it('should fail if ID is mismatch', async () => {
             vi.mocked(storage.vouchExists).mockReturnValue(false);
             const result = await saveIncomingVouch(toIncomingVouch({
-                id: 'wrong-id', fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, signature: 's', timestamp: 1000
+                id: 'wrong-id', fromId: 'f', toId: 't', type: VouchType.HANDSHAKE, positive: true, signature: 's', timestamp: 1000
             }));
             expect(result).toBe(false);
         });

@@ -28,10 +28,12 @@ type MockUpeer = {
     sendChatUpdate?: ReturnType<typeof vi.fn>;
 };
 
-type WindowWithUpeer = Window & { upeer: MockUpeer };
+function getUpeerMock(): MockUpeer {
+    return (window as unknown as { upeer: MockUpeer }).upeer;
+}
 
-function getWindowWithUpeer(): WindowWithUpeer {
-    return window as WindowWithUpeer;
+function setUpeerMock(mock: MockUpeer): void {
+    (window as unknown as { upeer: MockUpeer }).upeer = mock;
 }
 
 const myIdentity: MyIdentity = { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' };
@@ -57,7 +59,7 @@ describe('useChatStore groups integration', () => {
     beforeEach(async () => {
         vi.resetModules();
         delete (window as Window & { __chat_listeners_initialized?: boolean }).__chat_listeners_initialized;
-        getWindowWithUpeer().upeer = {
+        setUpeerMock({
             sendMessage: vi.fn().mockResolvedValue({ id: 'msg-direct', savedMessage: 'intermedio', timestamp: 200 }),
             sendGroupMessage: vi.fn().mockResolvedValue({ id: 'msg-1', timestamp: 1710000000000 }),
             inviteToGroup: vi.fn().mockResolvedValue({ success: true }),
@@ -81,7 +83,7 @@ describe('useChatStore groups integration', () => {
             onGroupMessageDelivered: vi.fn(),
             onMessageReactionUpdated: vi.fn(),
             onMessageUpdated: vi.fn(),
-        };
+        });
     });
 
     it('keeps recovered direct messages ordered by sent timestamp', async () => {
@@ -113,7 +115,7 @@ describe('useChatStore groups integration', () => {
         });
 
         useChatStore.getState().initListeners();
-        const onReceive = getWindowWithUpeer().upeer.onReceive.mock.calls[0]?.[0] as ((data: Record<string, unknown>) => void);
+        const onReceive = getUpeerMock().onReceive.mock.calls[0]?.[0] as ((data: Record<string, unknown>) => void);
 
         onReceive({
             id: 'msg-200',
@@ -130,7 +132,7 @@ describe('useChatStore groups integration', () => {
     it('passes replyTo when sending a group message', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
         const preview: LinkPreview = { url: 'https://example.com', title: 'Example' };
-        getWindowWithUpeer().upeer.getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
+        getUpeerMock().getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
 
         useChatStore.setState({
             activeGroupId: 'grp-1',
@@ -266,7 +268,7 @@ describe('useChatStore groups integration', () => {
     it('keeps link preview payload when editing a message with preview', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
         const preview: LinkPreview = { url: 'https://example.com', title: 'Example' };
-        getWindowWithUpeer().upeer.sendChatUpdate = vi.fn().mockResolvedValue(undefined);
+        getUpeerMock().sendChatUpdate = vi.fn().mockResolvedValue(undefined);
 
         useChatStore.setState({
             targetUpeerId: 'peer-1',

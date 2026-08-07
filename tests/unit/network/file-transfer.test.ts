@@ -7,7 +7,7 @@ import * as contacts from '../../../src/main_process/storage/contacts/operations
 
 type TransferManagerSend = Parameters<TransferManager['initialize']>[0];
 type TransferManagerWindow = Parameters<TransferManager['initialize']>[1];
-type TransferValidatorInternals = TransferManager['validator'] & {
+type TransferValidatorInternals = {
     calculateFileHash(filePath: string): Promise<string>;
 };
 
@@ -59,14 +59,14 @@ vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
 
 describe('TransferManager - Integration', () => {
     let manager: TransferManager;
-    const mockSend: TransferManagerSend = vi.fn();
+    const mockSend: ReturnType<typeof vi.fn> & TransferManagerSend = vi.fn() as ReturnType<typeof vi.fn> & TransferManagerSend;
     const mockWindow = {
         isDestroyed: vi.fn(() => false),
         webContents: {
             isDestroyed: vi.fn(() => false),
             send: vi.fn()
         }
-    } as TransferManagerWindow;
+    } as unknown as TransferManagerWindow;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -90,11 +90,11 @@ describe('TransferManager - Integration', () => {
         expect(transfer?.phase).toBe(TransferPhase.PROPOSED);
         expect(mockSend).toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_PROPOSAL' }), 'pubkey');
 
-        await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId, signature: 'sig' });
+        await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId, signature: 'sig' } as never);
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.phase).toBe(TransferPhase.TRANSFERRING);
 
-        await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId, chunkIndex: 0 });
+        await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId, chunkIndex: 0 } as never);
         transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.chunksProcessed).toBe(1);
 
@@ -123,7 +123,7 @@ describe('TransferManager - Integration', () => {
         });
         manager.store.updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.PROPOSED });
 
-        await manager.handleAccept('peer1', 'addr-fresh', { type: 'FILE_ACCEPT', fileId, signature: 'sig' });
+        await manager.handleAccept('peer1', 'addr-fresh', { type: 'FILE_ACCEPT', fileId, signature: 'sig' } as never);
 
         const transfer = manager.getTransfer(fileId, 'sending');
         expect(transfer?.peerAddress).toBe('addr-fresh');
@@ -183,8 +183,8 @@ describe('TransferManager - Integration', () => {
             write: vi.fn().mockResolvedValue({ bytesWritten: 50 }),
             close: vi.fn()
         };
-        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
-        vi.spyOn(manager.validator as TransferValidatorInternals, 'calculateFileHash').mockResolvedValue('a'.repeat(64));
+        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as unknown as ReturnType<TransferManager['getFileHandle']>);
+        vi.spyOn(manager.validator as unknown as TransferValidatorInternals, 'calculateFileHash').mockResolvedValue('a'.repeat(64));
         vi.spyOn(manager.validator, 'validateAndPrepareFile').mockResolvedValue({
             name: 'remote.txt',
             size: 50,
@@ -437,15 +437,15 @@ describe('TransferManager - Integration', () => {
             }),
             close: vi.fn()
         };
-        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
+        vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as unknown as ReturnType<TransferManager['getFileHandle']>);
 
         const createdId = await manager.startSend('peer1', 'addr1', '/path/to/retry.txt');
 
-        await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId: createdId, signature: 'sig' });
+        await manager.handleAccept('peer1', 'addr1', { type: 'FILE_ACCEPT', fileId: createdId, signature: 'sig' } as never);
 
         const transfer = manager.getTransfer(createdId, 'sending');
         if (transfer) {
-            await manager.sendNextChunks(transfer, 'addr1');
+            await manager.sendNextChunks(transfer);
         }
 
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -457,7 +457,7 @@ describe('TransferManager - Integration', () => {
 
         expect(currentMessages.length).toBeGreaterThan(0);
 
-        await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId: createdId, chunkIndex: 1 });
+        await manager.handleAck('peer1', 'addr1', { type: 'FILE_ACK', fileId: createdId, chunkIndex: 1 } as never);
 
         await new Promise(resolve => setTimeout(resolve, 5500));
 
@@ -700,7 +700,7 @@ describe('TransferManager - Integration', () => {
                 write: vi.fn().mockRejectedValue(new Error('No space left on device')),
                 close: vi.fn()
             };
-            vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as ReturnType<TransferManager['getFileHandle']>);
+            vi.spyOn(manager, 'getFileHandle').mockReturnValue(mockHandle as unknown as ReturnType<TransferManager['getFileHandle']>);
 
             await manager.handleFileChunk('peer1', 'addr1', { fileId, chunkIndex: 0, data: 'AAAA' });
 

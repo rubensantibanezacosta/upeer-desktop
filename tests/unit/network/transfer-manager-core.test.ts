@@ -8,7 +8,8 @@ type TransferManagerSend = Parameters<TransferManager['initialize']>[0];
 type KnownContact = NonNullable<Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>>;
 type TransferRecord = NonNullable<ReturnType<TransferManager['getTransfer']>>;
 type TransferRecordWithChunkTimes = TransferRecord & { _chunksSentTimes?: Map<number, number> };
-type TransferManagerTestInstance = TransferManager & { fileHandles: Map<string, unknown> };
+type TransferManagerTestInstance = TransferManager;
+type CreateTransferInput = Parameters<TransferManager['store']['createTransfer']>[0];
 
 // Mock node:fs y node:path antes de los otros mocks que puedan importarlos
 vi.mock('node:fs/promises', () => ({
@@ -111,7 +112,9 @@ describe('TransferManager - Core Orchestration', () => {
             send: vi.fn(),
             isDestroyed: vi.fn(() => false)
         }
-    } as unknown as TransferManagerWindow;
+    } as unknown as TransferManagerWindow & {
+        webContents: { send: ReturnType<typeof vi.fn> };
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -213,7 +216,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
             fileId, upeerId: 'p2', peerAddress: 'addr2', totalChunks: 2, chunkSize: 1024, direction: 'receiving'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.READY });
 
         await manager.handleMessage('p2', 'addr2', { type: 'FILE_CHUNK', fileId, chunkIndex: 0, data: 'AAAA' });
@@ -224,13 +227,13 @@ describe('TransferManager - Core Orchestration', () => {
     it('should complete receiver when all chunks arrive', async () => {
         const fileId = 'id-done';
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ upeerId: 'p3' } as KnownContact);
-        vi.spyOn(manager.validator, 'verifyFileHash').mockResolvedValue(true);
+        vi.spyOn(manager.validator, 'verifyFileHash').mockResolvedValue(true as never);
 
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
             fileId, upeerId: 'p3', peerAddress: 'addr3', totalChunks: 1, chunkSize: 1024, direction: 'receiving', fileHash: 'h',
             tempPath: '/tmp/test.tmp'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         await manager.handleMessage('p3', 'addr3', { type: 'FILE_CHUNK', fileId, chunkIndex: 0, data: 'AAAA' });
@@ -317,7 +320,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['store'].createTransfer({
             fileId, upeerId: 'p6', peerAddress: 'addr6',
             totalChunks: 10, direction: 'sending', windowSize: 10
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         await manager.handleMessage('p6', 'addr6', { type: 'FILE_CHUNK_ACK', fileId, chunkIndex: 0 });
@@ -334,7 +337,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['store'].createTransfer({
             fileId, upeerId: 'p7', peerAddress: 'addr7',
             totalChunks: 1, direction: 'sending'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         await manager.handleMessage('p7', 'addr7', { type: 'FILE_DONE_ACK', fileId });
@@ -356,7 +359,7 @@ describe('TransferManager - Core Orchestration', () => {
             chunksProcessed: 0,
             state: 'active',
             filePath: '/path'
-        });
+        } as unknown as CreateTransferInput);
         // Simulamos que está en fase VAULTED
         manager['store'].updateTransfer(fileId, 'sending', { phase: TransferPhase.VAULTED });
 
@@ -378,7 +381,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
             fileId, upeerId: 'p9', peerAddress: 'addr9', totalChunks: 10, direction: 'receiving'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         manager['store'].updateTransfer(fileId, 'receiving', { chunksProcessed: 1 });
@@ -399,7 +402,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
             fileId, upeerId: 'p10', peerAddress: 'addr10', totalChunks: 5, direction: 'receiving'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active' });
 
         // Index fuera de rango
@@ -432,7 +435,7 @@ describe('TransferManager - Core Orchestration', () => {
         // Simulamos manualmente el timer de retransmisión para el chunk 0
         const tx = manager['store'].getTransfer(fileId, 'sending');
         if (tx) {
-            manager.setRetryTimer(fileId, 0, tx, 'addr11');
+            manager.setRetryTimer(fileId, 0, tx);
         }
 
         mockSend.mockClear();
@@ -457,7 +460,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['store'].createTransfer({
             fileId, upeerId: 'p12', peerAddress: 'addr12',
             totalChunks: 10, direction: 'sending', srtt: 200, rto: 400
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         const chunksSentTimes = new Map<number, number>();
@@ -512,7 +515,7 @@ describe('TransferManager - Core Orchestration', () => {
 
         const tx = manager['store'].getTransfer(fileId, 'sending');
         if (tx) {
-            manager.setRetryTimer(fileId, 0, tx, 'addr-timeout');
+            manager.setRetryTimer(fileId, 0, tx);
         }
 
         await vi.advanceTimersByTimeAsync(1600);
@@ -555,7 +558,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['transferKeys'].set(fileId, Buffer.alloc(32));
         manager['store'].createTransfer({
             fileId, upeerId: 'p14', peerAddress: 'addr14', direction: 'receiving'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active' });
 
         // Simular mensaje de cancelación firmado
@@ -583,7 +586,7 @@ describe('TransferManager - Core Orchestration', () => {
         manager['store'].updateTransfer(fileId, 'receiving', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         // Recibir chunk 2 antes que el 0 y 1
-        await manager.handleFileChunk('p15', 'addr15', { type: 'FILE_CHUNK', fileId, chunkIndex: 2, data: 'AAAA' });
+        await manager.handleFileChunk('p15', 'addr15', { type: 'FILE_CHUNK', fileId, chunkIndex: 2, data: 'AAAA' } as never);
 
         const updated = manager['store'].getTransfer(fileId, 'receiving');
         expect(updated?.chunksProcessed).toBe(1);
@@ -601,7 +604,7 @@ describe('TransferManager - Core Orchestration', () => {
             fileId, upeerId: 'p16', peerAddress: 'addr16',
             fileName: 'f.txt', fileSize: 1000, mimeType: 'text/plain',
             totalChunks: 20, direction: 'sending', chunkSize: 50
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', {
             state: 'active',
             phase: TransferPhase.TRANSFERRING,
@@ -636,15 +639,15 @@ describe('TransferManager - Core Orchestration', () => {
         manager['store'].createTransfer({
             fileId, upeerId: 'p1', peerAddress: 'addr1',
             totalChunks: 1, direction: 'sending', filePath: '/invalid/path'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active', phase: TransferPhase.TRANSFERRING });
 
         const transfer = manager['store'].getTransfer(fileId, 'sending');
         if (transfer) {
-            await manager.sendNextChunks(transfer, 'addr1');
+            await manager.sendNextChunks(transfer);
         }
 
-        expect(manager['fileHandles'].has(fileId)).toBe(false);
+        expect((manager as unknown as { fileHandles: Map<string, unknown> })['fileHandles'].has(fileId)).toBe(false);
     });
 
     it('should not oversend when the inflight window is full', async () => {
@@ -677,7 +680,7 @@ describe('TransferManager - Core Orchestration', () => {
 
         const transfer = manager['store'].getTransfer(fileId, 'sending');
         if (transfer) {
-            await manager.sendNextChunks(transfer, 'addr-window');
+            await manager.sendNextChunks(transfer);
         }
 
         expect(mockSend).not.toHaveBeenCalledWith(
@@ -717,7 +720,7 @@ describe('TransferManager - Core Orchestration', () => {
 
         const transfer = manager['store'].getTransfer(fileId, 'sending');
         if (transfer) {
-            await manager.sendNextChunks(transfer, 'addr-new');
+            await manager.sendNextChunks(transfer);
         }
 
         expect(mockSend).toHaveBeenCalledWith(
@@ -736,7 +739,7 @@ describe('TransferManager - Core Orchestration', () => {
         const fileId = 'id-peer-cancel';
         manager['store'].createTransfer({
             fileId, upeerId: 'p1', peerAddress: 'addr1', direction: 'sending'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active' });
 
         await manager.handleMessage('p1', 'addr1', { type: 'FILE_CANCEL', fileId, reason: 'remote' });
@@ -749,7 +752,7 @@ describe('TransferManager - Core Orchestration', () => {
         const fileId = 'id-heartbeat';
         manager['store'].createTransfer({
             fileId, upeerId: 'p1', peerAddress: 'addr1', direction: 'sending'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'sending', { state: 'active' });
 
         await manager.handleMessage('p1', 'addr1', { type: 'FILE_HEARTBEAT', fileId, t: Date.now() });
@@ -835,7 +838,7 @@ describe('TransferManager - Core Orchestration', () => {
             fileName: 'f.txt', fileSize: 100, mimeType: 'text/plain',
             totalChunks: 1, chunkSize: 100, fileHash: 'h',
             direction: 'receiving', tempPath: '/tmp/df.tmp'
-        });
+        } as unknown as CreateTransferInput);
         manager['store'].updateTransfer(fileId, 'receiving', {
             state: 'active', phase: TransferPhase.TRANSFERRING
         });

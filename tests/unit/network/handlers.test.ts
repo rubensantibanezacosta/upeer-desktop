@@ -324,7 +324,7 @@ describe('network/handlers.ts - handlePacket', () => {
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             publicKey: '00'.repeat(32),
             status: 'disconnected'
-        } as NonNullable<KnownContact>);
+        } as unknown as NonNullable<KnownContact>);
 
         const packet = {
             type: 'CHAT',

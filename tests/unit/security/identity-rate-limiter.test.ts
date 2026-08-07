@@ -6,7 +6,7 @@ type IdentityBucket = {
     tokens: number;
     lastRefill: number;
 };
-type IdentityRateLimiterInternals = IdentityRateLimiter & {
+type IdentityRateLimiterInternals = {
     identityBuckets: Map<string, Map<string, IdentityBucket>>;
 };
 
@@ -87,7 +87,7 @@ describe('IdentityRateLimiter', () => {
 
         expect(l.checkIdentityOnly('p', 'F')).toBe(false);
 
-        const buckets = (l as IdentityRateLimiterInternals).identityBuckets.get('p');
+        const buckets = (l as unknown as IdentityRateLimiterInternals).identityBuckets.get('p');
         expect(buckets).toBeDefined();
         if (!buckets) throw new Error('Missing buckets');
         const bucket = buckets.get('F');
@@ -100,7 +100,7 @@ describe('IdentityRateLimiter', () => {
 
     it('should cleanup', () => {
         limiter.checkIdentityOnly('p', 'TEST_TYPE');
-        const buckets = (limiter as IdentityRateLimiterInternals).identityBuckets;
+        const buckets = (limiter as unknown as IdentityRateLimiterInternals).identityBuckets;
         const peerBuckets = buckets.get('p');
         expect(peerBuckets).toBeDefined();
         if (!peerBuckets) throw new Error('Missing peer buckets');
@@ -133,7 +133,7 @@ describe('IdentityRateLimiter', () => {
             await warmDirectContacts(l);
 
             l.checkIdentityOnly('p', 'T');
-            const buckets = (l as IdentityRateLimiterInternals).identityBuckets.get('p');
+            const buckets = (l as unknown as IdentityRateLimiterInternals).identityBuckets.get('p');
             expect(buckets).toBeDefined();
             if (!buckets) throw new Error('Missing buckets');
             const bucket = buckets.get('T');
@@ -147,7 +147,7 @@ describe('IdentityRateLimiter', () => {
 
     it('should return true if identityBuckets Map retrieval fails unexpectedly', () => {
         limiter.checkIdentityOnly('p1', 'TEST_TYPE');
-        const bucketsMap = (limiter as IdentityRateLimiterInternals).identityBuckets;
+        const bucketsMap = (limiter as unknown as IdentityRateLimiterInternals).identityBuckets;
         vi.spyOn(bucketsMap, 'get').mockReturnValue(undefined);
 
         expect(limiter.checkIdentityOnly('p1', 'TEST_TYPE')).toBe(true);

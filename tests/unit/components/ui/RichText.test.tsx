@@ -4,8 +4,8 @@ import { RichText } from '../../../../src/components/ui/RichText.js';
 
 const mockOpenExternal = vi.fn();
 type RichTextUpeer = Pick<Window['upeer'], 'openExternal'>;
-type RichTextWindow = Window & { upeer?: RichTextUpeer };
-const richTextWindow = window as RichTextWindow;
+type RichTextWindow = { upeer?: RichTextUpeer };
+const richTextWindow = window as unknown as RichTextWindow;
 
 beforeEach(() => {
     vi.clearAllMocks();

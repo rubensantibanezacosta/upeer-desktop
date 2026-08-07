@@ -52,11 +52,11 @@ describe('NavigationRail Component', () => {
         const { rerender } = render(<NavigationRail {...defaultProps} activeView="chat" />);
         const chatButton = screen.getByTestId('ChatIcon').closest('button');
         expect(chatButton).not.toBeNull();
-        expect(chatButton.className).toContain('MuiIconButton-variantSoft');
+        expect(chatButton!.className).toContain('MuiIconButton-variantSoft');
 
         rerender(<NavigationRail {...defaultProps} activeView="settings" />);
         const settingsButton = screen.getByTestId('SettingsIcon').closest('button');
         expect(settingsButton).not.toBeNull();
-        expect(settingsButton.className).toContain('MuiIconButton-variantSoft');
+        expect(settingsButton!.className).toContain('MuiIconButton-variantSoft');
     });
 });

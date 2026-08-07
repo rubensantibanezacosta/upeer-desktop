@@ -78,7 +78,7 @@ const mockWin = {
     webContents: {
         send: vi.fn()
     }
-} as HandshakeWindow;
+} as unknown as HandshakeWindow;
 
 describe('Contact Handlers', () => {
     const rinfo: HandshakeRinfo = { address: '1.2.3.4', port: 12345 };
@@ -106,7 +106,7 @@ describe('Contact Handlers', () => {
                 alias: 'Alice'
             };
 
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -127,7 +127,7 @@ describe('Contact Handlers', () => {
 
         it('should reject new contact without PoW', async () => {
             const data: HandshakeReqData = { publicKey: validPubKey, alias: 'NoPOW' };
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -181,7 +181,7 @@ describe('Contact Handlers', () => {
 
         it('should alert if reputation is too low (untrustworthy)', async () => {
             const data: HandshakeReqData = { publicKey: validPubKey, alias: 'BadPeer', powProof: 'valid-proof' };
-            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(null);
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
             vi.mocked(reputation.computeScore).mockReturnValue(30);
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');

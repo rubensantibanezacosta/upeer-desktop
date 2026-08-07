@@ -76,7 +76,7 @@ describe('storage/backup/management.ts', () => {
 
     describe('updatePulseSync', () => {
         it('should update a kit and return true', () => {
-            const data = { version: 1, encrypted: 'data' } as PulseSyncData;
+            const data = { version: 1, encrypted: 'data' } as unknown as PulseSyncData;
             const res = updatePulseSync('k1', data);
 
             expect(res).toBe(true);

@@ -8,11 +8,11 @@ vi.mock('@mui/icons-material/LockRounded', () => ({ default: () => null }));
 const mockVerifyPin = vi.fn();
 const mockDeleteIdentity = vi.fn();
 type AppLockUpeer = Pick<Window['upeer'], 'verifyPin' | 'deleteIdentity'>;
-type AppLockWindow = Window & { upeer: AppLockUpeer };
+type AppLockWindow = { upeer: AppLockUpeer };
 
 beforeEach(() => {
     vi.clearAllMocks();
-    (window as AppLockWindow).upeer = {
+    (window as unknown as AppLockWindow).upeer = {
         verifyPin: mockVerifyPin,
         deleteIdentity: mockDeleteIdentity,
     };

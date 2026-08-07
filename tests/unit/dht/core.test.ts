@@ -7,14 +7,16 @@ import * as handlers from '../../../src/main_process/network/dht/handlers';
 import type { Contact } from '../../../src/types/chat.js';
 import type { KademliaContact } from '../../../src/main_process/network/dht/kademlia/types.js';
 import type { LocationBlock } from '../../../src/main_process/network/types.js';
+import type { KademliaDHT } from '../../../src/main_process/network/dht/kademlia/main.js';
 
-type NetworkContact = Contact & {
-    dhtSignature?: string | null;
+type NetworkContact = Omit<Contact, 'knownAddresses'> & {
+    knownAddresses?: string | null;
     dhtSeq?: number | null;
+    dhtSignature?: string | null;
     dhtExpiresAt?: number | null;
     renewalToken?: string | null;
     expiresAt?: number | null;
-    knownAddresses?: string[] | string;
+    lastSeen?: string;
 };
 
 type KademliaLookup = {
@@ -23,11 +25,9 @@ type KademliaLookup = {
 
 function createContact(overrides: Partial<NetworkContact> & Pick<NetworkContact, 'upeerId' | 'status'>): NetworkContact {
     return {
-        upeerId: overrides.upeerId,
-        status: overrides.status,
+        ...overrides,
         address: overrides.address ?? '',
         name: overrides.name ?? overrides.upeerId,
-        ...overrides,
     };
 }
 
@@ -93,7 +93,7 @@ describe('DHT Core', () => {
                 dhtSeq: 100,
                 signature: 'sig',
                 expiresAt: 12345
-            } as LocationBlock);
+            } as unknown as ReturnType<typeof utils.generateSignedLocationBlock>);
             vi.mocked(contactsOps.getContacts).mockReturnValue([
                 createContact({ upeerId: 'contact1', address: '200:db8::2', status: 'connected' })
             ]);
@@ -116,7 +116,7 @@ describe('DHT Core', () => {
                     createKademliaContact({ upeerId: 'peer1', address: 'addr1', publicKey: 'pk1', dhtSeq: 1, dhtSignature: 'sig1' })
                 ])
             };
-            vi.mocked(handlers.getKademliaInstance).mockReturnValue(kademliaMock);
+            vi.mocked(handlers.getKademliaInstance).mockReturnValue(kademliaMock as unknown as KademliaDHT);
             vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id: string) => {
                 if (id === 'target-id') return createContact({ upeerId: 'target-id', address: 'target-addr', status: 'connected' });
                 if (id === 'peer1') return createContact({
@@ -127,7 +127,7 @@ describe('DHT Core', () => {
                     renewalToken: JSON.stringify({ token: 'tok1' }),
                     knownAddresses: JSON.stringify(['addr1'])
                 });
-                return null;
+                return undefined;
             });
             await sendDhtExchange('target-id', sendSecureUDPMessage);
 
@@ -195,7 +195,7 @@ describe('DHT Core', () => {
 
     describe('startDhtSearch', () => {
         it('should abort if location found in cache', async () => {
-            vi.mocked(handlers.findNodeLocation).mockResolvedValue('found-ip');
+            vi.mocked(handlers.findNodeLocation).mockResolvedValue({ address: 'found-ip', dhtSeq: 1, signature: 'sig' } as LocationBlock);
             await startDhtSearch('target', sendSecureUDPMessage);
             expect(sendSecureUDPMessage).not.toHaveBeenCalled();
             expect(handlers.iterativeFindNode).not.toHaveBeenCalled();
@@ -203,8 +203,8 @@ describe('DHT Core', () => {
 
         it('should use iterativeFindNode if Kademlia is present', async () => {
             vi.mocked(handlers.findNodeLocation).mockResolvedValue(null);
-            vi.mocked(handlers.getKademliaInstance).mockReturnValue({ findClosestContacts: vi.fn() } as KademliaLookup);
-            vi.mocked(handlers.iterativeFindNode).mockResolvedValue(undefined);
+            vi.mocked(handlers.getKademliaInstance).mockReturnValue({ findClosestContacts: vi.fn() } as unknown as KademliaDHT);
+            vi.mocked(handlers.iterativeFindNode).mockResolvedValue(null);
 
             await startDhtSearch('target', sendSecureUDPMessage);
             expect(handlers.iterativeFindNode).toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe('DHT Core', () => {
             vi.mocked(handlers.findNodeLocation).mockResolvedValue(null);
 
             vi.mocked(contactsOps.getContacts).mockReturnValue([
-                createContact({ upeerId: 'peer1', address: 'addr1', lastSeen: Date.now() - 1000, status: 'connected' })
+                createContact({ upeerId: 'peer1', address: 'addr1', lastSeen: String(Date.now() - 1000), status: 'connected' })
             ]);
 
             const promise = aggressiveRediscovery('my-id', sendSecureUDPMessage);

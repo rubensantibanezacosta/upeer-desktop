@@ -53,7 +53,7 @@ describe('Storage - Reputation Operations', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
+        vi.mocked(getDb).mockReturnValue(mockDb as unknown as ReturnType<typeof getDb>);
     });
 
     it('should insert a vouch', () => {

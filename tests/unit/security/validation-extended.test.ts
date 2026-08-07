@@ -153,7 +153,7 @@ describe('Security Validation - Comprehensive Tests', () => {
         it('should validate validateDhtExchange', () => {
             const valid = { peers: [{ upeerId: 'a'.repeat(64), publicKey: 'b'.repeat(64), locationBlock: { address: '200::1', dhtSeq: 1, signature: 'c'.repeat(128) } }] };
             expect(validateDhtExchange(valid).valid).toBe(true);
-            expect(validateDhtExchange({ peers: 'not-an-array' }).valid).toBe(false);
+            expect(validateDhtExchange({ peers: 'not-an-array' } as unknown as Parameters<typeof validateDhtExchange>[0]).valid).toBe(false);
             expect(validateDhtExchange({ peers: new Array(51) }).valid).toBe(false);
             expect(validateDhtExchange({ peers: [{ upeerId: 'short' }] }).valid).toBe(false);
         });

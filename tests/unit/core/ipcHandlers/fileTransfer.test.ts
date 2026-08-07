@@ -73,7 +73,7 @@ describe('start-file-transfer multi-send a grupo', () => {
             if (id === 'alice') return { upeerId: id, publicKey: 'aa', address: '200::1' } as never;
             if (id === 'bob') return { upeerId: id, publicKey: 'bb', address: '200::2' } as never;
             if (id === 'carol') return { upeerId: id, publicKey: 'cc', address: '200::3' } as never;
-            return null;
+            return undefined;
         });
         vi.mocked(getMyUPeerId).mockReturnValue('self-id');
 
@@ -112,7 +112,7 @@ describe('start-file-transfer multi-send a grupo', () => {
             members: ['self-id', 'alice', 'bob'],
             epoch: 1,
         } as never);
-        vi.mocked(getContactByUpeerId).mockResolvedValue(null);
+        vi.mocked(getContactByUpeerId).mockResolvedValue(undefined);
 
         const handler = getHandler('start-file-transfer');
         const result = await handler({}, {

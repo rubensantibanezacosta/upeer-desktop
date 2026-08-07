@@ -51,7 +51,7 @@ describe('network/messaging/chatSupport.ts', () => {
                 { upeerId: 'self-id', address: ' ' },
                 { upeerId: 'other-id', address: '200::other' },
             ]),
-        });
+        } as unknown as ReturnType<typeof dhtHandlers.getKademliaInstance>);
 
         await expect(getSelfAddresses('self-id')).resolves.toEqual(['200::tablet']);
     });

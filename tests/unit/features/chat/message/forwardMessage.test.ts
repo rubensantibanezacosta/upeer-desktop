@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { forwardMessageToTargets, parseForwardPayload } from '../../../../../src/features/chat/message/forwardMessage.js';
 
 type ForwardMessageUpeer = Pick<Window['upeer'], 'sendMessage' | 'sendGroupMessage' | 'persistInternalAsset' | 'startFileTransfer'>;
-type ForwardMessageWindow = Window & { upeer: ForwardMessageUpeer };
-const forwardWindow = window as ForwardMessageWindow;
+type ForwardMessageWindow = { upeer: ForwardMessageUpeer };
+const forwardWindow = window as unknown as ForwardMessageWindow;
 
 describe('forwardMessage', () => {
     beforeEach(() => {

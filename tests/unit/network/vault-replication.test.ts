@@ -43,7 +43,7 @@ import * as transport from '../../../src/main_process/network/server/transport.j
 import * as dhtShared from '../../../src/main_process/network/dht/shared.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 
-type VaultManagerInternals = typeof VaultManager & {
+type VaultManagerInternals = {
     getDynamicReplicationFactor(recipientSid: string): Promise<number>;
 };
 type KnownContact = Awaited<ReturnType<typeof contactsOps.getContacts>>[number];
@@ -54,7 +54,7 @@ type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInsta
 describe('VaultManager - Replication Logic', () => {
     const myId = 'my-id';
     const recipientId = 'recipient-id';
-    const vaultManagerInternals = VaultManager as VaultManagerInternals;
+    const vaultManagerInternals = VaultManager as unknown as VaultManagerInternals;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -104,7 +104,7 @@ describe('VaultManager - Replication Logic', () => {
             findClosestContacts: vi.fn().mockReturnValue([]),
             storeValue: vi.fn().mockResolvedValue(undefined),
         } satisfies Pick<KademliaInstance, 'findClosestContacts' | 'storeValue'>;
-        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
 
         vi.spyOn(vaultManagerInternals, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
@@ -133,7 +133,7 @@ describe('VaultManager - Replication Logic', () => {
             findClosestContacts: vi.fn().mockReturnValue([meshNode]),
             storeValue: vi.fn().mockResolvedValue(undefined),
         } satisfies Pick<KademliaInstance, 'findClosestContacts' | 'storeValue'>;
-        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
         vi.mocked(reputation.getVouchScore).mockResolvedValue(50);
 
         await VaultManager.replicateToVaults(recipientId, { type: 'CHAT', data: 'hi' });

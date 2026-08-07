@@ -82,7 +82,7 @@ describe('Sealed Sender Unit Tests', () => {
             senderEphPub: 'a'.repeat(64),
             nonce: 'b'.repeat(48),
             ciphertext: 'c'.repeat(64)
-        }, badJsonSkFn);
+        } as never, badJsonSkFn);
 
         expect(result).toBeNull();
     });

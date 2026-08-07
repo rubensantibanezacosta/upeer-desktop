@@ -6,7 +6,7 @@ import * as transport from '../../../src/main_process/network/server/transport.j
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 import * as dhtShared from '../../../src/main_process/network/dht/shared.js';
 
-type VaultManagerPrivate = typeof VaultManager & {
+type VaultManagerPrivate = {
     getDynamicReplicationFactor: (targetUpeerId: string) => Promise<number>;
     sendWithRetry: (address: string, packet: Record<string, unknown>, maxRetries: number, baseDelayMs: number) => Promise<void>;
 };
@@ -14,7 +14,7 @@ type KnownContact = Awaited<ReturnType<typeof contactsOps.getContacts>>[number];
 type KnownRecipient = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
 type KademliaInstance = NonNullable<ReturnType<typeof dhtShared.getKademliaInstance>>;
 
-const vaultManagerPrivate = VaultManager as VaultManagerPrivate;
+const vaultManagerPrivate = VaultManager as unknown as VaultManagerPrivate;
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(),
@@ -77,7 +77,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
             createdAt: new Date().toISOString(),
             lastSeen: new Date().toISOString(),
             status: 'connected'
-        } as KnownRecipient);
+        } as unknown as KnownRecipient);
 
         const factor = await vaultManagerPrivate.getDynamicReplicationFactor('target-id');
         expect(factor).toBeGreaterThanOrEqual(6);
@@ -127,7 +127,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const mockKademlia = {
             storeValue: vi.fn().mockResolvedValue(undefined)
         } satisfies Pick<KademliaInstance, 'storeValue'>;
-        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(2);
 
         await VaultManager.replicateToVaults('recipient-id', { type: 'CHAT' });
@@ -148,7 +148,7 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
         vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'recipient-offline', address: '200::2', status: 'disconnected', lastSeen: new Date().toISOString() }
-        ] as KnownContact[]);
+        ] as unknown as KnownContact[]);
 
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
@@ -171,11 +171,11 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
 
     it('stores message locally when kademlia returns no extra nodes and all candidates are filtered', async () => {
         const mockKademlia = { findClosestContacts: vi.fn().mockReturnValue([]) };
-        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as KademliaInstance);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(mockKademlia as unknown as KademliaInstance);
 
         vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'target-peer', address: '200::2', status: 'disconnected' }
-        ] as KnownContact[]);
+        ] as unknown as KnownContact[]);
 
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(6);
 
@@ -224,7 +224,7 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
         vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'offline-peer', address: '200::2', status: 'disconnected' }
-        ] as KnownContact[]);
+        ] as unknown as KnownContact[]);
 
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 
@@ -243,7 +243,7 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
         vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'offline', status: 'disconnected' }
-        ] as KnownContact[]);
+        ] as unknown as KnownContact[]);
 
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(3);
 

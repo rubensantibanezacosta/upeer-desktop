@@ -88,7 +88,7 @@ describe('storage/pending-outbox.ts', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getDb).mockReturnValue(mockDb as ReturnType<typeof getDb>);
+        vi.mocked(getDb).mockReturnValue(mockDb as unknown as ReturnType<typeof getDb>);
     });
 
     describe('savePendingOutboxMessage', () => {
@@ -180,7 +180,7 @@ describe('storage/pending-outbox.ts', () => {
                 publicKey: '00'.repeat(32),
                 signedPreKey: 'bb'.repeat(32),
                 signedPreKeyId: 9,
-            });
+            } as unknown as Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>);
 
             await flushPendingOutbox('sid1', '00'.repeat(32));
 
