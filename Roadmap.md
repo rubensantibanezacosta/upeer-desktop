@@ -153,6 +153,12 @@ _Última actualización: 12 Marzo 2026_
 - [x] Tests e2e de envío de mensaje a grupo con varios miembros
 - [x] Revalidar `pnpm run lint`, `pnpm test`, `pnpm run test:integration` y `pnpm run test:e2e`
 
+**Extensión:** el multi-send de archivos a grupos (`fileTransfer.ts`) encadena `startSend` por miembro en serie (O(N)). Reutilizar el pool para paralelizarlo.
+
+- [x] Aplicar el pool al multi-send de archivos a grupos en `fileTransfer.ts`
+- [x] Tests unit/integración del multi-send paralelo
+- [x] Revalidar lint/test/integration/e2e
+
 ---
 
 ## 🔧 Principios de desarrollo

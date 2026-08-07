@@ -4,9 +4,12 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { error as logError } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../../network/file-transfer/transfer-manager.js';
+import { runWithConcurrencyMap } from '../../network/concurrency.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { saveFileMessage } from '../../storage/messages/operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
+
+const GROUP_SEND_CONCURRENCY = 4;
 
 /**
  * Registra los manejadores IPC relacionados con transferencia de archivos
@@ -40,28 +43,27 @@ export function registerFileTransferHandlers(): void {
         // Multi-send to all members with a shared logical message ID
         const myId = (await import('../../security/identity.js')).getMyUPeerId();
         const messageId = crypto.randomUUID();
-        let startedTransfers = 0;
         const stats = await fs.stat(resolvedSrc);
         const effectiveFileName = fileName || path.basename(resolvedSrc);
         const mimeType = fileTransferManager.validator.detectMimeType(resolvedSrc);
 
-        for (const memberId of group.members) {
-          if (memberId === myId) continue;
+        const memberIds = group.members.filter((memberId) => memberId !== myId);
+        const results = await runWithConcurrencyMap(memberIds, GROUP_SEND_CONCURRENCY, async (memberId) => {
           const contact = await getContactByUpeerId(memberId);
-          if (contact?.publicKey) {
-            await fileTransferManager.startSend(
-              memberId,
-              contact.address || '',
-              resolvedSrc,
-              thumbnail,
-              caption,
-              isVoiceNote,
-              effectiveFileName,
-              { chatUpeerId: upeerId, persistMessage: false, messageId }
-            );
-            startedTransfers += 1;
-          }
-        }
+          if (!contact?.publicKey) return null;
+          await fileTransferManager.startSend(
+            memberId,
+            contact.address || '',
+            resolvedSrc,
+            thumbnail,
+            caption,
+            isVoiceNote,
+            effectiveFileName,
+            { chatUpeerId: upeerId, persistMessage: false, messageId }
+          );
+          return memberId;
+        });
+        const startedTransfers = results.filter((memberId) => memberId !== null).length;
 
         if (startedTransfers === 0) return { success: false, error: 'No valid group recipients available' };
 
