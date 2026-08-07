@@ -159,6 +159,15 @@ _Última actualización: 12 Marzo 2026_
 - [x] Tests unit/integración del multi-send paralelo
 - [x] Revalidar lint/test/integration/e2e
 
+**Extensión:** paginación del historial de mensajes — `getMessages` solo devuelve los últimos 100 sin forma de cargar más antiguos incrementalmente al hacer scroll hacia arriba.
+
+- [x] `getOlderMessages` en storage (cursor por timestamp, límite acotado)
+- [x] Handler IPC `get-older-messages` + preload + types
+- [x] Acción `loadOlderHistory` en el store (contacto y grupo)
+- [x] Scroll hacia arriba en `ChatArea` dispara carga incremental
+- [x] Tests unit de storage y store
+- [x] Revalidar lint/test/e2e
+
 ---
 
 ## 🔧 Principios de desarrollo

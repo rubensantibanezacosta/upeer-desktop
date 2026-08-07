@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { like, gte, lte } from 'drizzle-orm';
+import { like, gte, lte, lt } from 'drizzle-orm';
 import { getDb, getSchema, eq, desc, and, runTransaction, sql } from '../shared.js';
 import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
 
@@ -249,6 +249,22 @@ export function getMessagesAround(chatUpeerId: string, targetMsgId: string, cont
             .all();
         return { ...m, reactions: msgReactions };
     });
+}
+
+export function getOlderMessages(chatUpeerId: string, beforeTimestamp: number, limit = 50): MessageRow[] {
+    const db = getDb();
+    const schema = getSchema();
+
+    const rows = db.select().from(schema.messages)
+        .where(and(
+            eq(schema.messages.chatUpeerId, chatUpeerId),
+            lt(schema.messages.timestamp, beforeTimestamp)
+        ))
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(limit)
+        .all() as MessageRow[];
+
+    return purgeBrokenLegacySanitizedMessages(rows, db, schema);
 }
 
 export function searchMessages(query: string, limit = 25) {

@@ -131,6 +131,36 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         });
     },
 
+    loadOlderHistory: async () => {
+        const { targetUpeerId, activeGroupId, contacts, myIdentity, chatHistory, groupChatHistory } = get();
+        const chatId = activeGroupId || targetUpeerId;
+        if (!chatId) {
+            return;
+        }
+        const history = activeGroupId ? groupChatHistory : chatHistory;
+        if (history.length === 0) {
+            return;
+        }
+        const oldestTimestamp = history[0].date ?? history[0].timestamp;
+        const raw = await window.upeer.getOlderMessages(chatId, oldestTimestamp);
+        if (raw.length === 0) {
+            return;
+        }
+        const older = raw.reverse();
+        if (activeGroupId) {
+            set({
+                groupChatHistory: [
+                    ...older.map((message) => mapGroupMessage(chatId, message, contacts, myIdentity)),
+                    ...history,
+                ],
+            });
+            return;
+        }
+        set({
+            chatHistory: [...older.map(mapContactMessage), ...history],
+        });
+    },
+
     refreshContacts: async () => {
         const contacts = await window.upeer.getContacts();
         set({ contacts });

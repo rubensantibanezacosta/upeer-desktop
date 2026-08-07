@@ -146,6 +146,7 @@ const messagingApi = {
     getMessages: (upeerId: string) => ipcRenderer.invoke('get-messages', upeerId),
     searchMessages: (query: string) => ipcRenderer.invoke('search-messages', { query }),
     getMessagesAround: (chatUpeerId: string, targetMsgId: string) => ipcRenderer.invoke('get-messages-around', { chatUpeerId, targetMsgId }),
+    getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => ipcRenderer.invoke('get-older-messages', { chatUpeerId, beforeTimestamp, limit }),
     getFileHistory: (limit?: number) => ipcRenderer.invoke('get-file-history', { limit }),
 };
 

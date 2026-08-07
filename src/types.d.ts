@@ -42,6 +42,7 @@ declare global {
             getMessages: (upeerId: string) => Promise<UpeerChatMessage[]>;
             searchMessages: (query: string) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
+            getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => Promise<UpeerChatMessage[]>;
             getFileHistory: (limit?: number) => Promise<UpeerFileHistoryEntry[]>;
             getContacts: () => Promise<UpeerContact[]>;
             addContact: (address: string, name: string) => Promise<{ success: boolean; upeerId?: string; error?: string; alreadyExists?: boolean }>;

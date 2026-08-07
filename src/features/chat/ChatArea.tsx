@@ -39,8 +39,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
     const { pendingScrollMsgId, setPendingScrollMsgId } = useNavigationStore();
-    const { isWindowedHistory, reloadLatestHistory } = useChatStore();
+    const { isWindowedHistory, reloadLatestHistory, loadOlderHistory } = useChatStore();
     const pendingScrollRef = useRef(pendingScrollMsgId);
+    const loadingOlderRef = useRef(false);
     pendingScrollRef.current = pendingScrollMsgId;
 
     React.useLayoutEffect(() => {
@@ -66,14 +67,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
         if (!container) return;
 
         const handleScroll = () => {
-            const isNearBottom = Math.abs(container.scrollTop) < 50;
+            const maxScroll = container.scrollHeight - container.clientHeight;
+            const isNearBottom = container.scrollTop <= 50;
+            const isAtTop = maxScroll > 0 && container.scrollTop >= maxScroll - 60;
             setShowScrollButton(!isNearBottom);
             if (isWindowedHistory && isNearBottom) reloadLatestHistory();
+            if (!loadingOlderRef.current && isAtTop) {
+                loadingOlderRef.current = true;
+                const prevHeight = container.scrollHeight;
+                loadOlderHistory()
+                    .catch(() => {})
+                    .finally(() => {
+                        loadingOlderRef.current = false;
+                        if (container.scrollHeight > prevHeight) {
+                            container.scrollTop = container.scrollHeight - prevHeight;
+                        }
+                    });
+            }
         };
 
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [isWindowedHistory, reloadLatestHistory]);
+    }, [isWindowedHistory, reloadLatestHistory, loadOlderHistory]);
 
     const scrollToBottom = () => {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });

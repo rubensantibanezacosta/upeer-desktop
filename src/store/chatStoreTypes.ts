@@ -35,6 +35,7 @@ export interface ChatActions {
     handleSearchGlobal: (query: string) => Promise<void>;
     loadHistoryAround: (targetMsgId: string) => Promise<void>;
     reloadLatestHistory: () => Promise<void>;
+    loadOlderHistory: () => Promise<void>;
     refreshContacts: () => Promise<void>;
     refreshGroups: () => Promise<void>;
     refreshData: () => Promise<void>;
