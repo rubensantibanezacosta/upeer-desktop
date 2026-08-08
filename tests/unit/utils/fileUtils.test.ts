@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toMediaUrl, fromMediaUrl } from '../../../src/utils/fileUtils.js';
+import { toMediaUrl, fromMediaUrl, getMimeType, resolveFileMimeType, isImageFile, isPdfFile } from '../../../src/utils/fileUtils.js';
 import { getInlineVideoUnsupportedReason, isVideoFile, supportsInlineVideoPlayback } from '../../../src/utils/videoPlayback.js';
 
 describe('toMediaUrl', () => {
@@ -69,5 +69,30 @@ describe('videoPlayback', () => {
     it('mantiene MP4 como reproducible inline', () => {
         expect(supportsInlineVideoPlayback('video/mp4', 'clip.mp4')).toBe(true);
         expect(getInlineVideoUnsupportedReason('video/mp4', 'clip.mp4')).toBeNull();
+    });
+});
+
+describe('getMimeType / resolveFileMimeType / isImageFile / isPdfFile', () => {
+    it('infiere el MIME por extensión y usa octet-stream por defecto', () => {
+        expect(getMimeType('foto.png')).toBe('image/png');
+        expect(getMimeType('doc.pdf')).toBe('application/pdf');
+        expect(getMimeType('sinExtension')).toBe('application/octet-stream');
+        expect(getMimeType('desconocido.xyz')).toBe('application/octet-stream');
+    });
+
+    it('resolveFileMimeType prioriza el MIME explícito y hace fallback a la extensión', () => {
+        expect(resolveFileMimeType('image/jpeg', 'foto.png')).toBe('image/jpeg');
+        expect(resolveFileMimeType(undefined, 'audio.mp3')).toBe('audio/mpeg');
+        expect(resolveFileMimeType('', 'video.mp4')).toBe('video/mp4');
+        expect(resolveFileMimeType(undefined, undefined)).toBe('application/octet-stream');
+    });
+
+    it('isImageFile / isPdfFile detectan por MIME y por nombre', () => {
+        expect(isImageFile('image/png')).toBe(true);
+        expect(isImageFile(undefined, 'foto.jpg')).toBe(true);
+        expect(isImageFile('text/plain')).toBe(false);
+        expect(isPdfFile('application/pdf')).toBe(true);
+        expect(isPdfFile(undefined, 'manual.pdf')).toBe(true);
+        expect(isPdfFile('text/plain')).toBe(false);
     });
 });
