@@ -44,6 +44,11 @@ vi.mock('@mui/icons-material/VideoFile', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/AudioFile', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Description', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/AttachFile', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Mic', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Close', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Edit', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Send', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => null }));
 
 // Setup test mocks for sodium-native
 const __dirname = dirname(fileURLToPath(import.meta.url));
