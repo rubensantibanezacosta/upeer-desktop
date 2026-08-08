@@ -189,6 +189,17 @@ const fileTransferApi = {
     saveTransferredFile: (fileId: string, destinationPath: string) => ipcRenderer.invoke('save-transferred-file', { fileId, destinationPath }),
 };
 
+const callApi = {
+    startCall: (upeerId: string, kind: 'audio' | 'video') => ipcRenderer.invoke('start-call', { upeerId, kind }),
+    acceptCall: (callId: string) => ipcRenderer.invoke('accept-call', { callId }),
+    rejectCall: (callId: string) => ipcRenderer.invoke('reject-call', { callId }),
+    endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
+    toggleMedia: (callId: string, type: 'mute' | 'camera') => ipcRenderer.invoke('call-toggle-media', { callId, type }),
+    sendCallMedia: (callId: string, data: string) => ipcRenderer.invoke('send-call-media', { callId, data }),
+    getCallDevices: () => ipcRenderer.invoke('call-devices'),
+    getCallParams: (callId: string) => ipcRenderer.invoke('call-params', { callId }),
+};
+
 const networkApi = {
     fetchOgPreview: (url: string) => ipcRenderer.invoke('fetch-og-preview', { url }),
     getNetworkStats: () => ipcRenderer.invoke('get-network-stats'),
@@ -231,6 +242,13 @@ const eventApi = {
     onVaultRecoveryStatus: (callback: (data: VaultRecoveryStatusPayload) => void) => subscribe<[VaultRecoveryStatusPayload]>('vault-recovery-status', callback),
     onYggstackAddress: (callback: (address: string) => void) => subscribe('yggstack-address', (address: string) => callback(address)),
     onYggstackStatus: (callback: (status: string, address?: string) => void) => subscribe('yggstack-status', (status: string, address?: string) => callback(status, address)),
+    onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) => subscribe<[{ callId: string; peerUpeerId: string; kind: 'audio' | 'video' }]>('call-incoming', (data) => callback(data)),
+    onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-ring', (data) => callback(data)),
+    onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-accepted', (data) => callback(data)),
+    onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; reason?: string }]>('call-ended', (data) => callback(data)),
+    onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown }) => void) => subscribe<[{ callId: string; peerUpeerId: string; data: string; timestamp?: unknown }]>('call-media', (data) => callback(data)),
+    onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => subscribe<[{ callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }]>('call-media-update', (data) => callback(data)),
+    onCallMeta: (callback: (data: { callId: string; peerUpeerId: string; meta?: unknown }) => void) => subscribe<[{ callId: string; peerUpeerId: string; meta?: unknown }]>('call-meta', (data) => callback(data)),
 };
 
 export const buildPreloadBridge = () => ({
@@ -238,6 +256,7 @@ export const buildPreloadBridge = () => ({
     ...contactApi,
     ...messagingApi,
     ...deviceApi,
+    ...callApi,
     ...groupApi,
     ...fileApi,
     ...fileTransferApi,

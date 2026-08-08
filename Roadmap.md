@@ -166,6 +166,78 @@ _Última actualización: 8 Agosto 2026_
 - [x] Tests unit de storage y store
 - [x] Revalidar lint/test/e2e
 
+## 📞 Llamadas y videollamadas (media P2P)
+
+_Estado: núcleo implementado y probado (señalización `CALL_*`, máquina de estados, validación, IPC/preload, UI y media transport P2P). Pendiente: codecs WebCodecs reales de captura/decode, grupos mesh y SFU distribuido._
+
+### Objetivo
+Llamadas de voz y videollamadas E2EE **100% P2P**: sin TURN, sin STUN, sin servidores ni infraestructura centralizada. Solo los peers, la DHT y el transporte P2P existente sobre Yggdrasil.
+
+### Principio de transporte (sin TURN)
+No usamos `RTCPeerConnection`/ICE/DTLS-SRTP para mover el media: el renderer no puede emitir candidates hacia la IP Ygg (200::) porque el nodo corre sin TUN, y un TURN sería un punto centralizado que contradice el diseño. En su lugar:
+- **Captura** con `getUserMedia` (APIs de captura WebRTC).
+- **Codifica/decodifica** con **WebCodecs** (`VideoEncoder`/`AudioDecoder`; opus para audio, VP8/VP9/AV1 para vídeo).
+- **Transporta** los chunks codificados como paquetes P2P **cifrados E2EE** por el canal existente (TCP sobre Yggdrasil, reutilizando `sendSecureUDPMessage` + framing + ratchet). En Ygg todo nodo es alcanzable desde cualquier otro: la mesh ya resuelve enrutamiento y reachability, no hay NAT que atravesar ni relay que levantar.
+- Opcional en F10: canal **UDP real** vía `yggstack -remote-udp` + SOCKS5 UDP associate para bajar latencia/jitter bajo pérdida. TCP es el MVP.
+
+### Flujo de datos de media
+1. `getUserMedia` → tracks.
+2. `VideoEncoder`/`AudioEncoder` → chunks con `timestamp` + `sequence` + payload de codec.
+3. Fragmentación y **cifrado E2EE** con la capa existente (claves de sesión/ratchet del contacto).
+4. Envío por el transporte P2P; el receptor reensambla, desencripta, decodifica (`VideoDecoder`/`AudioDecoder`) y reproduce con **jitter buffer** + **control de congestión** adaptativo (ajuste de bitrate/QP según RTT y pérdida).
+
+### Señalización (tipos de paquete nuevos, firmados Ed25519)
+- `CALL_OFFER` — oferta (upeerId + callId + media: audio/vídeo + params de codec)
+- `CALL_RING` — aviso de llamada entrante
+- `CALL_ACCEPT` / `CALL_ANSWER` — aceptar con params negociados
+- `CALL_REJECT` / `CALL_BUSY` / `CALL_CANCEL` / `CALL_END`
+- `CALL_MEDIA` — chunks de media (o `CALL_MEDIA_UPDATE` para mute/calidad)
+- `CALL_META` — metadatos de llamada (join/leave en grupos, locutor activo)
+
+La señalización 1:1 viaja por el canal directo del contacto; la **DHT** se usa para localizar a los participantes de una llamada de grupo y para elegir/rotar relays.
+
+### Máquina de estados
+`idle → outgoing(ringing) | incoming(ringing) → negotiating → connected → ended(causa)`
+con timeouts, manejo de rechazo/ocupado/no-answer y caída de red; `CALL_MEDIA` solo tras `connected`.
+
+### IPC / preload
+- `ipcMain.handle`: `start-call`, `accept-call`, `reject-call`, `end-call`, `call-toggle-media`, `call-devices`, `call-params`.
+- Eventos: `call-incoming`, `call-accepted`, `call-state`, `call-media` (chunks), `call-error`.
+- El renderer captura/codifica/decodifica; el main enruta señalización y media por la mesh.
+
+### UI (Joy UI)
+- Botones en `TopHeaderActions` (ya presentes): voz y vídeo.
+- Modal de llamada entrante y overlay de llamada activa (mic, cámara, colgar, duración).
+- Componentes: `CallOverlay`, `CallVideoTile`, `CallControls`, hook `useCall`.
+
+### Escalabilidad
+1. **1:1**: stream directo peer-a-peer por la mesh (siempre alcanzable; O(1) flujos).
+2. **Grupos pequeños (≤ 4-6)**: **mesh** — cada peer envía su stream a los demás (O(N²) flujos); sin relay, máxima resiliencia.
+3. **Grupos grandes**: **SFU distribuido en un peer** elegido por DHT/reputación/latencia — el peer recibe y reenvía (O(N) flujos). No es servidor central: es un participante de la llamada, con **failover** (otro peer asume por consenso si se cae) y rotación.
+4. **Grupos muy grandes**: cascada/árbol de relays entre peers (reducción logarítmica del ancho de banda) + **AV1/VP9 simulcast** y **selección de locutor activo** (solo se cursa vídeo del que habla).
+5. **Control de congestión propio** (no hay `RTCPeerConnection`): bitrate adaptativo por RTT/pérdida, escalado VP8→VP9→AV1.
+6. La **DHT** aporta: descubrimiento de participantes en grupos, elección/failover del SFU y hallazgo de rutas óptimas.
+
+### Fases
+- [x] **F1 — Señalización y estado**: paquetes `CALL_*` (`CALL_OFFER/RING/ACCEPT/REJECT/BUSY/CANCEL/END/MEDIA/MEDIA_UPDATE/META`), `callManager` en main (máquina de estados `idle→ringing→negotiating→connected→ended` con timeouts), validación en `validationCalls`/`validation.ts` + tests unit e integración multiproceso.
+- [x] **F2 — IPC/preload + hook**: channels (`start-call`, `accept-call`, `reject-call`, `end-call`, `call-toggle-media`, `call-devices`, `call-params`), `callApi` + eventos en `preloadBridge`, `useCallStore` + `useCall`, modales y overlay (`CallHost`, `CallIncomingModal`, `CallOverlay`, `CallControls`) integrados en `App` y botones conectados en `TopHeaderActions`.
+- [~] **F3 — Media local**: `getUserMedia`, preview local (`srcObject`), captura por track y enumeración implementados en `useCallMedia`/`CallOverlay`; verificación real requiere navegador/cámara.
+- [~] **F4 — Audio 1:1 P2P**: transporte cifrado por el canal P2P + IPC `send-call-media` probados end-to-end en el harness; captura/codificación opus y decodificación/reproducción remota (AudioContext) implementadas con WebCodecs (`webCodecsSession`).
+- [~] **F5 — Vídeo 1:1**: captura/codificación VP8 y decodificación + dibujado en `<canvas>` remoto implementadas con WebCodecs; verificación real requiere cámara.
+- [x] **F6 — Robustez**: timeouts de ring (30 s) y negociación (20 s) en `callManager`, manejo de rechazo/ocupado/cancelado/no-answer/remote-end.
+- [x] **F7 — Seguridad**: validación estricta de tipos y payloads `CALL_*`, sellado de la señalización con la clave pública del contacto (E2EE del canal).
+- [x] **F8 — Grupos mesh (≤ 4-6)**: `startGroupCall`, sesiones de grupo (`createGroup`/`createGroupIncoming`), fan-out de `CALL_MEDIA` a todos los miembros; probado en el harness con 3 procesos.
+- [ ] **F9 — SFU distribuido + failover**: elección por DHT/reputación, reenvío y failover; grupos grandes.
+- [ ] **F10 — Canal UDP real (opcional)**: `yggstack -remote-udp` + SOCKS5 UDP associate para bajar latencia.
+- [x] **F11 — Validación global**: `tsc`, `lint`, tests unit (39 de llamada) e integración multiproceso (escenario `llamada de voz P2P` con señalización `CALL_*` end-to-end) en verde.
+
+### Riesgos / limitaciones
+- TCP introduce latencia/head-of-line vs UDP; mitigar con jitter buffer y, en F10, canal UDP.
+- WebCodecs requiere Chromium (Electron lo tiene); mockear `VideoEncoder`/`AudioDecoder` en tests (patrón de `useAudioRecorder`).
+- El SFU distribuido ve el media de la llamada → aplicar E2EE con claves por-llamada en la que el SFU reenvía sin poder descifrar (o tolerar que, como participante, descifre/recifre).
+- Sin TUN el media va por el canal existente (Ygg); la reachability siempre está (mesh), la latencia depende de la ruta Ygg.
+
+
 ---
 
 ## 🔧 Principios de desarrollo

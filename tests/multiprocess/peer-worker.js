@@ -25,6 +25,8 @@ const { sendGroupMessage } = await import('../../src/main_process/network/messag
 const { getMessageStatus } = await import('../../src/main_process/storage/messages/status.js');
 const { fileTransferManager } = await import('../../src/main_process/network/file-transfer/transfer-manager.js');
 const { VaultManager } = await import('../../src/main_process/network/vault/manager.js');
+const { callManager } = await import('../../src/main_process/network/call/callManager.js');
+const { sendCallOffer, sendCallAccept, sendCallEnd, sendCallMedia, startGroupCall } = await import('../../src/main_process/network/call/callSignaling.js');
 const { BrowserWindow } = await import('electron');
 const { getSqlite } = await import('../../src/main_process/storage/shared.js');
 const { setKademliaInstance } = await import('../../src/main_process/network/dht/handlers.js');
@@ -63,7 +65,8 @@ state.setTcpServer({ listening: true });
 state.setNetworkReady(true);
 
 const sendResponse = (ip, data) => transport.sendSecureUDPMessage(ip, data);
-fileTransferManager.initialize(sendResponse, new BrowserWindow());
+const win = new BrowserWindow();
+fileTransferManager.initialize(sendResponse, win);
 
 const socketPeerIds = new Map();
 const server = net.createServer((socket) => {
@@ -91,7 +94,7 @@ const server = net.createServer((socket) => {
                 rxType = '(unparseable)';
             }
             process.send({ type: 'networkRx', peerId, rxType });
-            void handlePacket(msg, rinfo, null, sendResponse, () => {});
+            void handlePacket(msg, rinfo, win, sendResponse, () => {});
         }
     });
 });
@@ -170,6 +173,52 @@ process.on('message', (msg) => {
             case 'queryOwnVaults':
                 await VaultManager.queryOwnVaults('test');
                 reply(msg._id, { ok: true });
+                break;
+            case 'startCall':
+                await sendCallOffer(msg.upeerId, msg.kind)
+                    .then((callId) => reply(msg._id, { ok: true, callId }))
+                    .catch((e) => reply(msg._id, { ok: false, error: String(e) }));
+                break;
+            case 'startGroupCall':
+                await startGroupCall(msg.members, msg.kind)
+                    .then((callId) => reply(msg._id, { ok: true, callId }))
+                    .catch((e) => reply(msg._id, { ok: false, error: String(e) }));
+                break;
+            case 'getSentEvents':
+                reply(msg._id, { ok: true, events: globalThis.__sentEvents__ ?? [] });
+                break;
+            case 'acceptCall': {
+                const active = callManager.getActive();
+                if (active && active.phase === 'incoming-ringing') {
+                    callManager.accept(active.callId);
+                    sendCallAccept(active.peerUpeerId, active.callId);
+                }
+                reply(msg._id, { ok: true });
+                break;
+            }
+            case 'connectCall': {
+                const active = callManager.getActive();
+                if (active) callManager.connect(active.callId);
+                reply(msg._id, { ok: true });
+                break;
+            }
+            case 'endCall': {
+                const active = callManager.getActive();
+                if (active) {
+                    callManager.end(active.callId, 'local-hangup');
+                    sendCallEnd(active.peerUpeerId, active.callId);
+                }
+                reply(msg._id, { ok: true });
+                break;
+            }
+            case 'sendMedia': {
+                const active = callManager.getActive();
+                if (active) sendCallMedia(active.peerUpeerId, active.callId, msg.data);
+                reply(msg._id, { ok: true });
+                break;
+            }
+            case 'getActiveCall':
+                reply(msg._id, { ok: true, call: callManager.getActive() ?? null });
                 break;
             case 'shutdown':
                 server.close();

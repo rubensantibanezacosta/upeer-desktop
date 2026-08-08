@@ -8,7 +8,13 @@ export const app = {
 
 export class BrowserWindow {
     constructor() {
-        this.webContents = { send: () => undefined, isDestroyed: () => false };
+        this.webContents = {
+            send: (channel, payload) => {
+                const target = (globalThis.__sentEvents__ || (globalThis.__sentEvents__ = []));
+                target.push({ channel, payload });
+            },
+            isDestroyed: () => false,
+        };
         this.isDestroyed = () => false;
     }
     static getAllWindows() {

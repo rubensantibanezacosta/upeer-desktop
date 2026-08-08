@@ -1,5 +1,6 @@
 import { app, protocol } from 'electron';
 import { registerContactHandlers } from './main_process/core/ipcHandlers/contacts.js';
+import { registerCallHandlers } from './main_process/core/ipcHandlers/calls.js';
 import { registerDeviceHandlers } from './main_process/core/ipcHandlers/devices.js';
 import { registerFileHandlers } from './main_process/core/ipcHandlers/files.js';
 import { registerFileTransferHandlers } from './main_process/core/ipcHandlers/fileTransfer.js';
@@ -30,6 +31,7 @@ export const configureLinuxMediaSupport = () => {
 export const registerIpcHandlers = () => {
     registerNetworkHandlers();
     registerContactHandlers();
+    registerCallHandlers();
     registerMessageHandlers();
     registerGroupHandlers();
     registerIdentityHandlers();

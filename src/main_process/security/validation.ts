@@ -19,8 +19,7 @@ import {
     validatePingPong,
     validateRead,
     validateTyping,
-} from './validationMessaging.js';
-import {
+} from './validationMessaging.js';import {
     validateDhtExchange,
     validateDhtFindNode,
     validateDhtFindValue,
@@ -58,6 +57,7 @@ import {
     validateVaultRenew,
     validateVaultStore,
 } from './validationVaultGroups.js';
+import { validateCallMessage } from './validationCalls.js';
 import type { ValidationResult } from './validationShared.js';
 
 const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
@@ -112,6 +112,16 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     REPUTATION_REQUEST: validateReputationRequest,
     REPUTATION_DELIVER: validateReputationDeliver,
     DR_RESET: validateDrReset,
+    CALL_OFFER: (data: any) => validateCallMessage('CALL_OFFER', data),
+    CALL_RING: (data: any) => validateCallMessage('CALL_RING', data),
+    CALL_ACCEPT: (data: any) => validateCallMessage('CALL_ACCEPT', data),
+    CALL_REJECT: (data: any) => validateCallMessage('CALL_REJECT', data),
+    CALL_BUSY: (data: any) => validateCallMessage('CALL_BUSY', data),
+    CALL_CANCEL: (data: any) => validateCallMessage('CALL_CANCEL', data),
+    CALL_END: (data: any) => validateCallMessage('CALL_END', data),
+    CALL_MEDIA: (data: any) => validateCallMessage('CALL_MEDIA', data),
+    CALL_MEDIA_UPDATE: (data: any) => validateCallMessage('CALL_MEDIA_UPDATE', data),
+    CALL_META: (data: any) => validateCallMessage('CALL_META', data),
 };
 
 export function validateMessage(type: string, data: unknown): ValidationResult {

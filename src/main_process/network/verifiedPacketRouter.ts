@@ -6,6 +6,7 @@ import { handleChatAck, handleChatClear, handleChatContact, handleChatDelete, ha
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
 import { handleReputationDeliver, handleReputationGossip, handleReputationRequest } from './handlers/reputation.js';
 import { handleSyncPulse } from './handlers/sync.js';
+import { handleCallPacket } from './call/callPacketHandler.js';
 import { handleVaultDelivery } from './handlers/vault.js';
 import type { GroupAckPayload, GroupMessagePayload, VaultQueryData, VaultStoreData } from './types.js';
 import type { GroupControlPacket } from './handlers/groupControlShared.js';
@@ -602,6 +603,18 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             }
             break;
         }
+        case 'CALL_OFFER':
+        case 'CALL_RING':
+        case 'CALL_ACCEPT':
+        case 'CALL_REJECT':
+        case 'CALL_BUSY':
+        case 'CALL_CANCEL':
+        case 'CALL_END':
+        case 'CALL_MEDIA':
+        case 'CALL_MEDIA_UPDATE':
+        case 'CALL_META':
+            handleCallPacket(upeerId, data, win);
+            break;
         default:
             warn('Unknown packet', { upeerId, type: data.type, ip: rinfo.address }, 'network');
     }

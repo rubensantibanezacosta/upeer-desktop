@@ -10,6 +10,7 @@ import { useFilePersistence } from './hooks/useFilePersistence.js';
 import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
+import { CallHost } from './features/call/CallHost.js';
 import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
 import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
@@ -316,6 +317,10 @@ export default function App() {
                     setEditingMessage={setEditingMessage}
                 />
                     <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
+                    <CallHost
+                        resolvePeerName={(upeerId) => chatStore.contacts.find((contact) => contact.upeerId === upeerId)?.name || 'Contacto'}
+                        resolvePeerAvatar={(upeerId) => chatStore.contacts.find((contact) => contact.upeerId === upeerId)?.avatar}
+                    />
                 </div>
             </AppearanceController>
         </CssVarsProvider>

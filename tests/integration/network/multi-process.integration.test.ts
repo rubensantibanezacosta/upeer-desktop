@@ -387,5 +387,111 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         const bMessages = await nodeB.request('getMessages', { contactId: aId });
         expect((bMessages.messages as Array<{ message: string }>).some((m) => m.message === 'recupera desde el vault')).toBe(true);
     });
+
+    it('llamada de voz P2P: señalización CALL_* entre procesos con aceptación y media', async () => {
+        type CallState = { phase?: string; kind?: string; callId?: string };
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const start = await nodeA.request('startCall', { upeerId: bInfo.upeerId, kind: 'audio' });
+        expect(start.ok).toBe(true);
+        const callId = start.callId as string;
+        await sleep(500);
+
+        const bCall = await nodeB.request('getActiveCall');
+        expect((bCall.call as CallState | null)?.phase).toBe('incoming-ringing');
+        expect((bCall.call as CallState | null)?.kind).toBe('audio');
+
+        const aCall = await nodeA.request('getActiveCall');
+        expect((aCall.call as CallState | null)?.phase).toBe('outgoing-ringing');
+        expect((aCall.call as CallState | null)?.callId).toBe(callId);
+
+        await nodeB.request('acceptCall');
+        await sleep(500);
+        const aAfter = await nodeA.request('getActiveCall');
+        expect((aAfter.call as CallState | null)?.phase).toBe('negotiating');
+
+        await nodeA.request('connectCall');
+        await nodeB.request('connectCall');
+        await sleep(200);
+        const aConn = await nodeA.request('getActiveCall');
+        expect((aConn.call as CallState | null)?.phase).toBe('connected');
+
+        await nodeA.request('endCall');
+        await sleep(500);
+        const aAfterEnd = await nodeA.request('getActiveCall');
+        expect(aAfterEnd.call).toBeNull();
+        const bAfterEnd = await nodeB.request('getActiveCall');
+        expect(bAfterEnd.call).toBeNull();
+    });
+
+    it('llamada de grupo mesh: multiparty con 3 procesos y fan-out de media', async () => {
+        type CallState = { phase?: string; isGroup?: boolean; groupMembers?: string[] };
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+            '200::c': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        const nodeC = new PeerProcess('200::c');
+        peers.push(nodeA, nodeB, nodeC);
+
+        await nodeA.start({ routing });
+        const bInfo = await nodeB.start({ routing });
+        const cInfo = await nodeC.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await nodeA.addPeer(nodeC, '200::c');
+        await nodeC.addPeer(nodeA, '200::a');
+        await nodeB.addPeer(nodeC, '200::c');
+        await nodeC.addPeer(nodeB, '200::b');
+        await sleep(300);
+
+        const start = await nodeA.request('startGroupCall', { members: [bInfo.upeerId, cInfo.upeerId], kind: 'audio' });
+        expect(start.ok).toBe(true);
+        const callId = start.callId as string;
+        await sleep(600);
+
+        const aCall = await nodeA.request('getActiveCall');
+        expect((aCall.call as CallState | null)?.phase).toBe('outgoing-ringing');
+        expect((aCall.call as CallState | null)?.isGroup).toBe(true);
+
+        const bCall = await nodeB.request('getActiveCall');
+        expect((bCall.call as CallState | null)?.phase).toBe('incoming-ringing');
+        expect((bCall.call as CallState | null)?.groupMembers).toContain(cInfo.upeerId);
+
+        await nodeB.request('acceptCall');
+        await nodeC.request('acceptCall');
+        await sleep(600);
+
+        await nodeA.request('connectCall');
+        await nodeB.request('connectCall');
+        await nodeC.request('connectCall');
+        await sleep(200);
+
+        await nodeA.request('sendMedia', { data: 'frame-1' });
+        await sleep(400);
+
+        const bEvents = await nodeB.request('getSentEvents');
+        expect((bEvents.events as Array<{ channel: string }>).some((event) => event.channel === 'call-media')).toBe(true);
+        const cEvents = await nodeC.request('getSentEvents');
+        expect((cEvents.events as Array<{ channel: string }>).some((event) => event.channel === 'call-media')).toBe(true);
+
+        const aConn = await nodeA.request('getActiveCall');
+        expect((aConn.call as CallState | null)?.phase).toBe('connected');
+        expect(callId.length).toBe(32);
+    });
 });
 

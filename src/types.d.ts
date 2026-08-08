@@ -192,6 +192,22 @@ declare global {
             onYggstackStatus: (callback: (status: string, addr?: string) => void) => UpeerUnsubscribe;
             persistInternalAsset: (data: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             generateVideoThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+            /** Llamadas de voz/vídeo P2P */
+            startCall: (upeerId: string, kind: 'audio' | 'video') => Promise<{ success: boolean; callId?: string; error?: string }>;
+            acceptCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
+            rejectCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
+            endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
+            toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
+            sendCallMedia: (callId: string, data: string) => Promise<{ success: boolean; error?: string }>;
+            getCallDevices: () => Promise<{ success: boolean; devices: unknown[] }>;
+            getCallParams: (callId: string) => Promise<{ success: boolean; kind: 'audio' | 'video'; codecs: string[] }>;
+            onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) => UpeerUnsubscribe;
+            onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
+            onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
+            onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => UpeerUnsubscribe;
+            onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown }) => void) => UpeerUnsubscribe;
+            onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => UpeerUnsubscribe;
+            onCallMeta: (callback: (data: { callId: string; peerUpeerId: string; meta?: unknown }) => void) => UpeerUnsubscribe;
         }
     }
 }

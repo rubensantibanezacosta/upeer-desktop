@@ -11,6 +11,7 @@ import type { ChatMessage, PendingFile } from '../../types/chat.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { NavigationRail } from './NavigationRail.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
+import { useCall } from '../../features/call/useCall.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
@@ -112,6 +113,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     isContactInfoOpen,
     setIsInviteGroupMembersOpen,
 }) => {
+    const { startCall } = useCall();
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
@@ -184,6 +186,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onAccept={isIncomingRequest ? undefined : handleAcceptContact}
                                             onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
                                             onSearch={() => setIsChatSearchOpen(true)}
+                                            onCallAudio={() => void startCall(targetUpeerId, 'audio')}
+                                            onCallVideo={() => void startCall(targetUpeerId, 'video')}
                                         />
                                     )}
 

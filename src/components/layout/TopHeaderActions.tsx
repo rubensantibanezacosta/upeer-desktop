@@ -15,6 +15,8 @@ interface TopHeaderActionsProps {
     isAdmin?: boolean;
     onInviteMembers?: () => void;
     onSearch?: () => void;
+    onCallAudio?: () => void;
+    onCallVideo?: () => void;
 }
 
 export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
@@ -25,6 +27,8 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
     isAdmin,
     onInviteMembers,
     onSearch,
+    onCallAudio,
+    onCallVideo,
 }) => (
     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
         {status === 'incoming' && onAccept && (
@@ -39,10 +43,10 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
                     <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral" onClick={onSearch}><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
                 <Tooltip title="Llamada de voz" variant="soft">
-                    <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral"><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
+                    <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral" onClick={onCallAudio}><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
                 <Tooltip title="Videollamada" variant="soft">
-                    <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral"><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
+                    <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral" onClick={onCallVideo}><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
                 </Tooltip>
                 {isGroup && isAdmin && onInviteMembers && (
                     <Tooltip title="Añadir miembros" variant="soft">
