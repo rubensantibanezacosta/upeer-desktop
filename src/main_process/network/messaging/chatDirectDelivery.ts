@@ -47,6 +47,7 @@ type ConnectedSendOptions = {
     persistMessage?: boolean;
     scheduleVaultFallback?: boolean;
     syncOwnDevices?: boolean;
+    persistContent?: string;
 };
 
 export async function sendConnectedChatMessage({
@@ -62,6 +63,7 @@ export async function sendConnectedChatMessage({
     persistMessage = true,
     scheduleVaultFallback = true,
     syncOwnDevices = true,
+    persistContent,
 }: ConnectedSendOptions): Promise<void> {
     const encryptedData = await encryptChatPayload(upeerId, payload, contact);
     const contactPublicKey = contact.publicKey ?? undefined;
@@ -77,7 +79,7 @@ export async function sendConnectedChatMessage({
     const isToSelf = upeerId === selfId;
 
     if (persistMessage) {
-        await saveMessage(msgId, upeerId, true, payload, replyTo, signatureHex, isToSelf ? 'read' : 'sent', selfId, timestamp);
+        await saveMessage(msgId, upeerId, true, persistContent ?? payload, replyTo, signatureHex, isToSelf ? 'read' : 'sent', selfId, timestamp);
     }
 
     const selfAddresses = syncOwnDevices ? await getSelfAddresses(selfId) : [];

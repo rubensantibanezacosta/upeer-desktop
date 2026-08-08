@@ -20,6 +20,10 @@ vi.mock('../../../src/main_process/network/cryptoUtils.js', () => ({
     safeBufferFromHex: vi.fn((v: string) => Buffer.from(v, 'hex')),
 }));
 
+vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
+    getVouchScore: vi.fn(async () => 50),
+}));
+
 type RenewalToken = {
     targetId: string;
     allowedUntil: number;
@@ -176,6 +180,34 @@ describe('renewalTokens', () => {
                 findValue: vi.fn().mockResolvedValue(null),
             } as never);
             expect(await mod.canRenewLocationBlockWithDHT({}, 'aa'.repeat(32), 'target-1')).toBe(false);
+        });
+    });
+
+    describe('trustBasedMaxRenewals', () => {
+        it('escala el límite de renovaciones según la reputación', () => {
+            expect(mod.trustBasedMaxRenewals(90)).toBe(6);
+            expect(mod.trustBasedMaxRenewals(80)).toBe(6);
+            expect(mod.trustBasedMaxRenewals(70)).toBe(4);
+            expect(mod.trustBasedMaxRenewals(60)).toBe(4);
+            expect(mod.trustBasedMaxRenewals(50)).toBe(3);
+            expect(mod.trustBasedMaxRenewals(30)).toBe(2);
+        });
+    });
+
+    describe('generateTrustBasedRenewalToken', () => {
+        it('genera un token con maxRenewals según el vouch score del nodo', async () => {
+            const vouches = await import('../../../src/main_process/security/reputation/vouches.js');
+            vi.mocked(vouches.getVouchScore).mockResolvedValue(85);
+            const token = await mod.generateTrustBasedRenewalToken('target-1');
+            expect(token.maxRenewals).toBe(6);
+            expect(token.targetId).toBe('target-1');
+        });
+
+        it('usa un límite por defecto si el vouch score falla', async () => {
+            const vouches = await import('../../../src/main_process/security/reputation/vouches.js');
+            vi.mocked(vouches.getVouchScore).mockRejectedValue(new Error('db'));
+            const token = await mod.generateTrustBasedRenewalToken('target-1');
+            expect(token.maxRenewals).toBe(3);
         });
     });
 });

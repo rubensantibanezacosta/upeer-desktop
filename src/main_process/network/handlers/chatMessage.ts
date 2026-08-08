@@ -11,6 +11,7 @@ import {
     getMyUPeerId,
 } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
+import { decompressMessage } from '../../utils/messageCompression.js';
 import { error, warn, info } from '../../security/secure-logger.js';
 import { isValidMessageId } from './chatShared.js';
 import type { RatchetHeader } from '../../security/ratchetShared.js';
@@ -189,7 +190,7 @@ export async function handleChatMessage(
             warn('Dropping chat message that could not be decrypted with Double Ratchet', { upeerId, msgId }, 'security');
             return;
         }
-        displayContent = decryptedContent;
+        displayContent = decompressMessage(decryptedContent);
     } else if (data.nonce) {
         const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
         sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });

@@ -493,5 +493,31 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         expect((aConn.call as CallState | null)?.phase).toBe('connected');
         expect(callId.length).toBe(32);
     });
+
+    it('compresión de mensajes: mensaje largo se comprime y llega descomprimido', async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        const aStart = await nodeA.start({ routing });
+        const aInfo = aStart.upeerId;
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const longText = 'Lorem ipsum dolor sit amet consectetur adipiscing elit '.repeat(30);
+        expect(longText.length).toBeGreaterThan(512);
+        await nodeA.request('sendMessage', { to: bInfo.upeerId, content: longText });
+        await sleep(900);
+
+        const bMessages = await nodeB.request('getMessages', { contactId: aInfo });
+        const received = (bMessages.messages as Array<{ message: string }>).find((m) => m.message === longText);
+        expect(received).toBeTruthy();
+    });
 });
 

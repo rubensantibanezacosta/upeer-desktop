@@ -13,6 +13,7 @@ import { buildMessagePayload } from '../messagePayload.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { compressMessage } from '../../utils/messageCompression.js';
 import { sendConnectedChatMessage } from './chatDirectDelivery.js';
 import {
     emitMessageStatusUpdated,
@@ -127,11 +128,13 @@ export async function sendUDPMessage(
 
     const timestamp = Date.now();
     const knownAddresses = parseKnownAddresses(contact.knownAddresses, upeerId, 'Failed to parse knownAddresses for message send');
+    const wirePayload = compressMessage(payload);
     await sendConnectedChatMessage({
         contact,
         knownAddresses,
         msgId,
-        payload,
+        payload: wirePayload,
+        persistContent: payload,
         replyTo,
         selfId,
         timestamp,

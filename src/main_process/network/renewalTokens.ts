@@ -16,6 +16,24 @@ export function generateRenewalToken(targetId: string, maxRenewals = 3): Renewal
     return { targetId, allowedUntil, maxRenewals, renewalsUsed: 0, signature };
 }
 
+export function trustBasedMaxRenewals(score: number): number {
+    if (score >= 80) return 6;
+    if (score >= 60) return 4;
+    if (score >= 40) return 3;
+    return 2;
+}
+
+export async function generateTrustBasedRenewalToken(targetId: string): Promise<RenewalToken> {
+    let score = 50;
+    try {
+        const { getVouchScore } = await import('../security/reputation/vouches.js');
+        score = await getVouchScore(targetId);
+    } catch {
+        score = 50;
+    }
+    return generateRenewalToken(targetId, trustBasedMaxRenewals(score));
+}
+
 export function verifyRenewalToken(token: RenewalToken, publicKeyHex: string): boolean {
     if (token.allowedUntil < Date.now()) return false;
     if (token.renewalsUsed >= token.maxRenewals) return false;

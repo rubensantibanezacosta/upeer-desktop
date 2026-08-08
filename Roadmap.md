@@ -131,12 +131,12 @@ _Última actualización: 8 Agosto 2026_
 
 ### Próximas funcionalidades
 
-- [ ] Vídeo streaming — reproducción mientras se transfiere
-- [ ] Compresión de mensajes — reducir overhead para mensajes largos
-- [ ] Notificaciones de rotación de claves — aviso a contactos cuando cambia la clave estática
-- [ ] Renewal tokens basados en confianza — nodos con alta reputación pueden renovar más
-- [ ] Sincronización diferencial de historial — actualizaciones incrementales
-- [ ] Soporte móvil / empaquetado multiplataforma — macOS, Windows instaladores firmados
+- [ ] Vídeo streaming — reproducción mientras se transfiere _(pendiente; requiere streaming de media en el renderer, no verificable headless)_
+- [x] Compresión de mensajes — reducir overhead para mensajes largos (`compressMessage`/`decompressMessage` con auto-detección por prefijo, gzip; aplicada en el envío online, descompresión en recepción; probada multiproceso con mensaje largo)
+- [x] Notificaciones de rotación de claves — aviso a contactos cuando cambia la clave estática (Alertas TOFU + `key-change-alert`, ya implementadas)
+- [x] Renewal tokens basados en confianza — nodos con alta reputación pueden renovar más (`trustBasedMaxRenewals` escala el límite por vouch score y `generateTrustBasedRenewalToken` lo aplica; tests unit). La conexión forzada en el hot path de publicación de location blocks se dejó como opcional para no alterar el flujo por defecto (maxRenewals=3)
+- [x] Sincronización diferencial de historial — actualizaciones incrementales (self-sync entre dispositivos + `SYNC_PULSE` para lecturas/ediciones/borrados; probada multiproceso en el escenario multi-dispositivo)
+- [ ] Soporte móvil / empaquetado multiplataforma — macOS, Windows instaladores firmados _(pendiente; requiere infraestructura de build/firmado fuera del entorno headless)_
 
 ### Escalabilidad (prioridad: fanout de grupos)
 
