@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Box } from '@mui/joy';
 import { Contact, Group } from '../../types/chat.js';
+import { useIsOnline } from '../../hooks/useIsOnline.js';
 import { ContactsPanelList } from './ContactsPanelList.js';
 import { ContactsPanelDetails } from './ContactsPanelDetails.js';
 import { ContactsPanelDeleteDialog } from './ContactsPanelDeleteDialog.js';
@@ -50,7 +51,7 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
 
     const activeContact = visibleContacts.find(contact => contact.upeerId === selectedContactId) || null;
 
-    const isOnline = activeContact?.status === 'connected';
+    const isOnline = useIsOnline(activeContact?.lastSeen);
     const lastSeenText = activeContact && activeContact.lastSeen && !isOnline ?
         new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(activeContact.lastSeen))
         : null;

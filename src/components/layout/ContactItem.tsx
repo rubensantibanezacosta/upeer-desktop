@@ -12,6 +12,7 @@ import { Contact } from '../../types/chat.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { ContactItemActions } from './ContactItemActions.js';
 import { formatContactTime, getTrustIndicator, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
+import { useIsOnline } from '../../hooks/useIsOnline.js';
 
 interface ContactItemProps {
     contact: Contact;
@@ -25,7 +26,7 @@ interface ContactItemProps {
 
 export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '' }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
-    const isOnline = c.lastSeen && (new Date().getTime() - new Date(c.lastSeen).getTime()) < 65000;
+    const isOnline = useIsOnline(c.lastSeen);
     const isPending = c.status === 'pending' || c.status === 'incoming';
 
     const timeStr = isPending && c.status === 'incoming' ? formatContactTime(c.lastSeen) : formatContactTime(c.lastMessageTime);

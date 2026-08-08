@@ -63,6 +63,14 @@ export function resetPendingDirectMessages(): void {
     retryingPeers.clear();
 }
 
+export function getPendingDirectCount(upeerId: string): number {
+    let count = 0;
+    for (const message of pendingDirectMessages.values()) {
+        if (message.upeerId === upeerId) count += 1;
+    }
+    return count;
+}
+
 export async function retryPendingDirectMessages(upeerId: string): Promise<number> {
     if (retryingPeers.has(upeerId)) return 0;
 

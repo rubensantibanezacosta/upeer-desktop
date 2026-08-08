@@ -83,6 +83,25 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             }
         });
 
+        window.upeer.onPresence((data: { upeerId: string; lastSeen?: string; alias?: string; avatar?: string }) => {
+            if (!data?.upeerId) {
+                return;
+            }
+            set((state) => ({
+                contacts: state.contacts.map((contact) => {
+                    if (contact.upeerId !== data.upeerId) {
+                        return contact;
+                    }
+                    return {
+                        ...contact,
+                        ...(data.lastSeen !== undefined ? { lastSeen: data.lastSeen } : {}),
+                        ...(data.alias !== undefined ? { alias: data.alias } : {}),
+                        ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
+                    };
+                }),
+            }));
+        });
+
         window.upeer.onContactUntrustworthy((data) => {
             const nextAlert: UntrustworthyInfo = {
                 upeerId: data.upeerId,
