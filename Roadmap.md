@@ -1,6 +1,6 @@
 # Roadmap uPeer
 
-_Última actualización: 12 Marzo 2026_
+_Última actualización: 8 Agosto 2026_
 
 ---
 
@@ -49,6 +49,7 @@ _Última actualización: 12 Marzo 2026_
 - [x] Indicador "Escribiendo…" — en tiempo real con debounce (2,5 s)
 - [x] Presencia — "En línea" / "Última vez visto" por heartbeats autenticados
 - [x] Vault — almacén cifrado de mensajes para contactos offline (hasta 1 GB)
+- [x] **Mensajes de voz** — grabación (`useAudioRecorder` + `useRecordingWaveform`), envío como nota de voz (`isVoiceNote`) y reproducción (`AudioPlayer` con wavesurfer); funcionan en chats privados y grupos
 - [x] **Social Mesh Resilience** — entrega robusta de mensajes offline via Vault + punteros DHT automáticos
 
 ### Grupos
@@ -70,6 +71,8 @@ _Última actualización: 12 Marzo 2026_
 - [x] UI completa — `FilePreviewOverlay`, `TransferProgressBar`, `MediaFileMessage`, `DocumentFileMessage`
 - [x] Diálogo "Guardar como" nativo — `show-save-dialog` + `save-transferred-file`
 - [x] Abrir archivo con app del sistema — `open-file` vía `shell.openPath`
+- [x] **Cifrado E2EE para archivos** — AES-256-GCM por chunk (`encryptChunk`/`decryptChunk`) + clave AES sellada al peer con sealed box (`sealTransferKey`/`unsealTransferKey`)
+- [x] **Velocidad y tiempo restante** en `TransferProgressBar` — `useTransferSpeed` (`speedBps`/`etaSeconds`) con ventana de muestras de 3 s
 - [x] **Estado 'Vaulted' para adjuntos** — actualización automática a doble tick gris tras replicación exitosa en bóvedas
 - [x] **Compatibilidad Nativa Wayland** — corrección de diálogos de archivos bloqueantes y habilitación de `--ozone-platform-hint=wayland`
 
@@ -122,18 +125,13 @@ _Última actualización: 12 Marzo 2026_
 - [x] Ajustes de Apariencia — tema claro/oscuro/sistema aplicado en vivo y tamaño de fuente propagado
 - [x] "Liberar espacio" en Almacenamiento — handler `cleanupVaultExpired` y refresco de estadísticas
 - [x] Búsqueda de mensajes en chat — buscador en `TopHeader` con resultados y salto al mensaje
+- [x] **Velocidad y tiempo restante en `TransferProgressBar`** — `useTransferSpeed` calcula `speedBps`/`etaSeconds` (ventana 3 s, mín. 500 ms de muestra); se muestra "Velocidad:" y "Tiempo restante:"
 - [ ] Llamadas de voz / vídeo — botones presentes en `TopHeader`, sin implementar
 - [x] Archivar chat, silenciar, fijar, favoritos — acciones en menú contextual persistentes (`useChatActionsStore`)
-- [x] Marcar como no leído — handler en menú contextual persistente
-- [ ] Velocidad y tiempo restante en `TransferProgressBar` — muestra "calculando…"
 
 ### Próximas funcionalidades
 
-- [ ] Mensajes de voz — grabación y envío de audio comprimido
 - [ ] Vídeo streaming — reproducción mientras se transfiere
-- [ ] Cifrado E2EE para archivos — integración con claves efímeras del ratchet
-- [x] Transferencias simultáneas — límite configurable `maxConcurrentTransfers` (máx. 3 por defecto)
-- [x] Historial de archivos compartidos — búsqueda y organización por tipo (Ajustes → Almacenamiento)
 - [ ] Compresión de mensajes — reducir overhead para mensajes largos
 - [ ] Notificaciones de rotación de claves — aviso a contactos cuando cambia la clave estática
 - [ ] Renewal tokens basados en confianza — nodos con alta reputación pueden renovar más
