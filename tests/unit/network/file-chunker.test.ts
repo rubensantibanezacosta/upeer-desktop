@@ -138,4 +138,97 @@ describe('FileChunker - Unit Tests', () => {
         const lastChunk = await chunker.createChunkData(transfer as FileTransfer, 2);
         expect(Buffer.from(lastChunk.data, 'base64').length).toBe(2500 - 2048);
     });
+
+    it('should throw when createChunkData has no file path', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1',
+            fileSize: 10,
+            direction: 'sending',
+            totalChunks: 1,
+            chunkSize: 1024,
+        };
+        await expect(chunker.createChunkData(transfer as FileTransfer, 0)).rejects.toThrow('No file path');
+    });
+
+    it('should throw when createChunkData reads beyond file size', async () => {
+        const testFilePath = path.join(tempTestDir, 'small.txt');
+        await fs.writeFile(testFilePath, Buffer.alloc(500));
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1',
+            fileSize: 500,
+            direction: 'sending',
+            totalChunks: 1,
+            chunkSize: 1024,
+            filePath: testFilePath,
+        };
+        await expect(chunker.createChunkData(transfer as FileTransfer, 2)).rejects.toThrow('Invalid chunk range');
+    });
+
+    it('should throw when createTempFile is not for receiving', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1',
+            fileSize: 10,
+            direction: 'sending',
+            totalChunks: 1,
+            chunkSize: 1024,
+        };
+        await expect(chunker.createTempFile(transfer as FileTransfer)).rejects.toThrow('Can only create temp files');
+    });
+
+    it('should throw when writeChunk has no temp path', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1',
+            fileSize: 10,
+            direction: 'receiving',
+            totalChunks: 1,
+            chunkSize: 1024,
+        };
+        await expect(chunker.writeChunk(transfer as FileTransfer, {
+            fileId: 'f1', chunkIndex: 0, totalChunks: 1, data: 'x', chunkHash: 'y',
+        })).rejects.toThrow('No temp path');
+    });
+
+    it('should read the complete temp file', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1',
+            fileSize: 10,
+            direction: 'receiving',
+            totalChunks: 1,
+            chunkSize: 1024,
+        };
+        await chunker.createTempFile(transfer as FileTransfer);
+        await fs.writeFile(transfer.tempPath as string, Buffer.alloc(10, 5));
+        const data = await chunker.readCompleteFile(transfer as FileTransfer);
+        expect(data.length).toBe(10);
+    });
+
+    it('should throw when readCompleteFile has no temp path', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1', fileSize: 1, direction: 'receiving', totalChunks: 1, chunkSize: 1024,
+        };
+        await expect(chunker.readCompleteFile(transfer as FileTransfer)).rejects.toThrow('No temp path');
+    });
+
+    it('should calculate chunks, validate index and manage chunk size', () => {
+        expect(chunker.calculateChunks(2500)).toBe(3);
+        expect(chunker.calculateChunks(2500, 500)).toBe(5);
+        expect(chunker.validateChunkIndex(0, 3)).toBe(true);
+        expect(chunker.validateChunkIndex(3, 3)).toBe(false);
+        expect(chunker.getChunkSize()).toBe(1024);
+
+        chunker.setChunkSize(512);
+        expect(chunker.getChunkSize()).toBe(512);
+
+        expect(() => chunker.setChunkSize(0)).toThrow('must be positive');
+        expect(() => chunker.setChunkSize(999999)).toThrow('cannot exceed');
+    });
+
+    it('should cleanup temp files without throwing when paths are missing', async () => {
+        const transfer: ChunkerTestTransfer = {
+            fileId: 'f1', fileSize: 1, direction: 'receiving', totalChunks: 1, chunkSize: 1024,
+        };
+        await chunker.createTempFile(transfer as FileTransfer);
+        await expect(chunker.cleanupTempFile(transfer as FileTransfer)).resolves.toBeUndefined();
+        await expect(chunker.cleanupTempFile({ fileId: 'f2' } as FileTransfer)).resolves.toBeUndefined();
+    });
 });

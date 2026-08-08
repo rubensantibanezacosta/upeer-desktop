@@ -3,6 +3,7 @@ import { TransferValidator } from '../../../src/main_process/network/file-transf
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 
 describe('TransferValidator - Unit Tests', () => {
     let validator: TransferValidator;
@@ -76,6 +77,62 @@ describe('TransferValidator - Unit Tests', () => {
             const _invalid = { ...validMeta, fileSize: 5000, totalChunks: 1, chunkSize: 100 };
             // Este test depende de si el validador comprueba la coherencia matemática
             // Agreguemos una comprobación de coherencia si no existe
+        });
+    });
+
+    describe('verifyFileHash', () => {
+        it('should throw without temp path', async () => {
+            await expect(validator.verifyFileHash({ fileId: 'f1' } as never, 'abc')).rejects.toThrow('No temp file');
+        });
+
+        it('should verify a matching hash', async () => {
+            const testFile = path.join(tempTestDir, 'hash.txt');
+            await fs.writeFile(testFile, Buffer.from('contenido de prueba'));
+            const hash = crypto.createHash('sha256').update('contenido de prueba').digest('hex');
+            await expect(validator.verifyFileHash({ fileId: 'f1', tempPath: testFile } as never, hash)).resolves.toBeUndefined();
+        });
+
+        it('should throw on hash mismatch', async () => {
+            const testFile = path.join(tempTestDir, 'hash2.txt');
+            await fs.writeFile(testFile, Buffer.from('contenido'));
+            await expect(validator.verifyFileHash({ fileId: 'f1', tempPath: testFile } as never, 'a'.repeat(64))).rejects.toThrow('File hash mismatch');
+        });
+    });
+
+    describe('validateChunkData', () => {
+        const transfer = { fileId: 'f1', totalChunks: 5 } as never;
+
+        it('should accept valid chunk data', () => {
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'f1', chunkIndex: 2, totalChunks: 5, data: 'x', chunkHash: 'y',
+            })).not.toThrow();
+        });
+
+        it('should reject fileId, index, totalChunks, data and hash mismatches', () => {
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'other', chunkIndex: 0, totalChunks: 5, data: 'x', chunkHash: 'y',
+            })).toThrow('File ID mismatch');
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'f1', chunkIndex: 9, totalChunks: 5, data: 'x', chunkHash: 'y',
+            })).toThrow('Invalid chunk index');
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'f1', chunkIndex: 0, totalChunks: 3, data: 'x', chunkHash: 'y',
+            })).toThrow('Total chunks mismatch');
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'f1', chunkIndex: 0, totalChunks: 5, data: '', chunkHash: 'y',
+            })).toThrow('Invalid chunk data');
+            expect(() => validator.validateChunkData(transfer, {
+                fileId: 'f1', chunkIndex: 0, totalChunks: 5, data: 'x', chunkHash: '',
+            })).toThrow('Invalid chunk hash');
+        });
+    });
+
+    describe('max file size accessors', () => {
+        it('should get and set max file size', () => {
+            expect(validator.getMaxFileSize()).toBe(5000);
+            validator.setMaxFileSize(1000);
+            expect(validator.getMaxFileSize()).toBe(1000);
+            expect(() => validator.setMaxFileSize(0)).toThrow('must be positive');
         });
     });
 });
