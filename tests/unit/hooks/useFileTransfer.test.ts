@@ -290,4 +290,73 @@ describe('useFileTransfer hook', () => {
         expect(result.current.formatProgress(t2)).toBe('45.7%');
         expect(result.current.formatProgress(t3)).toBe('Falló');
     });
+
+    it('retryTransfer llama al IPC y notifica el cambio de estado', async () => {
+        const onStateChange = vi.fn();
+        const { result } = renderHook(() => useFileTransfer(onStateChange));
+        mockUpeer.retryFileTransfer.mockResolvedValue({ success: true });
+        await act(async () => {
+            await result.current.retryTransfer('f1');
+        });
+        expect(mockUpeer.retryFileTransfer).toHaveBeenCalledWith('f1');
+        expect(onStateChange).toHaveBeenCalledWith('f1', { transferState: 'pending' });
+    });
+
+    it('retryTransfer devuelve error si el IPC falla', async () => {
+        const { result } = renderHook(() => useFileTransfer());
+        mockUpeer.retryFileTransfer.mockRejectedValue(new Error('boom'));
+        const res = await result.current.retryTransfer('f1');
+        expect(res.success).toBe(false);
+        expect(res.error).toBeDefined();
+    });
+
+    it('saveFile llama al IPC de guardado', async () => {
+        const { result } = renderHook(() => useFileTransfer());
+        mockUpeer.saveTransferredFile.mockResolvedValue({ success: true });
+        const res = await result.current.saveFile({ fileId: 'f1', destinationPath: '/dest' });
+        expect(mockUpeer.saveTransferredFile).toHaveBeenCalledWith('f1', '/dest');
+        expect(res.success).toBe(true);
+    });
+
+    it('saveFile maneja errores', async () => {
+        const { result } = renderHook(() => useFileTransfer());
+        mockUpeer.saveTransferredFile.mockRejectedValue('no');
+        const res = await result.current.saveFile({ fileId: 'f1', destinationPath: '/dest' });
+        expect(res.success).toBe(false);
+    });
+
+    it('getTransfer busca por fileId y sessionFileId', async () => {
+        const transfer = { fileId: 'f1', sessionFileId: 's1', upeerId: 'p1', direction: 'sending', state: 'active', progress: 0 };
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: [transfer] });
+        const { result } = renderHook(() => useFileTransfer());
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
+        expect(result.current.getTransfer('f1')).toBeDefined();
+        expect(result.current.getTransfer('s1')).toBeDefined();
+        expect(result.current.getTransfer('nope')).toBeUndefined();
+    });
+
+    it('getTransfersForContact filtra por upeerId', async () => {
+        const list = [
+            { fileId: 'f1', upeerId: 'p1', direction: 'sending', state: 'active', progress: 0 },
+            { fileId: 'f2', upeerId: 'p2', direction: 'sending', state: 'active', progress: 0 },
+        ];
+        mockUpeer.getFileTransfers.mockResolvedValue({ success: true, transfers: list });
+        const { result } = renderHook(() => useFileTransfer());
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
+        expect(result.current.getTransfersForContact('p1')).toHaveLength(1);
+    });
+
+    it('openFilePicker y closeFilePicker gestionan el picker', () => {
+        const { result } = renderHook(() => useFileTransfer());
+        act(() => result.current.openFilePicker('p1'));
+        expect(result.current.isFilePickerOpen).toBe(true);
+        expect(result.current.selectedUpeerId).toBe('p1');
+        act(() => result.current.closeFilePicker());
+        expect(result.current.isFilePickerOpen).toBe(false);
+        expect(result.current.selectedUpeerId).toBe('');
+    });
 });
