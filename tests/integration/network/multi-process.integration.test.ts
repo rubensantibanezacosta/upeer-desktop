@@ -565,7 +565,7 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         expect(received.some((t) => t.state === 'completed')).toBe(true);
     });
 
-    it('recovery offline->online: todos los tipos de adjunto (nota de voz, imagen, documento) vaulteados', { timeout: 40000 }, async () => {
+    it('recovery offline->online: vídeo y otros documentos (office, archivo) vaulteados', { timeout: 40000 }, async () => {
         const routing = {
             '200::a': await freePort(),
             '200::b': await freePort(),
@@ -582,21 +582,32 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         await sleep(200);
 
         const stamp = Date.now();
-        const voicePath = path.join(os.tmpdir(), `upeer-voice-${stamp}.ogg`);
-        const imagePath = path.join(os.tmpdir(), `upeer-img-${stamp}.png`);
-        const docPath = path.join(os.tmpdir(), `upeer-doc-${stamp}.pdf`);
-        fs.writeFileSync(voicePath, 'nota de voz codificada en ogg');
-        fs.writeFileSync(imagePath, 'datos de imagen png');
-        fs.writeFileSync(docPath, '%PDF-1.4 datos de documento');
+        const files: Array<{ name: string; content: string; mimePrefix?: string }> = [
+            { name: `upeer-video-${stamp}.mp4`, content: 'datos de vídeo mp4', mimePrefix: 'video' },
+            { name: `upeer-office-${stamp}.docx`, content: 'documento word docx', mimePrefix: 'document' },
+            { name: `upeer-archive-${stamp}.zip`, content: 'archivo comprimido zip', mimePrefix: 'zip' },
+        ];
+        const paths = files.map((f) => {
+            const p = path.join(os.tmpdir(), f.name);
+            fs.writeFileSync(p, f.content);
+            return p;
+        });
 
-        // Fase offline: B no acepta propuestas → A vaultea cada adjunto
+        // Fase offline: B no acepta propuestas → A vaultea cada adjunto.
+        // Máximo 3 simultáneos (maxConcurrentTransfers); se envían y se deja que
+        // cada uno entre en vaulting secuencialmente.
         await nodeB.request('setVaultOffline', { value: true });
         await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
         await sleep(200);
-        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath: voicePath, isVoiceNote: true });
-        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath: imagePath, caption: 'foto' });
-        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath: docPath });
-        await sleep(5000);
+        for (let i = 0; i < files.length; i++) {
+            await nodeA.request('sendFile', {
+                upeerId: bInfo.upeerId,
+                address: '200::b',
+                filePath: paths[i],
+            });
+            await sleep(1500);
+        }
+        await sleep(4000);
 
         const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
         const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
@@ -609,24 +620,22 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
         await sleep(300);
         await nodeB.request('queryOwnVaults');
-        await sleep(8000);
+        await sleep(9000);
 
         const bReceiving = await nodeB.request('getTransfers', { direction: 'receiving' });
-        const received = bReceiving.transfers as Array<{ state: string; fileName?: string; mimeType?: string; isVoiceNote?: boolean; caption?: string }>;
+        const received = bReceiving.transfers as Array<{ state: string; fileName?: string; mimeType?: string }>;
         const completed = received.filter((t) => t.state === 'completed');
 
-        const voice = completed.find((t) => t.fileName?.endsWith('.ogg'));
-        const image = completed.find((t) => t.fileName?.endsWith('.png'));
-        const doc = completed.find((t) => t.fileName?.endsWith('.pdf'));
+        const video = completed.find((t) => t.fileName?.endsWith('.mp4'));
+        const office = completed.find((t) => t.fileName?.endsWith('.docx'));
+        const archive = completed.find((t) => t.fileName?.endsWith('.zip'));
 
-        expect(voice).toBeTruthy();
-        expect(voice?.isVoiceNote).toBe(true);
-        expect(voice?.mimeType).toContain('audio');
-        expect(image).toBeTruthy();
-        expect(image?.mimeType).toContain('image');
-        expect(image?.caption).toBe('foto');
-        expect(doc).toBeTruthy();
-        expect(doc?.mimeType).toBe('application/pdf');
+        expect(video).toBeTruthy();
+        expect(video?.mimeType).toContain('video');
+        expect(office).toBeTruthy();
+        expect(office?.mimeType).toContain('document');
+        expect(archive).toBeTruthy();
+        expect(archive?.mimeType).toContain('zip');
     });
 
     it('recovery offline->online: edición (CHAT_UPDATE) vaulteada se aplica al reconectar', { timeout: 30000 }, async () => {
