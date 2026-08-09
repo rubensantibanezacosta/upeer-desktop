@@ -1,4 +1,5 @@
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { callManager } from './callManager.js';
 import type { CallMediaKind } from './callTypes.js';
@@ -76,9 +77,12 @@ export function sendCallEnd(peerUpeerId: string, callId: string): void {
 
 export function sendCallMedia(peerUpeerId: string, callId: string, data: string): void {
     const session = callManager.get(callId);
-    if (session && session.isGroup && session.groupMembers.length > 0) {
+    if (session && session.isGroup) {
+        const myId = getMyUPeerId();
         for (const member of session.groupMembers) {
-            send(member, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+            if (member !== myId) {
+                send(member, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+            }
         }
         return;
     }
@@ -95,4 +99,18 @@ export function sendCallMediaUpdate(
 
 export function sendCallMeta(peerUpeerId: string, callId: string, meta: Record<string, unknown>): void {
     send(peerUpeerId, { type: 'CALL_META', callId, meta, timestamp: Date.now() });
+}
+
+export function sendCallJoin(callId: string, memberUpeerId: string, kind: CallMediaKind, groupMembers: string[]): void {
+    send(memberUpeerId, {
+        type: 'CALL_JOIN',
+        callId,
+        kind,
+        groupMembers,
+        timestamp: Date.now(),
+    });
+}
+
+export function sendCallLeave(callId: string, memberUpeerId: string): void {
+    send(memberUpeerId, { type: 'CALL_LEAVE', callId, timestamp: Date.now() });
 }

@@ -494,6 +494,59 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         expect(callId.length).toBe(32);
     });
 
+    it('llamada de grupo: join dinámico de un participante y fan-out de media', async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+            '200::c': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        const nodeC = new PeerProcess('200::c');
+        peers.push(nodeA, nodeB, nodeC);
+
+        await nodeA.start({ routing });
+        const aInfo = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeC.start({ routing });
+
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await nodeA.addPeer(nodeC, '200::c');
+        await nodeC.addPeer(nodeA, '200::a');
+        await nodeB.addPeer(nodeC, '200::c');
+        await nodeC.addPeer(nodeB, '200::b');
+        await sleep(300);
+
+        const start = await nodeA.request('startGroupCall', { members: [bInfo.upeerId, aInfo], kind: 'audio' });
+        expect(start.ok).toBe(true);
+        const callId = start.callId as string;
+        await sleep(500);
+
+        // B acepta y la llamada queda activa (A + B).
+        await nodeB.request('acceptCall');
+        await sleep(400);
+        await nodeA.request('connectCall');
+        await nodeB.request('connectCall');
+        await sleep(300);
+
+        // C se une dinámicamente: crea su sesión de grupo local y participa.
+        const joined = await nodeC.request('joinGroupCall', { callId, members: [aInfo, bInfo.upeerId], kind: 'audio' });
+        expect(joined.ok).toBe(true);
+        expect((joined.connected as string[]).length).toBeGreaterThanOrEqual(1);
+
+        // C envía media; B lo recibe (fan-out de CALL_MEDIA a participantes).
+        await nodeC.request('sendMedia', { data: 'frame-join' });
+        await sleep(500);
+        const bEvents = await nodeB.request('getSentEvents');
+        expect((bEvents.events as Array<{ channel: string }>).some((event) => event.channel === 'call-media')).toBe(true);
+
+        // C abandona su sesión de grupo.
+        const left = await nodeC.request('leaveGroupCall');
+        expect(left.ok).toBe(true);
+        expect(callId.length).toBe(32);
+    });
+
     it('compresión de mensajes: mensaje largo se comprime y llega descomprimido', async () => {
         const routing = {
             '200::a': await freePort(),

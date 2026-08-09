@@ -6,5 +6,6 @@ export default defineConfig({
         environment: 'node',
         include: ['tests/integration/**/*.integration.test.ts'],
         setupFiles: ['./tests/setup-test-mocks.js'],
+        testTimeout: 30000,
     },
 });

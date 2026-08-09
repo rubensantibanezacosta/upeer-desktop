@@ -239,6 +239,36 @@ process.on('message', (msg) => {
             case 'getActiveCall':
                 reply(msg._id, { ok: true, call: callManager.getActive() ?? null });
                 break;
+            case 'joinGroupCall': {
+                const active = callManager.getActive();
+                const callId = active?.callId ?? msg.callId;
+                if (callId) {
+                    const myId = identity.getMyUPeerId();
+                    const members = Array.isArray(msg.members) ? msg.members : (active?.groupMembers ?? []);
+                    if (!callManager.get(callId)) {
+                        const created = callManager.createGroup(members, active?.kind ?? msg.kind ?? 'audio');
+                        callManager.joinGroup(created.callId, myId);
+                    } else {
+                        callManager.joinGroup(callId, myId);
+                    }
+                }
+                const activeAfter = callManager.getActive();
+                reply(msg._id, { ok: true, connected: activeAfter ? callManager.getConnectedMembers(activeAfter.callId) : [] });
+                break;
+            }
+            case 'leaveGroupCall': {
+                const active = callManager.getActive();
+                if (active) {
+                    callManager.leaveGroup(active.callId, identity.getMyUPeerId());
+                }
+                reply(msg._id, { ok: true });
+                break;
+            }
+            case 'getConnectedMembers': {
+                const activeCall = callManager.getActive();
+                reply(msg._id, { ok: true, connected: activeCall ? callManager.getConnectedMembers(activeCall.callId) : [] });
+                break;
+            }
             case 'getMessageById':
                 reply(msg._id, { ok: true, message: messages.getMessageById(msg.id) ?? null });
                 break;

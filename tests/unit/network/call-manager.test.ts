@@ -109,4 +109,42 @@ describe('callManager', () => {
         expect(change.groupMembers).toEqual(['peer1']);
         unsubscribe();
     });
+
+    it('getAll devuelve todas las sesiones activas', () => {
+        callManager.resetForTests();
+        callManager.create('peer1', 'audio', 'outgoing');
+        callManager.createGroup(['peer2'], 'video');
+        const all = callManager.getAll();
+        expect(all.length).toBe(2);
+        const byPeer = new Map(all.map((s) => [s.peerUpeerId, s]));
+        expect(byPeer.has('peer1')).toBe(true);
+        expect(byPeer.has('peer2')).toBe(true);
+    });
+
+    it('joinGroup añade miembro y lo marca como conectado', () => {
+        callManager.resetForTests();
+        const session = callManager.createGroup(['peer1', 'peer2'], 'audio');
+        callManager.joinGroup(session.callId, 'peer1');
+        callManager.joinGroup(session.callId, 'peer2');
+        expect(callManager.getConnectedMembers(session.callId)).toEqual(['peer1', 'peer2']);
+        expect(callManager.get(session.callId)?.groupMembers).toContain('peer1');
+    });
+
+    it('joinGroup añade un miembro nuevo no incluido inicialmente', () => {
+        callManager.resetForTests();
+        const session = callManager.createGroup(['peer1'], 'audio');
+        callManager.joinGroup(session.callId, 'peer9');
+        expect(callManager.get(session.callId)?.groupMembers).toContain('peer9');
+        expect(callManager.getConnectedMembers(session.callId)).toContain('peer9');
+    });
+
+    it('leaveGroup elimina miembro de conectados y de la lista', () => {
+        callManager.resetForTests();
+        const session = callManager.createGroup(['peer1', 'peer2'], 'audio');
+        callManager.joinGroup(session.callId, 'peer1');
+        callManager.joinGroup(session.callId, 'peer2');
+        callManager.leaveGroup(session.callId, 'peer1');
+        expect(callManager.getConnectedMembers(session.callId)).toEqual(['peer2']);
+        expect(callManager.get(session.callId)?.groupMembers).not.toContain('peer1');
+    });
 });

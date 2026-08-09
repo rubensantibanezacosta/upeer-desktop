@@ -1,8 +1,11 @@
 import { ipcMain } from 'electron';
 import { callManager } from '../../network/call/callManager.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import {
     sendCallAccept,
     sendCallEnd,
+    sendCallJoin,
+    sendCallLeave,
     sendCallMedia,
     sendCallMediaUpdate,
     sendCallOffer,
@@ -150,6 +153,44 @@ export function registerCallHandlers(): void {
                 isGroup: session.isGroup,
                 groupMembers: session.groupMembers,
             })),
+        };
+    });
+
+    ipcMain.handle('join-group-call', (event, { callId }) => {
+        if (!isValidCallId(callId)) {
+            return { success: false, error: 'Invalid callId' };
+        }
+        const session = callManager.get(callId);
+        if (!session) {
+            return { success: false, error: 'Call not found' };
+        }
+        const myId = getMyUPeerId();
+        callManager.joinGroup(callId, myId);
+        sendCallJoin(callId, session.peerUpeerId, session.kind, session.groupMembers);
+        return { success: true, connected: callManager.getConnectedMembers(callId) };
+    });
+
+    ipcMain.handle('leave-group-call', (event, { callId }) => {
+        if (!isValidCallId(callId)) {
+            return { success: false, error: 'Invalid callId' };
+        }
+        const session = callManager.get(callId);
+        if (session) {
+            const myId = getMyUPeerId();
+            callManager.leaveGroup(callId, myId);
+            sendCallLeave(callId, session.peerUpeerId);
+        }
+        return { success: true };
+    });
+
+    ipcMain.handle('call-group-members', (event, { callId }) => {
+        if (!isValidCallId(callId)) {
+            return { success: false, error: 'Invalid callId' };
+        }
+        return {
+            success: true,
+            connected: callManager.getConnectedMembers(callId),
+            members: callManager.get(callId)?.groupMembers ?? [],
         };
     });
 }

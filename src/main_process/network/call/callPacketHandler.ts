@@ -3,6 +3,7 @@ import { warn } from '../../security/secure-logger.js';
 import { callManager } from './callManager.js';
 import {
     sendCallBusy,
+    sendCallMeta,
     sendCallRing,
 } from './callSignaling.js';
 import type { CallMediaKind } from './callTypes.js';
@@ -99,5 +100,33 @@ export function handleCallPacket(
         case 'CALL_META':
             win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta: data.meta });
             break;
+        case 'CALL_JOIN': {
+            const rawMembers = Array.isArray(data.groupMembers)
+                ? data.groupMembers.filter((value): value is string => typeof value === 'string' && value.length > 0)
+                : [];
+            callManager.joinGroup(callId, upeerId);
+            const session = callManager.get(callId);
+            const members = session?.groupMembers ?? rawMembers;
+            // Notificar a los participantes de la llamada la incorporación del nuevo miembro.
+            for (const member of members) {
+                if (member !== upeerId) {
+                    sendCallMeta(member, callId, { type: 'member-joined', member: upeerId, connected: callManager.getConnectedMembers(callId) });
+                }
+            }
+            win?.webContents.send('call-member-joined', { callId, peerUpeerId: upeerId, connected: callManager.getConnectedMembers(callId) });
+            break;
+        }
+        case 'CALL_LEAVE': {
+            callManager.leaveGroup(callId, upeerId);
+            const session = callManager.get(callId);
+            const members = session?.groupMembers ?? [];
+            for (const member of members) {
+                if (member !== upeerId) {
+                    sendCallMeta(member, callId, { type: 'member-left', member: upeerId, connected: callManager.getConnectedMembers(callId) });
+                }
+            }
+            win?.webContents.send('call-member-left', { callId, peerUpeerId: upeerId, connected: callManager.getConnectedMembers(callId) });
+            break;
+        }
     }
 }

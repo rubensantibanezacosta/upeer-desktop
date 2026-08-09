@@ -11,6 +11,8 @@ const CALL_TYPES = new Set([
     'CALL_MEDIA',
     'CALL_MEDIA_UPDATE',
     'CALL_META',
+    'CALL_JOIN',
+    'CALL_LEAVE',
 ]);
 
 const MAX_CALL_ID = 128;

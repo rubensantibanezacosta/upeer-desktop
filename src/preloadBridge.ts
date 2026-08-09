@@ -200,6 +200,9 @@ const callApi = {
     getCallDevices: () => ipcRenderer.invoke('call-devices'),
     getCallParams: (callId: string) => ipcRenderer.invoke('call-params', { callId }),
     getAllCalls: () => ipcRenderer.invoke('get-all-calls'),
+    joinGroupCall: (callId: string) => ipcRenderer.invoke('join-group-call', { callId }),
+    leaveGroupCall: (callId: string) => ipcRenderer.invoke('leave-group-call', { callId }),
+    getCallGroupMembers: (callId: string) => ipcRenderer.invoke('call-group-members', { callId }),
 };
 
 const networkApi = {

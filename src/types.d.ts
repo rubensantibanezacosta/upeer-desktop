@@ -212,6 +212,9 @@ declare global {
                 isGroup?: boolean;
                 groupMembers?: string[];
             }> }>;
+            joinGroupCall: (callId: string) => Promise<{ success: boolean; connected?: string[]; error?: string }>;
+            leaveGroupCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
+            getCallGroupMembers: (callId: string) => Promise<{ success: boolean; connected: string[]; members: string[] }>;
             onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) => UpeerUnsubscribe;
             onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
             onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;

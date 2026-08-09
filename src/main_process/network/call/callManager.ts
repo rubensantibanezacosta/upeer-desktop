@@ -25,6 +25,7 @@ class CallManager {
     private sessions = new Map<string, CallSession>();
     private listeners = new Set<CallStateListener>();
     private timers = new Map<string, ReturnType<typeof setTimeout>>();
+    private connectedMembers = new Map<string, Set<string>>();
 
     getActive(): CallSession | null {
         for (const session of this.sessions.values()) {
@@ -43,6 +44,43 @@ class CallManager {
         return Array.from(this.sessions.values()).filter(
             (session) => session.phase !== 'ended' && session.phase !== 'idle',
         );
+    }
+
+    joinGroup(callId: string, memberUpeerId: string): void {
+        const session = this.sessions.get(callId);
+        if (!session || !session.isGroup) {
+            return;
+        }
+        if (!session.groupMembers.includes(memberUpeerId)) {
+            session.groupMembers.push(memberUpeerId);
+        }
+        const members = this.connectedMembers.get(callId) ?? new Set<string>();
+        members.add(memberUpeerId);
+        this.connectedMembers.set(callId, members);
+        if (session.phase === 'outgoing-ringing' || session.phase === 'incoming-ringing') {
+            this.transition(callId, 'negotiating');
+        }
+        this.notify(callId);
+    }
+
+    leaveGroup(callId: string, memberUpeerId: string): void {
+        const members = this.connectedMembers.get(callId);
+        if (members) {
+            members.delete(memberUpeerId);
+        }
+        const session = this.sessions.get(callId);
+        if (!session) {
+            return;
+        }
+        const idx = session.groupMembers.indexOf(memberUpeerId);
+        if (idx >= 0) {
+            session.groupMembers.splice(idx, 1);
+        }
+        this.notify(callId);
+    }
+
+    getConnectedMembers(callId: string): string[] {
+        return Array.from(this.connectedMembers.get(callId) ?? []);
     }
 
     hasActiveWith(peerUpeerId: string): boolean {
