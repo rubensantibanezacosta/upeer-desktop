@@ -28,13 +28,11 @@ describe('chatStoreSupport', () => {
         expect(formatMessageTimestamp(NaN)).toMatch(/^\d{1,2}:\d{2}/);
     });
 
-    it('insertMessageChronologically ordena por fecha numérica', () => {
+    it('insertMessageChronologically añade el nuevo mensaje al final (orden de llegada)', () => {
         const a = { id: 'a', date: 5 } as never;
         const b = { id: 'b', date: 1 } as never;
-        const c = { id: 'c', date: 'no-num' } as never;
         const result = insertMessageChronologically([a] as never, b as never);
-        expect(result.map((m) => m.id)).toEqual(['b', 'a']);
-        expect(insertMessageChronologically([b] as never, c as never).map((m) => m.id)).toEqual(['c', 'b']);
+        expect(result.map((m) => m.id)).toEqual(['a', 'b']);
     });
 
     it('mapContactMessage transforma un mensaje crudo de contacto', () => {

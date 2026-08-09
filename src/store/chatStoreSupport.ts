@@ -11,11 +11,33 @@ export const formatMessageTimestamp = (timestamp?: number) => {
 };
 
 export const insertMessageChronologically = (messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] => {
-    return [...messages, nextMessage].sort((left, right) => {
-        const leftDate = typeof left.date === 'number' ? left.date : 0;
-        const rightDate = typeof right.date === 'number' ? right.date : 0;
-        return leftDate - rightDate;
-    });
+    if (messages.length === 0) {
+        return [nextMessage];
+    }
+    const nextDate = typeof nextMessage.date === 'number' ? nextMessage.date : 0;
+    let minDate = Number.POSITIVE_INFINITY;
+    let maxDate = Number.NEGATIVE_INFINITY;
+    for (const message of messages) {
+        const date = typeof message.date === 'number' ? message.date : 0;
+        if (date < minDate) minDate = date;
+        if (date > maxDate) maxDate = date;
+    }
+    // El timestamp del nuevo mensaje es anterior al más antiguo conocido pero llegó en tiempo
+    // real después (los relojes de los peers no están sincronizados): se añade al final para
+    // respetar el orden de llegada (p.ej. una respuesta a un mensaje anterior de un contacto
+    // con el reloj adelantado no debe aparecer antes que los mensajes ya mostrados).
+    if (nextDate < minDate) {
+        return [...messages, nextMessage];
+    }
+    // El nuevo mensaje es el más reciente conocido: se añade al final.
+    if (nextDate >= maxDate) {
+        return [...messages, nextMessage];
+    }
+    // Cae dentro del rango: se inserta en su posición cronológica.
+    const index = messages.findIndex((message) => (typeof message.date === 'number' ? message.date : 0) > nextDate);
+    const copy = [...messages];
+    copy.splice(index, 0, nextMessage);
+    return copy;
 };
 
 export const mapContactMessage = (message: RawChatMessage): ChatMessage => ({
