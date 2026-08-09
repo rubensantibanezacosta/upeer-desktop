@@ -46,7 +46,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({ call, peerName, avatar
     const isVideo = call.kind === 'video';
 
     useEffect(() => {
-        if (call.phase !== 'connected') {
+        if (call.phase !== 'negotiating' && call.phase !== 'connected') {
             return;
         }
         setOnRemoteFrame((kind, frame) => {

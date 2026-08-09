@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, protocol, session, shell, systemPreferences } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
@@ -151,6 +151,19 @@ export const createMainWindow = async (baseDir: string, devServerUrl: string | u
     });
 
     mainWindow.maximize();
+
+    mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+        if (permission === 'media' || permission === 'mediaKeySystem') {
+            callback(true);
+            return;
+        }
+        callback(false);
+    });
+
+    if (process.platform === 'darwin') {
+        systemPreferences.askForMediaAccess('camera').catch(() => undefined);
+        systemPreferences.askForMediaAccess('microphone').catch(() => undefined);
+    }
 
     if (devServerUrl) {
         await mainWindow.loadURL(devServerUrl);

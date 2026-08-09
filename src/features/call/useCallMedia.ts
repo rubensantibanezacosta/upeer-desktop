@@ -44,7 +44,7 @@ export function useCallMedia() {
     }, []);
 
     useEffect(() => {
-        if (call.phase !== 'connected') {
+        if (call.phase !== 'negotiating' && call.phase !== 'connected') {
             return undefined;
         }
         const session = new WebCodecsSession();
