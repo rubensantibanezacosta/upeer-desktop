@@ -196,6 +196,17 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden' }}>
                 {isGroup ? (
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1, width: '100%', height: '100%', alignItems: 'center' }}>
+                        {/* Self-view: tu propia cámara */}
+                        <Box sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
+                            {isVideoActive && call.cameraEnabled ? (
+                                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                <Avatar sx={{ width: 40, height: 40, fontSize: 18 }}>T</Avatar>
+                            )}
+                            <Box sx={{ position: 'absolute', bottom: 4, left: 4, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                                <Typography level="body-xs">Tú</Typography>
+                            </Box>
+                        </Box>
                         {call.groupMembers?.map((memberId, idx) => (
                             <Box key={memberId} sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {idx === 0 && isVideoActive ? (
@@ -212,8 +223,17 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 ) : isVideoActive ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
                         <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 8 }} />
-                        <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 96, height: 64, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)', backgroundColor: '#000' }}>
-                            <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 120, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.4)', backgroundColor: '#000', boxShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>
+                            {call.cameraEnabled ? (
+                                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>
+                                    <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>T</Avatar>
+                                </Box>
+                            )}
+                            <Box sx={{ position: 'absolute', bottom: 2, left: 4, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                                <Typography level="body-xs">Tú</Typography>
+                            </Box>
                         </Box>
                     </Box>
                 ) : (
