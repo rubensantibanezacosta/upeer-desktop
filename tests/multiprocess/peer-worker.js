@@ -173,7 +173,7 @@ process.on('message', (msg) => {
                 break;
             case 'sendFile':
                 await fileTransferManager
-                    .startSend(msg.upeerId, msg.address, msg.filePath, undefined, msg.caption)
+                    .startSend(msg.upeerId, msg.address, msg.filePath, undefined, msg.caption, msg.isVoiceNote === true)
                     .then((fileId) => reply(msg._id, { ok: true, fileId }))
                     .catch((e) => reply(msg._id, { ok: false, error: String(e) }));
                 break;
@@ -181,6 +181,12 @@ process.on('message', (msg) => {
                 reply(msg._id, {
                     ok: true,
                     transfers: fileTransferManager.getAllTransfers().filter((t) => t.direction === msg.direction),
+                });
+                break;
+            case 'readTransferFile':
+                reply(msg._id, {
+                    ok: true,
+                    transfer: fileTransferManager.getTransfer(msg.fileId, 'receiving') ?? null,
                 });
                 break;
             case 'queryOwnVaults':

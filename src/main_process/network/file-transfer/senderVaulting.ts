@@ -63,6 +63,7 @@ export async function startVaultingFailover(
             ...(vaultEncKey ? { encryptedKey: vaultEncKey, ...(vaultEncKeyNonce ? { encryptedKeyNonce: vaultEncKeyNonce } : {}), useRecipientEphemeral: false } : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: currentTransfer.caption,
+            ...(currentTransfer.isVoiceNote ? { isVoiceNote: true } : {}),
             ...(currentTransfer.messageId && currentTransfer.messageId !== currentTransfer.fileId ? { messageId: currentTransfer.messageId } : {}),
             ...(currentTransfer.chatUpeerId?.startsWith('grp-') ? { chatUpeerId: currentTransfer.chatUpeerId } : {}),
         };
