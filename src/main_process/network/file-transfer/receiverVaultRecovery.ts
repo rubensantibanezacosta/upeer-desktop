@@ -85,11 +85,27 @@ async function recoverReceivingTransfer(this: TransferManager, fileId: string): 
 
         const shardsBySegment = new Map<number, Array<{ shardIndex: number; data: Buffer }>>();
 
+        // Resolver todas las entradas del vault en paralelo (evita N queries DB secuenciales,
+        // que degradaba el recovery de archivos grandes con muchos shards).
+        const shardCids = trackedShards
+            .filter((shard) => typeof shard.cid === 'string')
+            .map((shard) => shard.cid as string);
+        const entries = await Promise.all(
+            shardCids.map((cid) => getVaultEntryByHash(cid).catch(() => undefined)),
+        );
+        const entryByCid = new Map<string, { data?: string }>();
+        for (let i = 0; i < shardCids.length; i++) {
+            const entry = entries[i];
+            if (entry && typeof entry.data === 'string') {
+                entryByCid.set(shardCids[i], entry);
+            }
+        }
+
         for (const shard of trackedShards) {
             if (typeof shard.cid !== 'string') {
                 continue;
             }
-            const entry = await getVaultEntryByHash(shard.cid);
+            const entry = entryByCid.get(shard.cid);
             if (!entry?.data) {
                 continue;
             }
