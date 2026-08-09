@@ -138,7 +138,7 @@ export function validateVaultDelivery(data: VaultDeliveryPayload): ValidationRes
     if (!Array.isArray(data.entries)) {
         return { valid: false, error: 'Invalid entries' };
     }
-    if (data.entries.length > 100) {
+    if (data.entries.length > 120) {
         return { valid: false, error: 'Too many vault entries' };
     }
     for (const entry of data.entries as VaultDeliveryEntry[]) {

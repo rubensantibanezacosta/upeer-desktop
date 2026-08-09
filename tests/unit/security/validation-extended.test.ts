@@ -183,7 +183,7 @@ describe('Security Validation - Comprehensive Tests', () => {
             const valid = { entries: [entry] };
             expect(validateVaultDelivery(valid).valid).toBe(true);
             expect(validateVaultDelivery({ entries: 'not-array' }).valid).toBe(false);
-            expect(validateVaultDelivery({ entries: new Array(101) }).valid).toBe(false);
+            expect(validateVaultDelivery({ entries: new Array(121) }).valid).toBe(false);
             expect(validateVaultDelivery({ entries: [{ ...entry, senderSid: 'a'.repeat(129) }] }).valid).toBe(false);
         });
 
@@ -266,8 +266,8 @@ describe('Security Validation - Comprehensive Tests', () => {
         });
 
         it('should validate vault delivery page limit', () => {
-            // entries.length > 100
-            const manyEntries = new Array(101).fill({ senderSid: 'a', payloadHash: 'b', data: 'c' });
+            // entries.length > 120
+            const manyEntries = new Array(121).fill({ senderSid: 'a', payloadHash: 'b', data: 'c' });
             expect(validateVaultDelivery({ entries: manyEntries }).valid).toBe(false);
         });
 

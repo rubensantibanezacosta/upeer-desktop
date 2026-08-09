@@ -5,7 +5,7 @@ import { computeScore, issueVouch, VouchType } from '../../../security/reputatio
 import { VAULT_TTL_MS } from '../manager.js';
 
 /** Número máximo de entradas por respuesta VAULT_DELIVERY (anti-OOM) */
-const VAULT_DELIVERY_PAGE_SIZE = 50;
+const VAULT_DELIVERY_PAGE_SIZE = 120;
 
 type VaultResponsePacket = {
     type: string;

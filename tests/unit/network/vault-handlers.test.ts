@@ -102,8 +102,8 @@ describe('Vault Delivery Handler', () => {
         expect(contactsOps.getContactByUpeerId).not.toHaveBeenCalled();
     });
 
-    it('should limit entries to MAX_DELIVERY_ENTRIES (50)', async () => {
-        const manyEntries = Array(100).fill({
+    it('should limit entries to MAX_DELIVERY_ENTRIES (120)', async () => {
+        const manyEntries = Array(200).fill({
             senderSid: 'origin-id',
             data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex')
         });
@@ -112,7 +112,7 @@ describe('Vault Delivery Handler', () => {
 
         await handleVaultDelivery(custodianSid, { entries: manyEntries }, mockWin, mockSendResponse, '1.2.3.4');
 
-        expect(contactsOps.getContactByUpeerId).toHaveBeenCalledTimes(50);
+        expect(contactsOps.getContactByUpeerId).toHaveBeenCalledTimes(120);
     });
 
     it('should verify integrity of inner packets', async () => {

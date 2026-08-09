@@ -65,7 +65,7 @@ describe('validationVaultGroups', () => {
 
         it('rechaza no-array, demasiados y entries inválidos', () => {
             expect(validateVaultDelivery({}).valid).toBe(false);
-            expect(validateVaultDelivery({ entries: Array(101).fill(entry) }).valid).toBe(false);
+            expect(validateVaultDelivery({ entries: Array(121).fill(entry) }).valid).toBe(false);
             expect(validateVaultDelivery({ entries: [null] }).valid).toBe(false);
             expect(validateVaultDelivery({ entries: [{ ...entry, senderSid: 42 }] }).valid).toBe(false);
             expect(validateVaultDelivery({ entries: [{ ...entry, senderSid: 'x'.repeat(129) }] }).valid).toBe(false);

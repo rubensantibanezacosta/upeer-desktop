@@ -638,6 +638,54 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         expect(archive?.mimeType).toContain('zip');
     });
 
+    it('recovery offline->online: archivo grande (~2MB) se reconstruye por segmentos sin atascarse', { timeout: 60000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const filePath = path.join(os.tmpdir(), `upeer-large-${Date.now()}.bin`);
+        const sizeBytes = 2 * 1024 * 1024;
+        const data = Buffer.alloc(sizeBytes);
+        for (let i = 0; i < sizeBytes; i++) {
+            data[i] = i % 256;
+        }
+        fs.writeFileSync(filePath, data);
+
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath });
+        await sleep(6000);
+
+        const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
+        const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
+        const vaulted = sending.find((t) => t.state === 'active' && (t.isVaulting || t.phase === 'replicating'));
+        expect(vaulted).toBeTruthy();
+
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(15000);
+
+        const bReceiving = await nodeB.request('getTransfers', { direction: 'receiving' });
+        const received = bReceiving.transfers as Array<{ state: string; fileName?: string }>;
+        const completed = received.find((t) => t.state === 'completed' && t.fileName?.endsWith('.bin'));
+        expect(completed).toBeTruthy();
+    });
+
     it('recovery offline->online: edición (CHAT_UPDATE) vaulteada se aplica al reconectar', { timeout: 30000 }, async () => {
         const routing = {
             '200::a': await freePort(),

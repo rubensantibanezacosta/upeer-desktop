@@ -48,7 +48,7 @@ describe('Validation - Advanced Components', () => {
             const validEntry = { senderSid: 's', payloadHash: 'h', data: 'd' };
             expect(validateVaultDelivery({ entries: [validEntry] }).valid).toBe(true);
             expect(validateVaultDelivery({ entries: 'not-array' }).valid).toBe(false);
-            expect(validateVaultDelivery({ entries: Array(101).fill(validEntry) }).valid).toBe(false);
+            expect(validateVaultDelivery({ entries: Array(121).fill(validEntry) }).valid).toBe(false);
 
             // Invalid entry structure
             expect(validateVaultDelivery({ entries: [null] }).valid).toBe(false);

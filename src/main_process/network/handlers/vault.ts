@@ -74,7 +74,7 @@ export async function handleVaultDelivery(
         security('VAULT_DELIVERY: entries no es un array', { from: senderSid }, 'vault');
         return;
     }
-    const MAX_DELIVERY_ENTRIES = 50; // igual que la paginación del custodio
+    const MAX_DELIVERY_ENTRIES = 120; // alineado con VAULT_DELIVERY_PAGE_SIZE del custodio
     const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES).filter(isVaultEntry);
 
     touchVaultRecoverySource(recoverySourceKey, senderSid);
@@ -86,6 +86,9 @@ export async function handleVaultDelivery(
     const validatedHashes: string[] = [];
     let processedEntries = 0;
     let reportedIntegrityFailure = false;
+    // Shards recibidos en este batch → se dispara el recovery una sola vez por archivo
+    // al final del batch (en lugar de por cada shard), evitando escaneos O(N²) en la DB.
+    const recoveredFileHashes = new Set<string>();
     try {
         for (const entry of entries) {
             try {
@@ -244,7 +247,7 @@ export async function handleVaultDelivery(
                                 Date.now() + SHARD_TTL_MS
                             );
                             await trackDistributedAsset(fileHash, entry.payloadHash, shardIndex, 12, myId, segmentIndex);
-                            await fileTransferManager.tryRecoverVaultTransferByFileHash(fileHash);
+                            recoveredFileHashes.add(fileHash);
                         }
                     }
                 }
@@ -267,6 +270,18 @@ export async function handleVaultDelivery(
         error('Vault delivery processing failed', err, 'vault');
     }
 
+    // Disparar el recovery de archivos vaulteados una vez por archivo tras procesar
+    // todo el batch de shards, en lugar de hacerlo por cada shard individual.
+    if (recoveredFileHashes.size > 0) {
+        for (const fileHash of recoveredFileHashes) {
+            try {
+                await fileTransferManager.tryRecoverVaultTransferByFileHash(fileHash);
+            } catch (err) {
+                warn('Vault transfer recovery failed', { fileHash, err: String(err) }, 'vault');
+            }
+        }
+    }
+
     if (processedEntries > 0) {
         issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => {
             warn('Failed to issue vault retrieved vouch', { senderSid, err: String(err) }, 'reputation');
@@ -275,7 +290,11 @@ export async function handleVaultDelivery(
 
     // ACK solo para entradas que pasaron integridad y fueron procesadas sin error.
     // Entradas con firma inválida o que lanzaron excepción NO se ACKên.
-    if (validatedHashes.length > 0) {
+    // Si hay más páginas (hasMore), NO se ACKea aún: el ACK borra los shards del
+    // custodio y rompería la paginación por offset (el offset se vuelve inestable
+    // cuando se borran registros entre páginas). Se ACKea al completar la última.
+    const hasMore = data.hasMore === true;
+    if (validatedHashes.length > 0 && !hasMore) {
         sendResponse(fromAddress, {
             type: 'VAULT_ACK',
             payloadHashes: validatedHashes
