@@ -4,6 +4,8 @@ import MinimizeIcon from '@mui/icons-material/Minimize';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import CallEndIcon from '@mui/icons-material/CallEnd';
+import ScreenShareIcon from '@mui/icons-material/ScreenShare';
+import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import { CallControls } from './CallControls.js';
 import { useCallMedia } from './useCallMedia.js';
 import type { ActiveCallView } from './useCall.js';
@@ -21,6 +23,19 @@ interface CallWindowProps {
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 560;
 
+const shareOptionSx = {
+    textAlign: 'left' as const,
+    border: 'none',
+    background: 'transparent',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: 12,
+    px: 1.5,
+    py: 0.5,
+    borderRadius: 6,
+    '&:hover': { backgroundColor: 'rgba(255,255,255,0.12)' },
+};
+
 function formatDuration(totalSeconds: number): string {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -36,10 +51,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const remoteCanvasRef = useRef<HTMLCanvasElement>(null);
+    const screenCanvasRef = useRef<HTMLCanvasElement>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const nextStartRef = useRef(0);
+    const [remoteScreen, setRemoteScreen] = useState(false);
+    const [showShareOptions, setShowShareOptions] = useState(false);
     const media = useCallMedia();
-    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream } = media;
+    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing } = media;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -60,6 +78,23 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             return;
         }
         setOnRemoteFrame((kind, frame) => {
+            if (kind === 'screen') {
+                setRemoteScreen(true);
+                const canvas = screenCanvasRef.current;
+                const screenFrame = frame as { displayWidth?: number; displayHeight?: number; close?: () => void };
+                if (!canvas || !screenFrame || typeof screenFrame.displayWidth !== 'number' || typeof screenFrame.displayHeight !== 'number') {
+                    return;
+                }
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    return;
+                }
+                canvas.width = screenFrame.displayWidth;
+                canvas.height = screenFrame.displayHeight;
+                (ctx as CanvasRenderingContext2D).drawImage(screenFrame as unknown as CanvasImageSource, 0, 0);
+                screenFrame.close?.();
+                return;
+            }
             if (kind === 'video') {
                 const canvas = remoteCanvasRef.current;
                 const videoFrame = frame as { displayWidth?: number; displayHeight?: number; close?: () => void };
@@ -99,11 +134,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         return () => {
             setOnRemoteFrame(null);
             stopLocalCapture();
+            stopScreenShare();
+            setRemoteScreen(false);
             audioCtxRef.current?.close();
             audioCtxRef.current = null;
             nextStartRef.current = 0;
         };
-    }, [call.phase, isVideo, startLocalCapture, stopLocalCapture, setOnRemoteFrame]);
+    }, [call.phase, isVideo, startLocalCapture, stopLocalCapture, stopScreenShare, setOnRemoteFrame]);
 
     useEffect(() => {
         if (videoRef.current && localStream) {
@@ -131,6 +168,15 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
     }, [pos]);
+
+    const doShare = useCallback((target: 'screen' | 'window', withSystemAudio: boolean) => {
+        setShowShareOptions(false);
+        if (screenSharing) {
+            stopScreenShare();
+        } else {
+            void startScreenShare({ target, withSystemAudio });
+        }
+    }, [screenSharing, startScreenShare, stopScreenShare]);
 
     return (
 
@@ -175,6 +221,22 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 {isGroup && (
                     <Chip size="sm" variant="soft" color="neutral">{call.groupMembers?.length ? call.groupMembers.length + 1 : 1}</Chip>
                 )}
+                {screenSharing && (
+                    <Chip size="sm" variant="solid" color="warning">Compartiendo</Chip>
+                )}
+                {remoteScreen && (
+                    <Chip size="sm" variant="soft" color="primary">Pantalla remota</Chip>
+                )}
+                <Tooltip title={screenSharing ? 'Detener pantalla' : 'Compartir pantalla'}>
+                    <IconButton
+                        size="sm"
+                        variant="plain"
+                        color={screenSharing ? 'warning' : 'neutral'}
+                        onClick={() => setShowShareOptions((prev) => !prev)}
+                    >
+                        {screenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                    </IconButton>
+                </Tooltip>
                 <Tooltip title={expanded ? 'Reducir' : 'Expandir'}>
                     <IconButton size="sm" variant="plain" color="neutral" onClick={() => setExpanded((prev) => !prev)}>
                         {expanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
@@ -192,10 +254,27 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 </Tooltip>
             </Box>
 
+            {showShareOptions && (
+                <Box data-nodrag="true" sx={{ position: 'absolute', top: 44, right: 12, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+                    <Typography level="body-xs" sx={{ px: 1, color: 'rgba(255,255,255,0.7)' }}>Compartir pantalla</Typography>
+                    <Box component="button" data-nodrag="true" onClick={() => doShare('screen', true)} sx={shareOptionSx}>Pantalla con sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => doShare('screen', false)} sx={shareOptionSx}>Pantalla sin sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => doShare('window', true)} sx={shareOptionSx}>Ventana con sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => doShare('window', false)} sx={shareOptionSx}>Ventana sin sonido</Box>
+                </Box>
+            )}
 
-            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden' }}>
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
+                {remoteScreen ? (
+                    <Box sx={{ position: 'relative', width: '100%', height: isGroup ? '70%' : '100%' }}>
+                        <canvas ref={screenCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 8 }} />
+                        <Box sx={{ position: 'absolute', top: 4, left: 6, px: 1, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                            <Typography level="body-xs">{peerName} comparte pantalla</Typography>
+                        </Box>
+                    </Box>
+                ) : null}
                 {isGroup ? (
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1, width: '100%', height: '100%', alignItems: 'center' }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1, width: '100%', height: remoteScreen ? '30%' : '100%', alignItems: 'center' }}>
                         {/* Self-view: tu propia cámara */}
                         <Box sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
                             {isVideoActive && call.cameraEnabled ? (
@@ -220,7 +299,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                             </Box>
                         ))}
                     </Box>
-                ) : isVideoActive ? (
+                ) : (!remoteScreen && isVideoActive) ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
                         <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 8 }} />
                         <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 120, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.4)', backgroundColor: '#000', boxShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>

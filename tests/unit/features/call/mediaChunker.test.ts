@@ -24,6 +24,17 @@ describe('mediaChunker', () => {
         expect(Array.from(frameResult.data)).toEqual([1, 2, 3, 4]);
     });
 
+    it('hace roundtrip de un frame de pantalla (screen)', () => {
+        const encoded = encodeMediaFrame({ kind: 'screen', ts: 200, seq: 7, data: new Uint8Array([9, 8, 7]) });
+        const decoded = decodeMediaFrame(encoded);
+        expect(decoded).not.toBeNull();
+        const frameResult = decoded as MediaFrame;
+        expect(frameResult.kind).toBe('screen');
+        expect(frameResult.ts).toBe(200);
+        expect(frameResult.seq).toBe(7);
+        expect(Array.from(frameResult.data)).toEqual([9, 8, 7]);
+    });
+
     it('devuelve null ante base64 inválida o payload corto', () => {
         expect(decodeMediaFrame('!!!')).toBeNull();
         expect(decodeMediaFrame(bytesToBase64(new Uint8Array([0, 0])))).toBeNull();

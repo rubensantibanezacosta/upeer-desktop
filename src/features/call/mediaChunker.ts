@@ -1,4 +1,10 @@
-export type CallMediaKind = 'audio' | 'video';
+export type CallMediaKind = 'audio' | 'video' | 'screen';
+export type ScreenAudio = boolean;
+export type ScreenTarget = 'screen' | 'window';
+export type ScreenCaptureOptions = {
+    target: ScreenTarget;
+    withSystemAudio: boolean;
+};
 
 export interface MediaFrame {
     kind: CallMediaKind;
@@ -12,7 +18,7 @@ const HEADER_BYTES = 16;
 export function encodeMediaFrame(frame: MediaFrame): string {
     const header = new Uint8Array(HEADER_BYTES);
     const view = new DataView(header.buffer);
-    view.setUint8(0, frame.kind === 'video' ? 1 : 0);
+    view.setUint8(0, frame.kind === 'audio' ? 0 : (frame.kind === 'screen' ? 2 : 1));
     view.setFloat64(4, frame.ts);
     view.setUint32(12, frame.seq >>> 0);
 
@@ -42,7 +48,8 @@ export function decodeMediaFrame(encoded: string): MediaFrame | null {
         return null;
     }
     const view = new DataView(bytes.buffer, bytes.byteOffset, HEADER_BYTES);
-    const kind: CallMediaKind = view.getUint8(0) === 1 ? 'video' : 'audio';
+    const kindByte = view.getUint8(0);
+    const kind: CallMediaKind = kindByte === 0 ? 'audio' : (kindByte === 2 ? 'screen' : 'video');
     const ts = view.getFloat64(4);
     const seq = view.getUint32(12);
     const data = new Uint8Array(bytes.subarray(HEADER_BYTES));

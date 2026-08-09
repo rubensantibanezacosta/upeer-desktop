@@ -88,12 +88,54 @@ export function useCallMedia() {
         }
     }, [sendChunk]);
 
+    const screenRef = useRef<MediaStream | null>(null);
+    const [screenSharing, setScreenSharing] = useState(false);
+
+    const stopScreenShare = useCallback(() => {
+        screenRef.current?.getTracks().forEach((track) => track.stop());
+        screenRef.current = null;
+        setScreenSharing(false);
+    }, []);
+
+    const startScreenShare = useCallback(async (options: { target: 'screen' | 'window'; withSystemAudio: boolean }): Promise<boolean> => {
+        try {
+            const stream = await (navigator.mediaDevices as unknown as {
+                getDisplayMedia: (opts: Record<string, unknown>) => Promise<MediaStream>;
+            }).getDisplayMedia({
+                video: {
+                    displaySurface: options.target === 'window' ? 'window' : 'monitor',
+                    frameRate: 30,
+                },
+                audio: options.withSystemAudio,
+            });
+            screenRef.current = stream;
+            setScreenSharing(true);
+            const session = sessionRef.current ?? new WebCodecsSession();
+            sessionRef.current = session;
+            if (stream.getVideoTracks()[0]) {
+                await session.startCapture(stream, 'screen', sendChunk);
+            }
+            // Audio del sistema (opcional): se codifica y envía como canal 'audio'.
+            if (options.withSystemAudio && stream.getAudioTracks()[0]) {
+                await session.startCapture(stream, 'audio', sendChunk);
+            }
+            // Al terminar la captura de pantalla (botón del SO), limpiar.
+            stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+                stopScreenShare();
+            });
+            return true;
+        } catch {
+            return false;
+        }
+    }, [sendChunk, stopScreenShare]);
+
     const stopLocalCapture = useCallback(() => {
         void sessionRef.current?.release();
         localStreamRef.current?.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
         setLocalStream(null);
-    }, []);
+        stopScreenShare();
+    }, [stopScreenShare]);
 
     useEffect(() => {
         if (call.phase !== 'connected') {
@@ -104,6 +146,9 @@ export function useCallMedia() {
     return {
         startLocalCapture,
         stopLocalCapture,
+        startScreenShare,
+        stopScreenShare,
+        screenSharing,
         localStream,
         setOnRemoteFrame,
         enabled: call.phase === 'connected',
