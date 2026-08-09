@@ -519,5 +519,246 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         const received = (bMessages.messages as Array<{ message: string }>).find((m) => m.message === longText);
         expect(received).toBeTruthy();
     });
+
+    it('adjunto offline->online: recovery del multimedia vaulteado tras reconexión', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const filePath = path.join(os.tmpdir(), `upeer-att-offline-${Date.now()}.txt`);
+        fs.writeFileSync(filePath, 'contenido multimedia offline que debe recuperarse del vault');
+
+        // Fase offline: B no responde a propuestas de archivo y A lo ve desconectado.
+        // El envío de A debe fallar al vaulting (nunca se acepta directo).
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath });
+        await sleep(4000);
+
+        const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
+        const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
+        const vaulted = sending.find((t) => t.state === 'active' && (t.isVaulting || t.phase === 'replicating'));
+        expect(vaulted).toBeTruthy();
+
+        // Fase reconexión: B vuelve online y consulta su vault; A le entrega el archivo
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const bReceiving = await nodeB.request('getTransfers', { direction: 'receiving' });
+        const received = bReceiving.transfers as Array<{ state: string; fileName?: string }>;
+        expect(received.some((t) => t.state === 'completed')).toBe(true);
+    });
+
+    it('recovery offline->online: edición (CHAT_UPDATE) vaulteada se aplica al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        // B offline: A envía un mensaje (vaulteado) y luego lo edita (también vaulteado)
+        const send = await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'versión original' });
+        const msgId = (send.result as { id: string }).id;
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendChatUpdate', { upeerId: bInfo.upeerId, msgId, newContent: 'versión editada' });
+        await sleep(1500);
+
+        // Reconexión: B consulta su vault y debe aplicar la edición
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const bMsg = await nodeB.request('getMessageById', { id: msgId });
+        expect((bMsg.message as { message: string } | null)?.message).toBe('versión editada');
+    });
+
+    it('recovery offline->online: borrado (CHAT_DELETE) vaulteado se aplica al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const send = await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'a borrar' });
+        const msgId = (send.result as { id: string }).id;
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendChatDelete', { upeerId: bInfo.upeerId, msgId });
+        await sleep(1500);
+
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const bMsg = await nodeB.request('getMessageById', { id: msgId });
+        const bMsgRecord = bMsg.message as { isDeleted?: boolean; message?: string } | null;
+        expect(bMsgRecord?.isDeleted).toBe(true);
+        expect(bMsgRecord?.message).toBe('Mensaje eliminado');
+    });
+
+    it('recovery offline->online: reacción (CHAT_REACTION) vaulteada se aplica al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const send = await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'con reacción' });
+        const msgId = (send.result as { id: string }).id;
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendChatReaction', { upeerId: bInfo.upeerId, msgId, emoji: '👍', remove: false });
+        await sleep(1500);
+
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const reactions = await nodeB.request('getReactions', { id: msgId });
+        expect((reactions.reactions as Array<{ emoji: string }>).some((r) => r.emoji === '👍')).toBe(true);
+    });
+
+    it('recovery offline->online: recibo de lectura (READ) vaulteado se aplica al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        // A envía a B (online) para que B tenga el mensaje y pueda enviar el READ
+        const send = await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'mensaje con read' });
+        const msgId = (send.result as { id: string }).id;
+        await sleep(500);
+
+        // A offline: B marca como leído → READ vaulteado para A
+        await nodeA.request('setVaultOffline', { value: true });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'disconnected' });
+        await sleep(200);
+        await nodeB.request('sendReadReceipt', { upeerId: aId, id: msgId });
+        await sleep(1500);
+
+        // A reconecta y recupera el READ del vault
+        await nodeA.request('setVaultOffline', { value: false });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await sleep(300);
+        await nodeA.request('queryOwnVaults');
+        await sleep(5000);
+
+        const status = await nodeA.request('getMessageStatus', { id: msgId });
+        expect(status.status).toBe('read');
+    });
+
+    it('recovery offline->online: grupo vaulteado (mensaje) se entrega al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+            '200::c': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        const nodeC = new PeerProcess('200::c');
+        peers.push(nodeA, nodeB, nodeC);
+
+        await nodeA.start({ routing });
+        const bInfo = await nodeB.start({ routing });
+        const cInfo = await nodeC.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeA.addPeer(nodeC, '200::c');
+        await nodeB.addPeer(nodeA, '200::a');
+        await nodeC.addPeer(nodeA, '200::a');
+        await sleep(300);
+
+        const created = await nodeA.request('createGroup', { name: 'g-offline', members: [bInfo.upeerId, cInfo.upeerId] });
+        const groupId = created.groupId as string;
+        await sleep(1200);
+
+        // Verifica que B tiene el grupo (recibió la invitación online)
+        const bGroupsPre = await nodeB.request('getGroups');
+        expect((bGroupsPre.groups as Array<{ groupId: string }>).some((g) => g.groupId === groupId)).toBe(true);
+
+        // B offline: A envía mensaje de grupo → se vaultea para B
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendGroupMessage', { groupId, message: 'mensaje de grupo offline' });
+        await sleep(2000);
+
+        // B reconecta y recupera el mensaje de grupo del vault
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: cInfo.upeerId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const bMessages = await nodeB.request('getMessages', { contactId: groupId });
+        expect((bMessages.messages as Array<{ message: string }>).some((m) => m.message === 'mensaje de grupo offline')).toBe(true);
+    });
 });
 

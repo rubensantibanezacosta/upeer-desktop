@@ -108,18 +108,27 @@ export async function handleVaultDelivery(
 
                 // If it's a signed inner packet (CHAT, FILE_DATA_SMALL, etc.)
                 if (innerPacket && typeof innerPacket.signature === 'string') {
-                    if (isOwnVaultEntry) {
-                        innerPacket.isInternalSync = true;
-                    }
-                    const { signature: innerSig, senderUpeerId: _senderUpeerId, ...innerData } = innerPacket;
+                    const { signature: innerSig, senderUpeerId: _senderUpeerId, isInternalSync: _isInternalSync, ...innerData } = innerPacket;
                     const isFileTransferPacket = innerPacket.type === 'FILE_DATA_SMALL'
                         || (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_'));
 
                     // End-to-end integrity verification must mirror the packet family.
+                    // isInternalSync se marca al entregar para self-sync, pero la firma del
+                    // emisor NO lo incluye: se excluye del innerData verificado y se añade
+                    // al packet solo después de validar la integridad.
+                    // GROUP_MSG se firma sobre el packet COMPLETO (incluye senderUpeerId),
+                    // a diferencia del resto (CHAT, mutaciones) que firman sin senderUpeerId.
+                    // Por tanto se verifica excluyendo solo signature/isInternalSync pero
+                    // conservando senderUpeerId en los datos verificados.
+                    let verifiedData: Record<string, unknown> = innerData;
+                    if (innerPacket.type === 'GROUP_MSG') {
+                        const { signature: _sig, isInternalSync: _intSync, ...groupData } = innerPacket;
+                        verifiedData = groupData;
+                    }
                     const isInnerValid = isFileTransferPacket
                         ? verifyFileTransferPacketSignature(innerPacket, originalContact.publicKey)
                         : verify(
-                            Buffer.from(canonicalStringify(innerData)),
+                            Buffer.from(canonicalStringify(verifiedData)),
                             Buffer.from(innerSig, 'hex'),
                             Buffer.from(originalContact.publicKey, 'hex')
                         );
@@ -133,6 +142,9 @@ export async function handleVaultDelivery(
                             });
                         }
                         continue;
+                    }
+                    if (isOwnVaultEntry) {
+                        innerPacket.isInternalSync = true;
                     }
 
                     // BUG FK fix: los inner packets de vault delivery saltaban validateMessage().
@@ -195,10 +207,10 @@ export async function handleVaultDelivery(
                         await handleChatAck(entry.senderSid, { ...innerPacket, status: 'read' } as unknown as Parameters<typeof handleChatAck>[1], win);
                     } else if (innerPacket.type === 'GROUP_INVITE') {
                         const { handleGroupInvite } = await import('./groups.js');
-                        await handleGroupInvite(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupInvite>[1], win);
+                        await handleGroupInvite(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupInvite>[1], win, fromAddress, sendResponse);
                     } else if (innerPacket.type === 'GROUP_UPDATE') {
                         const { handleGroupUpdate } = await import('./groups.js');
-                        await handleGroupUpdate(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupUpdate>[1], win);
+                        await handleGroupUpdate(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupUpdate>[1], win, fromAddress, sendResponse);
                     } else if (innerPacket.type === 'GROUP_LEAVE') {
                         const { handleGroupLeave } = await import('./groups.js');
                         await handleGroupLeave(entry.senderSid, innerPacket as unknown as Parameters<typeof handleGroupLeave>[1], win);

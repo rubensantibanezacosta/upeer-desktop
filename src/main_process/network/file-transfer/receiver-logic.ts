@@ -22,6 +22,7 @@ type FileAcceptPacket = {
 };
 
 type FileProposalPacket = {
+    type?: string;
     fileId: string;
     fileName: string;
     fileSize: number;
@@ -32,6 +33,7 @@ type FileProposalPacket = {
     signature?: string;
     encryptedKey?: string;
     encryptedKeyNonce?: string;
+    useRecipientEphemeral?: boolean;
     thumbnail?: string | EncryptedThumbnail;
     caption?: string;
     isVoiceNote?: boolean;

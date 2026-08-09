@@ -33,3 +33,11 @@ export function deleteReaction(messageId: string, upeerId: string, emoji: string
             eq(schema.reactions.emoji, emoji)
         )).run();
 }
+
+export function getReactionsForMessage(messageId: string): Array<{ upeerId: string; emoji: string; timestamp: number }> {
+    const db = getDb();
+    const schema = getSchema();
+    return db.select().from(schema.reactions)
+        .where(eq(schema.reactions.messageId, messageId))
+        .all() as Array<{ upeerId: string; emoji: string; timestamp: number }>;
+}

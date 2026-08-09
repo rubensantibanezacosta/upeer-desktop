@@ -139,6 +139,7 @@ export class TransferManager implements ITransferManager {
             case 'FILE_START':
                 if (typeof data.fileId !== 'string' || typeof data.fileName !== 'string') return;
                 await this.handleFileProposal(upeerId, address, {
+                    type: typeof data.type === 'string' ? data.type : 'FILE_PROPOSAL',
                     fileId: data.fileId,
                     fileName: data.fileName,
                     fileSize: typeof data.fileSize === 'number' ? data.fileSize : 1,
@@ -149,11 +150,12 @@ export class TransferManager implements ITransferManager {
                     signature: typeof data.signature === 'string' ? data.signature : undefined,
                     encryptedKey: typeof data.encryptedKey === 'string' ? data.encryptedKey : undefined,
                     encryptedKeyNonce: typeof data.encryptedKeyNonce === 'string' ? data.encryptedKeyNonce : undefined,
+                    ...(typeof data.useRecipientEphemeral === 'boolean' ? { useRecipientEphemeral: data.useRecipientEphemeral } : {}),
                     thumbnail: typeof data.thumbnail === 'string' || (typeof data.thumbnail === 'object' && data.thumbnail !== null)
                         ? data.thumbnail as string | { data: string; iv: string; tag: string }
                         : undefined,
                     caption: typeof data.caption === 'string' ? data.caption : undefined,
-                    isVoiceNote: data.isVoiceNote === true,
+                    ...(typeof data.isVoiceNote === 'boolean' ? { isVoiceNote: data.isVoiceNote } : {}),
                     messageId: typeof data.messageId === 'string' ? data.messageId : undefined,
                     chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
                 });

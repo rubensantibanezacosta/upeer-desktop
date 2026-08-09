@@ -16,11 +16,14 @@ const { initDB } = await import('../../src/main_process/storage/init.js');
 const { handlePacket } = await import('../../src/main_process/network/handlers.js');
 const contacts = await import('../../src/main_process/storage/contacts/operations.js');
 const messages = await import('../../src/main_process/storage/messages/operations.js');
+const messagesReactions = await import('../../src/main_process/storage/messages/reactions.js');
 const { updateContactSignedPreKey } = await import('../../src/main_process/storage/contacts/keys.js');
 const { sendUDPMessage } = await import('../../src/main_process/network/messaging/chatSend.js');
 const { sendTypingIndicator } = await import('../../src/main_process/network/messaging/chatSend.js');
-const { sendReadReceipt } = await import('../../src/main_process/network/messaging/chatInteractions.js');
+const { sendReadReceipt, sendChatReaction, sendContactCard } = await import('../../src/main_process/network/messaging/chatInteractions.js');
+const { sendChatUpdate, sendChatDelete, sendChatClear } = await import('../../src/main_process/network/messaging/chatMutations.js');
 const { createGroup, inviteToGroup } = await import('../../src/main_process/network/messaging/groupControl.js');
+const groupOps = await import('../../src/main_process/storage/groups/operations.js');
 const { sendGroupMessage } = await import('../../src/main_process/network/messaging/groups.js');
 const { getMessageStatus } = await import('../../src/main_process/storage/messages/status.js');
 const { fileTransferManager } = await import('../../src/main_process/network/file-transfer/transfer-manager.js');
@@ -69,6 +72,7 @@ const win = new BrowserWindow();
 fileTransferManager.initialize(sendResponse, win);
 
 const socketPeerIds = new Map();
+let vaultOffline = false;
 const server = net.createServer((socket) => {
     let frameBuf = Buffer.alloc(0);
     let identified = false;
@@ -94,6 +98,11 @@ const server = net.createServer((socket) => {
                 rxType = '(unparseable)';
             }
             process.send({ type: 'networkRx', peerId, rxType });
+            // Modo offline simulado: el peer no responde a propuestas de archivo, como
+            // si estuviera apagado, pero mantiene la conexión TCP del harness activa.
+            if (vaultOffline && rxType === 'FILE_PROPOSAL') {
+                continue;
+            }
             void handlePacket(msg, rinfo, win, sendResponse, () => {});
         }
     });
@@ -123,6 +132,10 @@ process.on('message', (msg) => {
                 break;
             case 'setContactStatus':
                 getSqlite()?.exec(`UPDATE contacts SET status = '${msg.status}' WHERE upeer_id = '${msg.upeerId}'`);
+                reply(msg._id, { ok: true });
+                break;
+            case 'setVaultOffline':
+                vaultOffline = msg.value === true;
                 reply(msg._id, { ok: true });
                 break;
             case 'getMessages':
@@ -219,6 +232,35 @@ process.on('message', (msg) => {
             }
             case 'getActiveCall':
                 reply(msg._id, { ok: true, call: callManager.getActive() ?? null });
+                break;
+            case 'getMessageById':
+                reply(msg._id, { ok: true, message: messages.getMessageById(msg.id) ?? null });
+                break;
+            case 'getReactions':
+                reply(msg._id, { ok: true, reactions: messagesReactions.getReactionsForMessage(msg.id) });
+                break;
+            case 'sendChatUpdate':
+                await sendChatUpdate(msg.upeerId, msg.msgId, msg.newContent);
+                reply(msg._id, { ok: true });
+                break;
+            case 'sendChatDelete':
+                await sendChatDelete(msg.upeerId, msg.msgId);
+                reply(msg._id, { ok: true });
+                break;
+            case 'sendChatClear':
+                await sendChatClear(msg.upeerId);
+                reply(msg._id, { ok: true });
+                break;
+            case 'sendChatReaction':
+                await sendChatReaction(msg.upeerId, msg.msgId, msg.emoji, msg.remove === true);
+                reply(msg._id, { ok: true });
+                break;
+            case 'sendContactCard':
+                await sendContactCard(msg.upeerId, msg.contact);
+                reply(msg._id, { ok: true });
+                break;
+            case 'getGroups':
+                reply(msg._id, { ok: true, groups: groupOps.getGroups() });
                 break;
             case 'shutdown':
                 server.close();

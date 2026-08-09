@@ -69,6 +69,7 @@ export async function startVaultingFailover(
 
         const sig = sign(Buffer.from(canonicalStringify(proposalData)));
 
+
         try {
             const { VaultManager } = await import('../vault/manager.js');
             VaultManager.replicateToVaults(upeerId, {
