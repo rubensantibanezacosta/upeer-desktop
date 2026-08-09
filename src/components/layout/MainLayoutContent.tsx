@@ -171,6 +171,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
                                             onSearch={() => setIsChatSearchOpen(true)}
+                                            onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members)}
+                                            onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup?.members)}
                                         />
                                     ) : (
                                         <TopHeader

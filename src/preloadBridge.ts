@@ -191,6 +191,7 @@ const fileTransferApi = {
 
 const callApi = {
     startCall: (upeerId: string, kind: 'audio' | 'video') => ipcRenderer.invoke('start-call', { upeerId, kind }),
+    startGroupCall: (members: string[], kind: 'audio' | 'video') => ipcRenderer.invoke('start-group-call', { members, kind }),
     acceptCall: (callId: string) => ipcRenderer.invoke('accept-call', { callId }),
     rejectCall: (callId: string) => ipcRenderer.invoke('reject-call', { callId }),
     endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
@@ -198,6 +199,7 @@ const callApi = {
     sendCallMedia: (callId: string, data: string) => ipcRenderer.invoke('send-call-media', { callId, data }),
     getCallDevices: () => ipcRenderer.invoke('call-devices'),
     getCallParams: (callId: string) => ipcRenderer.invoke('call-params', { callId }),
+    getAllCalls: () => ipcRenderer.invoke('get-all-calls'),
 };
 
 const networkApi = {

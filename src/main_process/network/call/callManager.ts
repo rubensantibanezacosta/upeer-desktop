@@ -39,6 +39,12 @@ class CallManager {
         return this.sessions.get(callId);
     }
 
+    getAll(): CallSession[] {
+        return Array.from(this.sessions.values()).filter(
+            (session) => session.phase !== 'ended' && session.phase !== 'idle',
+        );
+    }
+
     hasActiveWith(peerUpeerId: string): boolean {
         for (const session of this.sessions.values()) {
             if (session.peerUpeerId === peerUpeerId && session.phase !== 'ended') {

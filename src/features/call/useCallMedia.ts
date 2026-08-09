@@ -6,7 +6,7 @@ import { WebCodecsSession, type MediaChunk } from './webCodecsSession.js';
 export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown) => void;
 
 export function useCallMedia() {
-    const call = useCallStore((s) => s.call);
+    const call = useCallStore((s) => (s.activeCallId ? s.calls[s.activeCallId] : undefined)) ?? { phase: 'idle' as const, kind: 'audio' as const, muted: false, cameraEnabled: false };
     const sessionRef = useRef<WebCodecsSession | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const seqRef = useRef(0);
@@ -18,7 +18,7 @@ export function useCallMedia() {
     }, []);
 
     const sendChunk = useCallback((chunk: MediaChunk) => {
-        const callId = useCallStore.getState().call.callId;
+        const callId = useCallStore.getState().activeCallId;
         if (!callId) {
             return;
         }

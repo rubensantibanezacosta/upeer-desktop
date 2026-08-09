@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Avatar, Box, Typography } from '@mui/joy';
+import { Avatar, Box, Chip, Typography } from '@mui/joy';
 import { CallControls } from './CallControls.js';
 import { useCallMedia } from './useCallMedia.js';
 import type { ActiveCallView } from './useCall.js';
@@ -8,9 +8,11 @@ interface CallOverlayProps {
     call: ActiveCallView;
     peerName: string;
     avatar?: string;
+    participants?: Array<{ id: string; name: string; avatar?: string }>;
     onToggleMute: () => void;
     onToggleCamera: () => void;
     onEnd: () => void;
+    onMinimize: () => void;
 }
 
 function useElapsed(startedAtRef: number | null): number {
@@ -33,7 +35,7 @@ function formatDuration(totalSeconds: number): string {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export const CallOverlay: React.FC<CallOverlayProps> = ({ call, peerName, avatar, onToggleMute, onToggleCamera, onEnd }) => {
+export const CallOverlay: React.FC<CallOverlayProps> = ({ call, peerName, avatar, participants, onToggleMute, onToggleCamera, onEnd, onMinimize }) => {
     const [startedAt] = useState<number>(Date.now());
     const elapsed = useElapsed(startedAt);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -44,6 +46,8 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({ call, peerName, avatar
     const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream } = media;
     const phaseLabel = call.phase === 'negotiating' ? 'Conectando…' : (call.phase === 'outgoing-ringing' ? 'Llamando…' : 'En curso');
     const isVideo = call.kind === 'video';
+    const isGroup = call.isGroup === true;
+    const memberCount = isGroup && Array.isArray(call.groupMembers) ? call.groupMembers.length + 1 : (participants ? participants.length : 1);
 
     useEffect(() => {
         if (call.phase !== 'negotiating' && call.phase !== 'connected') {
@@ -107,28 +111,59 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({ call, peerName, avatar
                 position: 'fixed',
                 inset: 0,
                 zIndex: 1300,
-                backgroundColor: 'rgba(0,0,0,0.85)',
+                backgroundColor: 'rgba(0,0,0,0.9)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 3,
+                gap: 2,
                 color: 'white',
+                p: 2,
             }}
         >
-            {isVideo ? (
-                <Box sx={{ position: 'relative', width: '70vw', height: '60vh' }}>
-                    <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 12 }} />
-                    <Box sx={{ position: 'absolute', bottom: 12, right: 12, width: 180, height: 120, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
-                        <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Box sx={{ position: 'absolute', top: 12, left: 20, display: 'flex', alignItems: 'center', gap: 1.5, width: 'calc(100% - 40px)' }}>
+                <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
+                <Chip size="sm" variant="soft" color="neutral">{memberCount}</Chip>
+                <Box sx={{ flex: 1 }} />
+                <Chip size="sm" variant="outlined" sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.4)', cursor: 'pointer' }} onClick={onMinimize}>Minimizar</Chip>
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: isGroup ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr', gap: 2, width: '100%', maxWidth: 1200, alignItems: 'center' }}>
+                {isGroup && Array.isArray(call.groupMembers) && call.groupMembers.map((memberId, idx) => (
+                    <Box key={memberId} sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#1a1a1a', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {idx === 0 && isVideo ? (
+                            <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111' }} />
+                        ) : (
+                            <Avatar sx={{ width: 56, height: 56, fontSize: 24 }}>{memberId.charAt(0).toUpperCase()}</Avatar>
+                        )}
+                        <Box sx={{ position: 'absolute', bottom: 8, left: 8, px: 1, py: 0.25, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                            <Typography level="body-xs">{memberId.slice(0, 6)}</Typography>
+                        </Box>
                     </Box>
-                </Box>
-            ) : (
-                <>
-                    <Avatar src={avatar} size="lg" sx={{ width: 96, height: 96, fontSize: 40 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
-                    <Typography level="h3" sx={{ color: 'white' }}>{peerName}</Typography>
-                </>
-            )}
+                ))}
+
+                {!isGroup && isVideo && (
+                    <Box sx={{ position: 'relative', width: '100%', aspectRatio: '16/9' }}>
+                        <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 12 }} />
+                        <Box sx={{ position: 'absolute', bottom: 12, right: 12, width: 180, height: 120, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
+                            <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </Box>
+                    </Box>
+                )}
+
+                {!isGroup && !isVideo && (
+                    <>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                            <Avatar src={avatar} size="lg" sx={{ width: 120, height: 120, fontSize: 48 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                            <Typography level="h3" sx={{ color: 'white' }}>{peerName}</Typography>
+                        </Box>
+                        <Box sx={{ position: 'absolute', bottom: 12, right: 12, width: 180, height: 120, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
+                            <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </Box>
+                    </>
+                )}
+            </Box>
+
             <Typography level="body-md" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                 {phaseLabel} · {formatDuration(elapsed)}
             </Typography>

@@ -26,6 +26,25 @@ export function registerCallHandlers(): void {
         }
     });
 
+    ipcMain.handle('start-group-call', async (event, { members, kind }) => {
+        if (!Array.isArray(members) || members.some((m) => typeof m !== 'string' || !m || m.length > 128)) {
+            return { success: false, error: 'Invalid members' };
+        }
+        if (members.length < 1 || members.length > 50) {
+            return { success: false, error: 'Invalid member count' };
+        }
+        if (!isValidMediaKind(kind)) {
+            return { success: false, error: 'Invalid kind' };
+        }
+        try {
+            const { startGroupCall } = await import('../../network/call/callSignaling.js');
+            const callId = await startGroupCall(members, kind);
+            return { success: true, callId };
+        } catch (err) {
+            return { success: false, error: 'Group call unavailable' };
+        }
+    });
+
     ipcMain.handle('accept-call', (event, { callId }) => {
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
@@ -115,5 +134,22 @@ export function registerCallHandlers(): void {
         }
         sendCallMedia(session.peerUpeerId, callId, data);
         return { success: true };
+    });
+
+    ipcMain.handle('get-all-calls', () => {
+        const sessions = callManager.getAll();
+        return {
+            success: true,
+            calls: sessions.map((session) => ({
+                callId: session.callId,
+                peerUpeerId: session.peerUpeerId,
+                phase: session.phase,
+                kind: session.kind,
+                muted: session.muted,
+                cameraEnabled: session.cameraEnabled,
+                isGroup: session.isGroup,
+                groupMembers: session.groupMembers,
+            })),
+        };
     });
 }

@@ -234,6 +234,8 @@ con timeouts, manejo de rechazo/ocupado/no-answer y caída de red; `CALL_MEDIA` 
 - [ ] **F9 — SFU distribuido + failover**: elección por DHT/reputación, reenvío y failover; grupos grandes.
 - [ ] **F10 — Canal UDP real (opcional)**: `yggstack -remote-udp` + SOCKS5 UDP associate para bajar latencia.
 - [x] **F11 — Validación global**: `tsc`, `lint`, tests unit (39 de llamada) e integración multiproceso (escenario `llamada de voz P2P` con señalización `CALL_*` end-to-end) en verde.
+- [x] **F12 — UI estilo Google Meet (multi-llamada + grupos + ventanas)**: `useCallStore` pasa de una única llamada a un **mapa de llamadas activas** (`calls` + `activeCallId`) con soporte de `isGroup`/`groupMembers`. `callManager.getAll()` expone todas las sesiones y nuevo IPC `get-all-calls` + `start-group-call` (+ `callApi.getAllCalls`/`startGroupCall`). `CallOverlay` ahora tiene **vista grupal en grid** (tiles de participantes estilo Meet), barra superior con contador y botón Minimizar; `CallHost` gestiona **múltiples llamadas a la vez** con **barra flotante** (pills) para llamadas minimizadas/secundarias, y la llamada activa a pantalla completa. Botones de llamada de grupo conectados en `TopHeader`. (Verificación visual de captura/decode requiere navegador/cámara.)
+
 
 ### Riesgos / limitaciones
 - TCP introduce latencia/head-of-line vs UDP; mitigar con jitter buffer y, en F10, canal UDP.
