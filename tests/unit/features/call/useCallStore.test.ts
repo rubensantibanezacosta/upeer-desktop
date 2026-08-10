@@ -18,4 +18,12 @@ describe('useCallStore', () => {
         useCallStore.getState().removeGroupMember('c1', 'peer2');
         expect(useCallStore.getState().calls.c1.groupMembers).toEqual(['peer3']);
     });
+
+    it('setRelayUpeer fija y limpia el relay', () => {
+        useCallStore.getState().setStarted('c1', 'peer1', 'video', true, ['peer2', 'peer3']);
+        useCallStore.getState().setRelayUpeer('c1', 'peer2');
+        expect(useCallStore.getState().calls.c1.relayUpeerId).toBe('peer2');
+        useCallStore.getState().setRelayUpeer('c1', undefined);
+        expect(useCallStore.getState().calls.c1.relayUpeerId).toBeUndefined();
+    });
 });

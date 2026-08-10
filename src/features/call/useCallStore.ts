@@ -13,6 +13,7 @@ export interface ActiveCallView {
     endReason?: string;
     isGroup?: boolean;
     groupMembers?: string[];
+    relayUpeerId?: string;
 }
 
 interface CallStore {
@@ -27,6 +28,7 @@ interface CallStore {
     applyMediaUpdate: (callId: string, data: { muted: boolean; cameraEnabled: boolean }) => void;
     addGroupMember: (callId: string, memberId: string) => void;
     removeGroupMember: (callId: string, memberId: string) => void;
+    setRelayUpeer: (callId: string, relayUpeerId?: string) => void;
     setActive: (callId?: string) => void;
     removeCall: (callId: string) => void;
     reset: () => void;
@@ -130,6 +132,14 @@ export const useCallStore = create<CallStore>((set) => ({
             return state;
         }
         return { calls: { ...state.calls, [callId]: { ...call, groupMembers: (call.groupMembers ?? []).filter((m) => m !== memberId) } } };
+    }),
+
+    setRelayUpeer: (callId, relayUpeerId) => set((state) => {
+        const call = state.calls[callId];
+        if (!call) {
+            return state;
+        }
+        return { calls: { ...state.calls, [callId]: { ...call, relayUpeerId } } };
     }),
 
     setActive: (callId) => set({ activeCallId: callId }),

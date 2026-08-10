@@ -20,6 +20,12 @@ export function useCall() {
             window.upeer?.onCallEnded?.((data) => useCallStore.getState().markEnded(data.callId, data.reason)),
             window.upeer?.onCallMemberJoined?.((data) => useCallStore.getState().addGroupMember(data.callId, data.peerUpeerId)),
             window.upeer?.onCallMemberLeft?.((data) => useCallStore.getState().removeGroupMember(data.callId, data.peerUpeerId)),
+            window.upeer?.onCallMeta?.((data) => {
+                const meta = data.meta as { type?: string; relay?: string } | undefined;
+                if (meta && meta.type === 'relay') {
+                    useCallStore.getState().setRelayUpeer(data.callId, typeof meta.relay === 'string' ? meta.relay : undefined);
+                }
+            }),
             window.upeer?.onCallRing?.((data) => useCallStore.getState().setActive(data.callId)),
         ].filter((fn) => typeof fn === 'function') as Array<() => void>;
 

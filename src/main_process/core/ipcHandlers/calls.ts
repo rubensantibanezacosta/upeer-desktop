@@ -229,6 +229,7 @@ export function registerCallHandlers(): void {
                 cameraEnabled: session.cameraEnabled,
                 isGroup: session.isGroup,
                 groupMembers: session.groupMembers,
+                relayUpeerId: session.relayUpeerId,
             })),
         };
     });

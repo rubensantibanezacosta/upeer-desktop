@@ -53,7 +53,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [showShareOptions, setShowShareOptions] = useState(false);
     const media = useCallMedia();
-    const { startLocalCapture, stopLocalCapture, localStream, remoteStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
+    const { startLocalCapture, stopLocalCapture, localStream, remoteStream, remoteStreams, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -220,7 +220,38 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             )}
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
-                {isVideoActive && remoteStream ? (
+                {isGroup && isVideoActive ? (
+                    <Box sx={{ width: '100%', height: '100%', overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(110px, 1fr)', gap: 1 }}>
+                        <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
+                            {call.cameraEnabled ? (
+                                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>
+                                    <Avatar sx={{ width: 40, height: 40, fontSize: 16 }}>T</Avatar>
+                                </Box>
+                            )}
+                            <Box sx={{ position: 'absolute', bottom: 4, left: 6, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                                <Typography level="body-xs">Tú</Typography>
+                            </Box>
+                        </Box>
+                        {Object.entries(remoteStreams).map(([pid, stream]) => (
+                            <Box key={pid} sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                <video autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }}
+                                    ref={(el) => { if (el && el.srcObject !== stream) { el.srcObject = stream; } }} />
+                                <Box sx={{ position: 'absolute', bottom: 4, left: 6, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                                    <Typography level="body-xs" sx={{ color: 'white' }}>{pid.slice(0, 8)}</Typography>
+                                </Box>
+                            </Box>
+                        ))}
+                        {Object.keys(remoteStreams).length === 0 && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, gridColumn: '1 / -1' }}>
+                                <Avatar size="lg" sx={{ width: 72, height: 72, fontSize: 28 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                                <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
+                                <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{formatDuration(seconds)}</Typography>
+                            </Box>
+                        )}
+                    </Box>
+                ) : isVideoActive && remoteStream ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
                         <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
                         <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 120, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.4)', backgroundColor: '#000', boxShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>

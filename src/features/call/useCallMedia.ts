@@ -11,8 +11,10 @@ export function useCallMedia() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const screenRef = useRef<MediaStream | null>(null);
     const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+    const myUpeerIdRef = useRef<string | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
     const [screenSharing, setScreenSharing] = useState(false);
 
     const sendSdp = useCallback((peerUpeerId: string, description: RTCSessionDescriptionInit | null) => {
@@ -40,6 +42,7 @@ export function useCallMedia() {
             s.getTracks().forEach((t) => combined.addTrack(t));
         }
         setRemoteStream(combined);
+        setRemoteStreams(Object.fromEntries(remoteStreamsRef.current.entries()));
     }, []);
 
     const ensurePeer = useCallback((peerUpeerId: string, stream: MediaStream): RTCPeerConnection => {
@@ -54,6 +57,21 @@ export function useCallMedia() {
         peer.ontrack = (event) => {
             if (event.streams[0]) {
                 attachRemoteStream(peerUpeerId, event.streams[0]);
+                // SFU: si soy el relay, reenviar los tracks recibidos al resto de conexiones.
+                if (myUpeerIdRef.current && call.relayUpeerId === myUpeerIdRef.current) {
+                    const incoming = event.streams[0];
+                    for (const [pid, otherPeer] of peersRef.current) {
+                        if (pid !== peerUpeerId) {
+                            incoming.getTracks().forEach((t) => {
+                                try {
+                                    otherPeer.addTrack(t, incoming);
+                                } catch {
+                                    // Track ya añadido.
+                                }
+                            });
+                        }
+                    }
+                }
             }
         };
         peer.onnegotiationneeded = async () => {
@@ -118,6 +136,14 @@ export function useCallMedia() {
 
 
 
+    useEffect(() => {
+        window.upeer?.getMyIdentity?.().then((id) => {
+            if (id?.upeerId) {
+                myUpeerIdRef.current = id.upeerId;
+            }
+        }).catch(() => undefined);
+    }, []);
+
     const startLocalCapture = useCallback(async (video: boolean): Promise<boolean> => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -127,10 +153,17 @@ export function useCallMedia() {
             localStreamRef.current = stream;
             setLocalStream(stream);
 
-            const remotePeers = (call.isGroup && call.groupMembers?.length)
+            const allMembers = (call.isGroup && call.groupMembers?.length)
                 ? call.groupMembers
                 : (call.peerUpeerId ? [call.peerUpeerId] : []);
-            for (const pid of remotePeers) {
+            const relay = call.relayUpeerId;
+            const myId = myUpeerIdRef.current;
+            let targets: string[] = allMembers;
+            if (relay && myId) {
+                // SFU: con relay electo, los no-relay conectan solo al relay; el relay a todos.
+                targets = relay === myId ? allMembers : [relay];
+            }
+            for (const pid of targets) {
                 if (pid) {
                     ensurePeer(pid, stream);
                 }
@@ -139,7 +172,7 @@ export function useCallMedia() {
         } catch {
             return false;
         }
-    }, [call.isGroup, call.groupMembers, call.peerUpeerId, ensurePeer]);
+    }, [call.isGroup, call.groupMembers, call.peerUpeerId, call.relayUpeerId, ensurePeer]);
 
     const stopScreenShare = useCallback(() => {
         screenRef.current?.getTracks().forEach((track) => track.stop());
@@ -186,6 +219,7 @@ export function useCallMedia() {
         localStreamRef.current = null;
         setLocalStream(null);
         setRemoteStream(null);
+        setRemoteStreams({});
         stopScreenShare();
     }, [stopScreenShare]);
 
@@ -218,6 +252,7 @@ export function useCallMedia() {
         screenSharing,
         localStream,
         remoteStream,
+        remoteStreams,
         setVideoEnabled,
         setAudioEnabled,
         enabled: call.phase === 'connected',
