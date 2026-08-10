@@ -75,10 +75,19 @@ export class WebCodecsSession {
     }
 
     private async pump(reader: ReadableStreamDefaultReader<unknown>, kind: CallMediaKind, encoder: WcEncoder): Promise<void> {
+        let videoFrameCount = 0;
         while (this.running) {
             const { value, done } = await reader.read();
             if (done || !value) {
                 break;
+            }
+            if (kind === 'video') {
+                videoFrameCount += 1;
+                // Limita el framerate de vídeo (~15 fps) para no saturar el
+                // main thread al codificar/decodificar cada fotograma.
+                if (videoFrameCount % 2 !== 0) {
+                    continue;
+                }
             }
             if (encoder.state === 'unconfigured') {
                 const frame = value as WcFrame;

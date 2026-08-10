@@ -55,6 +55,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const screenCanvasRef = useRef<HTMLCanvasElement>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const nextStartRef = useRef(0);
+    const lastVideoDrawRef = useRef(0);
     const [remoteScreen, setRemoteScreen] = useState(false);
     const [showShareOptions, setShowShareOptions] = useState(false);
     const media = useCallMedia();
@@ -101,14 +102,24 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 if (!videoFrame || typeof videoFrame.displayWidth !== 'number' || typeof videoFrame.displayHeight !== 'number') {
                     return;
                 }
+                // Throttle del dibujado a ~15 fps para no saturar el main thread.
+                const now = performance.now();
+                if (now - lastVideoDrawRef.current >= 66) {
+                    lastVideoDrawRef.current = now;
+                } else {
+                    videoFrame.close?.();
+                    return;
+                }
                 const canvas = isGroup
                     ? (peerUpeerId ? peerCanvasRefs.current.get(peerUpeerId) : undefined) ?? remoteCanvasRef.current
                     : remoteCanvasRef.current;
                 if (!canvas) {
+                    videoFrame.close?.();
                     return;
                 }
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
+                    videoFrame.close?.();
                     return;
                 }
                 canvas.width = videoFrame.displayWidth;

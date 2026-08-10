@@ -56,12 +56,17 @@ export function decodeMediaFrame(encoded: string): MediaFrame | null {
     return { kind, ts, seq, data };
 }
 
-export function bytesToBase64(bytes: Uint8Array): string {
+function bytesToBinaryString(bytes: Uint8Array): string {
     let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
     }
-    return btoa(binary);
+    return binary;
+}
+
+export function bytesToBase64(bytes: Uint8Array): string {
+    return btoa(bytesToBinaryString(bytes));
 }
 
 export function base64ToBytes(encoded: string): Uint8Array {
