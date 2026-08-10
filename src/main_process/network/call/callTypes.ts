@@ -16,6 +16,7 @@ export interface CallSession {
     endReason?: CallEndReason;
     isRelay: boolean;
     relayFor: string[];
+    relayUpeerId?: string;
     isGroup: boolean;
     groupMembers: string[];
 }

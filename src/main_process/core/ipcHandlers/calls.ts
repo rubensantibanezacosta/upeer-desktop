@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, type WebContents } from 'electron';
 import { callManager } from '../../network/call/callManager.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import {
@@ -8,13 +8,34 @@ import {
     sendCallLeave,
     sendCallMedia,
     sendCallMediaUpdate,
+    sendCallMeta,
     sendCallOffer,
     sendCallReject,
+    recomputeRelay,
 } from '../../network/call/callSignaling.js';
 import { isValidCallId, isValidMediaKind } from '../../network/call/validationCalls.js';
 
+let rendererSender: WebContents | null = null;
+
+function captureRenderer(event?: { sender?: WebContents } | null): void {
+    if (event?.sender) {
+        rendererSender = event.sender;
+    }
+}
+
 export function registerCallHandlers(): void {
+    callManager.onStateChange((change) => {
+        if (change.phase === 'ended' && (change.endReason === 'no-answer' || change.endReason === 'error')) {
+            rendererSender?.send('call-ended', {
+                callId: change.callId,
+                peerUpeerId: change.peerUpeerId,
+                reason: change.endReason,
+            });
+        }
+    });
+
     ipcMain.handle('start-call', async (event, { upeerId, kind }) => {
+        captureRenderer(event);
         if (typeof upeerId !== 'string' || !upeerId || upeerId.length > 128) {
             return { success: false, error: 'Invalid upeerId' };
         }
@@ -30,6 +51,7 @@ export function registerCallHandlers(): void {
     });
 
     ipcMain.handle('start-group-call', async (event, { members, kind }) => {
+        captureRenderer(event);
         if (!Array.isArray(members) || members.some((m) => typeof m !== 'string' || !m || m.length > 128)) {
             return { success: false, error: 'Invalid members' };
         }
@@ -42,6 +64,18 @@ export function registerCallHandlers(): void {
         try {
             const { startGroupCall } = await import('../../network/call/callSignaling.js');
             const callId = await startGroupCall(members, kind);
+            // Elegir el relay inicial (por reputación) y notificarlo a los miembros.
+            void recomputeRelay(callId).then((relay) => {
+                if (!relay) {
+                    return;
+                }
+                const myId = getMyUPeerId();
+                for (const member of members) {
+                    if (member !== myId) {
+                        sendCallMeta(member, callId, { type: 'relay', relay });
+                    }
+                }
+            });
             return { success: true, callId };
         } catch (err) {
             return { success: false, error: 'Group call unavailable' };
@@ -49,6 +83,7 @@ export function registerCallHandlers(): void {
     });
 
     ipcMain.handle('accept-call', (event, { callId }) => {
+        captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
@@ -57,11 +92,13 @@ export function registerCallHandlers(): void {
             return { success: false, error: 'Call not found' };
         }
         callManager.accept(callId);
+        callManager.connect(callId);
         sendCallAccept(session.peerUpeerId, callId);
         return { success: true };
     });
 
     ipcMain.handle('reject-call', (event, { callId }) => {
+        captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
@@ -74,6 +111,7 @@ export function registerCallHandlers(): void {
     });
 
     ipcMain.handle('end-call', (event, { callId }) => {
+        captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
@@ -86,6 +124,7 @@ export function registerCallHandlers(): void {
     });
 
     ipcMain.handle('call-toggle-media', (event, { callId, type }) => {
+        captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
@@ -125,6 +164,7 @@ export function registerCallHandlers(): void {
     });
 
     ipcMain.handle('send-call-media', (event, { callId, data }) => {
+        captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
@@ -139,7 +179,8 @@ export function registerCallHandlers(): void {
         return { success: true };
     });
 
-    ipcMain.handle('get-all-calls', () => {
+    ipcMain.handle('get-all-calls', (event) => {
+        captureRenderer(event);
         const sessions = callManager.getAll();
         return {
             success: true,

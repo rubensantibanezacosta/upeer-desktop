@@ -5,7 +5,6 @@ import {
     IconButton,
     CircularProgress,
 } from '@mui/joy';
-import DownloadIcon from '@mui/icons-material/Download';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
@@ -31,15 +30,12 @@ interface MediaFileMessageProps {
     isTransferInProgress: boolean;
     isTransferFailed: boolean;
     savedPath?: string;
-    direction?: string;
     safeProgress: number;
     transferState?: string;
-    isDownloading: boolean;
     isVaulting?: boolean;
     onOpen: () => void;
     onCancel: () => void;
     onRetry: () => void;
-    onDownload: () => void;
     onMediaClick?: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
     filePath?: string;
 }
@@ -60,15 +56,12 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     isTransferInProgress,
     isTransferFailed,
     savedPath,
-    direction,
     safeProgress,
     transferState,
-    isDownloading,
     isVaulting: _isVaulting,
     onOpen,
     onCancel,
     onRetry,
-    onDownload,
     onMediaClick,
     filePath,
 }) => {
@@ -187,20 +180,6 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                             <RefreshIcon />
                         </IconButton>
                     ) : null}
-                </Box>
-            )}
-
-            {/* Download overlay */}
-            {isTransferComplete && !savedPath && direction === 'receiving' && (
-                <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                    <IconButton
-                        size="lg" variant="solid" color="neutral"
-                        sx={{ borderRadius: 'md', boxShadow: 'md', bgcolor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
-                        onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                        disabled={isDownloading}
-                    >
-                        {isDownloading ? <CircularProgress color="primary" size="sm" /> : <DownloadIcon />}
-                    </IconButton>
                 </Box>
             )}
 

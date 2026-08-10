@@ -197,7 +197,16 @@ const callApi = {
     endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
     toggleMedia: (callId: string, type: 'mute' | 'camera') => ipcRenderer.invoke('call-toggle-media', { callId, type }),
     sendCallMedia: (callId: string, data: string) => ipcRenderer.invoke('send-call-media', { callId, data }),
-    getCallDevices: () => ipcRenderer.invoke('call-devices'),
+    getCallDevices: () => navigator.mediaDevices.enumerateDevices()
+        .then((devices) => ({
+            success: true,
+            devices: devices.map((device) => ({
+                deviceId: device.deviceId,
+                kind: device.kind,
+                label: device.label,
+            })),
+        }))
+        .catch(() => ({ success: false, devices: [], error: 'Enumerate devices error' })),
     getCallParams: (callId: string) => ipcRenderer.invoke('call-params', { callId }),
     getAllCalls: () => ipcRenderer.invoke('get-all-calls'),
     joinGroupCall: (callId: string) => ipcRenderer.invoke('join-group-call', { callId }),
@@ -253,6 +262,8 @@ const eventApi = {
     onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; reason?: string }]>('call-ended', (data) => callback(data)),
     onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown }) => void) => subscribe<[{ callId: string; peerUpeerId: string; data: string; timestamp?: unknown }]>('call-media', (data) => callback(data)),
     onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => subscribe<[{ callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }]>('call-media-update', (data) => callback(data)),
+    onCallMemberJoined: (callback: (data: { callId: string; peerUpeerId: string; connected?: string[] }) => void) => subscribe<[{ callId: string; peerUpeerId: string; connected?: string[] }]>('call-member-joined', (data) => callback(data)),
+    onCallMemberLeft: (callback: (data: { callId: string; peerUpeerId: string; connected?: string[] }) => void) => subscribe<[{ callId: string; peerUpeerId: string; connected?: string[] }]>('call-member-left', (data) => callback(data)),
     onCallMeta: (callback: (data: { callId: string; peerUpeerId: string; meta?: unknown }) => void) => subscribe<[{ callId: string; peerUpeerId: string; meta?: unknown }]>('call-meta', (data) => callback(data)),
 };
 

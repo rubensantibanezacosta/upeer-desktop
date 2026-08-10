@@ -1,10 +1,13 @@
 import type { BrowserWindow } from 'electron';
 import { warn } from '../../security/secure-logger.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import { callManager } from './callManager.js';
 import {
     sendCallBusy,
+    sendCallMediaTo,
     sendCallMeta,
     sendCallRing,
+    recomputeRelay,
 } from './callSignaling.js';
 import type { CallMediaKind } from './callTypes.js';
 import { validateCallPacket } from './validationCalls.js';
@@ -62,6 +65,7 @@ export function handleCallPacket(
             break;
         case 'CALL_ACCEPT': {
             callManager.accept(callId);
+            callManager.connect(callId);
             win?.webContents.send('call-accepted', { callId, peerUpeerId: upeerId });
             break;
         }
@@ -81,14 +85,25 @@ export function handleCallPacket(
             callManager.end(callId, 'remote-end');
             win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: 'remote-end' });
             break;
-        case 'CALL_MEDIA':
+        case 'CALL_MEDIA': {
             win?.webContents.send('call-media', {
                 callId,
                 peerUpeerId: upeerId,
                 data: data.data,
                 timestamp: data.timestamp,
             });
+            // Si este nodo es el relay, reenvía la media al resto de miembros.
+            const session = callManager.get(callId);
+            const myId = getMyUPeerId();
+            if (session?.isGroup && session.relayUpeerId === myId) {
+                for (const member of session.groupMembers) {
+                    if (member !== upeerId && member !== myId) {
+                        sendCallMediaTo(member, callId, data.data as string);
+                    }
+                }
+            }
             break;
+        }
         case 'CALL_MEDIA_UPDATE':
             win?.webContents.send('call-media-update', {
                 callId,
@@ -97,9 +112,14 @@ export function handleCallPacket(
                 cameraEnabled: data.cameraEnabled === true,
             });
             break;
-        case 'CALL_META':
+        case 'CALL_META': {
+            const meta = data.meta as Record<string, unknown> | undefined;
+            if (meta && meta.type === 'relay' && typeof meta.relay === 'string') {
+                callManager.setRelayUpeer(callId, meta.relay);
+            }
             win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta: data.meta });
             break;
+        }
         case 'CALL_JOIN': {
             const rawMembers = Array.isArray(data.groupMembers)
                 ? data.groupMembers.filter((value): value is string => typeof value === 'string' && value.length > 0)
@@ -114,6 +134,18 @@ export function handleCallPacket(
                 }
             }
             win?.webContents.send('call-member-joined', { callId, peerUpeerId: upeerId, connected: callManager.getConnectedMembers(callId) });
+            // Recalcular el relay (elección/failover) y notificarlo al resto.
+            void recomputeRelay(callId).then((relay) => {
+                if (!relay) {
+                    return;
+                }
+                const my = getMyUPeerId();
+                for (const member of (callManager.get(callId)?.groupMembers ?? [])) {
+                    if (member !== my) {
+                        sendCallMeta(member, callId, { type: 'relay', relay });
+                    }
+                }
+            });
             break;
         }
         case 'CALL_LEAVE': {
@@ -126,6 +158,18 @@ export function handleCallPacket(
                 }
             }
             win?.webContents.send('call-member-left', { callId, peerUpeerId: upeerId, connected: callManager.getConnectedMembers(callId) });
+            // Recalcular el relay tras la salida (failover si era el relay).
+            void recomputeRelay(callId).then((relay) => {
+                if (!relay) {
+                    return;
+                }
+                const my = getMyUPeerId();
+                for (const member of (callManager.get(callId)?.groupMembers ?? [])) {
+                    if (member !== my) {
+                        sendCallMeta(member, callId, { type: 'relay', relay });
+                    }
+                }
+            });
             break;
         }
     }

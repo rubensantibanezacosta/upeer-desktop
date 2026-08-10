@@ -3,7 +3,7 @@ import { decodeMediaFrame, encodeMediaFrame, type CallMediaKind } from './mediaC
 import { useCallStore } from './useCallStore.js';
 import { WebCodecsSession, type MediaChunk } from './webCodecsSession.js';
 
-export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown) => void;
+export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown, peerUpeerId?: string) => void;
 
 export function useCallMedia() {
     const call = useCallStore((s) => (s.activeCallId ? s.calls[s.activeCallId] : undefined)) ?? { phase: 'idle' as const, kind: 'audio' as const, muted: false, cameraEnabled: false };
@@ -32,14 +32,14 @@ export function useCallMedia() {
         void window.upeer.sendCallMedia(callId, frame);
     }, []);
 
-    const handleRemote = useCallback((callId: string, data: string) => {
+    const handleRemote = useCallback((callId: string, peerUpeerId: string, data: string) => {
         const frame = decodeMediaFrame(data);
         const session = sessionRef.current;
         if (!frame || !session) {
             return;
         }
         void session.decodeChunk(frame.kind, frame.data, (decoded) => {
-            onDecodedRef.current?.(frame.kind, decoded);
+            onDecodedRef.current?.(frame.kind, decoded, peerUpeerId);
         });
     }, []);
 
@@ -57,7 +57,7 @@ export function useCallMedia() {
 
     useEffect(() => {
         const unsub = window.upeer?.onCallMedia?.((event) => {
-            handleRemote(event.callId, event.data);
+            handleRemote(event.callId, event.peerUpeerId, event.data);
         });
         return () => {
             if (typeof unsub === 'function') {
@@ -137,8 +137,53 @@ export function useCallMedia() {
         stopScreenShare();
     }, [stopScreenShare]);
 
+    const setVideoEnabled = useCallback(async (enabled: boolean) => {
+        const stream = localStreamRef.current;
+        if (!stream) {
+            return;
+        }
+        const tracks = stream.getVideoTracks();
+        if (!enabled) {
+            tracks.forEach((track) => track.stop());
+            return;
+        }
+        if (tracks.length === 0 || tracks.every((track) => track.readyState === 'ended')) {
+            const fresh = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false,
+            });
+            tracks.forEach((track) => stream.removeTrack(track));
+            fresh.getVideoTracks().forEach((track) => stream.addTrack(track));
+            const session = sessionRef.current;
+            if (session) {
+                await session.startCapture(stream, 'video', sendChunk);
+            }
+        }
+    }, [sendChunk]);
+
+    const setAudioEnabled = useCallback(async (enabled: boolean) => {
+        const stream = localStreamRef.current;
+        if (!stream) {
+            return;
+        }
+        const tracks = stream.getAudioTracks();
+        if (!enabled) {
+            tracks.forEach((track) => track.stop());
+            return;
+        }
+        if (tracks.length === 0 || tracks.every((track) => track.readyState === 'ended')) {
+            const fresh = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            tracks.forEach((track) => stream.removeTrack(track));
+            fresh.getAudioTracks().forEach((track) => stream.addTrack(track));
+            const session = sessionRef.current;
+            if (session) {
+                await session.startCapture(stream, 'audio', sendChunk);
+            }
+        }
+    }, [sendChunk]);
+
     useEffect(() => {
-        if (call.phase !== 'connected') {
+        if (call.phase === 'idle' || call.phase === 'ended') {
             stopLocalCapture();
         }
     }, [call.phase, stopLocalCapture]);
@@ -151,6 +196,8 @@ export function useCallMedia() {
         screenSharing,
         localStream,
         setOnRemoteFrame,
+        setVideoEnabled,
+        setAudioEnabled,
         enabled: call.phase === 'connected',
     };
 }

@@ -200,7 +200,7 @@ declare global {
             endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
             sendCallMedia: (callId: string, data: string) => Promise<{ success: boolean; error?: string }>;
-            getCallDevices: () => Promise<{ success: boolean; devices: unknown[] }>;
+            getCallDevices: () => Promise<{ success: boolean; devices: Array<{ deviceId: string; kind: string; label: string }>; error?: string }>;
             getCallParams: (callId: string) => Promise<{ success: boolean; kind: 'audio' | 'video'; codecs: string[] }>;
             getAllCalls: () => Promise<{ success: boolean; calls: Array<{
                 callId: string;
@@ -221,6 +221,8 @@ declare global {
             onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => UpeerUnsubscribe;
             onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown }) => void) => UpeerUnsubscribe;
             onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => UpeerUnsubscribe;
+            onCallMemberJoined: (callback: (data: { callId: string; peerUpeerId: string; connected?: string[] }) => void) => UpeerUnsubscribe;
+            onCallMemberLeft: (callback: (data: { callId: string; peerUpeerId: string; connected?: string[] }) => void) => UpeerUnsubscribe;
             onCallMeta: (callback: (data: { callId: string; peerUpeerId: string; meta?: unknown }) => void) => UpeerUnsubscribe;
         }
     }

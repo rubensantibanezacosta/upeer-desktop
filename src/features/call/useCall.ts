@@ -18,7 +18,8 @@ export function useCall() {
                 useCallStore.getState().setActive(data.callId);
             }),
             window.upeer?.onCallEnded?.((data) => useCallStore.getState().markEnded(data.callId, data.reason)),
-            window.upeer?.onCallMediaUpdate?.((data) => useCallStore.getState().applyMediaUpdate(data.callId, data)),
+            window.upeer?.onCallMemberJoined?.((data) => useCallStore.getState().addGroupMember(data.callId, data.peerUpeerId)),
+            window.upeer?.onCallMemberLeft?.((data) => useCallStore.getState().removeGroupMember(data.callId, data.peerUpeerId)),
             window.upeer?.onCallRing?.((data) => useCallStore.getState().setActive(data.callId)),
         ].filter((fn) => typeof fn === 'function') as Array<() => void>;
 
@@ -77,16 +78,28 @@ export function useCall() {
 
     const toggleMute = useCallback(async (callId?: string) => {
         const target = callId ?? useCallStore.getState().activeCallId;
-        if (target) {
-            await window.upeer.toggleMedia(target, 'mute');
+        if (!target) {
+            return;
         }
+        const current = useCallStore.getState().calls[target];
+        if (!current) {
+            return;
+        }
+        await window.upeer.toggleMedia(target, 'mute');
+        useCallStore.getState().applyMediaUpdate(target, { muted: !current.muted, cameraEnabled: current.cameraEnabled });
     }, []);
 
     const toggleCamera = useCallback(async (callId?: string) => {
         const target = callId ?? useCallStore.getState().activeCallId;
-        if (target) {
-            await window.upeer.toggleMedia(target, 'camera');
+        if (!target) {
+            return;
         }
+        const current = useCallStore.getState().calls[target];
+        if (!current) {
+            return;
+        }
+        await window.upeer.toggleMedia(target, 'camera');
+        useCallStore.getState().applyMediaUpdate(target, { muted: current.muted, cameraEnabled: !current.cameraEnabled });
     }, []);
 
     const setActive = useCallStore((s) => s.setActive);

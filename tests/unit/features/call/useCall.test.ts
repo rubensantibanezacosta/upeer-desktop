@@ -3,10 +3,14 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { useCall } from '../../../../src/features/call/useCall.js';
 import { useCallStore } from '../../../../src/features/call/useCallStore.js';
 
-let incomingCallback: ((data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) | undefined;
+let incomingCallback: ((data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[] }) => void) | undefined;
+let memberJoinedCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
+let memberLeftCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 
 function installBridge(overrides: Record<string, unknown> = {}) {
     incomingCallback = undefined;
+    memberJoinedCallback = undefined;
+    memberLeftCallback = undefined;
     (globalThis as unknown as { window: unknown }).window = {
         upeer: {
             startCall: vi.fn(async () => ({ success: true, callId: 'c1' })),
@@ -23,6 +27,14 @@ function installBridge(overrides: Record<string, unknown> = {}) {
             onCallAccepted: vi.fn(() => () => undefined),
             onCallEnded: vi.fn(() => () => undefined),
             onCallMediaUpdate: vi.fn(() => () => undefined),
+            onCallMemberJoined: vi.fn((cb: typeof memberJoinedCallback) => {
+                memberJoinedCallback = cb;
+                return () => undefined;
+            }),
+            onCallMemberLeft: vi.fn((cb: typeof memberLeftCallback) => {
+                memberLeftCallback = cb;
+                return () => undefined;
+            }),
             onCallRing: vi.fn(() => () => undefined),
             ...overrides,
         },
@@ -30,7 +42,7 @@ function installBridge(overrides: Record<string, unknown> = {}) {
     return (globalThis as unknown as { window: { upeer: Record<string, ReturnType<typeof vi.fn>> } }).window.upeer;
 }
 
-function fireIncoming(data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) {
+function fireIncoming(data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[] }) {
     act(() => {
         incomingCallback?.(data);
     });
@@ -78,5 +90,18 @@ describe('useCall', () => {
         fireIncoming({ callId: 'in-1', peerUpeerId: 'peer9', kind: 'video' });
         expect(result.current.call.phase).toBe('incoming-ringing');
         expect(result.current.call.peerUpeerId).toBe('peer9');
+    });
+
+    it('actualiza la membresía del grupo en tiempo real', async () => {
+        const { result } = renderHook(() => useCall());
+        fireIncoming({ callId: 'g1', peerUpeerId: 'peer9', kind: 'video', isGroup: true, groupMembers: ['peerA'] });
+        act(() => {
+            memberJoinedCallback?.({ callId: 'g1', peerUpeerId: 'peerB' });
+        });
+        expect(result.current.activeCalls[0]?.groupMembers).toContain('peerB');
+        act(() => {
+            memberLeftCallback?.({ callId: 'g1', peerUpeerId: 'peerB' });
+        });
+        expect(result.current.activeCalls[0]?.groupMembers).not.toContain('peerB');
     });
 });

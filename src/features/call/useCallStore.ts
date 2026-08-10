@@ -25,6 +25,8 @@ interface CallStore {
     markConnected: (callId: string) => void;
     markEnded: (callId: string, reason?: string) => void;
     applyMediaUpdate: (callId: string, data: { muted: boolean; cameraEnabled: boolean }) => void;
+    addGroupMember: (callId: string, memberId: string) => void;
+    removeGroupMember: (callId: string, memberId: string) => void;
     setActive: (callId?: string) => void;
     removeCall: (callId: string) => void;
     reset: () => void;
@@ -86,7 +88,7 @@ export const useCallStore = create<CallStore>((set) => ({
         if (!call) {
             return state;
         }
-        return { calls: { ...state.calls, [callId]: { ...call, phase: 'negotiating' } } };
+        return { calls: { ...state.calls, [callId]: { ...call, phase: 'connected' } } };
     }),
 
     markConnected: (callId) => set((state) => {
@@ -112,6 +114,22 @@ export const useCallStore = create<CallStore>((set) => ({
             return state;
         }
         return { calls: { ...state.calls, [callId]: { ...call, muted: data.muted, cameraEnabled: data.cameraEnabled } } };
+    }),
+
+    addGroupMember: (callId, memberId) => set((state) => {
+        const call = state.calls[callId];
+        if (!call || call.groupMembers?.includes(memberId)) {
+            return state;
+        }
+        return { calls: { ...state.calls, [callId]: { ...call, groupMembers: [...(call.groupMembers ?? []), memberId] } } };
+    }),
+
+    removeGroupMember: (callId, memberId) => set((state) => {
+        const call = state.calls[callId];
+        if (!call) {
+            return state;
+        }
+        return { calls: { ...state.calls, [callId]: { ...call, groupMembers: (call.groupMembers ?? []).filter((m) => m !== memberId) } } };
     }),
 
     setActive: (callId) => set({ activeCallId: callId }),

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ipcMain } from 'electron';
 import { registerCallHandlers } from '../../../../src/main_process/core/ipcHandlers/calls.js';
 import { callManager } from '../../../../src/main_process/network/call/callManager.js';
@@ -13,6 +13,10 @@ vi.mock('../../../../src/main_process/network/call/callSignaling.js', () => ({
     sendCallEnd: vi.fn(),
     sendCallMediaUpdate: vi.fn(),
     sendCallMedia: vi.fn(),
+    sendCallMeta: vi.fn(),
+    sendCallMediaTo: vi.fn(),
+    recomputeRelay: vi.fn(async () => 'peer1'),
+    electRelay: vi.fn(async () => 'peer1'),
 }));
 
 vi.mock('../../../../src/main_process/security/secure-logger.js', () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }));
@@ -33,11 +37,28 @@ describe('registerCallHandlers', () => {
         callManager.resetForTests();
         registerCallHandlers();
     });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
 
     it('start-call valida upeerId y kind', async () => {
         const handler = getHandler('start-call');
         expect((await handler(null, { upeerId: '', kind: 'audio' }) as { success: boolean }).success).toBe(false);
         expect((await handler(null, { upeerId: 'x', kind: 'data' }) as { success: boolean }).success).toBe(false);
+    });
+
+    it('timeout de ring sin respuesta notifica call-ended al renderer', async () => {
+        vi.useFakeTimers();
+        try {
+            const sender = { send: vi.fn() };
+            const handler = getHandler('get-all-calls');
+            handler({ sender } as unknown as { sender: unknown }, {});
+            const session = callManager.create('peer1', 'audio', 'outgoing');
+            vi.advanceTimersByTime(31_000);
+            expect(sender.send).toHaveBeenCalledWith('call-ended', expect.objectContaining({ callId: session.callId, reason: 'no-answer' }));
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('start-call crea la llamada y devuelve el callId', async () => {
@@ -53,7 +74,7 @@ describe('registerCallHandlers', () => {
         const handler = getHandler('accept-call');
         const result = await handler(null, { callId: session.callId }) as { success: boolean };
         expect(result.success).toBe(true);
-        expect(session.phase).toBe('negotiating');
+        expect(session.phase).toBe('connected');
         expect(signaling.sendCallAccept).toHaveBeenCalledWith('peer1', session.callId);
     });
 

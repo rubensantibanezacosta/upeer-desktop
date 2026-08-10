@@ -105,6 +105,7 @@ class CallManager {
             startedAt: Date.now(),
             isRelay: false,
             relayFor: [],
+            relayUpeerId: undefined,
             isGroup: false,
             groupMembers: [],
         };
@@ -127,6 +128,7 @@ class CallManager {
             startedAt: Date.now(),
             isRelay: false,
             relayFor: [],
+            relayUpeerId: undefined,
             isGroup: true,
             groupMembers: memberUpeerIds.slice(),
         };
@@ -154,6 +156,7 @@ class CallManager {
             startedAt: Date.now(),
             isRelay: false,
             relayFor: [],
+            relayUpeerId: undefined,
             isGroup: true,
             groupMembers: memberUpeerIds.slice(),
         };
@@ -223,6 +226,32 @@ class CallManager {
         }
         session.isRelay = true;
         session.relayFor = relayFor.slice(0, MAX_RELAY_MEMBERS);
+    }
+
+    setRelayUpeer(callId: string, relayUpeerId: string): void {
+        const session = this.sessions.get(callId);
+        if (!session) {
+            return;
+        }
+        session.relayUpeerId = relayUpeerId;
+        session.isRelay = true;
+        session.relayFor = session.groupMembers
+            .filter((member) => member !== relayUpeerId)
+            .slice(0, MAX_RELAY_MEMBERS);
+    }
+
+    getRelayUpeer(callId: string): string | undefined {
+        return this.sessions.get(callId)?.relayUpeerId;
+    }
+
+    clearRelay(callId: string): void {
+        const session = this.sessions.get(callId);
+        if (!session) {
+            return;
+        }
+        session.relayUpeerId = undefined;
+        session.isRelay = false;
+        session.relayFor = [];
     }
 
     onStateChange(listener: CallStateListener): () => void {

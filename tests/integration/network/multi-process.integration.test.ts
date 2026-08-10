@@ -420,7 +420,7 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         await nodeB.request('acceptCall');
         await sleep(500);
         const aAfter = await nodeA.request('getActiveCall');
-        expect((aAfter.call as CallState | null)?.phase).toBe('negotiating');
+        expect((aAfter.call as CallState | null)?.phase).toBe('connected');
 
         await nodeA.request('connectCall');
         await nodeB.request('connectCall');

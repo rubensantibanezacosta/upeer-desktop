@@ -25,6 +25,7 @@ type MockUpeer = {
     onGroupMessageDelivered: ReturnType<typeof vi.fn>;
     onMessageReactionUpdated: ReturnType<typeof vi.fn>;
     onMessageUpdated: ReturnType<typeof vi.fn>;
+    onPresence: ReturnType<typeof vi.fn>;
     sendChatUpdate?: ReturnType<typeof vi.fn>;
 };
 
@@ -83,6 +84,7 @@ describe('useChatStore groups integration', () => {
             onGroupMessageDelivered: vi.fn(),
             onMessageReactionUpdated: vi.fn(),
             onMessageUpdated: vi.fn(),
+            onPresence: vi.fn(),
         });
     });
 

@@ -108,7 +108,6 @@ export class WebCodecsSession {
             data: bytes,
         });
         decoder.decode(chunk);
-        await decoder.flush().catch(() => undefined);
     }
 
     async release(): Promise<void> {

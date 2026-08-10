@@ -51,13 +51,14 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const remoteCanvasRef = useRef<HTMLCanvasElement>(null);
+    const peerCanvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
     const screenCanvasRef = useRef<HTMLCanvasElement>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const nextStartRef = useRef(0);
     const [remoteScreen, setRemoteScreen] = useState(false);
     const [showShareOptions, setShowShareOptions] = useState(false);
     const media = useCallMedia();
-    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing } = media;
+    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -77,7 +78,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         if (call.phase !== 'negotiating' && call.phase !== 'connected') {
             return;
         }
-        setOnRemoteFrame((kind, frame) => {
+        setOnRemoteFrame((kind, frame, peerUpeerId) => {
             if (kind === 'screen') {
                 setRemoteScreen(true);
                 const canvas = screenCanvasRef.current;
@@ -96,9 +97,14 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 return;
             }
             if (kind === 'video') {
-                const canvas = remoteCanvasRef.current;
                 const videoFrame = frame as { displayWidth?: number; displayHeight?: number; close?: () => void };
-                if (!canvas || !videoFrame || typeof videoFrame.displayWidth !== 'number' || typeof videoFrame.displayHeight !== 'number') {
+                if (!videoFrame || typeof videoFrame.displayWidth !== 'number' || typeof videoFrame.displayHeight !== 'number') {
+                    return;
+                }
+                const canvas = isGroup
+                    ? (peerUpeerId ? peerCanvasRefs.current.get(peerUpeerId) : undefined) ?? remoteCanvasRef.current
+                    : remoteCanvasRef.current;
+                if (!canvas) {
                     return;
                 }
                 const ctx = canvas.getContext('2d');
@@ -131,22 +137,38 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             audioData.close?.();
         });
         void startLocalCapture(isVideo);
+        const peerCanvas = peerCanvasRefs.current;
         return () => {
             setOnRemoteFrame(null);
             stopLocalCapture();
             stopScreenShare();
             setRemoteScreen(false);
+            peerCanvas.clear();
             audioCtxRef.current?.close();
             audioCtxRef.current = null;
             nextStartRef.current = 0;
         };
-    }, [call.phase, isVideo, startLocalCapture, stopLocalCapture, stopScreenShare, setOnRemoteFrame]);
+    }, [call.phase, isVideo, isGroup, startLocalCapture, stopLocalCapture, stopScreenShare, setOnRemoteFrame]);
 
     useEffect(() => {
         if (videoRef.current && localStream) {
             videoRef.current.srcObject = localStream;
         }
     }, [localStream]);
+
+    useEffect(() => {
+        if (call.phase !== 'connected') {
+            return;
+        }
+        void setVideoEnabled(call.cameraEnabled);
+    }, [call.phase, call.cameraEnabled, setVideoEnabled]);
+
+    useEffect(() => {
+        if (call.phase !== 'connected') {
+            return;
+        }
+        void setAudioEnabled(!call.muted);
+    }, [call.phase, call.muted, setAudioEnabled]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button, [data-nodrag="true"]')) {
@@ -286,10 +308,19 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                                 <Typography level="body-xs">Tú</Typography>
                             </Box>
                         </Box>
-                        {call.groupMembers?.map((memberId, idx) => (
+                        {call.groupMembers?.map((memberId) => (
                             <Box key={memberId} sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {idx === 0 && isVideoActive ? (
-                                    <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111' }} />
+                                {isVideoActive ? (
+                                    <canvas
+                                        ref={(el) => {
+                                            if (el) {
+                                                peerCanvasRefs.current.set(memberId, el);
+                                            } else {
+                                                peerCanvasRefs.current.delete(memberId);
+                                            }
+                                        }}
+                                        style={{ width: '100%', height: '100%', backgroundColor: '#111' }}
+                                    />
                                 ) : (
                                     <Avatar sx={{ width: 40, height: 40, fontSize: 18 }}>{memberId.charAt(0).toUpperCase()}</Avatar>
                                 )}

@@ -1,5 +1,6 @@
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
+import { getVouchScore } from '../../security/reputation/vouches.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
 import { callManager } from './callManager.js';
 import type { CallMediaKind } from './callTypes.js';
@@ -72,13 +73,43 @@ export function sendCallCancel(peerUpeerId: string, callId: string): void {
 }
 
 export function sendCallEnd(peerUpeerId: string, callId: string): void {
+    const session = callManager.get(callId);
+    if (session && session.isGroup) {
+        const myId = getMyUPeerId();
+        for (const member of session.groupMembers) {
+            if (member !== myId) {
+                send(member, { type: 'CALL_END', callId, timestamp: Date.now() });
+            }
+        }
+        return;
+    }
     send(peerUpeerId, { type: 'CALL_END', callId, timestamp: Date.now() });
+}
+
+export function sendCallMediaTo(memberUpeerId: string, callId: string, data: string): void {
+    send(memberUpeerId, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
 }
 
 export function sendCallMedia(peerUpeerId: string, callId: string, data: string): void {
     const session = callManager.get(callId);
     if (session && session.isGroup) {
         const myId = getMyUPeerId();
+        const relay = session.relayUpeerId;
+        if (relay) {
+            if (relay === myId) {
+                // Soy el relay: fan-out a todos los demás miembros.
+                for (const member of session.groupMembers) {
+                    if (member !== myId) {
+                        send(member, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+                    }
+                }
+            } else if (relay !== myId) {
+                // No soy el relay: envío mi media solo al relay.
+                send(relay, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+            }
+            return;
+        }
+        // Sin relay electo: fallback a fan-out completo.
         for (const member of session.groupMembers) {
             if (member !== myId) {
                 send(member, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
@@ -89,11 +120,80 @@ export function sendCallMedia(peerUpeerId: string, callId: string, data: string)
     send(peerUpeerId, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
 }
 
+/**
+ * Elige de forma determinista el relay de una llamada de grupo entre los
+ * participantes, priorizando la mayor reputación (vouch score) y desempatando
+ * por upeerId (menor lexicográficamente). Todos los nodos llegan al mismo
+ * resultado para el mismo conjunto de participantes.
+ */
+export async function electRelay(memberUpeerIds: string[]): Promise<string> {
+    const unique = Array.from(new Set(memberUpeerIds.filter((id) => typeof id === 'string' && id.length > 0)));
+    if (unique.length === 0) {
+        return '';
+    }
+    const withScores = await Promise.all(
+        unique.map(async (id) => {
+            let score = 50;
+            try {
+                score = await getVouchScore(id);
+            } catch {
+                score = 50;
+            }
+            return { id, score };
+        }),
+    );
+    withScores.sort((a, b) => (b.score - a.score) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return withScores[0].id;
+}
+
+/**
+ * Número mínimo de participantes (incluido uno mismo) a partir del cual se
+ * activa el relay distribuido. Por debajo se usa mesh (fan-out directo), que
+ * tiene menor latencia y no concentra tráfico en un nodo; por encima, el relay
+ * reduce la subida de cada participante de O(N) a O(1).
+ */
+export const RELAY_THRESHOLD = 4;
+
+/**
+ * Recalcula el relay de la llamada de grupo a partir de los participantes
+ * conectados y lo fija localmente (determinista). Devuelve el relay elegido o
+ * undefined si el grupo usa mesh (por debajo del umbral).
+ */
+export async function recomputeRelay(callId: string): Promise<string | undefined> {
+    const session = callManager.get(callId);
+    if (!session || !session.isGroup) {
+        return undefined;
+    }
+    const myId = getMyUPeerId();
+    const candidates = [...session.groupMembers, session.peerUpeerId, myId];
+    const uniqueCandidates = Array.from(new Set(candidates.filter((id) => typeof id === 'string' && id.length > 0)));
+    if (uniqueCandidates.length <= RELAY_THRESHOLD) {
+        // Mesh: sin relay.
+        callManager.clearRelay(callId);
+        return undefined;
+    }
+    const relay = await electRelay(uniqueCandidates);
+    if (relay) {
+        callManager.setRelayUpeer(callId, relay);
+    }
+    return relay;
+}
+
 export function sendCallMediaUpdate(
     peerUpeerId: string,
     callId: string,
     updates: { muted?: boolean; cameraEnabled?: boolean },
 ): void {
+    const session = callManager.get(callId);
+    if (session && session.isGroup) {
+        const myId = getMyUPeerId();
+        for (const member of session.groupMembers) {
+            if (member !== myId) {
+                send(member, { type: 'CALL_MEDIA_UPDATE', callId, ...updates, timestamp: Date.now() });
+            }
+        }
+        return;
+    }
     send(peerUpeerId, { type: 'CALL_MEDIA_UPDATE', callId, ...updates, timestamp: Date.now() });
 }
 
