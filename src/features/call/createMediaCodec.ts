@@ -95,7 +95,7 @@ export class WebCodecsMediaCodec implements MediaCodec {
         });
         const config = kind === 'audio'
             ? { codec: 'opus', sampleRate: 48000, numberOfChannels: 1 }
-            : { codec: 'vp8', width: 640, height: 480, bitrate: 500_000 };
+            : { codec: 'vp8', width: 640, height: 480, bitrate: 300_000 };
         encoder.configure(config);
         this.encoders[kind] = encoder;
         return encoder;

@@ -83,9 +83,9 @@ export class WebCodecsSession {
             }
             if (kind === 'video') {
                 videoFrameCount += 1;
-                // Limita el framerate de vídeo (~15 fps) para no saturar el
-                // main thread al codificar/decodificar cada fotograma.
-                if (videoFrameCount % 2 !== 0) {
+                // Limita el framerate de vídeo (~10 fps) para no saturar el canal
+                // ni el main thread al codificar/decodificar cada fotograma.
+                if (videoFrameCount % 3 !== 0) {
                     continue;
                 }
             }
@@ -93,7 +93,7 @@ export class WebCodecsSession {
                 const frame = value as WcFrame;
                 const config = kind === 'audio'
                     ? { codec: 'opus', sampleRate: frame.sampleRate ?? 48000, numberOfChannels: frame.numberOfChannels ?? 1 }
-                    : { codec: 'vp8', width: frame.codedWidth ?? 640, height: frame.codedHeight ?? 480, bitrate: 500_000 };
+                    : { codec: 'vp8', width: frame.codedWidth ?? 640, height: frame.codedHeight ?? 480, bitrate: 300_000 };
                 encoder.configure(config);
             }
             if (encoder.encode) {

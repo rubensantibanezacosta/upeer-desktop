@@ -3,7 +3,7 @@ import {
     getMyUPeerId,
     sign
 } from '../../security/identity.js';
-import { error } from '../../security/secure-logger.js';
+import { error, warn } from '../../security/secure-logger.js';
 import { getYggstackAddress, onYggstackAddress, onYggstackStatus } from '../../sidecars/yggstack.js';
 import { SEALED_TYPES, sealPacket } from '../sealed.js';
 import {
@@ -65,6 +65,7 @@ type PooledConnection = {
 };
 
 const connectionPool = new Map<string, PooledConnection>();
+let lastQueueFullLogTs = 0;
 
 export function resetTransportConnectionsForTests(): void {
     Array.from(connectionPool.keys()).forEach(destroyConnection);
@@ -170,7 +171,12 @@ async function flushConnection(ip: string): Promise<void> {
 function enqueueForSend(ip: string, framedBuf: Buffer, isFileTransfer: boolean, isProbeTraffic: boolean): void {
     const entry = connectionPool.get(ip) || { queue: [], flushing: false };
     if (entry.queue.length >= MAX_QUEUE_SIZE) {
-        error(`TCP send queue llena para ${ip}, frame descartado`, undefined, 'network');
+        // Rate-limit del log: no saturar el main process con miles de errores por segundo.
+        const now = Date.now();
+        if (now - lastQueueFullLogTs >= 1000) {
+            lastQueueFullLogTs = now;
+            warn(`TCP send queue llena para ${ip}, frame descartado (tamaño de cola ${entry.queue.length})`, undefined, 'network');
+        }
         return;
     }
     entry.queue.push({ framedBuf, isFileTransfer, isProbeTraffic });

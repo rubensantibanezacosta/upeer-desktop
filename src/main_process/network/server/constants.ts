@@ -9,7 +9,7 @@ export const BACKOFF_STEPS_MS = [
     30 * 60_000, // 30 min (tope)
 ];
 
-export const MAX_QUEUE_SIZE = 60;
+export const MAX_QUEUE_SIZE = 200;
 
 export const EPH_FRESHNESS_MS = 2 * 60 * 60 * 1000; // 2 horas
 
