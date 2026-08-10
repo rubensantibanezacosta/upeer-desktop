@@ -13,6 +13,8 @@ const CALL_TYPES = new Set([
     'CALL_META',
     'CALL_JOIN',
     'CALL_LEAVE',
+    'CALL_SDP',
+    'CALL_ICE',
 ]);
 
 const MAX_CALL_ID = 128;
@@ -44,6 +46,16 @@ export function validateCallPacket(type: string, data: Record<string, unknown>):
     if (type === 'CALL_MEDIA') {
         if (typeof data.data !== 'string' || data.data.length === 0 || data.data.length > MAX_MEDIA_PAYLOAD) {
             return { valid: false, reason: 'invalid-media' };
+        }
+    }
+    if (type === 'CALL_SDP') {
+        if (!data.sdp || typeof data.sdp !== 'object') {
+            return { valid: false, reason: 'invalid-sdp' };
+        }
+    }
+    if (type === 'CALL_ICE') {
+        if (!data.candidate || typeof data.candidate !== 'object') {
+            return { valid: false, reason: 'invalid-ice' };
         }
     }
     return { valid: true };

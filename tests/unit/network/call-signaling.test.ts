@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sendCallMediaUpdate, sendCallEnd, sendCallMedia, electRelay, recomputeRelay } from '../../../src/main_process/network/call/callSignaling.js';
+import { sendCallMediaUpdate, sendCallEnd, sendCallMedia, sendCallSdp, sendCallIce, electRelay, recomputeRelay } from '../../../src/main_process/network/call/callSignaling.js';
 import { callManager } from '../../../src/main_process/network/call/callManager.js';
 
 const { sendMock, scoreMock } = vi.hoisted(() => ({ sendMock: vi.fn(), scoreMock: vi.fn() }));
@@ -91,5 +91,23 @@ describe('callSignaling (grupos)', () => {
         callManager.setRelayUpeer(session.callId, 'me');
         sendCallMedia('p1', session.callId, 'data');
         expect(sendMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('sendCallSdp y sendCallIce transportan SDP/ICE al peer (WebRTC)', () => {
+        const session = callManager.create('peer9', 'audio', 'outgoing');
+        sendCallSdp('peer9', session.callId, { type: 'offer', sdp: 'v=0' });
+        expect(sendMock).toHaveBeenCalledTimes(1);
+        const sdpCall = sendMock.mock.calls[0] as [string, { type: string; sdp: { type: string } }];
+        expect(sdpCall[0]).toBe('1::1');
+        expect(sdpCall[1].type).toBe('CALL_SDP');
+        expect(sdpCall[1].sdp.type).toBe('offer');
+
+        sendMock.mockClear();
+        sendCallIce('peer9', session.callId, { candidate: 'candidate:1 1 udp', sdpMid: '0', sdpMLineIndex: 0 });
+        expect(sendMock).toHaveBeenCalledTimes(1);
+        const iceCall = sendMock.mock.calls[0] as [string, { type: string; candidate: { candidate: string } }];
+        expect(iceCall[0]).toBe('1::1');
+        expect(iceCall[1].type).toBe('CALL_ICE');
+        expect(iceCall[1].candidate.candidate).toBe('candidate:1 1 udp');
     });
 });

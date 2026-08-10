@@ -120,6 +120,22 @@ export function sendCallMedia(peerUpeerId: string, callId: string, data: string)
     send(peerUpeerId, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
 }
 
+export function sendCallSdp(
+    peerUpeerId: string,
+    callId: string,
+    sdp: { type: string; sdp?: string; relay?: string },
+): void {
+    send(peerUpeerId, { type: 'CALL_SDP', callId, sdp, timestamp: Date.now() });
+}
+
+export function sendCallIce(
+    peerUpeerId: string,
+    callId: string,
+    candidate: Record<string, unknown>,
+): void {
+    send(peerUpeerId, { type: 'CALL_ICE', callId, candidate, timestamp: Date.now() });
+}
+
 /**
  * Elige de forma determinista el relay de una llamada de grupo entre los
  * participantes, priorizando la mayor reputación (vouch score) y desempatando

@@ -50,16 +50,10 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const [seconds, setSeconds] = useState(0);
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const remoteCanvasRef = useRef<HTMLCanvasElement>(null);
-    const peerCanvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
-    const screenCanvasRef = useRef<HTMLCanvasElement>(null);
-    const audioCtxRef = useRef<AudioContext | null>(null);
-    const nextStartRef = useRef(0);
-    const lastVideoDrawRef = useRef(0);
-    const [remoteScreen, setRemoteScreen] = useState(false);
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [showShareOptions, setShowShareOptions] = useState(false);
     const media = useCallMedia();
-    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
+    const { startLocalCapture, stopLocalCapture, localStream, remoteStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -79,93 +73,24 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         if (call.phase !== 'negotiating' && call.phase !== 'connected') {
             return;
         }
-        setOnRemoteFrame((kind, frame, peerUpeerId) => {
-            if (kind === 'screen') {
-                setRemoteScreen(true);
-                const canvas = screenCanvasRef.current;
-                const screenFrame = frame as { displayWidth?: number; displayHeight?: number; close?: () => void };
-                if (!canvas || !screenFrame || typeof screenFrame.displayWidth !== 'number' || typeof screenFrame.displayHeight !== 'number') {
-                    return;
-                }
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    return;
-                }
-                canvas.width = screenFrame.displayWidth;
-                canvas.height = screenFrame.displayHeight;
-                (ctx as CanvasRenderingContext2D).drawImage(screenFrame as unknown as CanvasImageSource, 0, 0);
-                screenFrame.close?.();
-                return;
-            }
-            if (kind === 'video') {
-                const videoFrame = frame as { displayWidth?: number; displayHeight?: number; close?: () => void };
-                if (!videoFrame || typeof videoFrame.displayWidth !== 'number' || typeof videoFrame.displayHeight !== 'number') {
-                    return;
-                }
-                // Throttle del dibujado a ~15 fps para no saturar el main thread.
-                const now = performance.now();
-                if (now - lastVideoDrawRef.current >= 66) {
-                    lastVideoDrawRef.current = now;
-                } else {
-                    videoFrame.close?.();
-                    return;
-                }
-                const canvas = isGroup
-                    ? (peerUpeerId ? peerCanvasRefs.current.get(peerUpeerId) : undefined) ?? remoteCanvasRef.current
-                    : remoteCanvasRef.current;
-                if (!canvas) {
-                    videoFrame.close?.();
-                    return;
-                }
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    videoFrame.close?.();
-                    return;
-                }
-                canvas.width = videoFrame.displayWidth;
-                canvas.height = videoFrame.displayHeight;
-                (ctx as CanvasRenderingContext2D).drawImage(videoFrame as unknown as CanvasImageSource, 0, 0);
-                videoFrame.close?.();
-                return;
-            }
-            const audioData = frame as { sampleRate: number; numberOfFrames: number; numberOfChannels: number; copyTo: (dest: Float32Array, opts: { planeIndex: number }) => void; close?: () => void };
-            if (typeof audioData.sampleRate !== 'number' || typeof audioData.copyTo !== 'function') {
-                return;
-            }
-            const audioCtx = audioCtxRef.current ?? new AudioContext();
-            audioCtxRef.current = audioCtx;
-            const channels = Math.max(1, audioData.numberOfChannels);
-            const buffer = audioCtx.createBuffer(channels, audioData.numberOfFrames, audioData.sampleRate);
-            for (let channel = 0; channel < channels; channel++) {
-                audioData.copyTo(buffer.getChannelData(channel), { planeIndex: channel });
-            }
-            const source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioCtx.destination);
-            const startAt = Math.max(nextStartRef.current, audioCtx.currentTime);
-            source.start(startAt);
-            nextStartRef.current = startAt + buffer.duration;
-            audioData.close?.();
-        });
         void startLocalCapture(isVideo);
-        const peerCanvas = peerCanvasRefs.current;
         return () => {
-            setOnRemoteFrame(null);
             stopLocalCapture();
             stopScreenShare();
-            setRemoteScreen(false);
-            peerCanvas.clear();
-            audioCtxRef.current?.close();
-            audioCtxRef.current = null;
-            nextStartRef.current = 0;
         };
-    }, [call.phase, isVideo, isGroup, startLocalCapture, stopLocalCapture, stopScreenShare, setOnRemoteFrame]);
+    }, [call.phase, isVideo, startLocalCapture, stopLocalCapture, stopScreenShare]);
 
     useEffect(() => {
         if (videoRef.current && localStream) {
             videoRef.current.srcObject = localStream;
         }
     }, [localStream]);
+
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
 
     useEffect(() => {
         if (call.phase !== 'connected') {
@@ -257,9 +182,6 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 {screenSharing && (
                     <Chip size="sm" variant="solid" color="warning">Compartiendo</Chip>
                 )}
-                {remoteScreen && (
-                    <Chip size="sm" variant="soft" color="primary">Pantalla remota</Chip>
-                )}
                 <Tooltip title={screenSharing ? 'Detener pantalla' : 'Compartir pantalla'}>
                     <IconButton
                         size="sm"
@@ -298,52 +220,9 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             )}
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
-                {remoteScreen ? (
-                    <Box sx={{ position: 'relative', width: '100%', height: isGroup ? '70%' : '100%' }}>
-                        <canvas ref={screenCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 8 }} />
-                        <Box sx={{ position: 'absolute', top: 4, left: 6, px: 1, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-                            <Typography level="body-xs">{peerName} comparte pantalla</Typography>
-                        </Box>
-                    </Box>
-                ) : null}
-                {isGroup ? (
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1, width: '100%', height: remoteScreen ? '30%' : '100%', alignItems: 'center' }}>
-                        {/* Self-view: tu propia cámara */}
-                        <Box sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
-                            {isVideoActive && call.cameraEnabled ? (
-                                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                                <Avatar sx={{ width: 40, height: 40, fontSize: 18 }}>T</Avatar>
-                            )}
-                            <Box sx={{ position: 'absolute', bottom: 4, left: 4, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-                                <Typography level="body-xs">Tú</Typography>
-                            </Box>
-                        </Box>
-                        {call.groupMembers?.map((memberId) => (
-                            <Box key={memberId} sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: '#2a2a2a', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {isVideoActive ? (
-                                    <canvas
-                                        ref={(el) => {
-                                            if (el) {
-                                                peerCanvasRefs.current.set(memberId, el);
-                                            } else {
-                                                peerCanvasRefs.current.delete(memberId);
-                                            }
-                                        }}
-                                        style={{ width: '100%', height: '100%', backgroundColor: '#111' }}
-                                    />
-                                ) : (
-                                    <Avatar sx={{ width: 40, height: 40, fontSize: 18 }}>{memberId.charAt(0).toUpperCase()}</Avatar>
-                                )}
-                                <Box sx={{ position: 'absolute', bottom: 4, left: 4, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-                                    <Typography level="body-xs">{memberId.slice(0, 6)}</Typography>
-                                </Box>
-                            </Box>
-                        ))}
-                    </Box>
-                ) : (!remoteScreen && isVideoActive) ? (
+                {isVideoActive && remoteStream ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                        <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', backgroundColor: '#111', borderRadius: 8 }} />
+                        <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
                         <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 120, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.4)', backgroundColor: '#000', boxShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>
                             {call.cameraEnabled ? (
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

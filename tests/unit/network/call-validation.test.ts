@@ -27,6 +27,13 @@ describe('validateCallPacket', () => {
         expect(validateCallPacket('CALL_MEDIA', { callId: 'abc', data: 'eA==' }).valid).toBe(true);
     });
 
+    it('valida CALL_SDP y CALL_ICE (WebRTC)', () => {
+        expect(validateCallPacket('CALL_SDP', { callId: 'abc', sdp: { type: 'offer' } }).valid).toBe(true);
+        expect(validateCallPacket('CALL_SDP', { callId: 'abc' }).reason).toBe('invalid-sdp');
+        expect(validateCallPacket('CALL_ICE', { callId: 'abc', candidate: { candidate: 'c' } }).valid).toBe(true);
+        expect(validateCallPacket('CALL_ICE', { callId: 'abc' }).reason).toBe('invalid-ice');
+    });
+
     it('valida el resto de tipos de llamada', () => {
         for (const type of ['CALL_RING', 'CALL_ACCEPT', 'CALL_REJECT', 'CALL_END', 'CALL_CANCEL']) {
             expect(validateCallPacket(type, { callId: 'abc' }).valid).toBe(true);

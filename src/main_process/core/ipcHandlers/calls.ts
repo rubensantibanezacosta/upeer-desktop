@@ -4,6 +4,7 @@ import { getMyUPeerId } from '../../security/identity.js';
 import {
     sendCallAccept,
     sendCallEnd,
+    sendCallIce,
     sendCallJoin,
     sendCallLeave,
     sendCallMedia,
@@ -11,6 +12,7 @@ import {
     sendCallMeta,
     sendCallOffer,
     sendCallReject,
+    sendCallSdp,
     recomputeRelay,
 } from '../../network/call/callSignaling.js';
 import { isValidCallId, isValidMediaKind } from '../../network/call/validationCalls.js';
@@ -176,6 +178,38 @@ export function registerCallHandlers(): void {
             return { success: false, error: 'Call not found' };
         }
         sendCallMedia(session.peerUpeerId, callId, data);
+        return { success: true };
+    });
+
+    ipcMain.handle('send-call-sdp', (event, { callId, sdp }) => {
+        captureRenderer(event);
+        if (!isValidCallId(callId)) {
+            return { success: false, error: 'Invalid callId' };
+        }
+        if (!sdp || typeof sdp !== 'object') {
+            return { success: false, error: 'Invalid sdp' };
+        }
+        const session = callManager.get(callId);
+        if (!session) {
+            return { success: false, error: 'Call not found' };
+        }
+        sendCallSdp(session.peerUpeerId, callId, sdp);
+        return { success: true };
+    });
+
+    ipcMain.handle('send-call-ice', (event, { callId, candidate }) => {
+        captureRenderer(event);
+        if (!isValidCallId(callId)) {
+            return { success: false, error: 'Invalid callId' };
+        }
+        if (!candidate || typeof candidate !== 'object') {
+            return { success: false, error: 'Invalid candidate' };
+        }
+        const session = callManager.get(callId);
+        if (!session) {
+            return { success: false, error: 'Call not found' };
+        }
+        sendCallIce(session.peerUpeerId, callId, candidate);
         return { success: true };
     });
 

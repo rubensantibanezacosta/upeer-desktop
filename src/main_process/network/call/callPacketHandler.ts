@@ -112,6 +112,20 @@ export function handleCallPacket(
                 cameraEnabled: data.cameraEnabled === true,
             });
             break;
+        case 'CALL_SDP':
+            win?.webContents.send('call-sdp', {
+                callId,
+                peerUpeerId: upeerId,
+                sdp: data.sdp,
+            });
+            break;
+        case 'CALL_ICE':
+            win?.webContents.send('call-ice', {
+                callId,
+                peerUpeerId: upeerId,
+                candidate: data.candidate,
+            });
+            break;
         case 'CALL_META': {
             const meta = data.meta as Record<string, unknown> | undefined;
             if (meta && meta.type === 'relay' && typeof meta.relay === 'string') {
