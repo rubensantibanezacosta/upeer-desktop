@@ -197,8 +197,8 @@ const callApi = {
     endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
     toggleMedia: (callId: string, type: 'mute' | 'camera') => ipcRenderer.invoke('call-toggle-media', { callId, type }),
     sendCallMedia: (callId: string, data: string) => ipcRenderer.invoke('send-call-media', { callId, data }),
-    sendCallSdp: (callId: string, sdp: { type: string; sdp?: string; relay?: string }) => ipcRenderer.invoke('send-call-sdp', { callId, sdp }),
-    sendCallIce: (callId: string, candidate: Record<string, unknown>) => ipcRenderer.invoke('send-call-ice', { callId, candidate }),
+    sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => ipcRenderer.invoke('send-call-sdp', { callId, peerUpeerId, sdp }),
+    sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => ipcRenderer.invoke('send-call-ice', { callId, peerUpeerId, candidate }),
     getCallDevices: () => navigator.mediaDevices.enumerateDevices()
         .then((devices) => ({
             success: true,

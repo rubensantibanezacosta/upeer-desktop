@@ -200,8 +200,8 @@ declare global {
             endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
             sendCallMedia: (callId: string, data: string) => Promise<{ success: boolean; error?: string }>;
-            sendCallSdp: (callId: string, sdp: { type: string; sdp?: string; relay?: string }) => Promise<{ success: boolean; error?: string }>;
-            sendCallIce: (callId: string, candidate: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+            sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => Promise<{ success: boolean; error?: string }>;
+            sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
             getCallDevices: () => Promise<{ success: boolean; devices: Array<{ deviceId: string; kind: string; label: string }>; error?: string }>;
             getCallParams: (callId: string) => Promise<{ success: boolean; kind: 'audio' | 'video'; codecs: string[] }>;
             getAllCalls: () => Promise<{ success: boolean; calls: Array<{

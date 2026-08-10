@@ -5,65 +5,102 @@ type SdpMessage = { type: string; sdp?: string; relay?: string };
 type ScreenCaptureOptions = { target: 'screen' | 'window'; withSystemAudio: boolean };
 
 export function useCallMedia() {
-    const call = useCallStore((s) => (s.activeCallId ? s.calls[s.activeCallId] : undefined)) ?? { phase: 'idle' as const, kind: 'audio' as const, muted: false, cameraEnabled: false };
-    const peerRef = useRef<RTCPeerConnection | null>(null);
+    const call = useCallStore((s) => (s.activeCallId ? s.calls[s.activeCallId] : undefined)) ?? { phase: 'idle' as const, kind: 'audio' as const, muted: false, cameraEnabled: false, peerUpeerId: undefined, groupMembers: undefined };
+    const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+    const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
     const localStreamRef = useRef<MediaStream | null>(null);
-    const remoteStreamRef = useRef<MediaStream | null>(null);
     const screenRef = useRef<MediaStream | null>(null);
+    const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [screenSharing, setScreenSharing] = useState(false);
-    const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
-    const sendSdp = useCallback((description: RTCSessionDescriptionInit | null) => {
+    const sendSdp = useCallback((peerUpeerId: string, description: RTCSessionDescriptionInit | null) => {
         const callId = useCallStore.getState().activeCallId;
-        if (!callId || !description) {
+        if (!callId || !description || !peerUpeerId) {
             return;
         }
-        void window.upeer.sendCallSdp(callId, { type: description.type, sdp: description.sdp });
+        void window.upeer.sendCallSdp(callId, peerUpeerId, { type: description.type, sdp: description.sdp });
     }, []);
 
-    const sendIce = useCallback((candidate: RTCIceCandidate | null) => {
+    const sendIce = useCallback((peerUpeerId: string, candidate: RTCIceCandidate | null) => {
         const callId = useCallStore.getState().activeCallId;
-        if (!callId || !candidate) {
+        if (!callId || !candidate || !peerUpeerId) {
             return;
         }
-        void window.upeer.sendCallIce(callId, candidate.toJSON() as unknown as Record<string, unknown>);
+        void window.upeer.sendCallIce(callId, peerUpeerId, candidate.toJSON() as unknown as Record<string, unknown>);
     }, []);
 
-    const handleRemoteSdp = useCallback((_callId: string, sdp: SdpMessage) => {
-        const peer = peerRef.current;
-        if (!peer) {
+    const attachRemoteStream = useCallback((peerUpeerId: string, incoming: MediaStream) => {
+        const existing = remoteStreamsRef.current.get(peerUpeerId) ?? new MediaStream();
+        incoming.getTracks().forEach((t) => existing.addTrack(t));
+        remoteStreamsRef.current.set(peerUpeerId, existing);
+        const combined = new MediaStream();
+        for (const s of remoteStreamsRef.current.values()) {
+            s.getTracks().forEach((t) => combined.addTrack(t));
+        }
+        setRemoteStream(combined);
+    }, []);
+
+    const ensurePeer = useCallback((peerUpeerId: string, stream: MediaStream): RTCPeerConnection => {
+        const existing = peersRef.current.get(peerUpeerId);
+        if (existing) {
+            return existing;
+        }
+        const peer = new RTCPeerConnection({ iceServers: [] });
+        peersRef.current.set(peerUpeerId, peer);
+        remoteStreamsRef.current.set(peerUpeerId, new MediaStream());
+        stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+        peer.ontrack = (event) => {
+            if (event.streams[0]) {
+                attachRemoteStream(peerUpeerId, event.streams[0]);
+            }
+        };
+        peer.onnegotiationneeded = async () => {
+            try {
+                const offer = await peer.createOffer();
+                await peer.setLocalDescription(offer);
+                sendSdp(peerUpeerId, offer);
+            } catch {
+                // Se ignora: error transitorio.
+            }
+        };
+        peer.onicecandidate = (event) => sendIce(peerUpeerId, event.candidate);
+        return peer;
+    }, [attachRemoteStream, sendSdp, sendIce]);
+
+    const handleRemoteSdp = useCallback((peerUpeerId: string, sdp: SdpMessage) => {
+        const local = localStreamRef.current;
+        if (!local || !peerUpeerId) {
             return;
         }
+        const peer = ensurePeer(peerUpeerId, local);
         void (async () => {
             try {
                 await peer.setRemoteDescription({ type: sdp.type as RTCSdpType, sdp: sdp.sdp });
                 if (sdp.type === 'offer') {
                     const answer = await peer.createAnswer();
                     await peer.setLocalDescription(answer);
-                    sendSdp(answer);
+                    sendSdp(peerUpeerId, answer);
                 }
-                while (pendingCandidatesRef.current.length) {
-                    const c = pendingCandidatesRef.current.shift();
-                    if (c) {
-                        await peer.addIceCandidate(c).catch(() => undefined);
-                    }
+                const pending = pendingCandidatesRef.current.get(peerUpeerId) ?? [];
+                pendingCandidatesRef.current.delete(peerUpeerId);
+                for (const c of pending) {
+                    await peer.addIceCandidate(c).catch(() => undefined);
                 }
             } catch {
                 // Se ignora: error transitorio de negociación.
             }
         })();
-    }, [sendSdp]);
+    }, [ensurePeer, sendSdp]);
 
-    const handleRemoteIce = useCallback((_callId: string, candidate: Record<string, unknown>) => {
-        const peer = peerRef.current;
-        if (!peer) {
-            return;
-        }
+    const handleRemoteIce = useCallback((peerUpeerId: string, candidate: Record<string, unknown>) => {
+        const peer = peersRef.current.get(peerUpeerId);
         const init = candidate as unknown as RTCIceCandidateInit;
-        if (!peer.remoteDescription) {
-            pendingCandidatesRef.current.push(init);
+        if (!peer || !peer.remoteDescription) {
+            const list = pendingCandidatesRef.current.get(peerUpeerId) ?? [];
+            list.push(init);
+            pendingCandidatesRef.current.set(peerUpeerId, list);
         } else {
             void peer.addIceCandidate(init).catch(() => undefined);
         }
@@ -71,13 +108,14 @@ export function useCallMedia() {
 
     useEffect(() => {
         const unsubs = [
-            window.upeer?.onCallSdp?.((data) => handleRemoteSdp(data.callId, data.sdp)),
-            window.upeer?.onCallIce?.((data) => handleRemoteIce(data.callId, data.candidate)),
+            window.upeer?.onCallSdp?.((data) => handleRemoteSdp(data.peerUpeerId, data.sdp)),
+            window.upeer?.onCallIce?.((data) => handleRemoteIce(data.peerUpeerId, data.candidate)),
         ].filter(Boolean) as Array<() => void>;
         return () => {
             unsubs.forEach((u) => u());
         };
     }, [handleRemoteSdp, handleRemoteIce]);
+
 
 
     const startLocalCapture = useCallback(async (video: boolean): Promise<boolean> => {
@@ -89,31 +127,19 @@ export function useCallMedia() {
             localStreamRef.current = stream;
             setLocalStream(stream);
 
-            // Sin STUN/TURN: en la mesh Yggdrasil cada nodo es alcanzable por su IP 200::.
-            const peer = new RTCPeerConnection({ iceServers: [] });
-            peerRef.current = peer;
-            remoteStreamRef.current = new MediaStream();
-            setRemoteStream(remoteStreamRef.current);
-
-            stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-            peer.ontrack = (event) => {
-                event.streams[0]?.getTracks().forEach((t) => remoteStreamRef.current?.addTrack(t));
-            };
-            peer.onnegotiationneeded = async () => {
-                try {
-                    const offer = await peer.createOffer();
-                    await peer.setLocalDescription(offer);
-                    sendSdp(offer);
-                } catch {
-                    // Se ignora: error transitorio.
+            const remotePeers = (call.isGroup && call.groupMembers?.length)
+                ? call.groupMembers
+                : (call.peerUpeerId ? [call.peerUpeerId] : []);
+            for (const pid of remotePeers) {
+                if (pid) {
+                    ensurePeer(pid, stream);
                 }
-            };
-            peer.onicecandidate = (event) => sendIce(event.candidate);
+            }
             return true;
         } catch {
             return false;
         }
-    }, [sendSdp, sendIce]);
+    }, [call.isGroup, call.groupMembers, call.peerUpeerId, ensurePeer]);
 
     const stopScreenShare = useCallback(() => {
         screenRef.current?.getTracks().forEach((track) => track.stop());
@@ -131,11 +157,12 @@ export function useCallMedia() {
             });
             screenRef.current = stream;
             setScreenSharing(true);
-            const peer = peerRef.current;
-            const videoSender = peer?.getSenders().find((s) => s.track?.kind === 'video');
             const videoTrack = stream.getVideoTracks()[0];
-            if (videoSender && videoTrack) {
-                await videoSender.replaceTrack(videoTrack);
+            for (const peer of peersRef.current.values()) {
+                const sender = peer.getSenders().find((s) => s.track?.kind === 'video');
+                if (sender && videoTrack) {
+                    await sender.replaceTrack(videoTrack);
+                }
             }
             stream.getVideoTracks()[0]?.addEventListener('ended', () => {
                 stopScreenShare();
@@ -147,16 +174,17 @@ export function useCallMedia() {
     }, [stopScreenShare]);
 
     const stopLocalCapture = useCallback(() => {
-        const peer = peerRef.current;
-        if (peer) {
+        for (const peer of peersRef.current.values()) {
             peer.close();
-            peerRef.current = null;
         }
+        peersRef.current.clear();
+        for (const s of remoteStreamsRef.current.values()) {
+            s.getTracks().forEach((t) => t.stop());
+        }
+        remoteStreamsRef.current.clear();
         localStreamRef.current?.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
         setLocalStream(null);
-        remoteStreamRef.current?.getTracks().forEach((track) => track.stop());
-        remoteStreamRef.current = null;
         setRemoteStream(null);
         stopScreenShare();
     }, [stopScreenShare]);

@@ -181,7 +181,7 @@ export function registerCallHandlers(): void {
         return { success: true };
     });
 
-    ipcMain.handle('send-call-sdp', (event, { callId, sdp }) => {
+    ipcMain.handle('send-call-sdp', (event, { callId, peerUpeerId, sdp }) => {
         captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
@@ -193,11 +193,12 @@ export function registerCallHandlers(): void {
         if (!session) {
             return { success: false, error: 'Call not found' };
         }
-        sendCallSdp(session.peerUpeerId, callId, sdp);
+        const target = (typeof peerUpeerId === 'string' && peerUpeerId) ? peerUpeerId : session.peerUpeerId;
+        sendCallSdp(target, callId, sdp);
         return { success: true };
     });
 
-    ipcMain.handle('send-call-ice', (event, { callId, candidate }) => {
+    ipcMain.handle('send-call-ice', (event, { callId, peerUpeerId, candidate }) => {
         captureRenderer(event);
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
@@ -209,7 +210,8 @@ export function registerCallHandlers(): void {
         if (!session) {
             return { success: false, error: 'Call not found' };
         }
-        sendCallIce(session.peerUpeerId, callId, candidate);
+        const target = (typeof peerUpeerId === 'string' && peerUpeerId) ? peerUpeerId : session.peerUpeerId;
+        sendCallIce(target, callId, candidate);
         return { success: true };
     });
 
