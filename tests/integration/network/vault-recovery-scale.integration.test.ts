@@ -180,4 +180,67 @@ describe('e2e multiproceso: matriz de escalas de vaulting + recovery de archivos
             expect(completed, `B debió recuperar el archivo completo del vault (${n} peers)`).toBeTruthy();
         });
     }
+
+    it('1 peer conectado: A (solo) vaultea, B se conecta despues y recupera del vault', { timeout: 90000 }, async () => {
+        const routing: Record<string, number> = {};
+        for (let i = 0; i < 2; i++) routing[ADDRS[i]] = await freePort();
+
+        // B arranca primero solo para obtener su identidad/SPK y registrarlo en A.
+        // Luego se apaga: en el escenario real A ya conoce a B (handshake previo)
+        // pero B NO está conectado ahora. Se fija una mnemonic para que B2 (al
+        // reconectar) tenga la MISMA identidad/upeerId que B1.
+        const bMnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+        const nodeB = new PeerProcess(ADDRS[1]);
+        peers.push(nodeB);
+        const bInfo = await nodeB.start({ routing, mnemonic: bMnemonic });
+        await nodeB.close();
+
+        const nodeA = new PeerProcess(ADDRS[0]);
+        peers.push(nodeA);
+        await nodeA.start({ routing });
+
+        await nodeA.request('addPeer', {
+            upeerId: bInfo.upeerId,
+            address: '200::b',
+            publicKey: bInfo.pubKey,
+        });
+        await nodeA.request('setSpk', {
+            upeerId: bInfo.upeerId,
+            spkPub: bInfo.spk.spkPub,
+            spkSig: bInfo.spk.spkSig,
+            spkId: bInfo.spk.spkId,
+        });
+        // B está offline: A lo ve como desconectado (solo A conectado).
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+
+        const filePath = path.join(os.tmpdir(), `upeer-single-${Date.now()}.bin`);
+        const data = Buffer.alloc(300 * 1024);
+        for (let i = 0; i < data.length; i++) data[i] = (i * 3) % 251;
+        fs.writeFileSync(filePath, data);
+        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath });
+        await sleep(8000);
+
+        const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
+        const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
+        const vaulted = sending.find((t) => t.state === 'active' && (t.isVaulting || t.phase === 'replicating'));
+        expect(vaulted, 'A debió vaultear el archivo estando solo').toBeTruthy();
+
+        // B se conecta ahora (misma identidad, mismo upeerId). A vuelve a verlo online.
+        const nodeB2 = new PeerProcess(ADDRS[1]);
+        peers.push(nodeB2);
+        await nodeB2.start({ routing, mnemonic: bMnemonic });
+        await nodeB2.addPeer(nodeA, '200::a');
+        await nodeA.addPeer(nodeB2, '200::b');
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await sleep(400);
+
+        await nodeB2.request('queryOwnVaults');
+        await sleep(12000);
+
+        const bReceiving = await nodeB2.request('getTransfers', { direction: 'receiving' });
+        const received = bReceiving.transfers as Array<{ state: string; fileName?: string }>;
+        const completed = received.find((t) => t.state === 'completed' && t.fileName?.endsWith('.bin'));
+        expect(completed, 'B debió recuperar el archivo del vault al conectarse').toBeTruthy();
+    });
 });
