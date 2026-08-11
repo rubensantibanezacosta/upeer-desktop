@@ -934,5 +934,61 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         const bMessages = await nodeB.request('getMessages', { contactId: groupId });
         expect((bMessages.messages as Array<{ message: string }>).some((m) => m.message === 'mensaje de grupo offline')).toBe(true);
     });
+
+    it('recovery offline->online con custodian tercero: multimedia vaulteado se entrega a traves de C', { timeout: 60000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+            '200::c': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        const nodeC = new PeerProcess('200::c');
+        peers.push(nodeA, nodeB, nodeC);
+
+        await nodeA.start({ routing });
+        const aInfo = nodeA.info;
+        const bInfo = await nodeB.start({ routing });
+        const cInfo = await nodeC.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeA.addPeer(nodeC, '200::c');
+        await nodeB.addPeer(nodeA, '200::a');
+        await nodeB.addPeer(nodeC, '200::c');
+        await nodeC.addPeer(nodeA, '200::a');
+        await nodeC.addPeer(nodeB, '200::b');
+        await sleep(300);
+
+        const filePath = path.join(os.tmpdir(), `upeer-cust-third-${Date.now()}.bin`);
+        const data = Buffer.alloc(300 * 1024);
+        for (let i = 0; i < data.length; i++) {
+            data[i] = i % 256;
+        }
+        fs.writeFileSync(filePath, data);
+
+        // Fase offline: B no responde, A vaultea para B. C es un custodian conectado.
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendFile', { upeerId: bInfo.upeerId, address: '200::b', filePath });
+        await sleep(5000);
+
+        const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
+        const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
+        const vaulted = sending.find((t) => t.state === 'active' && (t.isVaulting || t.phase === 'replicating'));
+        expect(vaulted).toBeTruthy();
+
+        // Fase reconexión: B consulta su vault SOLO a C (custodian tercero), aislado de A.
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aInfo?.upeerId ?? '', status: 'disconnected' });
+        await nodeB.request('setContactStatus', { upeerId: cInfo.upeerId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(12000);
+
+        const bReceiving = await nodeB.request('getTransfers', { direction: 'receiving' });
+        const received = bReceiving.transfers as Array<{ state: string; fileName?: string }>;
+        expect(received.some((t) => t.state === 'completed')).toBe(true);
+    });
 });
 

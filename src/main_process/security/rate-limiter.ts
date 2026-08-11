@@ -65,7 +65,7 @@ export class RateLimiter {
             // BUG BH fix: tipos VAULT_* y REPUTATION_* no tenían reglas →
             // la llamada a check() devolvía true incondicionalmente (sin regla = ilimitado).
             // Un peer podía inundar con VAULT_STORE/VAULT_QUERY/REPUTATION_GOSSIP sin límite.
-            'VAULT_STORE': { windowMs: 60000, maxTokens: 30, refillRate: 30 / 60 },
+            'VAULT_STORE': { windowMs: 60000, maxTokens: 600, refillRate: 600 / 60 },
             'VAULT_QUERY': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
             'VAULT_DELIVERY': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
             'VAULT_ACK': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 },
