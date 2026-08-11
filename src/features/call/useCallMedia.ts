@@ -11,7 +11,10 @@ export function useCallMedia() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const screenRef = useRef<MediaStream | null>(null);
     const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+    const pendingSdpRef = useRef<Array<{ peerUpeerId: string; sdp: SdpMessage }>>([]);
     const myUpeerIdRef = useRef<string | null>(null);
+    const makingOfferRef = useRef<Set<string>>(new Set());
+    const settingRemoteAnswerRef = useRef<Set<string>>(new Set());
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
@@ -76,11 +79,14 @@ export function useCallMedia() {
         };
         peer.onnegotiationneeded = async () => {
             try {
+                makingOfferRef.current.add(peerUpeerId);
                 const offer = await peer.createOffer();
                 await peer.setLocalDescription(offer);
                 sendSdp(peerUpeerId, offer);
             } catch {
                 // Se ignora: error transitorio.
+            } finally {
+                makingOfferRef.current.delete(peerUpeerId);
             }
         };
         peer.onicecandidate = (event) => sendIce(peerUpeerId, event.candidate);
@@ -90,14 +96,32 @@ export function useCallMedia() {
     const handleRemoteSdp = useCallback((peerUpeerId: string, sdp: SdpMessage) => {
         const local = localStreamRef.current;
         if (!local || !peerUpeerId) {
+            if (peerUpeerId) {
+                pendingSdpRef.current.push({ peerUpeerId, sdp });
+            }
             return;
         }
         const peer = ensurePeer(peerUpeerId, local);
         void (async () => {
             try {
+                const isOffer = sdp.type === 'offer';
+                const isAnswer = sdp.type === 'answer';
+                const myId = myUpeerIdRef.current;
+                const polite = typeof myId === 'string' && typeof peerUpeerId === 'string' && myId < peerUpeerId;
+                const ignoreOffer = isOffer && polite === false && (makingOfferRef.current.has(peerUpeerId) || peer.signalingState !== 'stable');
+                if (ignoreOffer) {
+                    return;
+                }
+                if (isAnswer && settingRemoteAnswerRef.current.has(peerUpeerId)) {
+                    settingRemoteAnswerRef.current.delete(peerUpeerId);
+                    if (peer.signalingState === 'have-local-offer' && !polite) {
+                        await peer.setRemoteDescription({ type: 'rollback', sdp: '' } as unknown as RTCSessionDescriptionInit).catch(() => undefined);
+                    }
+                }
                 await peer.setRemoteDescription({ type: sdp.type as RTCSdpType, sdp: sdp.sdp });
-                if (sdp.type === 'offer') {
+                if (isOffer) {
                     const answer = await peer.createAnswer();
+                    settingRemoteAnswerRef.current.add(peerUpeerId);
                     await peer.setLocalDescription(answer);
                     sendSdp(peerUpeerId, answer);
                 }
@@ -168,11 +192,16 @@ export function useCallMedia() {
                     ensurePeer(pid, stream);
                 }
             }
+            const buffered = pendingSdpRef.current;
+            pendingSdpRef.current = [];
+            for (const item of buffered) {
+                handleRemoteSdp(item.peerUpeerId, item.sdp);
+            }
             return true;
         } catch {
             return false;
         }
-    }, [call.isGroup, call.groupMembers, call.peerUpeerId, call.relayUpeerId, ensurePeer]);
+    }, [call.isGroup, call.groupMembers, call.peerUpeerId, call.relayUpeerId, ensurePeer, handleRemoteSdp]);
 
     const stopScreenShare = useCallback(() => {
         screenRef.current?.getTracks().forEach((track) => track.stop());
