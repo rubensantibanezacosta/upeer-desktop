@@ -243,4 +243,44 @@ describe('e2e multiproceso: matriz de escalas de vaulting + recovery de archivos
         const completed = received.find((t) => t.state === 'completed' && t.fileName?.endsWith('.bin'));
         expect(completed, 'B debió recuperar el archivo del vault al conectarse').toBeTruthy();
     });
+
+    it('notificacion al renderer: B emite receive-p2p-message al recuperar un mensaje vaulteado del vault', { timeout: 90000 }, async () => {
+        const routing: Record<string, number> = {};
+        for (let i = 0; i < 2; i++) routing[ADDRS[i]] = await freePort();
+
+        const nodeA = new PeerProcess(ADDRS[0]);
+        peers.push(nodeA);
+        await nodeA.start({ routing });
+        const aInfo = nodeA.info as PeerInfo;
+
+        const nodeB = new PeerProcess(ADDRS[1]);
+        peers.push(nodeB);
+        const bInfo = await nodeB.start({ routing });
+
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+
+        // Fase offline: B pierde la conexión (proceso vivo, solo se marca desconectado).
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'mensaje vaulteado que debe llegar a la UI de B' });
+        await sleep(1500);
+
+        // Fase reconexión: B vuelve online y consulta su vault.
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aInfo.upeerId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(4000);
+
+        // Verificar que B emitió el evento que la UI escucha (receive-p2p-message).
+        const sentEvents = await nodeB.request('getSentEvents', {});
+        const events = (sentEvents.events ?? []) as Array<{ channel: string; payload?: Record<string, unknown> }>;
+        const receivedEvent = events.find((e) => e.channel === 'receive-p2p-message' && (e.payload as Record<string, unknown> | undefined)?.message === 'mensaje vaulteado que debe llegar a la UI de B');
+        expect(receivedEvent, 'B debió emitir receive-p2p-message al renderer al recuperar el mensaje del vault').toBeTruthy();
+
+        // Verificar que el mensaje está en BD accesible vía getMessages (lo que la UI carga al abrir la conversación).
+        const bMessages = await nodeB.request('getMessages', { contactId: aInfo.upeerId });
+        expect((bMessages.messages as Array<{ message: string }>).some((m) => m.message === 'mensaje vaulteado que debe llegar a la UI de B'), 'getMessages de B debe devolver el mensaje recuperado del vault').toBe(true);
+    });
 });
