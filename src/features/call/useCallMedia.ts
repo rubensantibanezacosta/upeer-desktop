@@ -170,6 +170,12 @@ export function useCallMedia() {
 
     const startLocalCapture = useCallback(async (video: boolean): Promise<boolean> => {
         try {
+            if (!myUpeerIdRef.current) {
+                const id = await window.upeer?.getMyIdentity?.().catch(() => undefined);
+                if (id?.upeerId) {
+                    myUpeerIdRef.current = id.upeerId;
+                }
+            }
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
                 video: video ? { width: { ideal: 640 }, height: { ideal: 480 } } : false,
