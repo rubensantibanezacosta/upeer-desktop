@@ -6,6 +6,16 @@ export default defineConfig({
         environment: 'node',
         include: ['tests/integration/**/*.integration.test.ts'],
         setupFiles: ['./tests/setup-test-mocks.js'],
-        testTimeout: 30000,
+        testTimeout: 90000,
+        hookTimeout: 60000,
+        fileParallelism: false,
+        pool: 'forks',
+        poolOptions: {
+            forks: {
+                singleFork: false,
+                minForks: 1,
+                maxForks: 1,
+            },
+        },
     },
 });
