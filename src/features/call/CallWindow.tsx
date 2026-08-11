@@ -223,7 +223,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 {isGroup && isVideoActive ? (
                     <Box sx={{ width: '100%', height: '100%', overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(110px, 1fr)', gap: 1 }}>
                         <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
-                            {call.cameraEnabled ? (
+                            {call.cameraEnabled && localStream ? (
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                                 <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>
@@ -251,11 +251,19 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                             </Box>
                         )}
                     </Box>
-                ) : isVideoActive && remoteStream ? (
+                ) : isVideoActive ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                        <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
+                        {remoteStream ? (
+                            <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
+                        ) : (
+                            <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                                <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
+                                <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{formatDuration(seconds)}</Typography>
+                            </Box>
+                        )}
                         <Box sx={{ position: 'absolute', bottom: 8, right: 8, width: 120, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.4)', backgroundColor: '#000', boxShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>
-                            {call.cameraEnabled ? (
+                            {call.cameraEnabled && localStream ? (
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                                 <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>

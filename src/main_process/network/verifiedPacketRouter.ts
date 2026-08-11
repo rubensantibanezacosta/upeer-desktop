@@ -615,6 +615,8 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
         case 'CALL_META':
         case 'CALL_JOIN':
         case 'CALL_LEAVE':
+        case 'CALL_SDP':
+        case 'CALL_ICE':
             handleCallPacket(upeerId, data, win);
             break;
         default:

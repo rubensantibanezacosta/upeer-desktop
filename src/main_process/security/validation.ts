@@ -122,6 +122,8 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     CALL_MEDIA: (data: any) => validateCallMessage('CALL_MEDIA', data),
     CALL_MEDIA_UPDATE: (data: any) => validateCallMessage('CALL_MEDIA_UPDATE', data),
     CALL_META: (data: any) => validateCallMessage('CALL_META', data),
+    CALL_SDP: (data: any) => validateCallMessage('CALL_SDP', data),
+    CALL_ICE: (data: any) => validateCallMessage('CALL_ICE', data),
 };
 
 export function validateMessage(type: string, data: unknown): ValidationResult {
