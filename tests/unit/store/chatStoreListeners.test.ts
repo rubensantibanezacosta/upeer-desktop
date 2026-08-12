@@ -95,4 +95,31 @@ describe('chatStoreListeners: onReceive con mensaje recuperado del vault', () =>
         const result = updater({ chatHistory: [existing] });
         expect(result.chatHistory).toHaveLength(1);
     });
+
+    it('inserta un adjunto (mensaje file del vault) cuando la conversación está abierta', () => {
+        const fileMessage = JSON.stringify({
+            type: 'file',
+            transferId: 'f1',
+            fileName: 'video.mp4',
+            fileSize: 4096,
+            mimeType: 'video/mp4',
+            fileHash: 'h'.repeat(64),
+            direction: 'receiving',
+            state: 'active',
+        });
+        const set = vi.fn((fn: (s: { chatHistory: ChatMessage[] }) => { chatHistory: ChatMessage[] }) => {
+            return fn({ chatHistory: [] });
+        });
+        const get = vi.fn(() => ({ targetUpeerId: 'peer-a', refreshContacts: refreshContactsMock }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        const handler = onReceiveMock.mock.calls[0][0];
+        handler({ id: 'file-1', upeerId: 'peer-a', isMine: false, message: fileMessage, timestamp: 2000 });
+
+        expect(set).toHaveBeenCalled();
+        const updater = (set.mock.calls[0][0] as (s: { chatHistory: ChatMessage[] }) => { chatHistory: ChatMessage[] });
+        const result = updater({ chatHistory: [] });
+        expect(result.chatHistory).toHaveLength(1);
+        expect(result.chatHistory[0].message).toBe(fileMessage);
+    });
 });

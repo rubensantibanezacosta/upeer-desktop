@@ -104,9 +104,26 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
     },
 
     updateFileTransferMessage: (fileId: string, updates: TransferMessageUpdates) => {
-        set((state) => ({
-            chatHistory: state.chatHistory.map((message) => updateTransferMessageContent(message, fileId, updates)),
-            groupChatHistory: state.groupChatHistory.map((message) => updateTransferMessageContent(message, fileId, updates)),
-        }));
+        let matched = false;
+        set((state) => {
+            const nextChat = state.chatHistory.map((message) => {
+                const next = updateTransferMessageContent(message, fileId, updates);
+                if (next !== message) matched = true;
+                return next;
+            });
+            const nextGroup = state.groupChatHistory.map((message) => {
+                const next = updateTransferMessageContent(message, fileId, updates);
+                if (next !== message) matched = true;
+                return next;
+            });
+            return { chatHistory: nextChat, groupChatHistory: nextGroup };
+        });
+
+        // Si un 'completed' no encontró el adjunto en el historial activo, el mensaje pudo
+        // haberse procesado del vault en un chat no abierto (no está en el store). Recargamos
+        // el historial desde la DB para que el adjunto aparezca al estar en el chat correcto.
+        if (updates.transferState === 'completed' && !matched) {
+            get().reloadLatestHistory?.();
+        }
     },
 });

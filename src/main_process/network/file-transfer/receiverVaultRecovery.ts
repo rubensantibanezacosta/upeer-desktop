@@ -8,6 +8,9 @@ import { ErasureCoder } from '../vault/redundancy/erasure.js';
 import { TransferPhase, type FileTransfer } from './types.js';
 import type { TransferManager } from './transfer-manager.js';
 
+// Archivos cuyo FILE_PROPOSAL vaulteado no llegó/no se procesó y ya avisamos, para no repetir.
+const vaultProposalMissingWarned = new Set<string>();
+
 type TrackedShard = {
     cid: string;
     shardIndex: number;
@@ -224,6 +227,13 @@ export async function tryRecoverVaultTransferByFileHash(this: TransferManager, f
         .filter((transfer): transfer is FileTransfer => !!transfer);
 
     if (!receivingTransfers.length) {
+        // Hay shards del vault pero no se ha procesado el FILE_PROPOSAL que crea el transfer
+        // receiving (con su metadata y clave AES). Sin el transfer no se puede reconstruir.
+        // Avisamos una sola vez por archivo para localizar la causa sin spam de logs.
+        if (!vaultProposalMissingWarned.has(fileHash)) {
+            vaultProposalMissingWarned.add(fileHash);
+            warn('Vault recovery sin FILE_PROPOSAL: hay shards del adjunto pero NO hay transfer receiving (el proposal no llegó o no se procesó)', { fileHash }, 'vault');
+        }
         return;
     }
 
