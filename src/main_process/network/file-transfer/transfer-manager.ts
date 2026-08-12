@@ -445,10 +445,12 @@ export class TransferManager implements ITransferManager {
                 }
             }
 
-            this.ui.notifyCompleted(updated);
-            const { saveTransferToDB } = await import('./db-helper.js');
-            await saveTransferToDB(updated);
-
+            // BUG UI-RACE: persistir savedPath en la DB ANTES de notificar a la UI.
+            // notifyCompleted dispara file-transfer-completed → la UI actualiza el mensaje
+            // con savedPath. Si un reloadLatestHistory concurrente (disparado por
+            // file-transfer-started o el resync del vault recovery) recarga el historial
+            // desde la DB en el hueco entre el notify y la persistencia, traería el mensaje
+            // SIN savedPath y pisaría la actualización → el adjunto no se ve en la UI.
             if (updated.direction === 'receiving' && updated.tempPath) {
                 const messageId = updated.messageId || fileId;
                 try {
@@ -471,6 +473,10 @@ export class TransferManager implements ITransferManager {
                     error('Failed to persist savedPath in DB for completed transfer', err, 'file-transfer');
                 }
             }
+
+            this.ui.notifyCompleted(updated);
+            const { saveTransferToDB } = await import('./db-helper.js');
+            await saveTransferToDB(updated);
 
             if (updated.direction === 'sending') {
                 const { updateTransferMessageStatus } = await import('./db-helper.js');
