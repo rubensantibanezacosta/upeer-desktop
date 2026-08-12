@@ -197,6 +197,14 @@ export async function handleVaultDelivery(
                             'delivered'
                         );
                     } else if (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_')) {
+                        if (innerPacket.type === 'FILE_PROPOSAL') {
+                            debug('Vault delivery: processing FILE_PROPOSAL', {
+                                fileId: innerPacket.fileId,
+                                fileHash: innerPacket.fileHash,
+                                fileName: innerPacket.fileName,
+                                from: entry.senderSid
+                            }, 'vault');
+                        }
                         await fileTransferManager.handleMessage(entry.senderSid, fromAddress, innerPacket as unknown as Parameters<typeof fileTransferManager.handleMessage>[2]);
                         if (innerPacket.type === 'FILE_PROPOSAL' && typeof innerPacket.fileHash === 'string') {
                             await fileTransferManager.tryRecoverVaultTransferByFileHash(innerPacket.fileHash);

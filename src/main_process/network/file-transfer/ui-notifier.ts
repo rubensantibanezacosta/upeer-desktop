@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { FileTransfer } from './types.js';
-import { warn } from '../../security/secure-logger.js';
+import { warn, debug } from '../../security/secure-logger.js';
 
 export class UINotifier {
     private lastUINotify = new Map<string, number>();
@@ -84,6 +84,7 @@ export class UINotifier {
             status: 'delivered',
             timestamp: Date.now()
         });
+        debug('notifyReceiveMessage: adjunto emitido a la UI', { upeerId, fileId: transfer.fileId, messageId, state: transfer.state, hasWindow: !!this.window }, 'file-transfer');
     }
 
     public safeSend(channel: string, data: unknown) {
