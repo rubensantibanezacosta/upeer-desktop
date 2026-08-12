@@ -10,7 +10,10 @@ type ActiveVaultRecoverySource = {
 };
 
 const VAULT_RECOVERY_CHANNEL = 'vault-recovery-status';
-const VAULT_RECOVERY_TIMEOUT_MS = 15_000;
+// La recuperación de muchos adjuntos grandes escribe shards y reconstruye por segmentos
+// en segundo plano; con 15s las fuentes legítimas expiraban antes de completar la última
+// página, apagando el indicador de progreso y generando timeouts espurios.
+const VAULT_RECOVERY_TIMEOUT_MS = 60_000;
 const activeSources = new Map<string, ActiveVaultRecoverySource>();
 
 function emitVaultRecoveryStatus() {

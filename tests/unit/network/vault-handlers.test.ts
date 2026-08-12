@@ -470,4 +470,21 @@ describe('Vault Delivery Handler', () => {
             payloadHashes: ['h1']
         }));
     });
+
+    it('ACKea todos los shards acumulados de páginas anteriores en la última página', async () => {
+        const page1 = { senderSid: 'origin-id', data: Buffer.from('shard-a').toString('hex'), payloadHash: 'p1' };
+        const page2 = { senderSid: 'origin-id', data: Buffer.from('shard-b').toString('hex'), payloadHash: 'p2' };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
+
+        // Página 1 con hasMore → aún NO se ACKea (solo se acumula para no romper el offset).
+        await handleVaultDelivery(custodianSid, { entries: [page1], hasMore: true, nextOffset: 1 }, mockWin, mockSendResponse, '9.9.9.9');
+        expect(mockSendResponse).not.toHaveBeenCalledWith('9.9.9.9', expect.objectContaining({ type: 'VAULT_ACK' }));
+
+        // Última página → ACK con los hashes de AMBAS páginas (p1 acumulado + p2).
+        await handleVaultDelivery(custodianSid, { entries: [page2], hasMore: false }, mockWin, mockSendResponse, '9.9.9.9');
+        expect(mockSendResponse).toHaveBeenCalledWith('9.9.9.9', expect.objectContaining({
+            type: 'VAULT_ACK',
+            payloadHashes: ['p1', 'p2']
+        }));
+    });
 });
