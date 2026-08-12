@@ -99,4 +99,16 @@ describe('chatStoreSupport', () => {
         const malformed = updateTransferMessageContent({ id: 'm', message: '{invalido' } as never, 'f1', {} as never);
         expect(malformed.message).toBe('{invalido');
     });
+
+    it('updateTransferMessageContent sincroniza transferState con state para parseMessage', () => {
+        // Un adjunto recibido del vault se inserta con state: 'active' (spinner de descarga).
+        // Al completar, el evento file-transfer-completed llega con transferState: 'completed';
+        // updateTransferMessageContent debe propagar ese valor a `state` (que es el campo
+        // que parseMessage lee) para que el spinner desaparezca y muestre el adjunto.
+        const base = { id: 'm', message: '{"type":"file","transferId":"f1","state":"active"}' } as never;
+        const completed = updateTransferMessageContent(base, 'f1', { transferState: 'completed', savedPath: '/tmp/f1.bin' });
+        expect(completed.message).toContain('"state":"completed"');
+        expect(completed.message).toContain('"savedPath":"/tmp/f1.bin"');
+        expect(completed.message).not.toContain('"state":"active"');
+    });
 });

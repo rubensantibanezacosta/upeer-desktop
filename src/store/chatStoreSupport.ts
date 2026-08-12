@@ -130,7 +130,14 @@ export const updateTransferMessageContent = (message: ChatMessage, fileId: strin
         if (parsed.type !== 'file' || (parsed.transferId !== fileId && parsed.fileId !== fileId)) {
             return message;
         }
-        return { ...message, message: JSON.stringify({ ...parsed, ...updates }) };
+        // parseMessage lee el estado del adjunto de `state` (no de `transferState`). Al
+        // actualizar el mensaje por eventos de transfer (started/completed/...), sincronizamos
+        // `state` con `transferState` para que el spinner/progreso se refleje correctamente.
+        const next = { ...parsed, ...updates };
+        if (updates.transferState !== undefined) {
+            next.state = updates.transferState;
+        }
+        return { ...message, message: JSON.stringify(next) };
     } catch {
         return message;
     }

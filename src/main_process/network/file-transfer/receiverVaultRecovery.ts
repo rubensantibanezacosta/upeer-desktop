@@ -130,6 +130,7 @@ async function recoverReceivingTransfer(this: TransferManager, fileId: string): 
         const handle = await ensureTempHandle(this, transfer);
         const coder = new ErasureCoder(VAULT_REQUIRED_SHARDS, 12 - VAULT_REQUIRED_SHARDS);
         let recoveredBytes = 0;
+        let lastProgressEmit = 0;
 
         for (const [segmentIndex, shards] of recoverableSegments) {
             const segmentOffset = segmentIndex * VAULT_SEGMENT_SIZE;
@@ -150,6 +151,23 @@ async function recoverReceivingTransfer(this: TransferManager, fileId: string): 
                 const decryptedSegment = decryptVaultSegment(reconstructed, aesKey, plainLength);
                 await writeAll(handle, decryptedSegment, segmentOffset);
                 recoveredBytes += decryptedSegment.length;
+
+                // Notificar progreso incremental por segmento reconstruido para que la UI
+                // muestre el proceso de descarga (como en una transferencia online), en vez
+                // de saltar de 0% a 100% al final. Se limita a ~3 updates/seg para no saturar.
+                const now = Date.now();
+                if (now - lastProgressEmit >= 300) {
+                    lastProgressEmit = now;
+                    const partialChunks = recoveredBytesToChunks(transfer, recoveredBytes);
+                    const partialUpdate = this.store.updateTransfer(transfer.fileId, 'receiving', {
+                        state: 'active',
+                        phase: TransferPhase.TRANSFERRING,
+                        chunksProcessed: partialChunks,
+                    });
+                    if (partialUpdate) {
+                        this.ui.notifyProgress(partialUpdate, false);
+                    }
+                }
             } catch (err) {
                 warn('Failed to reconstruct vault-backed segment', {
                     fileId: transfer.fileId,

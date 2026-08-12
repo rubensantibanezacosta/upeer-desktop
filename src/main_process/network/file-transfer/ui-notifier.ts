@@ -55,7 +55,12 @@ export class UINotifier {
             thumbnail: transfer.thumbnail,
             caption: transfer.caption,
             isVoiceNote: transfer.isVoiceNote,
-            direction: 'receiving'
+            direction: 'receiving',
+            // Incluir el estado y la ruta para que la UI refleje el proceso de descarga
+            // (spinner/progreso) aunque el transfer todavía no se haya cargado en el store
+            // de React al insertar el mensaje.
+            state: transfer.state,
+            ...(transfer.tempPath ? { tempPath: transfer.tempPath } : {}),
         };
 
         if (transfer.chatUpeerId?.startsWith('grp-')) {
