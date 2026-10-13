@@ -601,9 +601,10 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         await sleep(4000);
 
         const aSending = await nodeA.request('getTransfers', { direction: 'sending' });
-        const sending = aSending.transfers as Array<{ state: string; phase?: string; isVaulting?: boolean }>;
+        const sending = aSending.transfers as Array<{ fileId: string; state: string; phase?: string; isVaulting?: boolean }>;
         const vaulted = sending.find((t) => t.state === 'active' && (t.isVaulting || t.phase === 'replicating'));
         expect(vaulted).toBeTruthy();
+        expect(vaulted?.fileId).toBeTruthy();
 
         // Fase reconexión: B vuelve online y consulta su vault; A le entrega el archivo
         await nodeB.request('setVaultOffline', { value: false });
@@ -614,8 +615,16 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         await sleep(5000);
 
         const bReceiving = await nodeB.request('getTransfers', { direction: 'receiving' });
-        const received = bReceiving.transfers as Array<{ state: string; fileName?: string }>;
-        expect(received.some((t) => t.state === 'completed')).toBe(true);
+        const received = bReceiving.transfers as Array<{ fileId: string; state: string; fileName?: string }>;
+        const recovered = received.find((transfer) => transfer.fileId === vaulted?.fileId);
+        expect(recovered?.state).toBe('completed');
+
+        const persisted = await nodeB.request('getMessage', { messageId: vaulted?.fileId });
+        expect(persisted.message).toEqual(expect.objectContaining({
+            id: vaulted?.fileId,
+            chatUpeerId: aId,
+            isMine: false,
+        }));
     });
 
     it('recovery offline->online: vídeo y otros documentos (office, archivo) vaulteados', { timeout: 40000 }, async () => {

@@ -141,6 +141,9 @@ process.on('message', (msg) => {
             case 'getMessages':
                 reply(msg._id, { ok: true, messages: messages.getMessages(msg.contactId) });
                 break;
+            case 'getMessage':
+                reply(msg._id, { ok: true, message: messages.getMessageById(msg.messageId) });
+                break;
             case 'getMnemonic':
                 reply(msg._id, { ok: true, mnemonic: identity.getMnemonic() });
                 break;

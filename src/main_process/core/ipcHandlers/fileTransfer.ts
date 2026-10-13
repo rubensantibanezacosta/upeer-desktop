@@ -89,11 +89,11 @@ export function registerFileTransferHandlers(): void {
       }
 
       const contact = await getContactByUpeerId(upeerId);
-      if (!contact || contact.status !== 'connected') {
-        return { success: false, error: 'Contact not connected' };
+      if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status)) {
+        return { success: false, error: 'Contact is not available for file transfer' };
       }
 
-      const fileId = await fileTransferManager.startSend(upeerId, contact.address, resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
+      const fileId = await fileTransferManager.startSend(upeerId, contact.address || '', resolvedSrc, thumbnail, caption, isVoiceNote, fileName);
       return { success: true, fileId };
     } catch (err: unknown) {
       logError('Error starting file transfer', { err: String(err) }, 'file-transfer');

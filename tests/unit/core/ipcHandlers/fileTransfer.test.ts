@@ -124,4 +124,49 @@ describe('start-file-transfer multi-send a grupo', () => {
         expect(result.error).toContain('No valid group recipients');
         expect(startSend).not.toHaveBeenCalled();
     });
+
+    it('inicia el envío a un contacto offline para permitir el failover al vault', async () => {
+        vi.mocked(getGroupById).mockReturnValue(undefined);
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-offline',
+            publicKey: 'aa',
+            address: '200::offline',
+            status: 'offline',
+        } as never);
+
+        const handler = getHandler('start-file-transfer');
+        const result = await handler({}, {
+            upeerId: 'peer-offline',
+            filePath: '/home/user/.config/upeer/assets/foto.png',
+        });
+
+        expect(result).toEqual({ success: true, fileId: expect.any(String) });
+        expect(startSend).toHaveBeenCalledWith(
+            'peer-offline',
+            '200::offline',
+            '/home/user/.config/upeer/assets/foto.png',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+        );
+    });
+
+    it('rechaza el envío cuando el contacto está bloqueado', async () => {
+        vi.mocked(getGroupById).mockReturnValue(undefined);
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-blocked',
+            address: '200::blocked',
+            status: 'blocked',
+        } as never);
+
+        const handler = getHandler('start-file-transfer');
+        const result = await handler({}, {
+            upeerId: 'peer-blocked',
+            filePath: '/home/user/.config/upeer/assets/foto.png',
+        });
+
+        expect(result.success).toBe(false);
+        expect(startSend).not.toHaveBeenCalled();
+    });
 });
