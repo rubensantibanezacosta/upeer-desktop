@@ -72,6 +72,8 @@ describe('call relay integración (SFU distribuido)', () => {
         expect(sendMock).toHaveBeenCalledTimes(3);
         const targets = sendMock.mock.calls.map((c) => c[0]);
         expect(targets).toEqual(expect.arrayContaining(['200::p2', '200::p3', '200::p4']));
+        const relayedPackets = sendMock.mock.calls.map((call) => call[1] as { senderUpeerId?: string });
+        expect(relayedPackets.every((packet) => packet.senderUpeerId === 'p1')).toBe(true);
     });
 
     it('sin relay electo, el grupo hace fan-out a todos los miembros', async () => {

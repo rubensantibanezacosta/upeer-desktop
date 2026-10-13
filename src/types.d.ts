@@ -221,7 +221,7 @@ declare global {
             onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
             onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
             onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => UpeerUnsubscribe;
-            onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown }) => void) => UpeerUnsubscribe;
+            onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown; senderUpeerId?: string }) => void) => UpeerUnsubscribe;
             onCallSdp: (callback: (data: { callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }) => void) => UpeerUnsubscribe;
             onCallIce: (callback: (data: { callId: string; peerUpeerId: string; candidate: Record<string, unknown> }) => void) => UpeerUnsubscribe;
             onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => UpeerUnsubscribe;

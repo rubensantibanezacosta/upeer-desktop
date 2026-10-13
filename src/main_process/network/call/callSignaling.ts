@@ -86,8 +86,8 @@ export function sendCallEnd(peerUpeerId: string, callId: string): void {
     send(peerUpeerId, { type: 'CALL_END', callId, timestamp: Date.now() });
 }
 
-export function sendCallMediaTo(memberUpeerId: string, callId: string, data: string): void {
-    send(memberUpeerId, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+export function sendCallMediaTo(memberUpeerId: string, callId: string, data: string, senderUpeerId?: string): void {
+    send(memberUpeerId, { type: 'CALL_MEDIA', callId, data, senderUpeerId, timestamp: Date.now() });
 }
 
 export function sendCallMedia(peerUpeerId: string, callId: string, data: string): void {
@@ -100,7 +100,7 @@ export function sendCallMedia(peerUpeerId: string, callId: string, data: string)
                 // Soy el relay: fan-out a todos los demás miembros.
                 for (const member of session.groupMembers) {
                     if (member !== myId) {
-                        send(member, { type: 'CALL_MEDIA', callId, data, timestamp: Date.now() });
+                        send(member, { type: 'CALL_MEDIA', callId, data, senderUpeerId: myId, timestamp: Date.now() });
                     }
                 }
             } else if (relay !== myId) {

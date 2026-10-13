@@ -49,11 +49,19 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const [startedAt] = useState<number>(Date.now());
     const [seconds, setSeconds] = useState(0);
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+    const remoteCanvasRef = useRef<HTMLCanvasElement>(null);
+    const screenCanvasRef = useRef<HTMLCanvasElement>(null);
+    const peerCanvasRefs = useRef(new Map<string, HTMLCanvasElement>());
+    const remoteCanvasSourcesRef = useRef(new Map<string, HTMLCanvasElement>());
+    const screenCanvasSourceRef = useRef<HTMLCanvasElement | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const nextAudioTimeRef = useRef(0);
+    const [remotePeers, setRemotePeers] = useState<string[]>([]);
+    const [remoteScreen, setRemoteScreen] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [showShareOptions, setShowShareOptions] = useState(false);
-    const media = useCallMedia();
-    const { startLocalCapture, stopLocalCapture, localStream, remoteStream, remoteStreams, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
+    const media = useCallMedia(call.callId ?? '');
+    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -68,41 +76,104 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const effWidth = expanded ? Math.max(size.width, 640) : size.width;
     const effHeight = expanded ? Math.max(size.height, 480) : size.height;
 
-
-    useEffect(() => {
-        if (call.phase !== 'negotiating' && call.phase !== 'connected') {
+    const attachVideoCanvas = useCallback((peerUpeerId: string, element: HTMLCanvasElement | null) => {
+        if (!element) {
+            peerCanvasRefs.current.delete(peerUpeerId);
             return;
         }
-        void startLocalCapture(isVideo);
-        return () => {
-            stopLocalCapture();
-            stopScreenShare();
-        };
-    }, [call.phase, isVideo, startLocalCapture, stopLocalCapture, stopScreenShare]);
+        peerCanvasRefs.current.set(peerUpeerId, element);
+        const previousFrame = remoteCanvasSourcesRef.current.get(peerUpeerId);
+        if (previousFrame) {
+            element.width = previousFrame.width;
+            element.height = previousFrame.height;
+            element.getContext('2d')?.drawImage(previousFrame, 0, 0);
+        }
+    }, []);
+
+    const attachScreenCanvas = useCallback((element: HTMLCanvasElement | null) => {
+        screenCanvasRef.current = element;
+        const source = screenCanvasSourceRef.current;
+        if (element && source) {
+            element.width = source.width;
+            element.height = source.height;
+            element.getContext('2d')?.drawImage(source, 0, 0);
+        }
+    }, []);
+
+    const drawRemoteVideo = useCallback((kind: 'video' | 'screen', frame: VideoFrame, peerUpeerId: string) => {
+        const sourceCanvas = kind === 'screen'
+            ? screenCanvasSourceRef.current ?? document.createElement('canvas')
+            : remoteCanvasSourcesRef.current.get(peerUpeerId) ?? document.createElement('canvas');
+        if (kind === 'video') remoteCanvasSourcesRef.current.set(peerUpeerId, sourceCanvas);
+        else screenCanvasSourceRef.current = sourceCanvas;
+        sourceCanvas.width = frame.displayWidth;
+        sourceCanvas.height = frame.displayHeight;
+        sourceCanvas.getContext('2d')?.drawImage(frame, 0, 0);
+        const target = kind === 'screen'
+            ? screenCanvasRef.current
+            : isGroup ? peerCanvasRefs.current.get(peerUpeerId) : remoteCanvasRef.current;
+        if (target && target !== sourceCanvas) {
+            target.width = sourceCanvas.width;
+            target.height = sourceCanvas.height;
+            target.getContext('2d')?.drawImage(sourceCanvas, 0, 0);
+        }
+        if (kind === 'video') {
+            setRemotePeers((current) => current.includes(peerUpeerId) ? current : [...current, peerUpeerId]);
+        } else {
+            setRemoteScreen(peerUpeerId);
+        }
+        frame.close();
+    }, [isGroup]);
+
+    const playRemoteAudio = useCallback((audioData: AudioData) => {
+        const context = audioContextRef.current ?? new AudioContext();
+        audioContextRef.current = context;
+        const buffer = context.createBuffer(audioData.numberOfChannels, audioData.numberOfFrames, audioData.sampleRate);
+        for (let channel = 0; channel < audioData.numberOfChannels; channel += 1) {
+            audioData.copyTo(buffer.getChannelData(channel), { planeIndex: channel });
+        }
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        const startAt = Math.max(nextAudioTimeRef.current, context.currentTime);
+        source.start(startAt);
+        nextAudioTimeRef.current = startAt + buffer.duration;
+        audioData.close();
+    }, []);
 
     useEffect(() => {
-        if (videoRef.current && localStream) {
-            videoRef.current.srcObject = localStream;
-        }
+        if (videoRef.current && localStream) videoRef.current.srcObject = localStream;
     }, [localStream]);
 
     useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream]);
+        if (call.phase !== 'negotiating' && call.phase !== 'connected') return;
+        const remoteCanvasSources = remoteCanvasSourcesRef.current;
+        setOnRemoteFrame((kind, decoded, peerUpeerId) => {
+            if (kind === 'audio') playRemoteAudio(decoded as AudioData);
+            else drawRemoteVideo(kind, decoded as VideoFrame, peerUpeerId);
+        });
+        void startLocalCapture(isVideo);
+        return () => {
+            setOnRemoteFrame(null);
+            stopLocalCapture();
+            stopScreenShare();
+            setRemotePeers([]);
+            remoteCanvasSources.clear();
+            screenCanvasSourceRef.current = null;
+            setRemoteScreen(null);
+            void audioContextRef.current?.close();
+            audioContextRef.current = null;
+            nextAudioTimeRef.current = 0;
+        };
+    }, [call.callId, call.phase, isVideo, setOnRemoteFrame, startLocalCapture, stopLocalCapture, stopScreenShare, drawRemoteVideo, playRemoteAudio]);
 
     useEffect(() => {
-        if (call.phase !== 'connected') {
-            return;
-        }
+        if (call.phase !== 'connected') return;
         void setVideoEnabled(call.cameraEnabled);
     }, [call.phase, call.cameraEnabled, setVideoEnabled]);
 
     useEffect(() => {
-        if (call.phase !== 'connected') {
-            return;
-        }
+        if (call.phase !== 'connected') return;
         void setAudioEnabled(!call.muted);
     }, [call.phase, call.muted, setAudioEnabled]);
 
@@ -222,6 +293,12 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
                 {isGroup && isVideoActive ? (
                     <Box sx={{ width: '100%', height: '100%', overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(110px, 1fr)', gap: 1 }}>
+                        {remoteScreen && (
+                            <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
+                                <canvas ref={attachScreenCanvas} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
+                                <Chip size="sm" color="warning" sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreen.slice(0, 8)} comparte pantalla</Chip>
+                            </Box>
+                        )}
                         <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
                             {call.cameraEnabled && localStream ? (
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -234,16 +311,15 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                                 <Typography level="body-xs">Tú</Typography>
                             </Box>
                         </Box>
-                        {Object.entries(remoteStreams).map(([pid, stream]) => (
+                        {remotePeers.map((pid) => (
                             <Box key={pid} sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                <video autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }}
-                                    ref={(el) => { if (el && el.srcObject !== stream) { el.srcObject = stream; } }} />
+                                <canvas ref={(element) => attachVideoCanvas(pid, element)} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
                                 <Box sx={{ position: 'absolute', bottom: 4, left: 6, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
                                     <Typography level="body-xs" sx={{ color: 'white' }}>{pid.slice(0, 8)}</Typography>
                                 </Box>
                             </Box>
                         ))}
-                        {Object.keys(remoteStreams).length === 0 && (
+                        {remotePeers.length === 0 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, gridColumn: '1 / -1' }}>
                                 <Avatar size="lg" sx={{ width: 72, height: 72, fontSize: 28 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                                 <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
@@ -253,8 +329,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                     </Box>
                 ) : isVideoActive ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                        {remoteStream ? (
-                            <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
+                        {remoteScreen ? (
+                            <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+                                <canvas ref={attachScreenCanvas} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
+                                <Chip size="sm" color="warning" sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreen.slice(0, 8)} comparte pantalla</Chip>
+                            </Box>
+                        ) : remotePeers.length > 0 ? (
+                            <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
                         ) : (
                             <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                                 <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
@@ -290,4 +371,3 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         </Box>
     );
 };
-

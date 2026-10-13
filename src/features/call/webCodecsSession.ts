@@ -10,7 +10,7 @@ type WcCodecBase = {
 };
 
 type WcEncoder = WcCodecBase & {
-    onoutput: ((chunk: { byteLength: number; copyTo: (dest: Uint8Array) => void }) => void) | null;
+    onoutput: ((chunk: { byteLength: number; timestamp: number; type: string; copyTo: (dest: Uint8Array) => void }) => void) | null;
 };
 
 type WcDecoder = WcCodecBase & {
@@ -42,11 +42,11 @@ function chunkToBytes(chunk: { byteLength?: number; copyTo?: (dest: Uint8Array) 
     return bytes;
 }
 
-export type MediaChunk = { kind: CallMediaKind; bytes: Uint8Array; meta?: WcFrame };
+export type MediaChunk = { kind: CallMediaKind; bytes: Uint8Array; timestamp: number; keyFrame: boolean };
 
 export class WebCodecsSession {
     private encoders: Partial<Record<CallMediaKind, WcEncoder | null>> = {};
-    private decoders: Partial<Record<CallMediaKind, WcDecoder | null>> = {};
+    private decoders: Record<string, { decoder: WcDecoder; onDecoded: (frame: unknown) => void } | null> = {};
     private controllers: Partial<Record<CallMediaKind, ReadableStreamDefaultReader<unknown>>> = {};
     private running = false;
 
@@ -83,9 +83,8 @@ export class WebCodecsSession {
             }
             if (kind === 'video') {
                 videoFrameCount += 1;
-                // Limita el framerate de vídeo (~10 fps) para no saturar el canal
-                // ni el main thread al codificar/decodificar cada fotograma.
                 if (videoFrameCount % 3 !== 0) {
+                    (value as { close?: () => void }).close?.();
                     continue;
                 }
             }
@@ -97,23 +96,30 @@ export class WebCodecsSession {
                 encoder.configure(config);
             }
             if (encoder.encode) {
-                encoder.encode(value);
+                try {
+                    encoder.encode(value);
+                } finally {
+                    (value as { close?: () => void }).close?.();
+                }
             }
         }
     }
 
-    async decodeChunk(kind: CallMediaKind, bytes: Uint8Array, onDecoded: (frame: unknown) => void): Promise<void> {
-        const decoder = this.ensureDecoder(kind, onDecoded);
-        if (!decoder?.decode) {
+    async decodeChunk(kind: CallMediaKind, bytes: Uint8Array, timestamp: number, keyFrame: boolean, onDecoded: (frame: unknown) => void, streamId = 'default'): Promise<void> {
+        const decoderKey = `${kind}:${streamId}`;
+        const decoderState = this.ensureDecoder(decoderKey, kind, onDecoded);
+        const decoder = decoderState?.decoder;
+        if (!decoderState || !decoder?.decode) {
             return;
         }
+        decoderState.onDecoded = onDecoded;
         const ChunkCtor = kind === 'audio' ? globalApi().EncodedAudioChunk : globalApi().EncodedVideoChunk;
         if (typeof ChunkCtor !== 'function') {
             return;
         }
         const chunk = new (ChunkCtor as new (init: { type: string; timestamp: number; data: Uint8Array }) => unknown)({
-            type: 'key',
-            timestamp: 0,
+            type: kind === 'audio' || keyFrame ? 'key' : 'delta',
+            timestamp,
             data: bytes,
         });
         decoder.decode(chunk);
@@ -137,8 +143,8 @@ export class WebCodecsSession {
             }
             encoder?.close();
         }
-        for (const decoder of Object.values(this.decoders)) {
-            decoder?.close();
+        for (const decoderState of Object.values(this.decoders)) {
+            decoderState?.decoder.close();
         }
         this.encoders = {};
         this.decoders = {};
@@ -149,7 +155,7 @@ export class WebCodecsSession {
             return this.encoders[kind] ?? null;
         }
         const Ctor = globalApi()[kind === 'audio' ? 'AudioEncoder' : 'VideoEncoder'] as new (init: {
-            output: (chunk: { byteLength: number; copyTo: (dest: Uint8Array) => void }, meta?: WcFrame) => void;
+            output: (chunk: { byteLength: number; timestamp: number; type: string; copyTo: (dest: Uint8Array) => void }, meta?: WcFrame) => void;
             error: (e: unknown) => void;
         }) => WcEncoder;
         if (typeof Ctor !== 'function') {
@@ -157,8 +163,8 @@ export class WebCodecsSession {
             return null;
         }
         const encoder = new Ctor({
-            output: (chunk, meta) => {
-                onChunk({ kind, bytes: chunkToBytes(chunk), meta });
+            output: (chunk) => {
+                onChunk({ kind, bytes: chunkToBytes(chunk), timestamp: chunk.timestamp, keyFrame: kind === 'audio' || chunk.type === 'key' });
             },
             error: () => undefined,
         });
@@ -166,25 +172,27 @@ export class WebCodecsSession {
         return encoder;
     }
 
-    private ensureDecoder(kind: CallMediaKind, onDecoded: (frame: unknown) => void): WcDecoder | null {
-        if (kind in this.decoders) {
-            return this.decoders[kind] ?? null;
+    private ensureDecoder(decoderKey: string, kind: CallMediaKind, onDecoded: (frame: unknown) => void): { decoder: WcDecoder; onDecoded: (frame: unknown) => void } | null {
+        if (decoderKey in this.decoders) {
+            return this.decoders[decoderKey] ?? null;
         }
         const Ctor = globalApi()[kind === 'audio' ? 'AudioDecoder' : 'VideoDecoder'] as new (init: {
             output: (frame: unknown) => void;
             error: (e: unknown) => void;
         }) => WcDecoder;
         if (typeof Ctor !== 'function') {
-            this.decoders[kind] = null;
+            this.decoders[decoderKey] = null;
             return null;
         }
+        const decoderState = { decoder: null as unknown as WcDecoder, onDecoded };
         const decoder = new Ctor({
-            output: (frame) => onDecoded(frame),
+            output: (frame) => decoderState.onDecoded(frame),
             error: () => undefined,
         });
         const config = kind === 'audio' ? { codec: 'opus', sampleRate: 48000, numberOfChannels: 1 } : { codec: 'vp8' };
         decoder.configure(config);
-        this.decoders[kind] = decoder;
-        return decoder;
+        decoderState.decoder = decoder;
+        this.decoders[decoderKey] = decoderState;
+        return decoderState;
     }
 }

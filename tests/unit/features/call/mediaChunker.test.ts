@@ -21,7 +21,15 @@ describe('mediaChunker', () => {
         expect(frameResult.kind).toBe('video');
         expect(frameResult.ts).toBe(100);
         expect(frameResult.seq).toBe(5);
+        expect(frameResult.keyFrame).toBe(true);
         expect(Array.from(frameResult.data)).toEqual([1, 2, 3, 4]);
+    });
+
+    it('conserva metadata de keyframe y frame delta', () => {
+        const key = decodeMediaFrame(encodeMediaFrame({ kind: 'video', ts: 12_345, seq: 8, keyFrame: true, data: new Uint8Array([1]) }));
+        const delta = decodeMediaFrame(encodeMediaFrame({ kind: 'video', ts: 12_678, seq: 9, keyFrame: false, data: new Uint8Array([2]) }));
+        expect(key).toMatchObject({ ts: 12_345, keyFrame: true });
+        expect(delta).toMatchObject({ ts: 12_678, keyFrame: false });
     });
 
     it('hace roundtrip de un frame de pantalla (screen)', () => {
@@ -38,6 +46,7 @@ describe('mediaChunker', () => {
     it('devuelve null ante base64 inválida o payload corto', () => {
         expect(decodeMediaFrame('!!!')).toBeNull();
         expect(decodeMediaFrame(bytesToBase64(new Uint8Array([0, 0])))).toBeNull();
+        expect(decodeMediaFrame(bytesToBase64(new Uint8Array(16)))).toBeNull();
     });
 
     it('base64ToBytes/bytesToBase64 roundtrip', () => {

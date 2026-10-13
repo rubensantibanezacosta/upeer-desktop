@@ -10,6 +10,7 @@ export interface MediaFrame {
     kind: CallMediaKind;
     ts: number;
     seq: number;
+    keyFrame?: boolean;
     data: Uint8Array;
 }
 
@@ -19,6 +20,7 @@ export function encodeMediaFrame(frame: MediaFrame): string {
     const header = new Uint8Array(HEADER_BYTES);
     const view = new DataView(header.buffer);
     view.setUint8(0, frame.kind === 'audio' ? 0 : (frame.kind === 'screen' ? 2 : 1));
+    view.setUint8(1, frame.keyFrame === false ? 0 : 1);
     view.setFloat64(4, frame.ts);
     view.setUint32(12, frame.seq >>> 0);
 
@@ -49,11 +51,16 @@ export function decodeMediaFrame(encoded: string): MediaFrame | null {
     }
     const view = new DataView(bytes.buffer, bytes.byteOffset, HEADER_BYTES);
     const kindByte = view.getUint8(0);
+    const frameType = view.getUint8(1);
+    if (kindByte > 2 || frameType > 1) return null;
     const kind: CallMediaKind = kindByte === 0 ? 'audio' : (kindByte === 2 ? 'screen' : 'video');
+    const keyFrame = frameType === 1;
     const ts = view.getFloat64(4);
     const seq = view.getUint32(12);
+    if (!Number.isFinite(ts)) return null;
     const data = new Uint8Array(bytes.subarray(HEADER_BYTES));
-    return { kind, ts, seq, data };
+    if (data.length === 0) return null;
+    return { kind, ts, seq, keyFrame, data };
 }
 
 function bytesToBinaryString(bytes: Uint8Array): string {

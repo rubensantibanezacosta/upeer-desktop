@@ -88,7 +88,8 @@ export function handleCallPacket(
         case 'CALL_MEDIA': {
             win?.webContents.send('call-media', {
                 callId,
-                peerUpeerId: upeerId,
+                peerUpeerId: typeof data.senderUpeerId === 'string' ? data.senderUpeerId : upeerId,
+                senderUpeerId: typeof data.senderUpeerId === 'string' ? data.senderUpeerId : undefined,
                 data: data.data,
                 timestamp: data.timestamp,
             });
@@ -98,7 +99,7 @@ export function handleCallPacket(
             if (session?.isGroup && session.relayUpeerId === myId) {
                 for (const member of session.groupMembers) {
                     if (member !== upeerId && member !== myId) {
-                        sendCallMediaTo(member, callId, data.data as string);
+                        sendCallMediaTo(member, callId, data.data as string, upeerId);
                     }
                 }
             }
