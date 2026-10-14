@@ -19,10 +19,12 @@ import {
 } from './circuitBreaker.js';
 import {
     MAX_QUEUE_SIZE,
+    CALL_MEDIA_UDP_MAX_BYTES,
     YGG_PORT,
 } from './constants.js';
 import { encodeFrame, socks5Connect } from './socks5.js';
 import { callMediaSignatureValue, encodeBinaryCallMedia, hashCallMedia } from '../binaryCallMedia.js';
+import { sendCallMediaDatagram } from './callMediaUdp.js';
 import {
     addToSendQueue,
     clearSendQueue,
@@ -252,6 +254,13 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
         ? encodeBinaryCallMedia(packetToSend as Record<string, unknown>, binaryMedia)
         : Buffer.from(JSON.stringify(packetToSend));
     const framedBuf = encodeFrame(rawBuf);
+
+    if (binaryMedia && rawBuf.length <= CALL_MEDIA_UDP_MAX_BYTES && getNetworkReady()) {
+        if (sendCallMediaDatagram(ip, rawBuf, () => enqueueForSend(ip, framedBuf, false, false))) {
+            recordIPSuccess(ip);
+            return;
+        }
+    }
 
     if (!getNetworkReady()) {
         const isFileChunk = data.type === 'FILE_CHUNK' || data.type === 'FILE_START' || data.type === 'FILE_ACK';

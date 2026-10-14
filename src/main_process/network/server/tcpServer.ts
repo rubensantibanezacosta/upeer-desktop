@@ -24,9 +24,11 @@ import {
 } from './state.js';
 import { sendSecureUDPMessage } from './transport.js';
 import { drainSendQueue } from './transport.js';
+import { closeCallMediaUdpServer, startCallMediaUdpServer } from './callMediaUdp.js';
 
 export function startUDPServer(win: BrowserWindow) {
     setMainWindow(win);
+    startCallMediaUdpServer(win);
     if (getTcpServer()) {
         // Ya arrancado (e.g. identidad restaurada en arranque, ahora se llama de nuevo)
         return;
@@ -172,6 +174,7 @@ export function startUDPServer(win: BrowserWindow) {
 }
 
 export function closeUDPServer() {
+    closeCallMediaUdpServer();
     const timer = getDhtMaintenanceTimer();
     if (timer) {
         clearInterval(timer);

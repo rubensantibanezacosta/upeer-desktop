@@ -1,4 +1,6 @@
 export const YGG_PORT = 50005;
+export const CALL_MEDIA_UDP_PORT = 50006;
+export const CALL_MEDIA_UDP_MAX_BYTES = 1200;
 export const SOCKS5_HOST = '127.0.0.1';
 export const SOCKS5_PORT = 9050;
 

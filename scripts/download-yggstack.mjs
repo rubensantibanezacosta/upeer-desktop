@@ -16,6 +16,7 @@
  */
 
 import https from 'node:https';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,8 +28,8 @@ const BIN_DIR = path.join(ROOT, 'resources', 'bin');
 // ── Configuración de la release ──────────────────────────────────────────────
 // Ajusta YGGSTACK_VERSION a la última release disponible en:
 // https://github.com/yggdrasil-network/yggstack/releases
-// ⚠️  NOTA: este repo usa tags SIN prefijo 'v' (ej: '1.0.4', no 'v1.0.4')
-const YGGSTACK_VERSION = '1.0.4';
+// ⚠️  NOTA: este repo usa tags SIN prefijo 'v' (ej: '1.0.5', no 'v1.0.5')
+const YGGSTACK_VERSION = '1.0.5';
 const GITHUB_REPO = 'yggdrasil-network/yggstack';
 const BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download/${YGGSTACK_VERSION}`;
 
@@ -39,11 +40,11 @@ const BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download/${YGGSTACK
  * consultando: https://github.com/yggdrasil-network/yggstack/releases
  */
 const PLATFORM_MAP = {
-    'linux-x64': { file: 'yggstack-linux-amd64-static', exe: 'yggstack' },
-    'linux-arm64': { file: 'yggstack-linux-arm64-static', exe: 'yggstack' },
-    'darwin-x64': { file: 'yggstack-darwin-amd64', exe: 'yggstack' },
-    'darwin-arm64': { file: 'yggstack-darwin-arm64', exe: 'yggstack' },
-    'win32-x64': { file: 'yggstack-windows-amd64.exe', exe: 'yggstack.exe' },
+    'linux-x64': { file: 'yggstack-linux-amd64-static', exe: 'yggstack', sha256: '5d2c82ffd572175759f24592c3eb88f26b44216a2e93bbb68b67c0eeb54d416b' },
+    'linux-arm64': { file: 'yggstack-linux-arm64-static', exe: 'yggstack', sha256: 'ecc97eb86db259fd3e65fe637c6ee6138cc6dc48a012ccf98fcdc3e80ae333ac' },
+    'darwin-x64': { file: 'yggstack-darwin-amd64', exe: 'yggstack', sha256: '83ac0c8db7ad721de4402dcb02a003e0af067d4485f77396ccc34af274b8021a' },
+    'darwin-arm64': { file: 'yggstack-darwin-arm64', exe: 'yggstack', sha256: '5c2a7102cce9eda666e0f5ed0608e9bf8819ce21c763e461ee946fa553aff13e' },
+    'win32-x64': { file: 'yggstack-windows-amd64.exe', exe: 'yggstack.exe', sha256: '065e48d57f4d33335a8237312d09ddff834a5aa85f2ff6268a2779fe52dc99fd' },
 };
 
 // ── Utilidades ───────────────────────────────────────────────────────────────
@@ -64,22 +65,29 @@ function err(msg) {
  */
 function download(url, dest) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(dest);
-
-        const request = (targetUrl) => {
+        const request = (targetUrl, redirects = 0) => {
+            if (redirects > 5) {
+                reject(new Error(`Demasiadas redirecciones al descargar ${targetUrl}`));
+                return;
+            }
             https.get(targetUrl, (res) => {
-                // Seguir redirecciones de GitHub
                 if (res.statusCode === 301 || res.statusCode === 302) {
-                    file.close();
-                    return request(res.headers.location);
+                    res.resume();
+                    const nextUrl = res.headers.location;
+                    if (!nextUrl) {
+                        reject(new Error(`Redirección sin destino al descargar ${targetUrl}`));
+                        return;
+                    }
+                    request(nextUrl, redirects + 1);
+                    return;
                 }
 
                 if (res.statusCode !== 200) {
-                    file.close();
-                    fs.unlink(dest, () => { });
+                    res.resume();
                     return reject(new Error(`HTTP ${res.statusCode} al descargar ${targetUrl}`));
                 }
 
+                const file = fs.createWriteStream(dest);
                 const total = parseInt(res.headers['content-length'] || '0', 10);
                 let downloaded = 0;
 
@@ -96,10 +104,8 @@ function download(url, dest) {
                     process.stdout.write('\n');
                     file.close(resolve);
                 });
-            }).on('error', (e) => {
-                fs.unlink(dest, () => { });
-                reject(e);
-            });
+                file.on('error', reject);
+            }).on('error', reject);
         };
 
         request(url);
@@ -124,6 +130,14 @@ async function downloadForPlatform(platformKey) {
     const destFile = path.join(destDir, entry.exe);
     const url = `${BASE_URL}/${entry.file}`;
 
+    if (fs.existsSync(destFile) && fs.statSync(destFile).size > 0) {
+        const currentHash = createHash('sha256').update(fs.readFileSync(destFile)).digest('hex');
+        if (currentHash === entry.sha256) {
+            log(`✓ Ya está instalada la versión ${YGGSTACK_VERSION}: ${destFile}\n`);
+            return;
+        }
+    }
+
     log(`Plataforma: ${platformKey}`);
     log(`URL:        ${url}`);
     log(`Destino:    ${destFile}`);
@@ -131,24 +145,23 @@ async function downloadForPlatform(platformKey) {
     // Crear directorio si no existe
     fs.mkdirSync(destDir, { recursive: true });
 
-    // Saltar si el binario ya existe y tiene contenido (evita ETXTBSY si está en uso)
-    if (fs.existsSync(destFile) && fs.statSync(destFile).size > 0) {
-        log(`⚠ Ya existe, omitiendo: ${destFile}\n`);
-        return;
-    }
-    // Si existe pero está vacío (descarga interrumpida), eliminarlo
-    if (fs.existsSync(destFile)) {
-        fs.unlinkSync(destFile);
-        log('Archivo vacío previo eliminado, reintentando descarga…');
-    }
-
-    // Descargar
     log('Descargando…');
-    await download(url, destFile);
+    const tempFile = `${destFile}.download`;
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    try {
+        await download(url, tempFile);
+        const downloadedHash = createHash('sha256').update(fs.readFileSync(tempFile)).digest('hex');
+        if (downloadedHash !== entry.sha256) {
+            throw new Error(`SHA-256 no coincide para ${entry.file}: ${downloadedHash}`);
+        }
+        fs.chmodSync(tempFile, platformKey.startsWith('win32') ? 0o644 : 0o755);
+        fs.renameSync(tempFile, destFile);
+    } catch (error) {
+        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+        throw error;
+    }
 
-    // Hacer ejecutable en Linux/macOS
     if (!platformKey.startsWith('win32')) {
-        fs.chmodSync(destFile, 0o755);
         log('chmod +x aplicado.');
     }
 

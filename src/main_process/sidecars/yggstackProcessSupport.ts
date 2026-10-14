@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { warn } from '../security/secure-logger.js';
-import { APP_P2P_PORT, SOCKS_HOST, SOCKS_PORT } from './yggstackShared.js';
+import { APP_MEDIA_UDP_PORT, APP_P2P_PORT, SOCKS_HOST, SOCKS_PORT } from './yggstackShared.js';
 
 export const ensureYggstackExecutable = (yggstackPath: string) => {
     if (process.platform === 'win32') {
@@ -20,6 +20,7 @@ export const spawnYggstackProcess = (yggstackPath: string, confPath: string) => 
         '-useconffile', confPath,
         '-socks', `${SOCKS_HOST}:${SOCKS_PORT}`,
         '-remote-tcp', `${APP_P2P_PORT}`,
+        '-remote-udp', `${APP_MEDIA_UDP_PORT}:127.0.0.1:${APP_MEDIA_UDP_PORT}`,
     ],
     {
         stdio: ['ignore', 'pipe', 'pipe'],

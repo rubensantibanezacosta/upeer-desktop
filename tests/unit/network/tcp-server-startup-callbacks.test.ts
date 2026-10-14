@@ -96,6 +96,10 @@ vi.mock('../../../src/main_process/network/server/state.js', () => ({
     }),
     getMainWindow: vi.fn(() => storedMainWindow),
     getTcpServer: vi.fn(() => storedServer),
+    getCallMediaUdpServer: vi.fn(() => null),
+    setCallMediaUdpServer: vi.fn(),
+    getSocks5UdpAssociation: vi.fn(() => null),
+    setSocks5UdpAssociation: vi.fn(),
     setTcpServer: vi.fn((server: MockServer | null) => {
         storedServer = server;
     }),
@@ -109,6 +113,11 @@ vi.mock('../../../src/main_process/network/server/state.js', () => ({
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
     sendSecureUDPMessage: vi.fn(),
     drainSendQueue: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/server/callMediaUdp.js', () => ({
+    startCallMediaUdpServer: vi.fn(),
+    closeCallMediaUdpServer: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({

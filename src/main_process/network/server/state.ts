@@ -1,4 +1,5 @@
 import net from 'node:net';
+import dgram from 'node:dgram';
 import { BrowserWindow } from 'electron';
 import { KademliaDHT } from '../dht/kademlia/main.js';
 
@@ -9,6 +10,9 @@ export interface IPFailState {
 
 // TCP server state
 export let tcpServer: net.Server | null = null;
+export let callMediaUdpServer: dgram.Socket | null = null;
+export let callMediaUdpPort = 50006;
+export let socks5UdpAssociation: import('./socks5Udp.js').Socks5UdpAssociation | null = null;
 export let mainWindow: BrowserWindow | null = null;
 export let kademliaDHT: KademliaDHT | null = null;
 export let dhtMaintenanceTimer: ReturnType<typeof setInterval> | null = null;
@@ -35,6 +39,30 @@ export function setTcpServer(server: net.Server | null) {
 
 export function getTcpServer() {
     return tcpServer;
+}
+
+export function setCallMediaUdpServer(server: dgram.Socket | null) {
+    callMediaUdpServer = server;
+}
+
+export function getCallMediaUdpServer() {
+    return callMediaUdpServer;
+}
+
+export function setCallMediaUdpPort(port: number) {
+    callMediaUdpPort = port;
+}
+
+export function getCallMediaUdpPort() {
+    return callMediaUdpPort;
+}
+
+export function setSocks5UdpAssociation(association: import('./socks5Udp.js').Socks5UdpAssociation | null) {
+    socks5UdpAssociation = association;
+}
+
+export function getSocks5UdpAssociation() {
+    return socks5UdpAssociation;
 }
 
 export function setKademliaDHT(dht: KademliaDHT | null) {
