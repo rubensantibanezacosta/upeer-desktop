@@ -248,7 +248,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 onAttachFile={handleAttachFile}
                                                 allowContactShare={!activeGroupId && !!targetUpeerId}
                                                 onSendVoiceNote={handleSendVoiceNote}
-                                                disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? activeContact?.status !== 'connected' : false)}
+                                                disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '') : false)}
                                                 replyToMessage={currentReplyToMessage ? {
                                                     ...currentReplyToMessage,
                                                     senderName: currentReplyToMessage.senderName || (currentReplyToMessage.isMine ? 'Tú' : activeContact?.name),

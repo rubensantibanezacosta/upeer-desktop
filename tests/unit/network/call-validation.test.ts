@@ -25,6 +25,7 @@ describe('validateCallPacket', () => {
 
     it('acepta CALL_MEDIA con payload', () => {
         expect(validateCallPacket('CALL_MEDIA', { callId: 'abc', data: 'eA==' }).valid).toBe(true);
+        expect(validateCallPacket('CALL_MEDIA', { callId: 'abc', data: new Uint8Array([1]) }).valid).toBe(true);
     });
 
     it('valida CALL_SDP y CALL_ICE (WebRTC)', () => {

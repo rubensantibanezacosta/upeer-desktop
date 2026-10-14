@@ -122,7 +122,7 @@ export const useFileTransferHandlers = ({
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!targetUpeerId || activeContact?.status !== 'connected') return;
+        if (!targetUpeerId || !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '')) return;
         setIsDragging(true);
     };
 
@@ -139,7 +139,7 @@ export const useFileTransferHandlers = ({
         e.stopPropagation();
         setIsDragging(false);
 
-        if (!targetUpeerId || activeContact?.status !== 'connected') return;
+        if (!targetUpeerId || !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '')) return;
 
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
 

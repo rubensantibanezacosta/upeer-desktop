@@ -43,10 +43,11 @@ describe('mediaChunker', () => {
         expect(Array.from(frameResult.data)).toEqual([9, 8, 7]);
     });
 
-    it('devuelve null ante base64 inválida o payload corto', () => {
-        expect(decodeMediaFrame('!!!')).toBeNull();
-        expect(decodeMediaFrame(bytesToBase64(new Uint8Array([0, 0])))).toBeNull();
-        expect(decodeMediaFrame(bytesToBase64(new Uint8Array(16)))).toBeNull();
+    it('devuelve null ante payload corto o metadata inválida', () => {
+        expect(decodeMediaFrame(new Uint8Array([0, 0]))).toBeNull();
+        const invalid = new Uint8Array(17);
+        invalid[0] = 3;
+        expect(decodeMediaFrame(invalid)).toBeNull();
     });
 
     it('base64ToBytes/bytesToBase64 roundtrip', () => {

@@ -2,7 +2,6 @@ import type { CallMediaKind } from './mediaChunker.js';
 
 type WcCodecBase = {
     configure: (config: Record<string, unknown>) => void;
-    encode?: (input: unknown) => void;
     decode?: (input: unknown) => void;
     flush: () => Promise<void>;
     close: () => void;
@@ -10,7 +9,11 @@ type WcCodecBase = {
 };
 
 type WcEncoder = WcCodecBase & {
+    encode?: (input: unknown, options?: { keyFrame?: boolean }) => void;
+    encodeQueueSize?: number;
     onoutput: ((chunk: { byteLength: number; timestamp: number; type: string; copyTo: (dest: Uint8Array) => void }) => void) | null;
+    requestKeyFrame?: boolean;
+    requestQueueSize?: number;
 };
 
 type WcDecoder = WcCodecBase & {
@@ -71,19 +74,19 @@ export class WebCodecsSession {
         const processor = new Processor({ track });
         const reader = processor.readable.getReader();
         this.controllers[kind] = reader;
-        this.pump(reader, kind, encoder).catch(() => undefined);
+        void this.pump(reader, kind, encoder).catch(() => undefined);
     }
 
     private async pump(reader: ReadableStreamDefaultReader<unknown>, kind: CallMediaKind, encoder: WcEncoder): Promise<void> {
-        let videoFrameCount = 0;
         while (this.running) {
             const { value, done } = await reader.read();
             if (done || !value) {
                 break;
             }
             if (kind === 'video') {
-                videoFrameCount += 1;
-                if (videoFrameCount % 3 !== 0) {
+                const queuedFrames = encoder.encodeQueueSize ?? encoder.requestQueueSize ?? 0;
+                if (queuedFrames > 1) {
+                    encoder.requestKeyFrame = true;
                     (value as { close?: () => void }).close?.();
                     continue;
                 }
@@ -97,7 +100,10 @@ export class WebCodecsSession {
             }
             if (encoder.encode) {
                 try {
-                    encoder.encode(value);
+                    const keyFrame = kind === 'video' && encoder.requestKeyFrame === true;
+                    if (kind === 'video') encoder.requestQueueSize = (encoder.requestQueueSize ?? 0) + 1;
+                    encoder.encode(value, keyFrame ? { keyFrame: true } : undefined);
+                    if (keyFrame) encoder.requestKeyFrame = false;
                 } finally {
                     (value as { close?: () => void }).close?.();
                 }
@@ -164,6 +170,9 @@ export class WebCodecsSession {
         }
         const encoder = new Ctor({
             output: (chunk) => {
+                if (kind === 'video' && encoder.encodeQueueSize === undefined) {
+                    encoder.requestQueueSize = Math.max(0, (encoder.requestQueueSize ?? 1) - 1);
+                }
                 onChunk({ kind, bytes: chunkToBytes(chunk), timestamp: chunk.timestamp, keyFrame: kind === 'audio' || chunk.type === 'key' });
             },
             error: () => undefined,

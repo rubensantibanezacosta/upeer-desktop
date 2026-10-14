@@ -11,7 +11,7 @@ export function useCallMedia(callId: string) {
     const sessionRef = useRef<WebCodecsSession | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const screenRef = useRef<MediaStream | null>(null);
-    const sequenceRef = useRef(0);
+    const sequenceRef = useRef<Record<CallMediaKind, number>>({ audio: 0, video: 0, screen: 0 });
     const onRemoteFrameRef = useRef<RemoteFrameHandler | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [screenSharing, setScreenSharing] = useState(false);
@@ -24,14 +24,14 @@ export function useCallMedia(callId: string) {
         const frame = encodeMediaFrame({
             kind: chunk.kind,
             ts: chunk.timestamp,
-            seq: sequenceRef.current++,
+            seq: sequenceRef.current[chunk.kind]++,
             keyFrame: chunk.keyFrame,
             data: chunk.bytes,
         });
         void window.upeer.sendCallMedia(callId, frame);
     }, [callId]);
 
-    const handleRemoteMedia = useCallback((event: { callId: string; peerUpeerId: string; senderUpeerId?: string; data: string }) => {
+    const handleRemoteMedia = useCallback((event: { callId: string; peerUpeerId: string; senderUpeerId?: string; data: Uint8Array }) => {
         if (event.callId !== callId) return;
         const frame = decodeMediaFrame(event.data);
         const session = sessionRef.current;

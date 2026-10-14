@@ -196,7 +196,7 @@ const callApi = {
     rejectCall: (callId: string) => ipcRenderer.invoke('reject-call', { callId }),
     endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
     toggleMedia: (callId: string, type: 'mute' | 'camera') => ipcRenderer.invoke('call-toggle-media', { callId, type }),
-    sendCallMedia: (callId: string, data: string) => ipcRenderer.invoke('send-call-media', { callId, data }),
+    sendCallMedia: (callId: string, data: Uint8Array) => ipcRenderer.invoke('send-call-media', { callId, data }),
     sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => ipcRenderer.invoke('send-call-sdp', { callId, peerUpeerId, sdp }),
     sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => ipcRenderer.invoke('send-call-ice', { callId, peerUpeerId, candidate }),
     getCallDevices: () => navigator.mediaDevices.enumerateDevices()
@@ -262,7 +262,7 @@ const eventApi = {
     onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-ring', (data) => callback(data)),
     onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-accepted', (data) => callback(data)),
     onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; reason?: string }]>('call-ended', (data) => callback(data)),
-    onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: string; timestamp?: unknown; senderUpeerId?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; data: string; timestamp?: unknown; senderUpeerId?: string }]>('call-media', (data) => callback(data)),
+    onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: Uint8Array; timestamp?: unknown; senderUpeerId?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; data: Uint8Array; timestamp?: unknown; senderUpeerId?: string }]>('call-media', (data) => callback(data)),
     onCallSdp: (callback: (data: { callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }) => void) => subscribe<[{ callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }]>('call-sdp', (data) => callback(data)),
     onCallIce: (callback: (data: { callId: string; peerUpeerId: string; candidate: Record<string, unknown> }) => void) => subscribe<[{ callId: string; peerUpeerId: string; candidate: Record<string, unknown> }]>('call-ice', (data) => callback(data)),
     onCallMediaUpdate: (callback: (data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) => subscribe<[{ callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }]>('call-media-update', (data) => callback(data)),

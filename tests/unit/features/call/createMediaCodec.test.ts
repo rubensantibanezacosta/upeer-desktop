@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-    base64ToBytes,
-    bytesToBase64,
     createMediaCodec,
     isWebCodecsAvailable,
     PassthroughMediaCodec,
@@ -42,8 +40,8 @@ describe('PassthroughMediaCodec', () => {
         const codec = new PassthroughMediaCodec();
         const data = new Uint8Array([1, 2, 3, 4]);
         const encoded = await codec.encode({ kind: 'audio', ts: 0, seq: 0, data });
-        expect(encoded).toBe(bytesToBase64(data));
-        const decoded = await codec.decode('audio', base64ToBytes(encoded));
+        expect(encoded).toEqual(data);
+        const decoded = await codec.decode('audio', encoded);
         expect(Array.from(decoded)).toEqual([1, 2, 3, 4]);
         await codec.release();
     });

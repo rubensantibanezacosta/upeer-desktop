@@ -90,7 +90,7 @@ export function handleCallPacket(
                 callId,
                 peerUpeerId: typeof data.senderUpeerId === 'string' ? data.senderUpeerId : upeerId,
                 senderUpeerId: typeof data.senderUpeerId === 'string' ? data.senderUpeerId : undefined,
-                data: data.data,
+                data: new Uint8Array(data.data as Uint8Array),
                 timestamp: data.timestamp,
             });
             // Si este nodo es el relay, reenvía la media al resto de miembros.
@@ -99,7 +99,7 @@ export function handleCallPacket(
             if (session?.isGroup && session.relayUpeerId === myId) {
                 for (const member of session.groupMembers) {
                     if (member !== upeerId && member !== myId) {
-                        sendCallMediaTo(member, callId, data.data as string, upeerId);
+                        sendCallMediaTo(member, callId, data.data as Uint8Array, upeerId);
                     }
                 }
             }

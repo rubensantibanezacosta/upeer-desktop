@@ -26,6 +26,7 @@ import { handleHandshakeAccept, handleHandshakeReq } from './handlers/contacts.j
 import { unsealPacket } from './sealed.js';
 import { canonicalStringify } from './utils.js';
 import { routeVerifiedPacket } from './verifiedPacketRouter.js';
+import { decodeBinaryCallMedia, isBinaryCallMedia } from './binaryCallMedia.js';
 
 const rateLimiter = new IdentityRateLimiter();
 
@@ -56,14 +57,15 @@ export async function handlePacket(
     startDhtSearch: (upeerId: string) => void
 ) {
     try {
-        const fullPacketRaw: unknown = JSON.parse(msg.toString());
-
+        const binaryMedia = isBinaryCallMedia(msg);
+        const fullPacketRaw: unknown = binaryMedia ? decodeBinaryCallMedia(msg) : JSON.parse(msg.toString());
         if (typeof fullPacketRaw !== 'object' || fullPacketRaw === null) {
             security('Invalid packet format', { ip: rinfo.address }, 'network');
             return;
         }
 
         const fullPacket = fullPacketRaw as PacketRecord;
+        const binaryMediaHash = binaryMedia && typeof fullPacket.mediaHash === 'string' ? fullPacket.mediaHash : undefined;
 
         // ── Sealed Sender: desempaquetar antes de cualquier otro procesamiento ──
         // El paquete SEALED no tiene senderUpeerId en claro.
@@ -88,14 +90,19 @@ export async function handlePacket(
         const senderUpeerId = typeof fullPacket.senderUpeerId === 'string' ? fullPacket.senderUpeerId : undefined;
         const senderYggAddress = typeof fullPacket.senderYggAddress === 'string' ? fullPacket.senderYggAddress : undefined;
         const rawType = typeof fullPacket.type === 'string' ? fullPacket.type : '';
-
+        if (rawType === 'CALL_MEDIA' && !binaryMediaHash) return;
+        const decodedData = binaryMedia ? fullPacket.data : undefined;
         const data: PacketRecord = {};
         for (const key of Object.keys(fullPacket)) {
-            if (key !== 'signature' && key !== 'senderUpeerId' && key !== 'senderYggAddress') {
+            if (key !== 'signature' && key !== 'senderUpeerId' && key !== 'senderYggAddress' && (!binaryMediaHash || key !== 'mediaHash')) {
                 data[key] = fullPacket[key];
             }
         }
         data.type = rawType;
+        if (binaryMediaHash) {
+            data.data = decodedData;
+            data.mediaHash = binaryMediaHash;
+        }
 
         // BUG CM fix: guardar la IP de transporte TCP real ANTES del override.
         const tcpSourceAddress = rinfo.address;
@@ -128,6 +135,7 @@ export async function handlePacket(
         if (!rateLimiter.checkIp(tcpSourceAddress, pktType)) {
             return;
         }
+        if (binaryMediaHash && !rateLimiter.checkIdentity(rinfo.address, senderUpeerId ?? '', pktType)) return;
 
         // Input validation
         const validation = validateMessage(pktType, data as NetworkPacket);
@@ -186,6 +194,10 @@ export async function handlePacket(
         // Exclude fields not part of signature
         const fieldsToExclude = ['contactCache', 'renewalToken'];
         const dataForVerification: PacketRecord = { ...data };
+        if (binaryMediaHash) {
+            delete dataForVerification.data;
+            dataForVerification.mediaHash = binaryMediaHash;
+        }
         fieldsToExclude.forEach(field => { delete dataForVerification[field]; });
 
         const payloadForVerification: PacketRecord = { ...dataForVerification, senderUpeerId };
@@ -224,7 +236,6 @@ export async function handlePacket(
         } else if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
         }
-
         // Apply identity-based rate limiting
         if (!rateLimiter.checkIdentity(rinfo.address, upeerId, pktType)) {
             return;

@@ -74,14 +74,14 @@ describe('callSignaling (grupos)', () => {
 
     it('sendCallMedia sin relay hace fan-out a todos los miembros', () => {
         const session = callManager.createGroup(['p1', 'p2'], 'audio');
-        sendCallMedia('p1', session.callId, 'data');
+        sendCallMedia('p1', session.callId, new Uint8Array([1]));
         expect(sendMock).toHaveBeenCalledTimes(2);
     });
 
     it('sendCallMedia con relay envía solo al relay si no soy el relay', () => {
         const session = callManager.createGroup(['p1', 'p2'], 'audio');
         callManager.setRelayUpeer(session.callId, 'p1');
-        sendCallMedia('p1', session.callId, 'data');
+        sendCallMedia('p1', session.callId, new Uint8Array([1]));
         expect(sendMock).toHaveBeenCalledTimes(1);
         expect(sendMock).toHaveBeenCalledWith('1::1', expect.objectContaining({ type: 'CALL_MEDIA' }), undefined);
     });
@@ -89,7 +89,7 @@ describe('callSignaling (grupos)', () => {
     it('sendCallMedia con relay hace fan-out si soy el relay', () => {
         const session = callManager.createGroup(['p1', 'p2'], 'audio');
         callManager.setRelayUpeer(session.callId, 'me');
-        sendCallMedia('p1', session.callId, 'data');
+        sendCallMedia('p1', session.callId, new Uint8Array([1]));
         expect(sendMock).toHaveBeenCalledTimes(2);
     });
 

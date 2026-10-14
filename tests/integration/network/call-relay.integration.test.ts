@@ -56,7 +56,7 @@ describe('call relay integración (SFU distribuido)', () => {
         const relay = await signaling.recomputeRelay(session.callId);
         expect(relay).toBe('p2');
 
-        signaling.sendCallMedia('p1', session.callId, 'frame');
+        signaling.sendCallMedia('p1', session.callId, new Uint8Array([1]));
         expect(sendMock).toHaveBeenCalledTimes(1);
         expect(sendMock).toHaveBeenCalledWith('200::p2', expect.objectContaining({ type: 'CALL_MEDIA' }), expect.anything());
     });
@@ -67,7 +67,7 @@ describe('call relay integración (SFU distribuido)', () => {
         const relay = await signaling.recomputeRelay(session.callId);
         expect(relay).toBe('me');
 
-        handleCallPacket('p1', { type: 'CALL_MEDIA', callId: session.callId, data: 'frame', timestamp: Date.now() }, null);
+        handleCallPacket('p1', { type: 'CALL_MEDIA', callId: session.callId, data: new Uint8Array([1]), timestamp: Date.now() }, null);
         // Reenvía a p2, p3 y p4 (no al emisor p1 ni a mí).
         expect(sendMock).toHaveBeenCalledTimes(3);
         const targets = sendMock.mock.calls.map((c) => c[0]);
@@ -78,7 +78,7 @@ describe('call relay integración (SFU distribuido)', () => {
 
     it('sin relay electo, el grupo hace fan-out a todos los miembros', async () => {
         const session = callManager.createGroup(['p1', 'p2', 'p3'], 'audio');
-        signaling.sendCallMedia('p1', session.callId, 'frame');
+        signaling.sendCallMedia('p1', session.callId, new Uint8Array([1]));
         expect(sendMock).toHaveBeenCalledTimes(3);
     });
 });

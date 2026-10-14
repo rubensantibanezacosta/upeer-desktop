@@ -15,21 +15,17 @@ function makeCodec(overrides: Partial<MediaCodec> = {}): MediaCodec {
     };
 }
 
-function bytes(values: number[]): string {
-    let binary = '';
-    for (const value of values) {
-        binary += String.fromCharCode(value);
-    }
-    return btoa(binary);
+function bytes(values: number[]): Uint8Array {
+    return new Uint8Array(values);
 }
 
-function makeTransport(onSend: (data: string) => void): MediaTransport {
+function makeTransport(onSend: (data: Uint8Array) => void): MediaTransport {
     return { sendMedia: onSend };
 }
 
 describe('MediaPipeline', () => {
     it('envía frames codificados por el transporte cuando está habilitado', async () => {
-        const sent: string[] = [];
+        const sent: Uint8Array[] = [];
         const pipeline = new MediaPipeline(makeCodec(), makeTransport((d) => sent.push(d)));
         pipeline.setEnabled(true);
         await pipeline.pushLocalFrame('audio', 10, new Uint8Array([1, 2]));
@@ -37,7 +33,7 @@ describe('MediaPipeline', () => {
     });
 
     it('no envía nada cuando está deshabilitado', async () => {
-        const sent: string[] = [];
+        const sent: Uint8Array[] = [];
         const pipeline = new MediaPipeline(makeCodec(), makeTransport((d) => sent.push(d)));
         await pipeline.pushLocalFrame('audio', 1, new Uint8Array([1]));
         expect(sent.length).toBe(0);
@@ -58,7 +54,7 @@ describe('MediaPipeline', () => {
     });
 
     it('resetea la secuencia y el jitter buffer', async () => {
-        const sent: string[] = [];
+        const sent: Uint8Array[] = [];
         const pipeline = new MediaPipeline(makeCodec(), makeTransport((d) => sent.push(d)));
         pipeline.setEnabled(true);
         await pipeline.pushLocalFrame('audio', 1, new Uint8Array([1]));

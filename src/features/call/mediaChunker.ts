@@ -16,7 +16,7 @@ export interface MediaFrame {
 
 const HEADER_BYTES = 16;
 
-export function encodeMediaFrame(frame: MediaFrame): string {
+export function encodeMediaFrame(frame: MediaFrame): Uint8Array {
     const header = new Uint8Array(HEADER_BYTES);
     const view = new DataView(header.buffer);
     view.setUint8(0, frame.kind === 'audio' ? 0 : (frame.kind === 'screen' ? 2 : 1));
@@ -24,28 +24,18 @@ export function encodeMediaFrame(frame: MediaFrame): string {
     view.setFloat64(4, frame.ts);
     view.setUint32(12, frame.seq >>> 0);
 
-    const out = new Uint8Array(HEADER_BYTES + frame.data.length);
-    out.set(header, 0);
-    out.set(frame.data, HEADER_BYTES);
-
-    let binary = '';
-    for (let i = 0; i < out.length; i++) {
-        binary += String.fromCharCode(out[i]);
-    }
-    return btoa(binary);
+    return concatMediaBytes(header, frame.data);
 }
 
-export function decodeMediaFrame(encoded: string): MediaFrame | null {
-    let binary: string;
-    try {
-        binary = atob(encoded);
-    } catch {
-        return null;
-    }
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
+function concatMediaBytes(header: Uint8Array, data: Uint8Array): Uint8Array {
+    const out = new Uint8Array(header.length + data.length);
+    out.set(header, 0);
+    out.set(data, header.length);
+    return out;
+}
+
+export function decodeMediaFrame(encoded: Uint8Array): MediaFrame | null {
+    const bytes = encoded;
     if (bytes.length < HEADER_BYTES) {
         return null;
     }

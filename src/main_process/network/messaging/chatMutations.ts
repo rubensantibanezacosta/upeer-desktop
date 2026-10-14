@@ -25,7 +25,7 @@ type LinkPreviewPayload = Record<string, unknown>;
 type ChatContactRecord = {
     upeerId: string;
     publicKey?: string | null;
-    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected' | 'blocked';
     address?: string | null;
     knownAddresses?: string | string[] | null;
 };
@@ -79,7 +79,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         options?: { skipVault?: boolean; registerRetry?: boolean }
     ) => {
         const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
-        if (!contact || !contact.publicKey) return;
+        if (!contact || !contact.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
         const encrypted = await encryptChatPayload(targetId, payload, contact);
         const data = {
             type: 'CHAT_UPDATE',
@@ -196,6 +196,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
                 sendSecureUDPMessage(address, signedData, contact.publicKey);
             }
         }
+        if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
         import('../vault/manager.js').then(({ VaultManager }) => {
             VaultManager.replicateToVaults(targetId, signedData);
         });

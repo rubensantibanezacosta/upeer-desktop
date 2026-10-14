@@ -86,11 +86,11 @@ export function sendCallEnd(peerUpeerId: string, callId: string): void {
     send(peerUpeerId, { type: 'CALL_END', callId, timestamp: Date.now() });
 }
 
-export function sendCallMediaTo(memberUpeerId: string, callId: string, data: string, senderUpeerId?: string): void {
+export function sendCallMediaTo(memberUpeerId: string, callId: string, data: Uint8Array, senderUpeerId?: string): void {
     send(memberUpeerId, { type: 'CALL_MEDIA', callId, data, senderUpeerId, timestamp: Date.now() });
 }
 
-export function sendCallMedia(peerUpeerId: string, callId: string, data: string): void {
+export function sendCallMedia(peerUpeerId: string, callId: string, data: Uint8Array): void {
     const session = callManager.get(callId);
     if (session && session.isGroup) {
         const myId = getMyUPeerId();

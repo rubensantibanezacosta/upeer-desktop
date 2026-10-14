@@ -1,6 +1,4 @@
 import {
-    base64ToBytes,
-    bytesToBase64,
     decodeMediaFrame,
     encodeMediaFrame,
     MediaJitterBuffer,
@@ -9,15 +7,13 @@ import {
 } from './mediaChunker.js';
 
 export interface MediaCodec {
-    encode(frame: MediaFrame): Promise<string>;
+    encode(frame: MediaFrame): Promise<Uint8Array>;
     decode(kind: CallMediaKind, payload: Uint8Array): Promise<Uint8Array>;
     release(): Promise<void>;
 }
-
 export interface MediaTransport {
-    sendMedia(data: string): void;
+    sendMedia(data: Uint8Array): void;
 }
-
 export class MediaPipeline {
     private codec: MediaCodec;
     private transport: MediaTransport;
@@ -48,12 +44,11 @@ export class MediaPipeline {
         }
         const seq = this.seq++;
         const rawFrame: MediaFrame = { kind, ts, seq, data };
-        const payloadBase64 = await this.codec.encode(rawFrame);
-        const payload = base64ToBytes(payloadBase64);
+        const payload = await this.codec.encode(rawFrame);
         this.transport.sendMedia(encodeMediaFrame({ kind, ts, seq, data: payload }));
     }
 
-    receive(encodedMedia: string): Uint8Array | null {
+    receive(encodedMedia: Uint8Array): Uint8Array | null {
         const frame = decodeMediaFrame(encodedMedia);
         if (!frame) {
             return null;
@@ -74,5 +69,3 @@ export class MediaPipeline {
         this.jitter.reset();
     }
 }
-
-export { bytesToBase64 };

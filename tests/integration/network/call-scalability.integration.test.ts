@@ -57,7 +57,7 @@ describe('escalabilidad de llamadas (voz/vídeo)', () => {
             });
             const session = callManager.createGroup(members, 'audio');
             sendMock.mockClear();
-            signaling.sendCallMedia(members[0], session.callId, 'frame');
+            signaling.sendCallMedia(members[0], session.callId, new Uint8Array([1]));
             const sent = sendMock.mock.calls.length;
             expect(sent).toBe(N - 1);
             console.log(`  mesh N=${N}: ${sent} envíos por emisor`);
@@ -77,7 +77,7 @@ describe('escalabilidad de llamadas (voz/vídeo)', () => {
             const relay = members[1];
             callManager.setRelayUpeer(session.callId, relay);
             sendMock.mockClear();
-            signaling.sendCallMedia(members[0], session.callId, 'frame');
+            signaling.sendCallMedia(members[0], session.callId, new Uint8Array([1]));
             const sent = sendMock.mock.calls.length;
             expect(sent).toBe(1);
             expect(sendMock).toHaveBeenCalledWith(`200::p1`, expect.objectContaining({ type: 'CALL_MEDIA' }), expect.anything());

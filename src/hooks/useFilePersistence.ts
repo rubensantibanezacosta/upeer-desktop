@@ -25,7 +25,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault(); e.stopPropagation();
-        if (!effectiveId || (!activeGroupId && activeContact?.status !== 'connected')) return;
+        if (!effectiveId || (!activeGroupId && !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? ''))) return;
         setIsDragging(true);
     };
 
@@ -37,7 +37,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault(); e.stopPropagation();
         setIsDragging(false);
-        if (!effectiveId || (!activeGroupId && activeContact?.status !== 'connected')) return;
+        if (!effectiveId || (!activeGroupId && !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? ''))) return;
 
         const droppedFilesRaw = Array.from(e.dataTransfer.files);
         const mappedFiles = (await Promise.all(droppedFilesRaw.map(async (f: File & { path?: string }) => {

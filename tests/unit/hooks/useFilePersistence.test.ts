@@ -69,11 +69,21 @@ describe('useFilePersistence', () => {
         startTransfer.mockResolvedValue({ success: true, fileId: 'f1' });
     });
 
-    it('handleDragOver activa dragging solo con destinatario conectado', () => {
+    it('handleDragOver permite preparar archivos para un destinatario offline', () => {
+        useChatStore.setState({ contacts: [{ upeerId: 'peer-1', status: 'offline' }] as never });
         const { result } = makeHook();
         const e = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as never;
         act(() => result.current.handleDragOver(e));
         expect(mocks.setIsDragging).toHaveBeenCalledWith(true);
+    });
+
+    it('handleDragOver no permite preparar archivos para un contacto bloqueado', () => {
+        mocks.setIsDragging.mockClear();
+        useChatStore.setState({ contacts: [{ upeerId: 'peer-1', status: 'blocked' }] as never });
+        const { result } = makeHook();
+        const e = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as never;
+        act(() => result.current.handleDragOver(e));
+        expect(mocks.setIsDragging).not.toHaveBeenCalled();
     });
 
     it('handleDragLeave desactiva dragging cuando sale del contenedor', () => {

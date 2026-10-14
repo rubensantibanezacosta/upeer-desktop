@@ -22,7 +22,7 @@ type ChatContactRecord = {
     address?: string | null;
     publicKey?: string | null;
     avatar?: string | null;
-    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
+    status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected' | 'blocked';
     knownAddresses?: string | string[] | null;
 };
 
@@ -55,7 +55,7 @@ export async function sendReadReceipt(upeerId: string, id: string): Promise<void
     if (!targetId || targetId === myId) return;
 
     const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
-    if (!contact?.publicKey) return;
+    if (!contact?.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
 
     const data = {
         type: 'READ',
@@ -127,7 +127,7 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
                 for (const address of getFanOutAddresses(contact)) {
                     sendSecureUDPMessage(address, signedData, contact.publicKey);
                 }
-            } else if (contact?.publicKey) {
+            } else if (contact?.publicKey && ['offline', 'disconnected'].includes(contact.status ?? '')) {
                 import('../vault/manager.js').then(({ VaultManager }) => {
                     VaultManager.replicateToVaults(memberId, signedData);
                 });
@@ -147,7 +147,7 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
     }
 
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
-    if (!contact?.publicKey) return;
+    if (!contact?.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
     for (const address of getFanOutAddresses(contact)) {
         sendSecureUDPMessage(address, signedData, contact.publicKey);
     }

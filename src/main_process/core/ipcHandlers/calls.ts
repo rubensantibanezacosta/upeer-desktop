@@ -170,7 +170,7 @@ export function registerCallHandlers(): void {
         if (!isValidCallId(callId)) {
             return { success: false, error: 'Invalid callId' };
         }
-        if (typeof data !== 'string' || data.length === 0) {
+        if (!(data instanceof Uint8Array) || data.byteLength === 0) {
             return { success: false, error: 'Invalid data' };
         }
         const session = callManager.get(callId);

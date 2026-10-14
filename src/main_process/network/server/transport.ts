@@ -22,6 +22,7 @@ import {
     YGG_PORT,
 } from './constants.js';
 import { encodeFrame, socks5Connect } from './socks5.js';
+import { callMediaSignatureValue, encodeBinaryCallMedia, hashCallMedia } from '../binaryCallMedia.js';
 import {
     addToSendQueue,
     clearSendQueue,
@@ -212,7 +213,12 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
 
     const myId = getMyUPeerId();
     const fieldsToExclude = ['contactCache', 'renewalToken', 'signature'];
+    const binaryMedia = data.type === 'CALL_MEDIA' && data.data instanceof Uint8Array ? data.data : undefined;
     const dataForSignature = { ...data };
+    if (binaryMedia) {
+        delete dataForSignature.data;
+        dataForSignature.mediaHash = hashCallMedia(binaryMedia);
+    }
     fieldsToExclude.forEach(field => {
         if (field in dataForSignature) delete dataForSignature[field];
     });
@@ -224,9 +230,11 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
         senderYggAddress,
         isInternalSync
     };
-    const signature = sign(Buffer.from(canonicalStringify(payloadToSign)));
+    const signaturePayload = binaryMedia ? callMediaSignatureValue(payloadToSign) : canonicalStringify(payloadToSign);
+    const signature = sign(Buffer.from(signaturePayload));
     const signedInner = {
         ...data,
+        ...(binaryMedia ? { mediaHash: hashCallMedia(binaryMedia) } : {}),
         senderUpeerId: myId,
         senderYggAddress,
         isInternalSync,
@@ -234,13 +242,15 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
     };
 
     let packetToSend: TransportPacket | SignedTransportPacket;
-    if (recipientPubKeyHex && typeof data.type === 'string' && SEALED_TYPES.has(data.type)) {
+    if (recipientPubKeyHex && typeof data.type === 'string' && SEALED_TYPES.has(data.type) && !binaryMedia) {
         packetToSend = sealPacket(signedInner, recipientPubKeyHex);
     } else {
         packetToSend = signedInner as SignedTransportPacket;
     }
 
-    const rawBuf = Buffer.from(JSON.stringify(packetToSend));
+    const rawBuf = binaryMedia
+        ? encodeBinaryCallMedia(packetToSend as Record<string, unknown>, binaryMedia)
+        : Buffer.from(JSON.stringify(packetToSend));
     const framedBuf = encodeFrame(rawBuf);
 
     if (!getNetworkReady()) {

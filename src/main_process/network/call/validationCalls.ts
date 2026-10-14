@@ -44,7 +44,9 @@ export function validateCallPacket(type: string, data: Record<string, unknown>):
         return { valid: false, reason: 'invalid-kind' };
     }
     if (type === 'CALL_MEDIA') {
-        if (typeof data.data !== 'string' || data.data.length === 0 || data.data.length > MAX_MEDIA_PAYLOAD) {
+        const media = data.data;
+        const mediaBytes = media instanceof Uint8Array ? media.byteLength : typeof media === 'string' ? media.length : 0;
+        if (mediaBytes === 0 || mediaBytes > MAX_MEDIA_PAYLOAD) {
             return { valid: false, reason: 'invalid-media' };
         }
     }

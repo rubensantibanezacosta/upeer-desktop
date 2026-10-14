@@ -115,9 +115,10 @@ describe('registerCallHandlers', () => {
     it('send-call-media valida y reenvía el chunk por el canal', () => {
         const session = callManager.create('peer1', 'audio', 'outgoing');
         const handler = getHandler('send-call-media');
-        const result = handler(null, { callId: session.callId, data: 'frame-1' }) as { success: boolean };
+        const mediaData = new Uint8Array([1, 2, 3]);
+        const result = handler(null, { callId: session.callId, data: mediaData }) as { success: boolean };
         expect(result.success).toBe(true);
-        expect(signaling.sendCallMedia).toHaveBeenCalledWith('peer1', session.callId, 'frame-1');
+        expect(signaling.sendCallMedia).toHaveBeenCalledWith('peer1', session.callId, mediaData);
     });
 
     it('send-call-media rechaza payload vacío', () => {

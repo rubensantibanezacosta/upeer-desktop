@@ -97,15 +97,14 @@ export async function sendUDPMessage(
     }
 
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
-    if (!contact || !contact.publicKey) {
-        if (contact && !contact.publicKey) {
-            await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
-            const { savePendingOutboxMessage } = await import('../../storage/pending-outbox.js');
-            await savePendingOutboxMessage(upeerId, msgId, content, replyTo);
-            warn('No pubkey for contact, message queued in pending outbox', { upeerId }, 'vault');
-            return { id: msgId, savedMessage: content, timestamp: Date.now() };
-        }
-        return undefined;
+    if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return undefined;
+
+    if (!contact.publicKey) {
+        await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');
+        const { savePendingOutboxMessage } = await import('../../storage/pending-outbox.js');
+        await savePendingOutboxMessage(upeerId, msgId, content, replyTo);
+        warn('No pubkey for contact, message queued in pending outbox', { upeerId }, 'vault');
+        return { id: msgId, savedMessage: content, timestamp: Date.now() };
     }
 
     if (contact.status !== 'connected') {

@@ -1,9 +1,9 @@
-import { bytesToBase64, base64ToBytes, type CallMediaKind, type MediaFrame } from './mediaChunker.js';
+import { type CallMediaKind, type MediaFrame } from './mediaChunker.js';
 import type { MediaCodec } from './mediaPipeline.js';
 
 export class PassthroughMediaCodec implements MediaCodec {
-    async encode(frame: MediaFrame): Promise<string> {
-        return bytesToBase64(frame.data);
+    async encode(frame: MediaFrame): Promise<Uint8Array> {
+        return frame.data;
     }
 
     async decode(_kind: CallMediaKind, payload: Uint8Array): Promise<Uint8Array> {
@@ -42,14 +42,14 @@ export function isWebCodecsAvailable(): boolean {
 export class WebCodecsMediaCodec implements MediaCodec {
     private encoders: Partial<Record<CallMediaKind, WebCodecBase | null>> = {};
     private decoders: Partial<Record<CallMediaKind, WebCodecBase | null>> = {};
-    private pending: Array<(payload: string) => void> = [];
+    private pending: Array<(payload: Uint8Array) => void> = [];
 
-    async encode(frame: MediaFrame): Promise<string> {
+    async encode(frame: MediaFrame): Promise<Uint8Array> {
         const encoder = this.ensureEncoder(frame.kind);
         if (!encoder) {
-            return bytesToBase64(frame.data);
+            return frame.data;
         }
-        return new Promise<string>((resolve) => {
+        return new Promise<Uint8Array>((resolve) => {
             this.pending.push(resolve);
             encoder.encode(this.toInput(frame));
             void encoder.flush().catch(() => undefined);
@@ -89,7 +89,7 @@ export class WebCodecsMediaCodec implements MediaCodec {
                     return;
                 }
                 const bytes = this.chunkToBytes(chunk);
-                resolve(bytesToBase64(bytes));
+                resolve(bytes);
             },
             error: () => undefined,
         });
@@ -138,5 +138,3 @@ export class WebCodecsMediaCodec implements MediaCodec {
 export function createMediaCodec(): MediaCodec {
     return isWebCodecsAvailable() ? new WebCodecsMediaCodec() : new PassthroughMediaCodec();
 }
-
-export { base64ToBytes, bytesToBase64 };

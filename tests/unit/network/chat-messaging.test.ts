@@ -185,6 +185,24 @@ describe('network/messaging/chat.ts', () => {
         expect(startDhtSearch).toHaveBeenCalledWith('peer-offline', expect.any(Function));
     });
 
+    it('does not send messages to blocked contacts', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendUDPMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-blocked',
+            status: 'blocked',
+            publicKey: 'aa'.repeat(32),
+            address: '200::2',
+        } as unknown as ContactRecord);
+
+        await expect(sendUDPMessage('peer-blocked', 'no enviar')).resolves.toBeUndefined();
+        expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+        expect(VaultManager.replicateToVaults).not.toHaveBeenCalled();
+    });
+
     it('uses Double Ratchet for new offline vaulted messages when the contact already has signedPreKey', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
