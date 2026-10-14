@@ -6,6 +6,8 @@ import { WebCodecsSession, type MediaChunk } from './webCodecsSession.js';
 type ScreenCaptureOptions = { target: 'screen' | 'window'; withSystemAudio: boolean };
 export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown, peerUpeerId: string) => void;
 
+const remoteMediaDiagnostics = new Set<string>();
+
 export function useCallMedia(callId: string) {
     const call = useCallStore((state) => state.calls[callId]);
     const captureActive = call?.phase === 'negotiating' || call?.phase === 'connected';
@@ -34,16 +36,29 @@ export function useCallMedia(callId: string) {
     }, [callId]);
 
     const handleRemoteMedia = useCallback((event: { callId: string; peerUpeerId: string; senderUpeerId?: string; data: Uint8Array }) => {
-        if (event.callId !== callId) return;
+        if (event.callId !== callId) {
+            logRemoteMediaDiagnostic(`${event.callId}:call-id-mismatch`, 'Remote CALL_MEDIA does not match this call window', { expectedCallId: callId, receivedCallId: event.callId, peerUpeerId: event.peerUpeerId });
+            return;
+        }
         const frame = decodeMediaFrame(event.data);
         const session = sessionRef.current;
-        if (!frame || !session) {
+        if (!frame) {
+            logRemoteMediaDiagnostic(`${callId}:invalid-media-frame`, 'Remote CALL_MEDIA payload is not a valid media frame', { callId, peerUpeerId: event.peerUpeerId, mediaBytes: event.data.byteLength });
+            return;
+        }
+        if (!session) {
+            logRemoteMediaDiagnostic(`${callId}:decoder-session-missing`, 'Remote CALL_MEDIA received without an active decoder session', { callId, peerUpeerId: event.peerUpeerId });
             return;
         }
         const streamId = event.senderUpeerId ?? event.peerUpeerId;
+        const diagnosticKey = `${callId}:${streamId}:${frame.kind}`;
+        logRemoteMediaDiagnostic(`${diagnosticKey}:frame-received`, 'Remote CALL_MEDIA frame passed renderer parsing and was queued for decode', { callId, peerUpeerId: streamId, kind: frame.kind, mediaBytes: frame.data.byteLength, keyFrame: frame.keyFrame });
         void session.decodeChunk(frame.kind, frame.data, frame.ts, frame.keyFrame ?? true, (decoded) => {
+            logRemoteMediaDiagnostic(`${diagnosticKey}:frame-decoded`, 'Remote CALL_MEDIA frame decoded by WebCodecs', { callId, peerUpeerId: streamId, kind: frame.kind });
             onRemoteFrameRef.current?.(frame.kind, decoded, streamId);
-        }, streamId);
+        }, streamId).catch((cause: unknown) => {
+            logRemoteMediaDiagnostic(`${diagnosticKey}:decode-failed`, 'Remote CALL_MEDIA frame could not be queued for WebCodecs decode', { callId, peerUpeerId: streamId, kind: frame.kind, error: cause instanceof Error ? cause.message : String(cause) });
+        });
     }, [callId]);
 
     useEffect(() => {
@@ -184,4 +199,10 @@ export function useCallMedia(callId: string) {
         setAudioEnabled,
         enabled: call?.phase === 'connected',
     };
+}
+
+function logRemoteMediaDiagnostic(key: string, message: string, details: Record<string, unknown>): void {
+    if (remoteMediaDiagnostics.has(key)) return;
+    remoteMediaDiagnostics.add(key);
+    console.info(`[call] ${message}`, details);
 }

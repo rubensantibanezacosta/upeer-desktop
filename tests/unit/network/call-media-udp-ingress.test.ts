@@ -42,7 +42,7 @@ vi.mock('node:dgram', () => ({
     },
 }));
 
-vi.mock('../../../src/main_process/security/secure-logger.js', () => ({ error: vi.fn(), warn: vi.fn() }));
+vi.mock('../../../src/main_process/security/secure-logger.js', () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }));
 vi.mock('../../../src/main_process/security/identity.js', () => ({ getMyUPeerId: vi.fn(() => 'local-peer') }));
 vi.mock('../../../src/main_process/network/handlers.js', () => ({ queryOwnVaultsOnReconnect: vi.fn() }));
 vi.mock('../../../src/main_process/network/server/mediaWorker.js', () => ({

@@ -24,6 +24,7 @@ const workerScope = self as unknown as WorkerScope;
 const encoders = new Map<CallMediaKind, VideoEncoder | AudioEncoder>();
 const decoders = new Map<string, VideoDecoder | AudioDecoder>();
 const decodedFrameQueues = new Map<string, Array<{ kind: CallMediaKind; streamId: string }>>();
+const decoderDiagnostics = new Set<string>();
 
 function reportError(operation: string, cause: unknown): void {
     workerScope.postMessage({ type: 'error', operation, message: cause instanceof Error ? cause.message : String(cause) });
@@ -69,17 +70,20 @@ function decode(request: Extract<WorkerRequest, { type: 'decode' }>): void {
     const decoderKey = `${request.kind}:${request.streamId}`;
     let decoder = decoders.get(decoderKey);
     if (!decoder) {
+        reportDecodeDiagnostic(`${decoderKey}:created`, 'Remote media decoder created', { kind: request.kind, streamId: request.streamId });
         const output = (frame: VideoFrame | AudioData) => {
             const metadata = decodedFrameQueues.get(decoderKey)?.shift();
             if (!metadata) {
+                reportDecodeDiagnostic(`${decoderKey}:output-without-request`, 'WebCodecs emitted a remote frame without matching decode metadata', { decoderKey });
                 frame.close();
                 return;
             }
+            reportDecodeDiagnostic(`${decoderKey}:output`, 'WebCodecs emitted a decoded remote frame', { kind: metadata.kind, streamId: metadata.streamId });
             workerScope.postMessage({ type: 'decoded', ...metadata, frame }, [frame]);
         };
         decoder = request.kind === 'audio'
-            ? new AudioDecoder({ output, error: (cause) => reportError('audio decode', cause) })
-            : new VideoDecoder({ output, error: (cause) => reportError('video decode', cause) });
+            ? new AudioDecoder({ output, error: (cause) => { reportError('audio decode', cause); reportDecodeDiagnostic(`${decoderKey}:error`, 'WebCodecs remote audio decoder error', { streamId: request.streamId, error: cause.message }); } })
+            : new VideoDecoder({ output, error: (cause) => { reportError('video decode', cause); reportDecodeDiagnostic(`${decoderKey}:error`, 'WebCodecs remote video decoder error', { streamId: request.streamId, error: cause.message }); } });
         if (request.kind === 'audio') {
             (decoder as AudioDecoder).configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 1 });
         } else {
@@ -94,6 +98,13 @@ function decode(request: Extract<WorkerRequest, { type: 'decode' }>): void {
         ? new EncodedAudioChunk({ type: 'key', timestamp: request.timestamp, data: request.bytes })
         : new EncodedVideoChunk({ type: request.keyFrame ? 'key' : 'delta', timestamp: request.timestamp, data: request.bytes });
     decoder.decode(chunk);
+    reportDecodeDiagnostic(`${decoderKey}:queued`, 'Encoded remote media chunk queued in WebCodecs', { kind: request.kind, streamId: request.streamId, keyFrame: request.keyFrame, bytes: request.bytes.byteLength, decoderState: decoder.state });
+}
+
+function reportDecodeDiagnostic(key: string, message: string, details: Record<string, unknown>): void {
+    if (decoderDiagnostics.has(key)) return;
+    decoderDiagnostics.add(key);
+    workerScope.postMessage({ type: 'diagnostic', message, details });
 }
 
 function release(): void {
@@ -104,6 +115,7 @@ function release(): void {
     decoders.forEach((decoder) => decoder.close());
     decoders.clear();
     decodedFrameQueues.clear();
+    decoderDiagnostics.clear();
 }
 
 workerScope.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {

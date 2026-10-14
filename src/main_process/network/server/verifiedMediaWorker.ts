@@ -12,6 +12,7 @@ type ParentConnectRequest = { data: { type: 'connect' }; ports: MessagePortMain[
 
 let mediaPort: MessagePortMain | null = null;
 const contactKeys = new Map<string, string>();
+const reportedDiagnostics = new Set<string>();
 let contactsReady = false;
 
 const parentPort = (process as NodeJS.Process & { parentPort?: ParentPort }).parentPort;
@@ -33,27 +34,45 @@ parentPort?.on('message', (event: ParentConnectRequest) => {
 
 function verifyPacket(request: PacketRequest): void {
     const port = mediaPort;
-    if (!port || request.packet.byteLength > 600_000) return;
+    if (!port) return;
+    if (request.packet.byteLength > 600_000) {
+        reportDiagnostic('packet-too-large', request);
+        return;
+    }
     let packet: Record<string, unknown> | null;
     try {
         packet = decodeBinaryCallMedia(Buffer.from(request.packet));
-    } catch {
+    } catch (cause) {
+        reportDiagnostic('binary-decode-error', request, { error: cause instanceof Error ? cause.message : String(cause) });
         return;
     }
-    if (!packet || packet.type !== 'CALL_MEDIA') return;
+    if (!packet || packet.type !== 'CALL_MEDIA') {
+        reportDiagnostic('invalid-binary-media-packet', request, { packetDecoded: Boolean(packet), packetType: packet?.type ?? null });
+        return;
+    }
     const senderUpeerId = typeof packet.senderUpeerId === 'string' ? packet.senderUpeerId : '';
     const senderYggAddress = typeof packet.senderYggAddress === 'string' ? packet.senderYggAddress : '';
     const signature = typeof packet.signature === 'string' ? packet.signature : '';
     const callId = typeof packet.callId === 'string' ? packet.callId : '';
-    if (!senderUpeerId || !callId || !isYggdrasilAddress(senderYggAddress) || (request.sourceAddress && !sameIPv6Address(senderYggAddress, request.sourceAddress)) || !/^[0-9a-f]{128}$/i.test(signature)) return;
+    if (!senderUpeerId || !callId || !isYggdrasilAddress(senderYggAddress) || (request.sourceAddress && !sameIPv6Address(senderYggAddress, request.sourceAddress)) || !/^[0-9a-f]{128}$/i.test(signature)) {
+        reportDiagnostic('invalid-sender-metadata', request, { senderPresent: Boolean(senderUpeerId), callIdPresent: Boolean(callId), yggAddressValid: isYggdrasilAddress(senderYggAddress), addressMatches: !request.sourceAddress || sameIPv6Address(senderYggAddress, request.sourceAddress), signatureValid: /^[0-9a-f]{128}$/i.test(signature) });
+        return;
+    }
     const publicKey = contactKeys.get(senderUpeerId);
-    if (!publicKey || !contactsReady) return;
+    if (!contactsReady || !publicKey) {
+        reportDiagnostic(!contactsReady ? 'contacts-not-ready' : 'sender-key-not-found', request, { senderUpeerId });
+        return;
+    }
     const signedPacket: Record<string, unknown> = { ...packet, senderUpeerId, senderYggAddress };
     delete signedPacket.signature;
     delete signedPacket.data;
     const verified = verify(Buffer.from(canonicalStringify(signedPacket)), Buffer.from(signature, 'hex'), Buffer.from(publicKey, 'hex'));
-    if (!verified) return;
+    if (!verified) {
+        reportDiagnostic('signature-invalid', request, { senderUpeerId, callId });
+        return;
+    }
     const media = Uint8Array.from(packet.data as Uint8Array);
+    reportDiagnostic('signature-verified', request, { senderUpeerId, callId, mediaBytes: media.byteLength });
     port.postMessage({
         type: 'verified-media',
         senderUpeerId,
@@ -62,4 +81,11 @@ function verifyPacket(request: PacketRequest): void {
         media: Uint8Array.from(media),
         timestamp: packet.timestamp,
     });
+}
+
+function reportDiagnostic(reason: string, request: PacketRequest, details: Record<string, unknown> = {}): void {
+    const key = `${reason}:${details.senderUpeerId ?? ''}:${details.callId ?? ''}`;
+    if (reportedDiagnostics.has(key)) return;
+    reportedDiagnostics.add(key);
+    mediaPort?.postMessage({ type: 'diagnostic', stage: 'verification', reason, packetBytes: request.packet.byteLength, ...details });
 }

@@ -36,6 +36,8 @@ const shareOptionSx = {
     '&:hover': { backgroundColor: 'rgba(255,255,255,0.12)' },
 };
 
+const remoteCanvasDiagnostics = new Set<string>();
+
 function formatDuration(totalSeconds: number): string {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -105,10 +107,12 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             : isGroup ? peerCanvasRefs.current.get(peerUpeerId) : remoteCanvasRef.current;
         const width = frame.displayWidth;
         const height = frame.displayHeight;
+        const targetContext = target?.getContext('2d');
+        logRemoteCanvasOnce(`${call.callId ?? 'unknown'}:${peerUpeerId}:${kind}`, 'Remote video frame reached canvas drawing', { callId: call.callId, peerUpeerId, kind, width, height, canvasMounted: Boolean(target), contextAvailable: Boolean(targetContext) });
         if (target) {
             if (target.width !== width) target.width = width;
             if (target.height !== height) target.height = height;
-            target.getContext('2d')?.drawImage(frame, 0, 0, width, height);
+            targetContext?.drawImage(frame, 0, 0, width, height);
         } else {
             const sourceCanvas = kind === 'screen'
                 ? screenCanvasSourceRef.current ?? document.createElement('canvas')
@@ -125,7 +129,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             setRemoteScreen(peerUpeerId);
         }
         frame.close();
-    }, [isGroup]);
+    }, [call.callId, isGroup]);
 
     const playRemoteAudio = useCallback((audioData: AudioData) => {
         const context = audioContextRef.current ?? new AudioContext();
@@ -376,3 +380,9 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         </Box>
     );
 };
+
+function logRemoteCanvasOnce(key: string, message: string, details: Record<string, unknown>): void {
+    if (remoteCanvasDiagnostics.has(key)) return;
+    remoteCanvasDiagnostics.add(key);
+    console.info(`[call] ${message}`, details);
+}

@@ -6,6 +6,7 @@ type WorkerMessage =
     | { type: 'ready' }
     | { type: 'chunk'; kind: CallMediaKind; bytes: ArrayBuffer; timestamp: number; keyFrame: boolean }
     | { type: 'decoded'; kind: CallMediaKind; streamId: string; frame: VideoFrame | AudioData }
+    | { type: 'diagnostic'; message: string; details: Record<string, unknown> }
     | { type: 'error'; operation: string; message: string };
 
 type WorkerLike = Pick<Worker, 'addEventListener' | 'removeEventListener' | 'postMessage' | 'terminate'>;
@@ -52,6 +53,8 @@ export class WebCodecsSession {
                 else message.frame.close();
             } else if (message.type === 'error') {
                 console.error(`Call media worker ${message.operation} failed: ${message.message}`);
+            } else if (message.type === 'diagnostic') {
+                console.info(`[call] ${message.message}`, message.details);
             }
         });
     }

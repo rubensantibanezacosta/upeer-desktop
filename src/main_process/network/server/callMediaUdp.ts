@@ -1,6 +1,6 @@
 import { createSocket } from 'node:dgram';
 import type { BrowserWindow } from 'electron';
-import { error, warn } from '../../security/secure-logger.js';
+import { error, info, warn } from '../../security/secure-logger.js';
 import { isBinaryCallMedia } from '../binaryCallMedia.js';
 import { isYggdrasilAddress } from '../utils.js';
 import { createMediaVerificationWorker } from './mediaWorker.js';
@@ -24,6 +24,8 @@ let contactRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let presenceFlushTimer: ReturnType<typeof setInterval> | null = null;
 const verifiedPeers = new Set<string>();
 const pendingPresencePeers = new Set<string>();
+const mediaStageLogged = new Set<string>();
+let firstMediaDatagramLogged = false;
 
 export function startCallMediaUdpServer(win: BrowserWindow, listenPort = CALL_MEDIA_UDP_PORT): void {
     setCallMediaUdpPort(listenPort);
@@ -35,8 +37,19 @@ export function startCallMediaUdpServer(win: BrowserWindow, listenPort = CALL_ME
     const server = createSocket('udp4');
     server.on('message', (packet) => {
         const completePacket = reassembleCallMediaDatagram(packet);
-        if (!completePacket || completePacket.length > 600_000 || !isBinaryCallMedia(completePacket)) return;
-        if (!workerPort) return;
+        if (!completePacket) return;
+        if (completePacket.length > 600_000 || !isBinaryCallMedia(completePacket)) {
+            logMediaStageOnce('invalid-datagram', 'CALL_MEDIA UDP datagram rejected before verification', { datagramBytes: packet.length, packetBytes: completePacket.length, binaryMedia: isBinaryCallMedia(completePacket) });
+            return;
+        }
+        if (!workerPort) {
+            logMediaStageOnce('worker-unavailable', 'CALL_MEDIA UDP datagram received but verifier worker is unavailable', { packetBytes: completePacket.length });
+            return;
+        }
+        if (!firstMediaDatagramLogged) {
+            firstMediaDatagramLogged = true;
+            info('CALL_MEDIA UDP datagram reassembled and forwarded to verifier', { packetBytes: completePacket.length }, 'call');
+        }
         try {
             workerPort.postMessage({ type: 'packet', packet: Uint8Array.from(completePacket), listenPort, sourceAddress: '' });
         } catch (cause) {
@@ -77,12 +90,17 @@ export function closeCallMediaUdpServer(): void {
     worker = null;
     verifiedPeers.clear();
     pendingPresencePeers.clear();
+    mediaStageLogged.clear();
+    firstMediaDatagramLogged = false;
     clearCallMediaAssemblies();
 }
 
 export function sendCallMediaDatagram(address: string, packet: Buffer, onError?: () => void): boolean {
     let association = getSocks5UdpAssociation();
-    if (!getCallMediaUdpServer() || !association) return false;
+    if (!getCallMediaUdpServer() || !association) {
+        logMediaStageOnce('outbound-unavailable', 'CALL_MEDIA UDP send blocked because listener or SOCKS5 UDP association is unavailable', { listenerReady: Boolean(getCallMediaUdpServer()), associationReady: Boolean(association), packetBytes: packet.length });
+        return false;
+    }
     if (!association.isOpen()) {
         association.close();
         setSocks5UdpAssociation(null);
@@ -92,6 +110,10 @@ export function sendCallMediaDatagram(address: string, packet: Buffer, onError?:
     }
     try {
         const fragments = fragmentCallMediaPacket(packet, CALL_MEDIA_UDP_MAX_BYTES);
+        if (!mediaStageLogged.has('outbound-sent')) {
+            mediaStageLogged.add('outbound-sent');
+            info('CALL_MEDIA UDP fragments submitted to SOCKS5 relay', { packetBytes: packet.length, fragmentCount: fragments.length }, 'call');
+        }
         let accepted = true;
         for (const fragment of fragments) {
             const sent = association.send(address, getCallMediaUdpPort(), fragment, (cause) => {
@@ -118,8 +140,16 @@ function startMediaWorker(win: BrowserWindow): void {
     worker = mediaWorker.worker;
     workerPort = mediaWorker.port;
     workerPort.on('message', ({ data }: { data: { type: string; senderUpeerId: string; senderYggAddress?: string; callId?: string; media?: ArrayBuffer; timestamp?: number } }) => {
+        if (data.type === 'diagnostic') {
+            const { stage, reason, ...details } = data as unknown as { stage: string; reason: string; [key: string]: unknown };
+            const senderUpeerId = typeof details.senderUpeerId === 'string' ? details.senderUpeerId : '';
+            const callId = typeof details.callId === 'string' ? details.callId : '';
+            logMediaStageOnce(`${stage}:${reason}:${senderUpeerId}:${callId}`, `CALL_MEDIA ${stage} diagnostic: ${reason}`, details);
+            return;
+        }
         if (data.type !== 'verified-media' || !data.callId || !data.media) return;
         const media = new Uint8Array(data.media);
+        logMediaStageOnce(`ipc:${data.senderUpeerId}:${data.callId}`, 'CALL_MEDIA verified and delivered to renderer IPC', { senderUpeerId: data.senderUpeerId, callId: data.callId, mediaBytes: media.byteLength });
         if (!verifiedPeers.has(data.senderUpeerId)) {
             verifiedPeers.add(data.senderUpeerId);
             pendingPresencePeers.add(data.senderUpeerId);
@@ -161,6 +191,12 @@ function startMediaWorker(win: BrowserWindow): void {
     contactRefreshTimer.unref();
     presenceFlushTimer = setInterval(persistVerifiedPeerPresence, 60_000);
     presenceFlushTimer.unref();
+}
+
+function logMediaStageOnce(key: string, message: string, details: Record<string, unknown>): void {
+    if (mediaStageLogged.has(key)) return;
+    mediaStageLogged.add(key);
+    info(message, details, 'call');
 }
 
 function persistVerifiedPeerPresence(): void {

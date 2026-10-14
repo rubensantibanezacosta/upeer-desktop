@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { CALL_MEDIA_UDP_MAX_BYTES } from './constants.js';
 
 const FRAGMENT_MAGIC = Buffer.from([0x55, 0x43, 0x46, 0x31]);
 const FRAGMENT_HEADER_BYTES = 28;
@@ -7,7 +6,8 @@ const MAX_ASSEMBLIES = 64;
 const ASSEMBLY_TTL_MS = 5000;
 const MAX_FRAGMENT_COUNT = 512;
 const MAX_PACKET_BYTES = 600_000;
-const MAX_FRAGMENT_PAYLOAD_BYTES = CALL_MEDIA_UDP_MAX_BYTES - FRAGMENT_HEADER_BYTES;
+const MAX_DATAGRAM_BYTES = 1200;
+const MAX_FRAGMENT_PAYLOAD_BYTES = MAX_DATAGRAM_BYTES - FRAGMENT_HEADER_BYTES;
 
 type Assembly = {
     count: number;
@@ -19,8 +19,8 @@ type Assembly = {
 
 const assemblies = new Map<string, Assembly>();
 
-export function fragmentCallMediaPacket(packet: Buffer, maxDatagramBytes = CALL_MEDIA_UDP_MAX_BYTES): Buffer[] {
-    if (maxDatagramBytes > CALL_MEDIA_UDP_MAX_BYTES) throw new Error('CALL_MEDIA UDP fragment exceeds the configured datagram size');
+export function fragmentCallMediaPacket(packet: Buffer, maxDatagramBytes = MAX_DATAGRAM_BYTES): Buffer[] {
+    if (maxDatagramBytes > MAX_DATAGRAM_BYTES) throw new Error('CALL_MEDIA UDP fragment exceeds the configured datagram size');
     if (packet.length <= maxDatagramBytes) return [packet];
     const payloadBytes = maxDatagramBytes - FRAGMENT_HEADER_BYTES;
     const count = Math.ceil(packet.length / payloadBytes);
