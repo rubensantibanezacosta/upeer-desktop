@@ -11,7 +11,7 @@ type CodecFrame = {
 };
 
 type WorkerRequest =
-    | { type: 'start-capture'; kind: CallMediaKind; track: MediaStreamTrack }
+    | { type: 'encode-frame'; kind: CallMediaKind; frame: VideoFrame | AudioData }
     | { type: 'decode'; kind: CallMediaKind; bytes: ArrayBuffer; timestamp: number; keyFrame: boolean; streamId: string }
     | { type: 'release' };
 
@@ -22,10 +22,8 @@ type WorkerScope = {
 
 const workerScope = self as unknown as WorkerScope;
 const encoders = new Map<CallMediaKind, VideoEncoder | AudioEncoder>();
-const readers = new Map<CallMediaKind, ReadableStreamDefaultReader<VideoFrame | AudioData>>();
 const decoders = new Map<string, VideoDecoder | AudioDecoder>();
 const decodedFrameQueues = new Map<string, Array<{ kind: CallMediaKind; streamId: string }>>();
-let active = true;
 
 function reportError(operation: string, cause: unknown): void {
     workerScope.postMessage({ type: 'error', operation, message: cause instanceof Error ? cause.message : String(cause) });
@@ -52,34 +50,18 @@ function getEncoder(kind: CallMediaKind, frame: CodecFrame): VideoEncoder | Audi
     return encoder;
 }
 
-async function capture(track: MediaStreamTrack, kind: CallMediaKind): Promise<void> {
-    let reader: ReadableStreamDefaultReader<VideoFrame | AudioData> | null = null;
+function encodeFrame(frame: VideoFrame | AudioData, kind: CallMediaKind): void {
     try {
-        const Processor = (globalThis as unknown as { MediaStreamTrackProcessor?: new (options: { track: MediaStreamTrack }) => { readable: ReadableStream<VideoFrame | AudioData> } }).MediaStreamTrackProcessor;
-        if (!Processor) throw new Error('MediaStreamTrackProcessor is unavailable in the media worker');
-        const processor = new Processor({ track });
-        reader = processor.readable.getReader();
-        readers.set(kind, reader);
-        while (active) {
-            const { value, done } = await reader.read();
-            if (done || !value) break;
-            const frame = value as CodecFrame;
-            try {
-                const encoder = getEncoder(kind, frame);
-                if (kind !== 'audio' && encoder.encodeQueueSize > 1) {
-                    continue;
-                }
-                const requestKeyFrame = kind !== 'audio' && encoder.encodeQueueSize === 0;
-                if (kind === 'audio') (encoder as AudioEncoder).encode(value as AudioData);
-                else (encoder as VideoEncoder).encode(value as VideoFrame, requestKeyFrame ? { keyFrame: true } : undefined);
-            } finally {
-                frame.close?.();
-            }
-        }
+        const codecFrame = frame as CodecFrame;
+        const encoder = getEncoder(kind, codecFrame);
+        if (kind !== 'audio' && encoder.encodeQueueSize > 1) return;
+        const requestKeyFrame = kind !== 'audio' && encoder.encodeQueueSize === 0;
+        if (kind === 'audio') (encoder as AudioEncoder).encode(frame as AudioData);
+        else (encoder as VideoEncoder).encode(frame as VideoFrame, requestKeyFrame ? { keyFrame: true } : undefined);
     } catch (cause) {
-        if (active) reportError(`capture ${kind}`, cause);
+        reportError(`encode ${kind}`, cause);
     } finally {
-        if (readers.get(kind) === reader) readers.delete(kind);
+        frame.close();
     }
 }
 
@@ -115,10 +97,9 @@ function decode(request: Extract<WorkerRequest, { type: 'decode' }>): void {
 }
 
 function release(): void {
-    active = false;
-    readers.forEach((reader) => void reader.cancel().catch((cause) => reportError('cancel capture', cause)));
-    readers.clear();
-    encoders.forEach((encoder) => encoder.close());
+    encoders.forEach((encoder) => {
+        if (encoder.state !== 'closed') encoder.close();
+    });
     encoders.clear();
     decoders.forEach((decoder) => decoder.close());
     decoders.clear();
@@ -131,8 +112,8 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerRequest>) => 
         release();
         return;
     }
-    if (request.type === 'start-capture') {
-        void capture(request.track, request.kind);
+    if (request.type === 'encode-frame') {
+        encodeFrame(request.frame, request.kind);
         return;
     }
     try {

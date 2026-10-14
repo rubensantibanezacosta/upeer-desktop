@@ -39,19 +39,34 @@ describe('WebCodecsSession worker bridge', () => {
         expect(worker.terminated).toBe(true);
     });
 
-    it('transfiere track clonado para captura sin invalidar stream local', async () => {
+    it('procesa track en el renderer y transfiere frames codificables al worker', async () => {
         const worker = new MockWorker();
+        const frame = { close: vi.fn() } as unknown as VideoFrame;
         const trackClone = { stop: vi.fn() } as unknown as MediaStreamTrack;
         const track = { clone: vi.fn(() => trackClone) } as unknown as MediaStreamTrack;
-        const stream = { getAudioTracks: () => [track] } as unknown as MediaStream;
+        const reader = {
+            read: vi.fn()
+                .mockResolvedValueOnce({ value: frame, done: false })
+                .mockResolvedValueOnce({ value: undefined, done: true }),
+            cancel: vi.fn().mockResolvedValue(undefined),
+        };
+        vi.stubGlobal('MediaStreamTrackProcessor', class {
+            readable = { getReader: () => reader };
+            constructor(options: { track: MediaStreamTrack }) {
+                expect(options.track).toBe(trackClone);
+            }
+        });
+        const stream = { getVideoTracks: () => [track] } as unknown as MediaStream;
         const session = new WebCodecsSession(() => worker as unknown as Worker);
         worker.emit({ type: 'ready' });
 
-        await session.startCapture(stream, 'audio', vi.fn());
+        await session.startCapture(stream, 'video', vi.fn());
+        await vi.waitFor(() => expect(worker.messages).toHaveLength(1));
 
         expect(track.clone).toHaveBeenCalledOnce();
-        expect(worker.messages[0]?.message).toMatchObject({ type: 'start-capture', kind: 'audio', track: trackClone });
-        expect(worker.messages[0]?.transfer).toEqual([trackClone]);
+        expect(worker.messages[0]?.message).toMatchObject({ type: 'encode-frame', kind: 'video', frame });
+        expect(worker.messages[0]?.transfer).toEqual([frame]);
         await session.release();
+        vi.unstubAllGlobals();
     });
 });
