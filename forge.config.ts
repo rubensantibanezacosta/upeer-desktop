@@ -107,15 +107,16 @@ const config: ForgeConfig = {
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
+        {
+          entry: 'src/main_process/network/server/verifiedMediaWorker.ts',
+          config: 'vite.media-worker.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
-        },
-        {
-          name: 'verified_media_worker',
-          config: 'vite.media-worker.config.ts',
         },
       ],
     }),
