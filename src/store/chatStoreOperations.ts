@@ -1,7 +1,6 @@
 import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import type { LinkPreview } from '../types/chat.js';
-import crypto from 'node:crypto';
 
 export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
     handleTyping: () => {
@@ -65,7 +64,7 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
             await get().handleSendGroupMessage(message, linkPreview);
             return;
         }
-        const messageId = crypto.randomUUID();
+        const messageId = window.crypto.randomUUID();
         const timestamp = Date.now();
         set((state) => ({
             chatHistory: state.targetUpeerId === targetUpeerId
