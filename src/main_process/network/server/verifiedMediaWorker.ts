@@ -20,13 +20,16 @@ const parentPort = (process as NodeJS.Process & { parentPort?: ParentPort }).par
 parentPort?.on('message', (event: ParentConnectRequest) => {
     if (event.data.type !== 'connect') return;
     mediaPort = event.ports[0] ?? null;
+    mediaPort?.postMessage({ type: 'worker-status', status: mediaPort ? 'connected' : 'connection-port-missing' });
     mediaPort?.on('message', ({ data }: { data: WorkerRequest }) => {
         if (data.type === 'contacts') {
             contactKeys.clear();
             data.contacts.forEach(({ upeerId, publicKey }) => contactKeys.set(upeerId, publicKey));
             contactsReady = true;
+            mediaPort?.postMessage({ type: 'worker-status', status: 'contacts-loaded', contactCount: contactKeys.size });
             return;
         }
+        reportDiagnostic('packet-received-by-worker', data);
         verifyPacket(data);
     });
     mediaPort?.start();

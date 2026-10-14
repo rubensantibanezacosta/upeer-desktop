@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     associationReceiver: null as ((packet: Buffer, address: string, port: number) => void) | null,
     association: null as { isOpen: () => boolean; close: () => void; send: () => boolean } | null,
     port: null as MockPort | null,
-    worker: null as { postMessage: ReturnType<typeof vi.fn>; kill: ReturnType<typeof vi.fn> } | null,
+    worker: null as EventEmitter & { postMessage: ReturnType<typeof vi.fn>; kill: ReturnType<typeof vi.fn> } | null,
     datagramPort: 0,
 }));
 
@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
     },
     utilityProcess: {
         fork: vi.fn(() => {
-            mocks.worker = { postMessage: vi.fn(), kill: vi.fn() };
+            mocks.worker = Object.assign(new EventEmitter(), { postMessage: vi.fn(), kill: vi.fn() });
             return mocks.worker;
         }),
     },

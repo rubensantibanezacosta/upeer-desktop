@@ -139,12 +139,23 @@ function startMediaWorker(win: BrowserWindow): void {
     const mediaWorker = createMediaVerificationWorker();
     worker = mediaWorker.worker;
     workerPort = mediaWorker.port;
+    worker.on?.('error', (cause) => {
+        error('CALL_MEDIA verifier utility process error', cause, 'call');
+    });
+    worker.on?.('exit', (code) => {
+        error('CALL_MEDIA verifier utility process exited', { exitCode: code }, 'call');
+    });
     workerPort.on('message', ({ data }: { data: { type: string; senderUpeerId: string; senderYggAddress?: string; callId?: string; media?: ArrayBuffer; timestamp?: number } }) => {
         if (data.type === 'diagnostic') {
             const { stage, reason, ...details } = data as unknown as { stage: string; reason: string; [key: string]: unknown };
             const senderUpeerId = typeof details.senderUpeerId === 'string' ? details.senderUpeerId : '';
             const callId = typeof details.callId === 'string' ? details.callId : '';
             logMediaStageOnce(`${stage}:${reason}:${senderUpeerId}:${callId}`, `CALL_MEDIA ${stage} diagnostic: ${reason}`, details);
+            return;
+        }
+        if (data.type === 'worker-status') {
+            const status = data as unknown as { status: string; contactCount?: number };
+            logMediaStageOnce(`worker-status:${status.status}`, `CALL_MEDIA verifier worker status: ${status.status}`, { contactCount: status.contactCount });
             return;
         }
         if (data.type !== 'verified-media' || !data.callId || !data.media) return;
@@ -178,9 +189,14 @@ function startMediaWorker(win: BrowserWindow): void {
     const refreshContacts = () => {
         if (!workerPort) return;
         try {
+            const contacts = getContacts().map(({ upeerId, publicKey }) => ({ upeerId, publicKey }));
+            if (!mediaStageLogged.has('contacts-sent')) {
+                mediaStageLogged.add('contacts-sent');
+                info('CALL_MEDIA contact keys sent to verifier worker', { contactCount: contacts.length }, 'call');
+            }
             workerPort.postMessage({
                 type: 'contacts',
-                contacts: getContacts().map(({ upeerId, publicKey }) => ({ upeerId, publicKey })),
+                contacts,
             });
         } catch (cause) {
             warn('Unable to refresh media verification contacts', cause, 'call');
