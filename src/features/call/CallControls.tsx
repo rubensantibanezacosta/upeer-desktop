@@ -9,12 +9,13 @@ import CallEndIcon from '@mui/icons-material/CallEnd';
 interface CallControlsProps {
     muted: boolean;
     cameraEnabled: boolean;
+    showCamera?: boolean;
     onToggleMute: () => void;
     onToggleCamera: () => void;
     onEnd: () => void;
 }
 
-export const CallControls: React.FC<CallControlsProps> = ({ muted, cameraEnabled, onToggleMute, onToggleCamera, onEnd }) => (
+export const CallControls: React.FC<CallControlsProps> = ({ muted, cameraEnabled, showCamera = true, onToggleMute, onToggleCamera, onEnd }) => (
     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', justifyContent: 'center' }}>
         <Tooltip title={muted ? 'Activar micrófono' : 'Silenciar micrófono'} variant="soft">
             <IconButton aria-label="Silenciar micrófono" onClick={onToggleMute} color={muted ? 'danger' : 'neutral'} variant="soft" sx={{ width: 52, height: 52 }}>
@@ -26,10 +27,12 @@ export const CallControls: React.FC<CallControlsProps> = ({ muted, cameraEnabled
                 <CallEndIcon />
             </IconButton>
         </Tooltip>
-        <Tooltip title={cameraEnabled ? 'Apagar cámara' : 'Encender cámara'} variant="soft">
-            <IconButton aria-label="Alternar cámara" onClick={onToggleCamera} color={cameraEnabled ? 'neutral' : 'danger'} variant="soft" sx={{ width: 52, height: 52 }}>
-                {cameraEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
-            </IconButton>
-        </Tooltip>
+        {showCamera && (
+            <Tooltip title={cameraEnabled ? 'Apagar cámara' : 'Encender cámara'} variant="soft">
+                <IconButton aria-label="Alternar cámara" onClick={onToggleCamera} color={cameraEnabled ? 'neutral' : 'danger'} variant="soft" sx={{ width: 52, height: 52 }}>
+                    {cameraEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
+                </IconButton>
+            </Tooltip>
+        )}
     </Box>
 );

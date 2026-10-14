@@ -165,20 +165,19 @@ export function registerCallHandlers(): void {
         };
     });
 
-    ipcMain.handle('send-call-media', (event, { callId, data }) => {
+    ipcMain.on('send-call-media', (event, { callId, data }) => {
         captureRenderer(event);
         if (!isValidCallId(callId)) {
-            return { success: false, error: 'Invalid callId' };
+            return;
         }
         if (!(data instanceof Uint8Array) || data.byteLength === 0) {
-            return { success: false, error: 'Invalid data' };
+            return;
         }
         const session = callManager.get(callId);
         if (!session) {
-            return { success: false, error: 'Call not found' };
+            return;
         }
         sendCallMedia(session.peerUpeerId, callId, data);
-        return { success: true };
     });
 
     ipcMain.handle('send-call-sdp', (event, { callId, peerUpeerId, sdp }) => {

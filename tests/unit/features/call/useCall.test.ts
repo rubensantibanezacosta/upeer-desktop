@@ -6,11 +6,13 @@ import { useCallStore } from '../../../../src/features/call/useCallStore.js';
 let incomingCallback: ((data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[] }) => void) | undefined;
 let memberJoinedCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 let memberLeftCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
+let mediaUpdateCallback: ((data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) | undefined;
 
 function installBridge(overrides: Record<string, unknown> = {}) {
     incomingCallback = undefined;
     memberJoinedCallback = undefined;
     memberLeftCallback = undefined;
+    mediaUpdateCallback = undefined;
     (globalThis as unknown as { window: unknown }).window = {
         upeer: {
             startCall: vi.fn(async () => ({ success: true, callId: 'c1' })),
@@ -26,7 +28,10 @@ function installBridge(overrides: Record<string, unknown> = {}) {
             }),
             onCallAccepted: vi.fn(() => () => undefined),
             onCallEnded: vi.fn(() => () => undefined),
-            onCallMediaUpdate: vi.fn(() => () => undefined),
+            onCallMediaUpdate: vi.fn((cb: typeof mediaUpdateCallback) => {
+                mediaUpdateCallback = cb;
+                return () => undefined;
+            }),
             onCallMemberJoined: vi.fn((cb: typeof memberJoinedCallback) => {
                 memberJoinedCallback = cb;
                 return () => undefined;
@@ -103,5 +108,12 @@ describe('useCall', () => {
             memberLeftCallback?.({ callId: 'g1', peerUpeerId: 'peerB' });
         });
         expect(result.current.activeCalls[0]?.groupMembers).not.toContain('peerB');
+    });
+
+    it('refleja los cambios remotos de mute y cámara en la UI', () => {
+        const { result } = renderHook(() => useCall());
+        fireIncoming({ callId: 'media-1', peerUpeerId: 'peer9', kind: 'video' });
+        act(() => mediaUpdateCallback?.({ callId: 'media-1', peerUpeerId: 'peer9', muted: true, cameraEnabled: false }));
+        expect(result.current.activeCalls[0]).toMatchObject({ muted: true, cameraEnabled: false });
     });
 });

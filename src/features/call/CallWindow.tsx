@@ -101,21 +101,24 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     }, []);
 
     const drawRemoteVideo = useCallback((kind: 'video' | 'screen', frame: VideoFrame, peerUpeerId: string) => {
-        const sourceCanvas = kind === 'screen'
-            ? screenCanvasSourceRef.current ?? document.createElement('canvas')
-            : remoteCanvasSourcesRef.current.get(peerUpeerId) ?? document.createElement('canvas');
-        if (kind === 'video') remoteCanvasSourcesRef.current.set(peerUpeerId, sourceCanvas);
-        else screenCanvasSourceRef.current = sourceCanvas;
-        sourceCanvas.width = frame.displayWidth;
-        sourceCanvas.height = frame.displayHeight;
-        sourceCanvas.getContext('2d')?.drawImage(frame, 0, 0);
         const target = kind === 'screen'
             ? screenCanvasRef.current
             : isGroup ? peerCanvasRefs.current.get(peerUpeerId) : remoteCanvasRef.current;
-        if (target && target !== sourceCanvas) {
-            target.width = sourceCanvas.width;
-            target.height = sourceCanvas.height;
-            target.getContext('2d')?.drawImage(sourceCanvas, 0, 0);
+        const width = frame.displayWidth;
+        const height = frame.displayHeight;
+        if (target) {
+            if (target.width !== width) target.width = width;
+            if (target.height !== height) target.height = height;
+            target.getContext('2d')?.drawImage(frame, 0, 0, width, height);
+        } else {
+            const sourceCanvas = kind === 'screen'
+                ? screenCanvasSourceRef.current ?? document.createElement('canvas')
+                : remoteCanvasSourcesRef.current.get(peerUpeerId) ?? document.createElement('canvas');
+            if (kind === 'video') remoteCanvasSourcesRef.current.set(peerUpeerId, sourceCanvas);
+            else screenCanvasSourceRef.current = sourceCanvas;
+            if (sourceCanvas.width !== width) sourceCanvas.width = width;
+            if (sourceCanvas.height !== height) sourceCanvas.height = height;
+            sourceCanvas.getContext('2d')?.drawImage(frame, 0, 0, width, height);
         }
         if (kind === 'video') {
             setRemotePeers((current) => current.includes(peerUpeerId) ? current : [...current, peerUpeerId]);
@@ -366,7 +369,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             </Box>
 
             <Box data-nodrag="true" sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
-                <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
+                <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
             </Box>
         </Box>
     );

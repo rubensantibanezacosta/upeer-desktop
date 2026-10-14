@@ -4,7 +4,7 @@ import { registerCallHandlers } from '../../../../src/main_process/core/ipcHandl
 import { callManager } from '../../../../src/main_process/network/call/callManager.js';
 import * as signaling from '../../../../src/main_process/network/call/callSignaling.js';
 
-vi.mock('electron', () => ({ ipcMain: { handle: vi.fn() } }));
+vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }));
 
 vi.mock('../../../../src/main_process/network/call/callSignaling.js', () => ({
     sendCallOffer: vi.fn(async () => 'call-123'),
@@ -28,6 +28,12 @@ function getHandler(channel: string): Handler {
     if (!call) {
         throw new Error(`Missing handler for ${channel}`);
     }
+    return call[1] as Handler;
+}
+
+function getListener(channel: string): Handler {
+    const call = vi.mocked(ipcMain.on).mock.calls.find(([registeredChannel]) => registeredChannel === channel);
+    if (!call) throw new Error(`Missing listener for ${channel}`);
     return call[1] as Handler;
 }
 
@@ -112,19 +118,19 @@ describe('registerCallHandlers', () => {
         expect(result.codecs).toContain('vp8');
     });
 
-    it('send-call-media valida y reenvía el chunk por el canal', () => {
+    it('send-call-media unidireccional valida y reenvía el chunk sin esperar respuesta IPC', () => {
         const session = callManager.create('peer1', 'audio', 'outgoing');
-        const handler = getHandler('send-call-media');
+        const handler = getListener('send-call-media');
         const mediaData = new Uint8Array([1, 2, 3]);
-        const result = handler(null, { callId: session.callId, data: mediaData }) as { success: boolean };
-        expect(result.success).toBe(true);
+        const result = handler(null, { callId: session.callId, data: mediaData });
+        expect(result).toBeUndefined();
         expect(signaling.sendCallMedia).toHaveBeenCalledWith('peer1', session.callId, mediaData);
     });
 
     it('send-call-media rechaza payload vacío', () => {
         const session = callManager.create('peer1', 'audio', 'outgoing');
-        const handler = getHandler('send-call-media');
-        const result = handler(null, { callId: session.callId, data: '' }) as { success: boolean };
-        expect(result.success).toBe(false);
+        const handler = getListener('send-call-media');
+        handler(null, { callId: session.callId, data: '' });
+        expect(signaling.sendCallMedia).not.toHaveBeenCalled();
     });
 });

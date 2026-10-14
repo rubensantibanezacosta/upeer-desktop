@@ -199,7 +199,7 @@ declare global {
             rejectCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
-            sendCallMedia: (callId: string, data: Uint8Array) => Promise<{ success: boolean; error?: string }>;
+            sendCallMedia: (callId: string, data: Uint8Array) => void;
             sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => Promise<{ success: boolean; error?: string }>;
             sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
             getCallDevices: () => Promise<{ success: boolean; devices: Array<{ deviceId: string; kind: string; label: string }>; error?: string }>;

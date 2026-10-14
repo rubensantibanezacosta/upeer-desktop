@@ -18,6 +18,10 @@ export function useCall() {
                 useCallStore.getState().setActive(data.callId);
             }),
             window.upeer?.onCallEnded?.((data) => useCallStore.getState().markEnded(data.callId, data.reason)),
+            window.upeer?.onCallMediaUpdate?.((data) => {
+                const current = useCallStore.getState().calls[data.callId];
+                if (current) useCallStore.getState().applyMediaUpdate(data.callId, { muted: data.muted, cameraEnabled: data.cameraEnabled });
+            }),
             window.upeer?.onCallMemberJoined?.((data) => useCallStore.getState().addGroupMember(data.callId, data.peerUpeerId)),
             window.upeer?.onCallMemberLeft?.((data) => useCallStore.getState().removeGroupMember(data.callId, data.peerUpeerId)),
             window.upeer?.onCallMeta?.((data) => {
