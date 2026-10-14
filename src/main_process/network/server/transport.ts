@@ -255,11 +255,17 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
         : Buffer.from(JSON.stringify(packetToSend));
     const framedBuf = encodeFrame(rawBuf);
 
-    if (binaryMedia && rawBuf.length <= CALL_MEDIA_UDP_MAX_BYTES && getNetworkReady()) {
-        if (sendCallMediaDatagram(ip, rawBuf, () => enqueueForSend(ip, framedBuf, false, false))) {
-            recordIPSuccess(ip);
+    if (data.type === 'CALL_MEDIA') {
+        if (!binaryMedia || rawBuf.length > CALL_MEDIA_UDP_MAX_BYTES || !getNetworkReady()) {
+            warn('CALL_MEDIA dropped because UDP-only transport is unavailable for this packet', undefined, 'call');
             return;
         }
+        if (sendCallMediaDatagram(ip, rawBuf)) {
+            recordIPSuccess(ip);
+        } else {
+            warn('CALL_MEDIA dropped because UDP send is unavailable', undefined, 'call');
+        }
+        return;
     }
 
     if (!getNetworkReady()) {

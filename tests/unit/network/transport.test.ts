@@ -9,6 +9,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     error: vi.fn(),
     network: vi.fn(),
+    warn: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
@@ -178,12 +179,13 @@ describe('Transport - sendSecureUDPMessage', () => {
         sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: media });
         sendSecureUDPMessage('200::peer', { type: 'CALL_ACCEPT', callId: 'call-1' });
 
-        expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledWith('200::peer', expect.any(Buffer), expect.any(Function));
+        expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledTimes(1);
+        expect(callMediaUdp.sendCallMediaDatagram.mock.calls[0]?.[0]).toBe('200::peer');
         await new Promise(resolve => setTimeout(resolve, 20));
         expect(mockSocket.write).toHaveBeenCalledTimes(1);
     });
 
-    it('falls back to framed TCP when UDP cannot send call media', async () => {
+    it('drops call media instead of falling back to TCP when UDP cannot send', async () => {
         vi.mocked(callMediaUdp.sendCallMediaDatagram).mockReturnValue(false);
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
@@ -191,11 +193,12 @@ describe('Transport - sendSecureUDPMessage', () => {
         sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([1, 2, 3]) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
-        expect(socks5.socks5Connect).toHaveBeenCalledWith('200::peer', 50005);
-        expect(mockSocket.write).toHaveBeenCalled();
+        expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledOnce();
+        expect(socks5.socks5Connect).not.toHaveBeenCalled();
+        expect(mockSocket.write).not.toHaveBeenCalled();
     });
 
-    it('retries the same call media over TCP when the UDP socket reports an asynchronous send error', async () => {
+    it('does not schedule TCP fallback for asynchronous UDP send errors', async () => {
         vi.mocked(callMediaUdp.sendCallMediaDatagram).mockImplementation((_address, _packet, onError) => {
             onError?.();
             return true;
@@ -206,7 +209,19 @@ describe('Transport - sendSecureUDPMessage', () => {
         sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([7, 8, 9]) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
-        expect(mockSocket.write).toHaveBeenCalledTimes(1);
-        expect(mockSocket.write.mock.calls[0][0]).toBeInstanceOf(Buffer);
+        expect(socks5.socks5Connect).not.toHaveBeenCalled();
+        expect(mockSocket.write).not.toHaveBeenCalled();
+    });
+
+    it('drops oversized call media without attempting TCP', async () => {
+        const mockSocket = createMockSocket();
+        vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
+
+        sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array(1300) });
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        expect(callMediaUdp.sendCallMediaDatagram).not.toHaveBeenCalled();
+        expect(socks5.socks5Connect).not.toHaveBeenCalled();
+        expect(mockSocket.write).not.toHaveBeenCalled();
     });
 });

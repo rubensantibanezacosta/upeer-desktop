@@ -74,7 +74,7 @@ export function sendCallMediaDatagram(address: string, packet: Buffer, onError?:
         return false;
     }
     return association.send(address, getCallMediaUdpPort(), packet, (cause) => {
-        warn('CALL_MEDIA UDP send failed; retrying this media packet over TCP', cause, 'call');
+        warn('CALL_MEDIA UDP send failed; packet dropped because TCP fallback is disabled', cause, 'call');
         association.close();
         if (getSocks5UdpAssociation() === association) setSocks5UdpAssociation(null);
         onError?.();
