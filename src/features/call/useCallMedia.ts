@@ -91,15 +91,14 @@ export function useCallMedia(callId: string) {
                 return false;
             }
             return true;
-        } catch {
+        } catch (cause) {
+            console.error(`Call ${callId} local media capture failed`, cause);
             if (generation === captureGenerationRef.current) {
-                localStreamRef.current?.getTracks().forEach((track) => track.stop());
-                localStreamRef.current = null;
-                setLocalStream(null);
+                if (!localStreamRef.current) setLocalStream(null);
             }
             return false;
         }
-    }, [sendChunk]);
+    }, [callId, sendChunk]);
 
     const stopScreenShare = useCallback(() => {
         screenRef.current?.getTracks().forEach((track) => track.stop());
@@ -125,10 +124,11 @@ export function useCallMedia(callId: string) {
             await session.startCapture(stream, 'screen', sendChunk);
             stream.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare);
             return true;
-        } catch {
+        } catch (cause) {
+            console.error(`Call ${callId} screen capture failed`, cause);
             return false;
         }
-    }, [sendChunk, stopScreenShare]);
+    }, [callId, sendChunk, stopScreenShare]);
 
     const stopLocalCapture = useCallback(() => {
         captureGenerationRef.current += 1;

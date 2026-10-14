@@ -34,7 +34,11 @@ export class WebCodecsSession {
                 }
             };
             worker.addEventListener('message', onMessage);
-            worker.addEventListener('error', () => reject(new Error('Media worker failed')), { once: true });
+            worker.addEventListener('error', (event: ErrorEvent) => {
+                const cause = new Error(`Media worker failed: ${event.message || 'unknown worker error'}`);
+                console.error(cause.message, { filename: event.filename, lineno: event.lineno, colno: event.colno });
+                reject(cause);
+            }, { once: true });
         });
         this.worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
             const message = event.data;
@@ -45,7 +49,7 @@ export class WebCodecsSession {
                 if (handler) handler(message.frame);
                 else message.frame.close();
             } else if (message.type === 'error') {
-                console.warn(`Call media worker ${message.operation} failed: ${message.message}`);
+                console.error(`Call media worker ${message.operation} failed: ${message.message}`);
             }
         });
     }

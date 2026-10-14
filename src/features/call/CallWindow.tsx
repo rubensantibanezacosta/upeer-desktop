@@ -144,8 +144,14 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     }, []);
 
     useEffect(() => {
-        if (videoRef.current && localStream) videoRef.current.srcObject = localStream;
-    }, [localStream]);
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = localStream;
+        if (localStream) {
+            void videoRef.current.play().catch((cause: unknown) => {
+                console.error(`Call ${call.callId ?? 'unknown'} local video preview failed`, cause);
+            });
+        }
+    }, [call.callId, localStream]);
 
     useEffect(() => {
         if (!mediaActive) return;

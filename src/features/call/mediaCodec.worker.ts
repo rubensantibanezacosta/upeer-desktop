@@ -53,11 +53,13 @@ function getEncoder(kind: CallMediaKind, frame: CodecFrame): VideoEncoder | Audi
 }
 
 async function capture(track: MediaStreamTrack, kind: CallMediaKind): Promise<void> {
-    const Processor = (globalThis as unknown as { MediaStreamTrackProcessor: new (options: { track: MediaStreamTrack }) => { readable: ReadableStream<VideoFrame | AudioData> } }).MediaStreamTrackProcessor;
-    const processor = new Processor({ track });
-    const reader = processor.readable.getReader();
-    readers.set(kind, reader);
+    let reader: ReadableStreamDefaultReader<VideoFrame | AudioData> | null = null;
     try {
+        const Processor = (globalThis as unknown as { MediaStreamTrackProcessor?: new (options: { track: MediaStreamTrack }) => { readable: ReadableStream<VideoFrame | AudioData> } }).MediaStreamTrackProcessor;
+        if (!Processor) throw new Error('MediaStreamTrackProcessor is unavailable in the media worker');
+        const processor = new Processor({ track });
+        reader = processor.readable.getReader();
+        readers.set(kind, reader);
         while (active) {
             const { value, done } = await reader.read();
             if (done || !value) break;
@@ -76,6 +78,8 @@ async function capture(track: MediaStreamTrack, kind: CallMediaKind): Promise<vo
         }
     } catch (cause) {
         if (active) reportError(`capture ${kind}`, cause);
+    } finally {
+        if (readers.get(kind) === reader) readers.delete(kind);
     }
 }
 
