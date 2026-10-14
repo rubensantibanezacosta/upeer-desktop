@@ -60,9 +60,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const [remoteScreen, setRemoteScreen] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [showShareOptions, setShowShareOptions] = useState(false);
-    const media = useCallMedia(call.callId ?? '');
-    const { startLocalCapture, stopLocalCapture, setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = media;
-
+    const { setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = useCallMedia(call.callId ?? '');
     useEffect(() => {
         const timer = setInterval(() => {
             setSeconds(Math.floor((Date.now() - startedAt) / 1000));
@@ -72,6 +70,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
 
     const isVideo = call.kind === 'video';
     const isGroup = call.isGroup === true;
+    const mediaActive = call.phase === 'negotiating' || call.phase === 'connected';
     const isVideoActive = isVideo && (call.phase === 'negotiating' || call.phase === 'connected');
     const effWidth = expanded ? Math.max(size.width, 640) : size.width;
     const effHeight = expanded ? Math.max(size.height, 480) : size.height;
@@ -149,17 +148,14 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     }, [localStream]);
 
     useEffect(() => {
-        if (call.phase !== 'negotiating' && call.phase !== 'connected') return;
+        if (!mediaActive) return;
         const remoteCanvasSources = remoteCanvasSourcesRef.current;
         setOnRemoteFrame((kind, decoded, peerUpeerId) => {
             if (kind === 'audio') playRemoteAudio(decoded as AudioData);
             else drawRemoteVideo(kind, decoded as VideoFrame, peerUpeerId);
         });
-        void startLocalCapture(isVideo);
         return () => {
             setOnRemoteFrame(null);
-            stopLocalCapture();
-            stopScreenShare();
             setRemotePeers([]);
             remoteCanvasSources.clear();
             screenCanvasSourceRef.current = null;
@@ -168,7 +164,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             audioContextRef.current = null;
             nextAudioTimeRef.current = 0;
         };
-    }, [call.callId, call.phase, isVideo, setOnRemoteFrame, startLocalCapture, stopLocalCapture, stopScreenShare, drawRemoteVideo, playRemoteAudio]);
+    }, [call.callId, mediaActive, setOnRemoteFrame, drawRemoteVideo, playRemoteAudio]);
 
     useEffect(() => {
         if (call.phase !== 'connected') return;

@@ -97,6 +97,7 @@ export class WebCodecsSession {
                     ? { codec: 'opus', sampleRate: frame.sampleRate ?? 48000, numberOfChannels: frame.numberOfChannels ?? 1 }
                     : { codec: 'vp8', width: frame.codedWidth ?? 640, height: frame.codedHeight ?? 480, bitrate: 300_000 };
                 encoder.configure(config);
+                if (kind === 'video') encoder.requestKeyFrame = true;
             }
             if (encoder.encode) {
                 try {

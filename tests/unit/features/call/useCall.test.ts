@@ -7,12 +7,14 @@ let incomingCallback: ((data: { callId: string; peerUpeerId: string; kind: 'audi
 let memberJoinedCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 let memberLeftCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 let mediaUpdateCallback: ((data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) | undefined;
+let endedCallback: ((data: { callId: string; peerUpeerId: string; reason?: string }) => void) | undefined;
 
 function installBridge(overrides: Record<string, unknown> = {}) {
     incomingCallback = undefined;
     memberJoinedCallback = undefined;
     memberLeftCallback = undefined;
     mediaUpdateCallback = undefined;
+    endedCallback = undefined;
     (globalThis as unknown as { window: unknown }).window = {
         upeer: {
             startCall: vi.fn(async () => ({ success: true, callId: 'c1' })),
@@ -27,7 +29,10 @@ function installBridge(overrides: Record<string, unknown> = {}) {
                 return () => undefined;
             }),
             onCallAccepted: vi.fn(() => () => undefined),
-            onCallEnded: vi.fn(() => () => undefined),
+            onCallEnded: vi.fn((cb: typeof endedCallback) => {
+                endedCallback = cb;
+                return () => undefined;
+            }),
             onCallMediaUpdate: vi.fn((cb: typeof mediaUpdateCallback) => {
                 mediaUpdateCallback = cb;
                 return () => undefined;
@@ -88,6 +93,25 @@ describe('useCall', () => {
         });
         expect(result.current.call.phase).toBe('idle');
         expect(result.current.isActive).toBe(false);
+    });
+
+    it('quita la ventana local antes de esperar la respuesta IPC al colgar', async () => {
+        let resolveEndCall: (() => void) | undefined;
+        const bridge = installBridge({
+            endCall: vi.fn(() => new Promise((resolve) => {
+                resolveEndCall = () => resolve({ success: true });
+            })),
+        });
+        const { result } = renderHook(() => useCall());
+        await act(async () => {
+            await result.current.startCall('peer1', 'video');
+        });
+        act(() => {
+            void result.current.endCall('c1');
+        });
+        expect(result.current.isActive).toBe(false);
+        expect(bridge.endCall).toHaveBeenCalledWith('c1');
+        await act(async () => resolveEndCall?.());
     });
 
     it('reacciona a una llamada entrante emitida por el puente', async () => {

@@ -102,10 +102,7 @@ export const useCallStore = create<CallStore>((set) => ({
     }),
 
     markEnded: (callId, _reason) => set((state) => {
-        const call = state.calls[callId];
-        if (!call) {
-            return state;
-        }
+        if (!state.calls[callId]) return state;
         const { [callId]: _removed, ...rest } = state.calls;
         const nextActive = state.activeCallId === callId ? Object.keys(rest)[0] : state.activeCallId;
         return { calls: rest, activeCallId: nextActive };

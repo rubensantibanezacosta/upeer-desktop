@@ -8,8 +8,10 @@ export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown, peerUpeer
 
 export function useCallMedia(callId: string) {
     const call = useCallStore((state) => state.calls[callId]);
+    const captureActive = call?.phase === 'negotiating' || call?.phase === 'connected';
     const sessionRef = useRef<WebCodecsSession | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
+    const captureGenerationRef = useRef(0);
     const screenRef = useRef<MediaStream | null>(null);
     const sequenceRef = useRef<Record<CallMediaKind, number>>({ audio: 0, video: 0, screen: 0 });
     const onRemoteFrameRef = useRef<RemoteFrameHandler | null>(null);
@@ -47,6 +49,11 @@ export function useCallMedia(callId: string) {
         const unsubscribe = window.upeer?.onCallMedia?.(handleRemoteMedia);
         return () => {
             unsubscribe?.();
+            localStreamRef.current?.getTracks().forEach((track) => track.stop());
+            screenRef.current?.getTracks().forEach((track) => track.stop());
+            localStreamRef.current = null;
+            screenRef.current = null;
+            captureGenerationRef.current += 1;
             const session = sessionRef.current;
             sessionRef.current = null;
             if (session) void session.release();
@@ -55,22 +62,39 @@ export function useCallMedia(callId: string) {
 
     const startLocalCapture = useCallback(async (video: boolean): Promise<boolean> => {
         if (localStreamRef.current) return true;
+        const generation = captureGenerationRef.current;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
                 video: video ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 20 } } : false,
             });
+            if (generation !== captureGenerationRef.current) {
+                stream.getTracks().forEach((track) => track.stop());
+                return false;
+            }
             const session = sessionRef.current ?? new WebCodecsSession();
             localStreamRef.current = stream;
             sessionRef.current = session;
             setLocalStream(stream);
-            await session.startCapture(stream, 'audio', sendChunk);
-            if (video) await session.startCapture(stream, 'video', sendChunk);
+            await session.startCapture(stream, 'audio', (chunk) => {
+                if (generation === captureGenerationRef.current) sendChunk(chunk);
+            });
+            if (video) {
+                await session.startCapture(stream, 'video', (chunk) => {
+                    if (generation === captureGenerationRef.current) sendChunk(chunk);
+                });
+            }
+            if (generation !== captureGenerationRef.current) {
+                stream.getTracks().forEach((track) => track.stop());
+                return false;
+            }
             return true;
         } catch {
-            localStreamRef.current?.getTracks().forEach((track) => track.stop());
-            localStreamRef.current = null;
-            setLocalStream(null);
+            if (generation === captureGenerationRef.current) {
+                localStreamRef.current?.getTracks().forEach((track) => track.stop());
+                localStreamRef.current = null;
+                setLocalStream(null);
+            }
             return false;
         }
     }, [sendChunk]);
@@ -105,8 +129,10 @@ export function useCallMedia(callId: string) {
     }, [sendChunk, stopScreenShare]);
 
     const stopLocalCapture = useCallback(() => {
+        captureGenerationRef.current += 1;
         const session = sessionRef.current;
-        sessionRef.current = null;
+        const replacementSession = new WebCodecsSession();
+        sessionRef.current = replacementSession;
         if (session) void session.release();
         localStreamRef.current?.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
@@ -130,6 +156,15 @@ export function useCallMedia(callId: string) {
             track.enabled = enabled;
         });
     }, []);
+
+    useEffect(() => {
+        if (captureActive) {
+            void startLocalCapture(call.kind === 'video');
+            return;
+        }
+        stopLocalCapture();
+        stopScreenShare();
+    }, [captureActive, call?.kind, startLocalCapture, stopLocalCapture, stopScreenShare]);
 
     useEffect(() => {
         if (call?.phase === 'idle' || call?.phase === 'ended') stopLocalCapture();

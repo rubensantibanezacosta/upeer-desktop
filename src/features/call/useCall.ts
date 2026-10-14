@@ -81,8 +81,8 @@ export function useCall() {
     const endCall = useCallback(async (callId?: string) => {
         const target = callId ?? useCallStore.getState().activeCallId;
         if (target) {
-            await window.upeer.endCall(target);
             useCallStore.getState().removeCall(target);
+            await window.upeer.endCall(target);
         }
     }, []);
 
