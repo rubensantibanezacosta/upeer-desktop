@@ -4,7 +4,6 @@ import { canonicalStringify } from '../cryptoUtils.js';
 import { verify } from '../../security/identityCrypto.js';
 import { isYggdrasilAddress } from '../utils.js';
 import { sameIPv6Address } from './socks5Udp.js';
-import { CALL_MEDIA_UDP_MAX_BYTES } from './constants.js';
 
 type PacketRequest = { type: 'packet'; packet: Uint8Array; listenPort: number; sourceAddress: string };
 type ContactRequest = { type: 'contacts'; contacts: Array<{ upeerId: string; publicKey: string }> };
@@ -34,7 +33,7 @@ parentPort?.on('message', (event: ParentConnectRequest) => {
 
 function verifyPacket(request: PacketRequest): void {
     const port = mediaPort;
-    if (!port || request.packet.byteLength > CALL_MEDIA_UDP_MAX_BYTES) return;
+    if (!port || request.packet.byteLength > 600_000) return;
     let packet: Record<string, unknown> | null;
     try {
         packet = decodeBinaryCallMedia(Buffer.from(request.packet));

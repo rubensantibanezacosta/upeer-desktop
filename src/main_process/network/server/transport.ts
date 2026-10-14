@@ -19,7 +19,6 @@ import {
 } from './circuitBreaker.js';
 import {
     MAX_QUEUE_SIZE,
-    CALL_MEDIA_UDP_MAX_BYTES,
     YGG_PORT,
 } from './constants.js';
 import { encodeFrame, socks5Connect } from './socks5.js';
@@ -256,14 +255,22 @@ export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, 
     const framedBuf = encodeFrame(rawBuf);
 
     if (data.type === 'CALL_MEDIA') {
-        if (!binaryMedia || rawBuf.length > CALL_MEDIA_UDP_MAX_BYTES || !getNetworkReady()) {
-            warn('CALL_MEDIA dropped because UDP-only transport is unavailable for this packet', undefined, 'call');
+        if (!binaryMedia) {
+            warn('CALL_MEDIA dropped because payload is not a Uint8Array', undefined, 'call');
+            return;
+        }
+        if (rawBuf.length > 600_000) {
+            warn('CALL_MEDIA dropped because packet exceeds UDP fragmentation limit', { packetBytes: rawBuf.length }, 'call');
+            return;
+        }
+        if (!getNetworkReady()) {
+            warn('CALL_MEDIA dropped because Ygg network is not ready', undefined, 'call');
             return;
         }
         if (sendCallMediaDatagram(ip, rawBuf)) {
             recordIPSuccess(ip);
         } else {
-            warn('CALL_MEDIA dropped because UDP send is unavailable', undefined, 'call');
+            warn('CALL_MEDIA dropped because UDP association is unavailable or packet fragmentation failed', { packetBytes: rawBuf.length }, 'call');
         }
         return;
     }

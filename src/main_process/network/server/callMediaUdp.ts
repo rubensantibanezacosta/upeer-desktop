@@ -13,6 +13,7 @@ import { queryOwnVaultsOnReconnect } from '../handlers.js';
 import type { Contact } from '../../../types/chat.js';
 import { CALL_MEDIA_UDP_MAX_BYTES, CALL_MEDIA_UDP_PORT } from './constants.js';
 import { createSocks5UdpAssociation } from './socks5Udp.js';
+import { clearCallMediaAssemblies, fragmentCallMediaPacket, reassembleCallMediaDatagram } from './callMediaFragments.js';
 import { getCallMediaUdpPort, getCallMediaUdpServer, getMainWindow, getSocks5UdpAssociation, setCallMediaUdpPort, setCallMediaUdpServer, setSocks5UdpAssociation } from './state.js';
 
 let associationStartup: Promise<void> | null = null;
@@ -33,10 +34,11 @@ export function startCallMediaUdpServer(win: BrowserWindow, listenPort = CALL_ME
     }
     const server = createSocket('udp4');
     server.on('message', (packet) => {
-        if (packet.length > CALL_MEDIA_UDP_MAX_BYTES || !isBinaryCallMedia(packet)) return;
+        const completePacket = reassembleCallMediaDatagram(packet);
+        if (!completePacket || completePacket.length > 600_000 || !isBinaryCallMedia(completePacket)) return;
         if (!workerPort) return;
         try {
-            workerPort.postMessage({ type: 'packet', packet: Uint8Array.from(packet), listenPort, sourceAddress: '' });
+            workerPort.postMessage({ type: 'packet', packet: Uint8Array.from(completePacket), listenPort, sourceAddress: '' });
         } catch (cause) {
             warn('Unable to forward CALL_MEDIA datagram to verifier worker', cause, 'call');
         }
@@ -75,11 +77,12 @@ export function closeCallMediaUdpServer(): void {
     worker = null;
     verifiedPeers.clear();
     pendingPresencePeers.clear();
+    clearCallMediaAssemblies();
 }
 
 export function sendCallMediaDatagram(address: string, packet: Buffer, onError?: () => void): boolean {
     let association = getSocks5UdpAssociation();
-    if (!getCallMediaUdpServer() || !association || packet.length > CALL_MEDIA_UDP_MAX_BYTES) return false;
+    if (!getCallMediaUdpServer() || !association) return false;
     if (!association.isOpen()) {
         association.close();
         setSocks5UdpAssociation(null);
@@ -87,12 +90,26 @@ export function sendCallMediaDatagram(address: string, packet: Buffer, onError?:
         if (!associationStartup) startSocksAssociation();
         return false;
     }
-    return association.send(address, getCallMediaUdpPort(), packet, (cause) => {
-        warn('CALL_MEDIA UDP send failed; packet dropped because TCP fallback is disabled', cause, 'call');
-        association.close();
-        if (getSocks5UdpAssociation() === association) setSocks5UdpAssociation(null);
-        onError?.();
-    });
+    try {
+        const fragments = fragmentCallMediaPacket(packet, CALL_MEDIA_UDP_MAX_BYTES);
+        let accepted = true;
+        for (const fragment of fragments) {
+            const sent = association.send(address, getCallMediaUdpPort(), fragment, (cause) => {
+                warn('CALL_MEDIA UDP fragment send failed; packet dropped because TCP fallback is disabled', cause, 'call');
+                association?.close();
+                if (getSocks5UdpAssociation() === association) setSocks5UdpAssociation(null);
+                onError?.();
+            });
+            if (!sent) {
+                accepted = false;
+                break;
+            }
+        }
+        return accepted;
+    } catch (cause) {
+        warn('CALL_MEDIA UDP packet exceeds fragmentation limits', cause, 'call');
+        return false;
+    }
 }
 
 function startMediaWorker(win: BrowserWindow): void {
@@ -172,7 +189,7 @@ function startSocksAssociation(): void {
         }
         setSocks5UdpAssociation(association);
     }).catch((cause: unknown) => {
-        error('CALL_MEDIA SOCKS5 UDP unavailable; retrying while TCP remains active', cause, 'call');
+        error('CALL_MEDIA SOCKS5 UDP association unavailable; retrying UDP association', cause, 'call');
         if (associationRetryTimer) clearTimeout(associationRetryTimer);
         associationRetryTimer = setTimeout(() => {
             associationRetryTimer = null;
@@ -184,10 +201,11 @@ function startSocksAssociation(): void {
 }
 
 function handleAssociatedDatagram(packet: Buffer, address: string): void {
-    if (!isBinaryCallMedia(packet)) return;
+    const completePacket = reassembleCallMediaDatagram(packet);
+    if (!completePacket || !isBinaryCallMedia(completePacket)) return;
     if (!isYggdrasilAddress(address) || !workerPort) return;
     try {
-        workerPort.postMessage({ type: 'packet', packet: Uint8Array.from(packet), listenPort: getCallMediaUdpPort(), sourceAddress: address });
+        workerPort.postMessage({ type: 'packet', packet: Uint8Array.from(completePacket), listenPort: getCallMediaUdpPort(), sourceAddress: address });
     } catch (cause) {
         warn('Unable to forward associated CALL_MEDIA datagram to verifier worker', cause, 'call');
     }

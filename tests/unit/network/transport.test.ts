@@ -213,14 +213,14 @@ describe('Transport - sendSecureUDPMessage', () => {
         expect(mockSocket.write).not.toHaveBeenCalled();
     });
 
-    it('drops oversized call media without attempting TCP', async () => {
+    it('fragments oversized call media for UDP without attempting TCP', async () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
         sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array(1300) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
-        expect(callMediaUdp.sendCallMediaDatagram).not.toHaveBeenCalled();
+        expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledOnce();
         expect(socks5.socks5Connect).not.toHaveBeenCalled();
         expect(mockSocket.write).not.toHaveBeenCalled();
     });
