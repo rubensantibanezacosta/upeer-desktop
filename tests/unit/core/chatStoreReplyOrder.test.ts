@@ -49,8 +49,9 @@ describe('orden cronológico al responder a un mensaje anterior', () => {
         await useChatStore.getState().handleSend();
 
         const ids = useChatStore.getState().chatHistory.map((message) => message.id);
-        expect(ids).toEqual(['A', 'B', 'R']);
-        expect(getUpeerMock().sendMessage).toHaveBeenCalledWith('peer-1', 'respuesta a A', 'A', undefined);
+        expect(ids).toHaveLength(3);
+        expect(ids.slice(0, 2)).toEqual(['A', 'B']);
+        expect(getUpeerMock().sendMessage).toHaveBeenCalledWith('peer-1', 'respuesta a A', 'A', undefined, expect.any(String));
     });
 
     it('mantiene la respuesta al final aunque su timestamp sea menor que otros por desfase de reloj', async () => {
@@ -71,6 +72,54 @@ describe('orden cronológico al responder a un mensaje anterior', () => {
         await useChatStore.getState().handleSend();
 
         const ids = useChatStore.getState().chatHistory.map((message) => message.id);
-        expect(ids).toEqual(['A', 'B', 'R']);
+        expect(ids).toHaveLength(3);
+        expect(ids.slice(0, 2)).toEqual(['A', 'B']);
+    });
+
+    it('muestra y limpia el mensaje antes de que responda el IPC de envío', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        let resolveSend: ((result: { id: string; savedMessage: string; timestamp: number }) => void) | undefined;
+        getUpeerMock().sendMessage.mockImplementation(() => new Promise((resolve) => { resolveSend = resolve; }));
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            chatHistory: [],
+            messagesByConversation: { 'peer-1': 'mensaje durante llamada' },
+            replyByConversation: { 'peer-1': null },
+            myIdentity: { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' },
+        });
+
+        const pendingSend = useChatStore.getState().handleSend();
+
+        expect(useChatStore.getState().messagesByConversation['peer-1']).toBe('');
+        expect(useChatStore.getState().chatHistory).toHaveLength(1);
+        const pendingMessage = useChatStore.getState().chatHistory[0];
+        expect(pendingMessage.message).toBe('mensaje durante llamada');
+        expect(pendingMessage.id).toEqual(expect.any(String));
+
+        resolveSend?.({ id: pendingMessage.id as string, savedMessage: 'mensaje durante llamada', timestamp: pendingMessage.date });
+        await pendingSend;
+
+        expect(useChatStore.getState().chatHistory).toHaveLength(1);
+        expect(useChatStore.getState().chatHistory[0].status).toBe('sent');
+    });
+
+    it('conserva el mensaje local y lo marca fallido si el IPC rechaza el envío', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        getUpeerMock().sendMessage.mockRejectedValue(new Error('IPC unavailable'));
+        useChatStore.setState({
+            targetUpeerId: 'peer-1',
+            activeGroupId: '',
+            chatHistory: [],
+            messagesByConversation: { 'peer-1': 'mensaje pendiente' },
+            replyByConversation: { 'peer-1': null },
+            myIdentity: { upeerId: 'me', publicKey: 'pk', address: null, alias: 'Yo' },
+        });
+
+        await useChatStore.getState().handleSend();
+
+        expect(useChatStore.getState().messagesByConversation['peer-1']).toBe('');
+        expect(useChatStore.getState().chatHistory).toHaveLength(1);
+        expect(useChatStore.getState().chatHistory[0]).toMatchObject({ message: 'mensaje pendiente', status: 'failed' });
     });
 });

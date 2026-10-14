@@ -10,6 +10,7 @@ import * as groupHandlers from '../../../src/main_process/network/handlers/group
 import * as reputationHandlers from '../../../src/main_process/network/handlers/reputation.js';
 import * as vaultHandlers from '../../../src/main_process/network/handlers/vault.js';
 import { fileTransferManager } from '../../../src/main_process/network/file-transfer/transfer-manager.js';
+import { encodeBinaryCallMedia, hashCallMedia } from '../../../src/main_process/network/binaryCallMedia.js';
 
 import * as contactStatus from '../../../src/main_process/storage/contacts/status.js';
 import * as contactLocation from '../../../src/main_process/storage/contacts/location.js';
@@ -291,6 +292,44 @@ describe('network/handlers.ts - handlePacket', () => {
 
         expect(contactStatus.updateContactStatus).toHaveBeenCalledWith('peer1', 'connected');
         expect(contactStatus.updateLastSeen).toHaveBeenCalledWith('peer1');
+    });
+
+    it('does not write contact presence or lastSeen for every verified CALL_MEDIA frame', async () => {
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
+        const payload = Buffer.from([1, 2, 3]);
+        const packet = encodeBinaryCallMedia({
+            type: 'CALL_MEDIA',
+            callId: 'call-1',
+            mediaHash: hashCallMedia(payload),
+            senderUpeerId: 'peer1',
+            senderYggAddress: mockRinfo.address,
+            signature: '00'.repeat(64),
+        }, payload);
+
+        await handlePacket(packet, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(contactStatus.updateLastSeen).not.toHaveBeenCalled();
+        expect(contactStatus.updateContactStatus).not.toHaveBeenCalled();
+        expect(mockWin.webContents.send).not.toHaveBeenCalledWith('contact-presence', expect.anything());
+    });
+
+    it('rejects invalid binary media before signature verification', async () => {
+        vi.mocked(identity.verify).mockReturnValue(false);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
+        const payload = Buffer.from([1, 2, 3]);
+        const packet = encodeBinaryCallMedia({
+            type: 'CALL_MEDIA',
+            callId: 'call-1',
+            mediaHash: hashCallMedia(payload),
+            senderUpeerId: 'peer1',
+            senderYggAddress: mockRinfo.address,
+            signature: '00'.repeat(64),
+        }, payload);
+
+        await handlePacket(packet, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(identity.verify).toHaveBeenCalledTimes(1);
     });
 
     it('should query own vaults when an offline contact reconnects through CHAT traffic', async () => {

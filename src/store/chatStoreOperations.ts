@@ -1,6 +1,7 @@
 import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import type { LinkPreview } from '../types/chat.js';
+import crypto from 'node:crypto';
 
 export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
     handleTyping: () => {
@@ -64,21 +65,47 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
             await get().handleSendGroupMessage(message, linkPreview);
             return;
         }
-        const sendResult = await window.upeer.sendMessage(targetUpeerId, message, replyTo?.id, linkPreview ?? undefined);
-        if (sendResult) {
-            set((state) => ({
-                chatHistory: insertMessageChronologically(state.chatHistory, {
-                    id: sendResult.id,
+        const messageId = crypto.randomUUID();
+        const timestamp = Date.now();
+        set((state) => ({
+            chatHistory: state.targetUpeerId === targetUpeerId
+                ? insertMessageChronologically(state.chatHistory, {
+                    id: messageId,
                     upeerId: targetUpeerId,
                     isMine: true,
-                    message: sendResult.savedMessage,
+                    message,
                     status: targetUpeerId === myIdentity?.upeerId ? 'read' : 'sent',
-                    timestamp: formatMessageTimestamp(sendResult.timestamp),
+                    timestamp: formatMessageTimestamp(timestamp),
                     replyTo: replyTo?.id,
-                    date: sendResult.timestamp,
-                }),
-                messagesByConversation: { ...state.messagesByConversation, [targetUpeerId]: '' },
-                replyByConversation: { ...state.replyByConversation, [targetUpeerId]: null },
+                    date: timestamp,
+                })
+                : state.chatHistory,
+            messagesByConversation: { ...state.messagesByConversation, [targetUpeerId]: '' },
+            replyByConversation: { ...state.replyByConversation, [targetUpeerId]: null },
+        }));
+
+        try {
+            const sendResult = await window.upeer.sendMessage(targetUpeerId, message, replyTo?.id, linkPreview ?? undefined, messageId);
+            set((state) => ({
+                chatHistory: sendResult
+                    ? insertMessageChronologically(
+                        state.chatHistory.filter((item) => item.id !== messageId),
+                        {
+                            id: messageId,
+                            upeerId: targetUpeerId,
+                            isMine: true,
+                            message: sendResult.savedMessage,
+                            status: targetUpeerId === myIdentity?.upeerId ? 'read' : 'sent',
+                            replyTo: replyTo?.id,
+                            date: sendResult.timestamp,
+                            timestamp: formatMessageTimestamp(sendResult.timestamp),
+                        },
+                    )
+                    : state.chatHistory.map((item) => item.id === messageId ? { ...item, status: 'failed' } : item),
+            }));
+        } catch {
+            set((state) => ({
+                chatHistory: state.chatHistory.map((item) => item.id === messageId ? { ...item, status: 'failed' } : item),
             }));
         }
         get().refreshContacts();

@@ -113,6 +113,10 @@ const config: ForgeConfig = {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
         },
+        {
+          name: 'verified_media_worker',
+          config: 'vite.media-worker.config.ts',
+        },
       ],
     }),
     // Fuses are used to enable/disable various Electron functionality

@@ -200,8 +200,10 @@ describe('useChatStore groups integration', () => {
 
         await useChatStore.getState().handleSend();
 
-        expect(window.upeer.sendMessage).toHaveBeenCalledWith('peer-1', 'intermedio', undefined, undefined);
-        expect(useChatStore.getState().chatHistory.map((message) => message.id)).toEqual(['msg-100', 'msg-direct', 'msg-300']);
+        expect(window.upeer.sendMessage).toHaveBeenCalledWith('peer-1', 'intermedio', undefined, undefined, expect.any(String));
+        const sentHistory = useChatStore.getState().chatHistory;
+        expect(sentHistory.map((message) => message.date)).toEqual([100, 200, 300]);
+        expect(sentHistory[1]).toMatchObject({ id: expect.any(String), message: 'intermedio', isMine: true });
     });
 
     it('clears active group state when leaving the open group', async () => {

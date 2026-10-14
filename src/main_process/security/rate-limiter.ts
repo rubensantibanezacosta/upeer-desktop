@@ -56,6 +56,8 @@ export class RateLimiter {
             'CHAT_UPDATE': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
             'CHAT_DELETE': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
 
+            'CALL_MEDIA': { windowMs: 1000, maxTokens: 120, refillRate: 120 },
+
             // Kademlia DHT messages
             'DHT_FIND_NODE': { windowMs: 30000, maxTokens: 30, refillRate: 30 / 30 },
             'DHT_FIND_VALUE': { windowMs: 30000, maxTokens: 30, refillRate: 30 / 30 },

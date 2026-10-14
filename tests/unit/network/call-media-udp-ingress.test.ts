@@ -2,11 +2,31 @@ import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeBinaryCallMedia, hashCallMedia } from '../../../src/main_process/network/binaryCallMedia.js';
 
+type MockPort = EventEmitter & { start: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; postMessage: ReturnType<typeof vi.fn> };
+
 const mocks = vi.hoisted(() => ({
     server: null as EventEmitter | null,
     associationReceiver: null as ((packet: Buffer, address: string, port: number) => void) | null,
     association: null as { isOpen: () => boolean; close: () => void; send: () => boolean } | null,
-    handlePacket: vi.fn(),
+    port: null as MockPort | null,
+    worker: null as { postMessage: ReturnType<typeof vi.fn>; kill: ReturnType<typeof vi.fn> } | null,
+    datagramPort: 0,
+}));
+
+vi.mock('electron', () => ({
+    MessageChannelMain: class {
+        port1 = new EventEmitter() as MockPort;
+        port2 = Object.assign(new EventEmitter(), { start: vi.fn(), close: vi.fn(), postMessage: vi.fn() }) as MockPort;
+        constructor() {
+            mocks.port = this.port2;
+        }
+    },
+    utilityProcess: {
+        fork: vi.fn(() => {
+            mocks.worker = { postMessage: vi.fn(), kill: vi.fn() };
+            return mocks.worker;
+        }),
+    },
 }));
 
 vi.mock('node:dgram', () => ({
@@ -24,7 +44,18 @@ vi.mock('node:dgram', () => ({
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({ error: vi.fn(), warn: vi.fn() }));
 vi.mock('../../../src/main_process/security/identity.js', () => ({ getMyUPeerId: vi.fn(() => 'local-peer') }));
-vi.mock('../../../src/main_process/network/handlers.js', () => ({ handlePacket: mocks.handlePacket }));
+vi.mock('../../../src/main_process/network/handlers.js', () => ({ queryOwnVaultsOnReconnect: vi.fn() }));
+vi.mock('../../../src/main_process/network/server/mediaWorker.js', () => ({
+    createMediaVerificationWorker: vi.fn(() => {
+        mocks.port = Object.assign(new EventEmitter(), { start: vi.fn(), close: vi.fn(), postMessage: vi.fn() });
+        mocks.worker = { postMessage: vi.fn(), kill: vi.fn() };
+        return { worker: mocks.worker, port: mocks.port };
+    }),
+}));
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({ getContacts: vi.fn(() => []) }));
+vi.mock('../../../src/main_process/storage/contacts/status.js', () => ({ updateContactStatus: vi.fn(), updateLastSeen: vi.fn() }));
+vi.mock('../../../src/main_process/network/call/callManager.js', () => ({ callManager: { get: vi.fn(() => undefined) } }));
+vi.mock('../../../src/main_process/network/call/callSignaling.js', () => ({ sendCallMediaTo: vi.fn() }));
 vi.mock('../../../src/main_process/network/server/socks5Udp.js', () => ({
     sameIPv6Address: (left: string, right: string) => left.toLowerCase() === right.toLowerCase(),
     createSocks5UdpAssociation: vi.fn(async (receiver: typeof mocks.associationReceiver) => {
@@ -49,7 +80,8 @@ describe('CALL_MEDIA UDP ingress', () => {
         mocks.server = null;
         mocks.associationReceiver = null;
         mocks.association = null;
-        mocks.handlePacket.mockReset();
+        mocks.port = null;
+        mocks.worker = null;
         const state = await import('../../../src/main_process/network/server/state.js');
         vi.mocked(state.setCallMediaUdpServer).mockReset();
         vi.mocked(state.setCallMediaUdpPort).mockReset();
@@ -58,36 +90,18 @@ describe('CALL_MEDIA UDP ingress', () => {
         vi.mocked(socks.createSocks5UdpAssociation).mockClear();
     });
 
-    it('passes a datagram to the common security handler only when Ygg source matches signed sender', async () => {
+    it('passes accepted UDP media datagrams to the verification worker', async () => {
         const { startCallMediaUdpServer } = await import('../../../src/main_process/network/server/callMediaUdp.js');
         startCallMediaUdpServer({ webContents: { send: vi.fn() } } as never);
         await new Promise((resolve) => setTimeout(resolve, 30));
 
-        const payload = new Uint8Array([1, 2, 3]);
-        const packet = encodeBinaryCallMedia({
-            type: 'CALL_MEDIA',
-            callId: 'call-1',
-            mediaHash: hashCallMedia(payload),
-            senderUpeerId: 'remote-peer',
-            senderYggAddress: '200::1',
-            signature: 'signed-metadata',
-        }, payload);
-
         if (!mocks.server) throw new Error('UDP ingress did not initialize');
-        const associations = await import('../../../src/main_process/network/server/socks5Udp.js');
-        const createAssociation = vi.mocked(associations.createSocks5UdpAssociation);
-        const receiver = createAssociation.mock.calls[0]?.[0];
-        if (!receiver) throw new Error('SOCKS UDP receiver did not initialize');
-        receiver(packet, '200::2', 50006);
-        expect(mocks.handlePacket).not.toHaveBeenCalled();
-        receiver(packet, '200::1', 50006);
-        expect(mocks.handlePacket).toHaveBeenCalledWith(
-            packet,
-            { address: '200::1', port: 50006 },
-            expect.anything(),
-            expect.any(Function),
-            expect.any(Function),
-        );
+        const payload = new Uint8Array([1, 2, 3]);
+        const packet = encodeBinaryCallMedia({ type: 'CALL_MEDIA', callId: 'call-1', mediaHash: hashCallMedia(payload), senderUpeerId: 'remote-peer', senderYggAddress: '200::1', signature: 'signed-metadata' }, payload);
+        mocks.server.emit('message', packet);
+        expect(mocks.port?.listenerCount('message')).toBe(1);
+        expect(mocks.port?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'packet' }));
+        expect(mocks.port?.start).toHaveBeenCalledOnce();
     });
 
     it('starts the SOCKS5 association only after the local UDP listener is bound', async () => {

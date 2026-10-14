@@ -28,6 +28,7 @@ import { canonicalStringify } from './utils.js';
 import { routeVerifiedPacket } from './verifiedPacketRouter.js';
 import { decodeBinaryCallMedia, isBinaryCallMedia } from './binaryCallMedia.js';
 
+
 const rateLimiter = new IdentityRateLimiter();
 
 /** BUG AP fix: exponer cleanup para que server.ts lo llame cada hora. */
@@ -35,7 +36,7 @@ export function cleanupRateLimiter(): void {
     rateLimiter.cleanup();
 }
 
-function queryOwnVaultsOnReconnect(upeerId: string): void {
+export function queryOwnVaultsOnReconnect(upeerId: string): void {
     import('./vault/manager.js').then(({ VaultManager }) => {
         VaultManager.queryOwnVaults();
     }).catch((err) => {
@@ -132,7 +133,7 @@ export async function handlePacket(
             security('Packet missing type', { ip: tcpSourceAddress }, 'network');
             return;
         }
-        if (!rateLimiter.checkIp(tcpSourceAddress, pktType)) {
+        if (pktType !== 'CALL_MEDIA' && !rateLimiter.checkIp(tcpSourceAddress, pktType)) {
             return;
         }
         if (binaryMediaHash && !rateLimiter.checkIdentity(rinfo.address, senderUpeerId ?? '', pktType)) return;
@@ -210,32 +211,44 @@ export async function handlePacket(
             return;
         }
 
-        let verified = verify(
-            Buffer.from(canonicalStringify(payloadForVerification)),
-            Buffer.from(signature, 'hex'),
-            Buffer.from(contact.publicKey, 'hex')
-        );
-        if (!verified && senderYggAddress !== undefined) {
-            const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
+        let verified: boolean;
+        if (binaryMediaHash) {
             verified = verify(
-                Buffer.from(canonicalStringify(legacyPayload)),
+                Buffer.from(canonicalStringify(payloadForVerification)),
                 Buffer.from(signature, 'hex'),
                 Buffer.from(contact.publicKey, 'hex')
             );
+        } else {
+            verified = verify(
+                Buffer.from(canonicalStringify(payloadForVerification)),
+                Buffer.from(signature, 'hex'),
+                Buffer.from(contact.publicKey, 'hex')
+            );
+            if (!verified && senderYggAddress !== undefined) {
+                const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
+                verified = verify(
+                    Buffer.from(canonicalStringify(legacyPayload)),
+                    Buffer.from(signature, 'hex'),
+                    Buffer.from(contact.publicKey, 'hex')
+                );
+            }
         }
 
         if (!verified) {
-            security('Invalid signature', {
-                upeerId,
-                ip: rinfo.address,
-                type: pktType,
-                payload: canonicalStringify(payloadForVerification),
-                fullPacket
-            }, 'network');
+            if (pktType !== 'CALL_MEDIA') {
+                security('Invalid signature', {
+                    upeerId,
+                    ip: rinfo.address,
+                    type: pktType,
+                    payload: canonicalStringify(payloadForVerification),
+                    fullPacket
+                }, 'network');
+            }
             return;
         } else if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
         }
+        if (pktType === 'CALL_MEDIA' && binaryMediaHash) return;
         // Apply identity-based rate limiting
         if (!rateLimiter.checkIdentity(rinfo.address, upeerId, pktType)) {
             return;
@@ -247,18 +260,20 @@ export async function handlePacket(
             updateContactLocation(upeerId, rinfo.address);
         }
 
-        const nowIso = new Date().toISOString();
-        if (isReconnectState(contact.status)) {
-            updateContactStatus(upeerId, 'connected');
-            queryOwnVaultsOnReconnect(upeerId);
+        if (pktType !== 'CALL_MEDIA') {
+            const nowIso = new Date().toISOString();
+            if (isReconnectState(contact.status)) {
+                updateContactStatus(upeerId, 'connected');
+                queryOwnVaultsOnReconnect(upeerId);
+            }
+            updateLastSeen(upeerId);
+            win?.webContents.send('contact-presence', {
+                upeerId,
+                lastSeen: nowIso,
+                alias: data.alias as string | undefined,
+                avatar: data.avatar as string | undefined,
+            });
         }
-        updateLastSeen(upeerId);
-        win?.webContents.send('contact-presence', {
-            upeerId,
-            lastSeen: nowIso,
-            alias: data.alias as string | undefined,
-            avatar: data.avatar as string | undefined,
-        });
 
         await routeVerifiedPacket({
             upeerId,

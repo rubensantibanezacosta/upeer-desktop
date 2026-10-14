@@ -4,6 +4,11 @@ let mainWindow: BrowserWindow | null = null;
 
 export function setMainWindow(window: BrowserWindow): void {
   mainWindow = window;
+  window.once('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
 }
 
 export function getMainWindow(): BrowserWindow | null {

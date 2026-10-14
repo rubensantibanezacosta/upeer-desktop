@@ -27,6 +27,8 @@ async function _getDirectContactIds(): Promise<Set<string>> {
 export class IdentityRateLimiter extends RateLimiter {
     private identityBuckets: Map<string, Map<string, IdentityTokenBucket>> = new Map();
 
+    private readonly callMediaRule: RateLimitConfig = { windowMs: 1000, maxTokens: 120, refillRate: 120 };
+
     constructor(rules?: RateLimitRule) {
         super(rules);
     }
@@ -42,7 +44,7 @@ export class IdentityRateLimiter extends RateLimiter {
             _getDirectContactIds().catch((err) => warn('Failed to get direct contact IDs', err, 'rate-limiter'));
         }
 
-        const rule = this.rules[messageType];
+        const rule = messageType === 'CALL_MEDIA' ? this.callMediaRule : this.rules[messageType];
         if (!rule) return true;
 
         const adjustedRule = this.getAdjustedRule(upeerId, messageType, rule);
@@ -85,6 +87,9 @@ export class IdentityRateLimiter extends RateLimiter {
     }
 
     checkIdentity(ip: string, upeerId: string, messageType: string): boolean {
+        if (messageType === 'CALL_MEDIA') {
+            return super.check(ip, messageType) && this.checkIdentityOnly(upeerId, messageType);
+        }
         return super.check(ip, messageType) && this.checkIdentityOnly(upeerId, messageType);
     }
 

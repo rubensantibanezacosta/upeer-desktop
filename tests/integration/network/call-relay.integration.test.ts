@@ -34,7 +34,7 @@ vi.mock('../../../src/main_process/network/call/validationCalls.js', async (impo
 describe('call relay integración (SFU distribuido)', () => {
     let callManager: typeof import('../../../src/main_process/network/call/callManager.js')['callManager'];
     let signaling: typeof import('../../../src/main_process/network/call/callSignaling.js');
-    let handleCallPacket: (upeerId: string, data: Record<string, unknown>, win: null) => void;
+    let handleCallPacket: typeof import('../../../src/main_process/network/call/callPacketHandler.js')['handleCallPacket'];
 
     beforeEach(async () => {
         callManager = (await import('../../../src/main_process/network/call/callManager.js')).callManager;
@@ -74,6 +74,19 @@ describe('call relay integración (SFU distribuido)', () => {
         expect(targets).toEqual(expect.arrayContaining(['200::p2', '200::p3', '200::p4']));
         const relayedPackets = sendMock.mock.calls.map((call) => call[1] as { senderUpeerId?: string });
         expect(relayedPackets.every((packet) => packet.senderUpeerId === 'p1')).toBe(true);
+    });
+
+    it('no reenvía media entrante a participantes cuando la llamada ya terminó', () => {
+        const session = callManager.createGroup(['p1', 'p2', 'p3'], 'audio');
+        callManager.end(session.callId);
+        const sendToRenderer = vi.fn();
+
+        handleCallPacket('p1', { type: 'CALL_MEDIA', callId: session.callId, data: new Uint8Array([1]), timestamp: Date.now() }, {
+            webContents: { send: sendToRenderer },
+        } as unknown as Parameters<typeof handleCallPacket>[2]);
+
+        expect(sendToRenderer).toHaveBeenCalledWith('call-media', expect.objectContaining({ callId: session.callId }));
+        expect(sendMock).not.toHaveBeenCalled();
     });
 
     it('sin relay electo, el grupo hace fan-out a todos los miembros', async () => {

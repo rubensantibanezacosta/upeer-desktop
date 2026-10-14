@@ -37,7 +37,9 @@ export function useCallMedia(callId: string) {
         if (event.callId !== callId) return;
         const frame = decodeMediaFrame(event.data);
         const session = sessionRef.current;
-        if (!frame || !session) return;
+        if (!frame || !session) {
+            return;
+        }
         const streamId = event.senderUpeerId ?? event.peerUpeerId;
         void session.decodeChunk(frame.kind, frame.data, frame.ts, frame.keyFrame ?? true, (decoded) => {
             onRemoteFrameRef.current?.(frame.kind, decoded, streamId);

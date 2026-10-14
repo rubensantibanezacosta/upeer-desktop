@@ -21,19 +21,31 @@ function emitVaultRecoveryStatus() {
     if (!mainWindow || mainWindow.isDestroyed()) {
         return;
     }
+    const webContents = mainWindow.webContents;
+    if (webContents.isDestroyed() || webContents.isLoadingMainFrame()) {
+        return;
+    }
+    const mainFrame = webContents.mainFrame;
+    if (!mainFrame || mainFrame.isDestroyed()) {
+        return;
+    }
 
     const sources = Array.from(activeSources.values());
     const pendingStartupSources = sources.filter((source) => source.context === 'startup').length;
 
-    mainWindow.webContents.send(VAULT_RECOVERY_CHANNEL, {
-        active: sources.length > 0,
-        startupActive: pendingStartupSources > 0,
-        pendingSources: sources.length,
-        pendingStartupSources,
-        message: pendingStartupSources > 0
-            ? 'Recuperando mensajes y adjuntos guardados…'
-            : 'Sincronizando mensajes guardados…',
-    });
+    try {
+        webContents.send(VAULT_RECOVERY_CHANNEL, {
+            active: sources.length > 0,
+            startupActive: pendingStartupSources > 0,
+            pendingSources: sources.length,
+            pendingStartupSources,
+            message: pendingStartupSources > 0
+                ? 'Recuperando mensajes y adjuntos guardados…'
+                : 'Sincronizando mensajes guardados…',
+        });
+    } catch (cause) {
+        warn('Vault recovery status could not be sent to renderer', cause, 'vault');
+    }
 }
 
 function scheduleTimeout(key: string, label: string, context: VaultRecoveryContext) {

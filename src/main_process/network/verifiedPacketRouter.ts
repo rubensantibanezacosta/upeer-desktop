@@ -610,7 +610,6 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
         case 'CALL_BUSY':
         case 'CALL_CANCEL':
         case 'CALL_END':
-        case 'CALL_MEDIA':
         case 'CALL_MEDIA_UPDATE':
         case 'CALL_META':
         case 'CALL_JOIN':
