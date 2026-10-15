@@ -1,10 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, Box, Chip, IconButton, Tooltip, Typography } from '@mui/joy';
-import OpenInFullIcon from '@mui/icons-material/OpenInFull';
-import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
-import CallEndIcon from '@mui/icons-material/CallEnd';
-import ScreenShareIcon from '@mui/icons-material/ScreenShare';
-import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
+import { Avatar, Box, Chip, Typography } from '@mui/joy';
 import { CallControls } from './CallControls.js';
 import { useCallMedia } from './useCallMedia.js';
 import type { ActiveCallView } from './useCall.js';
@@ -46,7 +41,6 @@ function formatDuration(totalSeconds: number): string {
 export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false }) => {
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
     const [size] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
-    const [expanded, setExpanded] = useState(false);
     const [startedAt] = useState<number>(Date.now());
     const [seconds, setSeconds] = useState(0);
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
@@ -73,8 +67,8 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const isGroup = call.isGroup === true;
     const mediaActive = call.phase === 'negotiating' || call.phase === 'connected';
     const isVideoActive = isVideo && (call.phase === 'negotiating' || call.phase === 'connected');
-    const effWidth = expanded ? Math.max(size.width, 640) : size.width;
-    const effHeight = expanded ? Math.max(size.height, 480) : size.height;
+    const effWidth = size.width;
+    const effHeight = size.height;
 
     const attachVideoCanvas = useCallback((peerUpeerId: string, element: HTMLCanvasElement | null) => {
         if (!element) {
@@ -229,13 +223,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 maxWidth: embedded ? 'none' : undefined,
                 mx: embedded ? 0 : undefined,
                 zIndex: embedded ? 1 : 1400,
-                backgroundColor: embedded ? '#111' : '#1f1f1f',
-                borderRadius: embedded ? 0 : 12,
-                boxShadow: embedded ? 'none' : '0 8px 40px rgba(0,0,0,0.5)',
+                backgroundColor: '#111',
+                borderRadius: 0,
+                boxShadow: 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                border: embedded ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                border: 'none',
                 color: 'white',
                 userSelect: 'none',
                 cursor: embedded ? 'default' : 'grab',
@@ -264,30 +258,10 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 {screenSharing && (
                     <Chip size="sm" variant="solid" color="warning">Compartiendo</Chip>
                 )}
-                <Tooltip title={screenSharing ? 'Detener pantalla' : 'Compartir pantalla'}>
-                    <IconButton
-                        size="sm"
-                        variant="plain"
-                        color={screenSharing ? 'warning' : 'neutral'}
-                        onClick={() => setShowShareOptions((prev) => !prev)}
-                    >
-                        {screenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
-                    </IconButton>
-                </Tooltip>
-                {!embedded && <Tooltip title={expanded ? 'Reducir' : 'Expandir'}>
-                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => setExpanded((prev) => !prev)}>
-                        {expanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
-                    </IconButton>
-                </Tooltip>}
-                <Tooltip title="Colgar">
-                    <IconButton size="sm" variant="plain" color="danger" onClick={onEnd}>
-                        <CallEndIcon />
-                    </IconButton>
-                </Tooltip>
             </Box>
 
             {showShareOptions && (
-                <Box data-nodrag="true" sx={{ position: 'absolute', top: 44, right: 12, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+                <Box data-nodrag="true" sx={{ position: 'absolute', bottom: 92, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
                     <Typography level="body-xs" sx={{ px: 1, color: 'rgba(255,255,255,0.7)' }}>Compartir pantalla</Typography>
                     <Box component="button" data-nodrag="true" onClick={() => doShare('screen', true)} sx={shareOptionSx}>Pantalla con sonido</Box>
                     <Box component="button" data-nodrag="true" onClick={() => doShare('screen', false)} sx={shareOptionSx}>Pantalla sin sonido</Box>
@@ -372,7 +346,14 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             </Box>
 
             <Box data-nodrag="true" sx={{ p: embedded ? 2 : 1, pt: embedded ? 1.5 : 1, display: 'flex', justifyContent: 'center', borderTop: embedded ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
-                <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
+                <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} screenSharing={screenSharing} onToggleScreenShare={() => {
+                    if (screenSharing) {
+                        stopScreenShare();
+                        setShowShareOptions(false);
+                    } else {
+                        setShowShareOptions((previous) => !previous);
+                    }
+                }} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
             </Box>
         </Box>
     );

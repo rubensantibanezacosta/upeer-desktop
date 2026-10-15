@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, session, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, protocol, session, shell, systemPreferences } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
@@ -148,6 +148,33 @@ export const createMainWindow = async (baseDir: string, devServerUrl: string | u
             sandbox: true,
             webSecurity: true,
         },
+    });
+
+    mainWindow.webContents.session.setDisplayMediaRequestHandler(async (_request, callback) => {
+        try {
+            const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 } });
+            if (sources.length === 0) {
+                callback({});
+                return;
+            }
+            const selection = await dialog.showMessageBox(mainWindow, {
+                type: 'question',
+                title: 'Compartir pantalla o ventana',
+                message: 'Selecciona qué quieres compartir',
+                buttons: [...sources.map((source) => source.name), 'Cancelar'],
+                cancelId: sources.length,
+                noLink: true,
+            });
+            const source = sources[selection.response];
+            if (!source) {
+                callback({});
+                return;
+            }
+            callback({ video: source });
+        } catch (cause) {
+            logError('[Call] No se pudieron obtener fuentes para compartir pantalla', { err: String(cause) }, 'app');
+            callback({});
+        }
     });
 
     mainWindow.maximize();
