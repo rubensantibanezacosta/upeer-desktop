@@ -2,6 +2,17 @@ import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Contact, Group } from '../../../../src/types/chat.js';
+vi.mock('../../../../src/features/call/useCallMedia.js', () => ({
+    useCallMedia: () => ({
+        setOnRemoteFrame: vi.fn(),
+        localStream: null,
+        startScreenShare: vi.fn(),
+        stopScreenShare: vi.fn(),
+        screenSharing: false,
+        setVideoEnabled: vi.fn(),
+        setAudioEnabled: vi.fn(),
+    }),
+}));
 import { CallsPanel } from '../../../../src/features/call/CallsPanel.js';
 import { useCallStore } from '../../../../src/features/call/useCallStore.js';
 
@@ -26,11 +37,14 @@ describe('CallsPanel', () => {
             status: 'active',
         }];
         const onStartCall = vi.fn().mockResolvedValue({ success: true });
+        const onToggleMute = vi.fn().mockResolvedValue(undefined);
+        const onToggleCamera = vi.fn().mockResolvedValue(undefined);
+        const onEndCall = vi.fn().mockResolvedValue(undefined);
 
         useCallStore.getState().setStarted('call-1', 'peer-1', 'video');
-        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} />);
+        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEndCall={onEndCall} />);
 
-        expect(screen.getAllByText('Ana')).toHaveLength(2);
+        expect(screen.getAllByText('Ana')).toHaveLength(3);
         expect(screen.getByText('Equipo')).toBeDefined();
         expect(screen.getByText('Videollamada · Llamando')).toBeDefined();
         expect(screen.getByRole('button', { name: 'Llamar a Ana' })).toBeDisabled();

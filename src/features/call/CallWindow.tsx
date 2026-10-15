@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Box, Chip, IconButton, Tooltip, Typography } from '@mui/joy';
-import MinimizeIcon from '@mui/icons-material/Minimize';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import CallEndIcon from '@mui/icons-material/CallEnd';
@@ -17,7 +16,7 @@ interface CallWindowProps {
     onToggleMute: () => void;
     onToggleCamera: () => void;
     onEnd: () => void;
-    onMinimize: () => void;
+    embedded?: boolean;
 }
 
 const DEFAULT_WIDTH = 360;
@@ -44,7 +43,7 @@ function formatDuration(totalSeconds: number): string {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, onToggleMute, onToggleCamera, onEnd, onMinimize }) => {
+export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false }) => {
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
     const [size] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const [expanded, setExpanded] = useState(false);
@@ -219,14 +218,17 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     return (
 
         <Box
-            onPointerDown={handlePointerDown}
+            onPointerDown={embedded ? undefined : handlePointerDown}
             sx={{
-                position: 'fixed',
-                top: pos.y,
-                left: pos.x,
-                width: effWidth,
-                height: effHeight,
-                zIndex: 1400,
+                position: embedded ? 'relative' : 'fixed',
+                top: embedded ? undefined : pos.y,
+                left: embedded ? undefined : pos.x,
+                width: embedded ? '100%' : effWidth,
+                height: embedded ? { xs: 'min(70vh, 680px)', md: 'min(72vh, 760px)' } : effHeight,
+                minHeight: embedded ? 420 : undefined,
+                maxWidth: embedded ? 1100 : undefined,
+                mx: embedded ? 'auto' : undefined,
+                zIndex: embedded ? 1 : 1400,
                 backgroundColor: '#1f1f1f',
                 borderRadius: 12,
                 boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
@@ -236,7 +238,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 border: '1px solid rgba(255,255,255,0.12)',
                 color: 'white',
                 userSelect: 'none',
-                cursor: 'grab',
+                cursor: embedded ? 'default' : 'grab',
             }}
         >
             <Box
@@ -249,7 +251,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                     py: 0.75,
                     backgroundColor: 'rgba(0,0,0,0.25)',
                     borderBottom: '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'grab',
+                    cursor: embedded ? 'default' : 'grab',
                 }}
                 onPointerDown={handlePointerDown}
             >
@@ -272,16 +274,11 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                         {screenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
                     </IconButton>
                 </Tooltip>
-                <Tooltip title={expanded ? 'Reducir' : 'Expandir'}>
+                {!embedded && <Tooltip title={expanded ? 'Reducir' : 'Expandir'}>
                     <IconButton size="sm" variant="plain" color="neutral" onClick={() => setExpanded((prev) => !prev)}>
                         {expanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
                     </IconButton>
-                </Tooltip>
-                <Tooltip title="Minimizar">
-                    <IconButton size="sm" variant="plain" color="neutral" onClick={onMinimize}>
-                        <MinimizeIcon />
-                    </IconButton>
-                </Tooltip>
+                </Tooltip>}
                 <Tooltip title="Colgar">
                     <IconButton size="sm" variant="plain" color="danger" onClick={onEnd}>
                         <CallEndIcon />
