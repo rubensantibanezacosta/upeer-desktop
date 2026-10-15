@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const contactStatuses: Record<string, { status: string; publicKey: string; address: string }> = {};
 
-const { sendMock, scoreMock } = vi.hoisted(() => ({ sendMock: vi.fn(), scoreMock: vi.fn() }));
+const { sendMock, scoreMock, sendToMainWindow } = vi.hoisted(() => ({ sendMock: vi.fn(), scoreMock: vi.fn(), sendToMainWindow: vi.fn() }));
+
+vi.mock('../../../src/main_process/core/windowManager.js', () => ({
+    getMainWindow: () => ({
+        isDestroyed: () => false,
+        webContents: { isDestroyed: () => false, send: sendToMainWindow },
+    }),
+}));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: () => 'me',
@@ -42,12 +49,24 @@ describe('call relay integración (SFU distribuido)', () => {
         ({ handleCallPacket } = await import('../../../src/main_process/network/call/callPacketHandler.js'));
         callManager.resetForTests();
         sendMock.mockClear();
+        sendToMainWindow.mockClear();
         scoreMock.mockReset();
         scoreMock.mockResolvedValue(50);
         Object.keys(contactStatuses).forEach((key) => delete contactStatuses[key]);
         for (const id of ['me', 'p1', 'p2', 'p3', 'p4']) {
             contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${id}` };
         }
+    });
+
+    it('notifica al emisor cuando llega CALL_ACCEPT aunque el router no pase una ventana', () => {
+        const session = callManager.create('p1', 'audio', 'outgoing');
+
+        handleCallPacket('p1', { type: 'CALL_ACCEPT', callId: session.callId }, null);
+
+        expect(sendToMainWindow).toHaveBeenCalledWith('call-accepted', expect.objectContaining({
+            callId: session.callId,
+            peerUpeerId: 'p1',
+        }));
     });
 
     it('si no soy el relay, el emisor envía su media solo al relay', async () => {

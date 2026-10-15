@@ -23,6 +23,7 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { sendUDPMessage } from '../../network/messaging/chatSend.js';
 import { shouldSendCallMedia } from './callMediaFanout.js';
 import { handleCallMediaSpeakerState } from './callMediaSpeaker.js';
+import { sendCallRendererEvent } from '../../network/call/callRendererEvents.js';
 
 let rendererSender: WebContents | null = null;
 
@@ -147,7 +148,7 @@ export function registerCallHandlers(): void {
         callManager.accept(callId);
         callManager.connect(callId);
         sendCallAccept(session.peerUpeerId, callId);
-        rendererSender?.send('call-accepted', { callId, peerUpeerId: session.peerUpeerId, connectedAt: session.connectedAt });
+        sendCallRendererEvent('call-accepted', { callId, peerUpeerId: session.peerUpeerId, connectedAt: session.connectedAt });
         return { success: true };
     });
 

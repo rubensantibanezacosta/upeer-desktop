@@ -13,6 +13,7 @@ import type { CallMediaKind } from './callTypes.js';
 import { validateCallPacket } from './validationCalls.js';
 import { getGroupById } from '../../storage/groups/operations.js';
 import { callFanoutPolicy } from './callFanoutPolicy.js';
+import { sendCallRendererEvent } from './callRendererEvents.js';
 
 export function handleCallPacket(
     upeerId: string,
@@ -71,7 +72,7 @@ export function handleCallPacket(
         case 'CALL_ACCEPT': {
             callManager.accept(callId);
             callManager.connect(callId);
-            win?.webContents.send('call-accepted', { callId, peerUpeerId: upeerId, connectedAt: callManager.get(callId)?.connectedAt });
+            sendCallRendererEvent('call-accepted', { callId, peerUpeerId: upeerId, connectedAt: callManager.get(callId)?.connectedAt });
             break;
         }
         case 'CALL_REJECT':
