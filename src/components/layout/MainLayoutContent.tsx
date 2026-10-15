@@ -113,7 +113,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     isContactInfoOpen,
     setIsInviteGroupMembersOpen,
 }) => {
-    const { startCall } = useCall();
+    const { startCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
@@ -131,12 +131,13 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 activeView={navigation.appView}
                 onOpenChats={() => navigation.goToChat()}
                 onOpenContacts={() => navigation.goToContacts()}
+                onOpenCalls={() => navigation.goToCalls()}
                 onOpenSettings={() => navigation.toggleSettings()}
                 onOpenIdentity={() => navigation.goToSettings('perfil')}
             />
 
-            {navigation.appView === 'settings' || navigation.appView === 'contacts' ? (
-                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} />
+            {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (
+                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} />
             ) : (
                 <>
                     <Sidebar

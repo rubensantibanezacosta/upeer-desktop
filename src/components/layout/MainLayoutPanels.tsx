@@ -2,16 +2,19 @@ import React from 'react';
 import { Box } from '@mui/joy';
 import { ContactsPanel } from './ContactsPanel.js';
 import { SettingsPanel } from '../ui/SettingsPanel.js';
+import { CallsPanel } from '../../features/call/CallsPanel.js';
 import type { MainLayoutProps } from './MainLayout.js';
+import type { CallKind } from '../../features/call/useCall.js';
 
 interface MainLayoutPanelsProps {
     navigation: MainLayoutProps['navigation'];
     appStore: MainLayoutProps['appStore'];
     chatStore: MainLayoutProps['chatStore'];
     onLockSession: () => void;
+    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[]) => Promise<unknown>;
 }
 
-export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession }) => {
+export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession, onStartCall }) => {
     if (navigation.appView === 'settings') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -44,6 +47,14 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
                     onBlockContact={(upeerId) => chatStore.handleBlockContact(upeerId)}
                     onUnblockContact={chatStore.handleUnblockContact}
                 />
+            </Box>
+        );
+    }
+
+    if (navigation.appView === 'calls') {
+        return (
+            <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
+                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} selfUpeerId={chatStore.myIdentity?.upeerId} onStartCall={onStartCall} />
             </Box>
         );
     }

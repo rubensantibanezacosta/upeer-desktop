@@ -19,6 +19,9 @@ export interface ActiveCallView {
 interface CallStore {
     calls: Record<string, ActiveCallView>;
     activeCallId?: string;
+    isStartingCall: boolean;
+    beginCall: () => boolean;
+    finishCallStart: () => void;
     setCalls: (calls: ActiveCallView[]) => void;
     setFromIncoming: (data: { callId: string; peerUpeerId: string; kind: CallKind; isGroup?: boolean; groupMembers?: string[] }) => void;
     setStarted: (callId: string, peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[]) => void;
@@ -37,6 +40,19 @@ interface CallStore {
 export const useCallStore = create<CallStore>((set) => ({
     calls: {},
     activeCallId: undefined,
+    isStartingCall: false,
+
+    beginCall: () => {
+        let started = false;
+        set((state) => {
+            if (state.isStartingCall || Object.keys(state.calls).length > 0) return state;
+            started = true;
+            return { isStartingCall: true };
+        });
+        return started;
+    },
+
+    finishCallStart: () => set({ isStartingCall: false }),
 
     setCalls: (calls) => {
         const byId: Record<string, ActiveCallView> = {};
@@ -147,5 +163,5 @@ export const useCallStore = create<CallStore>((set) => ({
         return { calls: rest, activeCallId: nextActive };
     }),
 
-    reset: () => set({ calls: {}, activeCallId: undefined }),
+    reset: () => set({ calls: {}, activeCallId: undefined, isStartingCall: false }),
 }));

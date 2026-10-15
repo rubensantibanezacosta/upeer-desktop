@@ -3,7 +3,7 @@ import { useCallStore } from './useCallStore.js';
 
 export type { CallKind, CallPhase, ActiveCallView } from './useCallStore.js';
 
-export function useCall() {
+export function useCall(selfUpeerId?: string) {
     const calls = useCallStore((s) => s.calls);
     const activeCallId = useCallStore((s) => s.activeCallId);
     const reset = useCallStore((s) => s.reset);
@@ -47,15 +47,25 @@ export function useCall() {
     }, []);
 
     const startCall = useCallback(async (peerUpeerId: string, kind: 'audio' | 'video', isGroup?: boolean, groupMembers?: string[]) => {
-        const result = isGroup
-            ? await window.upeer.startGroupCall(groupMembers ?? [], kind)
-            : await window.upeer.startCall(peerUpeerId, kind);
-        if (result?.success && result.callId) {
-            useCallStore.getState().setStarted(result.callId, peerUpeerId, kind, isGroup, groupMembers);
-            useCallStore.getState().setActive(result.callId);
+        if (!isGroup && selfUpeerId && peerUpeerId === selfUpeerId) {
+            return { success: false, error: 'No puedes llamarte a ti mismo' };
         }
-        return result;
-    }, []);
+        if (!useCallStore.getState().beginCall()) {
+            return { success: false, error: 'Ya hay una llamada activa o en curso' };
+        }
+        try {
+            const result = isGroup
+                ? await window.upeer.startGroupCall(groupMembers ?? [], kind)
+                : await window.upeer.startCall(peerUpeerId, kind);
+            if (result?.success && result.callId) {
+                useCallStore.getState().setStarted(result.callId, peerUpeerId, kind, isGroup, groupMembers);
+                useCallStore.getState().setActive(result.callId);
+            }
+            return result;
+        } finally {
+            useCallStore.getState().finishCallStart();
+        }
+    }, [selfUpeerId]);
 
     const acceptCall = useCallback(async (callId?: string) => {
         const target = callId ?? useCallStore.getState().activeCallId;

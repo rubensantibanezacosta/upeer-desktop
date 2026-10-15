@@ -32,6 +32,9 @@ describe('useNavigationStore', () => {
         store.getState().goToContacts();
         expect(store.getState().appView).toBe('contacts');
 
+        store.getState().goToCalls();
+        expect(store.getState().appView).toBe('calls');
+
         store.getState().goToSettings('privacidad');
         expect(store.getState().appView).toBe('settings');
         expect(store.getState().settingsSection).toBe('privacidad');

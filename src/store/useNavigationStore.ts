@@ -5,7 +5,7 @@ import { MediaItem } from '../types/chat.js';
 // ── Tipos de vista de la sidebar ──────────────────────────────────────────────
 export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group';
 export type SidebarFilter = 'all' | 'unread' | 'favorites' | 'groups';
-export type AppView = 'chat' | 'contacts' | 'settings';
+export type AppView = 'chat' | 'contacts' | 'calls' | 'settings';
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 interface NavigationState {
@@ -45,6 +45,7 @@ interface NavigationActions {
     // Vista principal
     goToChat: () => void;
     goToContacts: () => void;
+    goToCalls: () => void;
     goToSettings: (section?: SettingsSection) => void;
     toggleSettings: () => void;
 
@@ -107,6 +108,8 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     goToChat: () => set({ appView: 'chat', sidebarView: 'list', newChatSearch: '' }),
 
     goToContacts: () => set({ appView: 'contacts', sidebarView: 'list', newChatSearch: '' }),
+
+    goToCalls: () => set({ appView: 'calls', sidebarView: 'list', newChatSearch: '' }),
 
     goToSettings: (section) => set({
         appView: 'settings',

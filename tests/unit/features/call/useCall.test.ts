@@ -83,6 +83,35 @@ describe('useCall', () => {
         expect(result.current.isActive).toBe(true);
     });
 
+    it('rechaza iniciar una segunda llamada mientras ya hay otra activa', async () => {
+        const bridge = installBridge();
+        const { result } = renderHook(() => useCall());
+        await act(async () => {
+            await result.current.startCall('peer1', 'audio');
+        });
+
+        let secondResult: unknown;
+        await act(async () => {
+            secondResult = await result.current.startCall('peer2', 'video');
+        });
+
+        expect(secondResult).toMatchObject({ success: false });
+        expect(bridge.startCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza llamadas al propio usuario sin invocar el puente', async () => {
+        const bridge = installBridge();
+        const { result } = renderHook(() => useCall('self-id'));
+        let startResult: unknown;
+
+        await act(async () => {
+            startResult = await result.current.startCall('self-id', 'audio');
+        });
+
+        expect(startResult).toMatchObject({ success: false });
+        expect(bridge.startCall).not.toHaveBeenCalled();
+    });
+
     it('endCall resetea a idle', async () => {
         const { result } = renderHook(() => useCall());
         await act(async () => {

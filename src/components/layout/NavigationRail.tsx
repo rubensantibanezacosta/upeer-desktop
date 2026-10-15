@@ -5,6 +5,7 @@ import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CallIcon from '@mui/icons-material/Call';
 
 interface NavigationRailProps {
     myIp: string;
@@ -12,9 +13,10 @@ interface NavigationRailProps {
     myInitial?: string;
     onOpenChats?: () => void;
     onOpenContacts?: () => void;
+    onOpenCalls?: () => void;
     onOpenSettings?: () => void;
     onOpenIdentity?: () => void;
-    activeView?: 'chat' | 'contacts' | 'settings';
+    activeView?: 'chat' | 'contacts' | 'calls' | 'settings';
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
@@ -23,6 +25,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     myInitial,
     onOpenChats,
     onOpenContacts,
+    onOpenCalls,
     onOpenSettings,
     onOpenIdentity,
     activeView = 'chat',
@@ -65,6 +68,19 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         sx={{ borderRadius: 'sm' }}
                     >
                         <ContactsRoundedIcon />
+                    </IconButton>
+                </Box>
+            </Tooltip>
+            <Tooltip title="Llamadas" placement="right">
+                <Box>
+                    <IconButton
+                        aria-label="Llamadas"
+                        variant={activeView === 'calls' ? 'soft' : 'plain'}
+                        color={activeView === 'calls' ? 'primary' : 'neutral'}
+                        onClick={onOpenCalls}
+                        sx={{ borderRadius: 'sm' }}
+                    >
+                        <CallIcon />
                     </IconButton>
                 </Box>
             </Tooltip>

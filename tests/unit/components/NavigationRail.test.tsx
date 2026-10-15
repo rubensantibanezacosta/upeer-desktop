@@ -7,6 +7,7 @@ vi.mock('@mui/icons-material/Chat', () => ({ default: () => <div data-testid="Ch
 vi.mock('@mui/icons-material/DonutLarge', () => ({ default: () => <div data-testid="DonutLargeIcon" /> }));
 vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
 vi.mock('@mui/icons-material/Settings', () => ({ default: () => <div data-testid="SettingsIcon" /> }));
+vi.mock('@mui/icons-material/Call', () => ({ default: () => <div data-testid="CallIcon" /> }));
 
 import { NavigationRail } from '../../../src/components/layout/NavigationRail';
 
@@ -21,6 +22,14 @@ describe('NavigationRail Component', () => {
         render(<NavigationRail {...defaultProps} />);
         expect(screen.getByTestId('ChatIcon')).toBeDefined();
         expect(screen.getByTestId('SettingsIcon')).toBeDefined();
+        expect(screen.getByTestId('CallIcon')).toBeDefined();
+    });
+
+    it('calls onOpenCalls when the calls item is clicked', () => {
+        const onOpenCalls = vi.fn();
+        render(<NavigationRail {...defaultProps} onOpenCalls={onOpenCalls} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Llamadas' }));
+        expect(onOpenCalls).toHaveBeenCalledTimes(1);
     });
 
     it('calls onOpenSettings when settings icon is clicked', () => {
