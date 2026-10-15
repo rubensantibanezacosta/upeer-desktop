@@ -37,13 +37,17 @@ export function registerCallHandlers(): void {
         if (change.phase === 'ended') {
             callFanoutPolicy.removeCall(change.callId);
             const session = callManager.get(change.callId);
-            if (session && !session.eventWritten && change.connectedAt !== undefined) {
+            const isMissedOutgoingCall = change.direction === 'outgoing'
+                && change.connectedAt === undefined
+                && ['no-answer', 'error', 'rejected', 'busy'].includes(change.endReason ?? '');
+            if (session && !session.eventWritten && (change.connectedAt !== undefined || isMissedOutgoingCall)) {
                 session.eventWritten = true;
-                const connectedAt = change.connectedAt;
-                const durationSeconds = Math.max(0, Math.floor(((change.endedAt ?? Date.now()) - connectedAt) / 1000));
-                const duration = `${String(Math.floor(durationSeconds / 60)).padStart(2, '0')}:${String(durationSeconds % 60).padStart(2, '0')}`;
                 const label = change.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
-                const message = `__SYS__|${label} · ${duration}`;
+                const duration = change.connectedAt === undefined
+                    ? null
+                    : formatCallDuration(Math.max(0, Math.floor(((change.endedAt ?? Date.now()) - change.connectedAt) / 1000)));
+                const displayMessage = duration === null ? `${label} perdida` : `${label} · ${duration}`;
+                const message = `__SYS__|${displayMessage}`;
                 const eventId = callEventMessageId(change.callId);
                 if (change.isGroup) {
                     const groupId = change.groupId;
@@ -61,7 +65,7 @@ export function registerCallHandlers(): void {
                                 id: eventId,
                                 upeerId: change.peerUpeerId,
                                 isMine: true,
-                                message: `${label} · ${duration}`,
+                                message: displayMessage,
                                 status: 'sent',
                                 timestamp,
                                 isSystem: true,
@@ -323,6 +327,10 @@ export function registerCallHandlers(): void {
             members: callManager.get(callId)?.groupMembers ?? [],
         };
     });
+}
+
+function formatCallDuration(durationSeconds: number): string {
+    return `${String(Math.floor(durationSeconds / 60)).padStart(2, '0')}:${String(durationSeconds % 60).padStart(2, '0')}`;
 }
 
 function callEventMessageId(callId: string): string {

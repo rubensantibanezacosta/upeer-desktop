@@ -227,6 +227,25 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         );
     });
 
+    it('encola un evento de llamada con ID estable para un contacto pending sin clave', async () => {
+        vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue({
+            upeerId: 'carol',
+            address: '200::carol',
+            status: 'pending',
+            publicKey: null,
+        } as never);
+
+        const result = await sendUDPMessage('carol', '__SYS__|Llamada de voz perdida', undefined, 'call-event-id');
+
+        expect(result).toMatchObject({ id: 'call-event-id' });
+        expect((await messagesOps()).saveMessage).toHaveBeenCalledWith(
+            'call-event-id', 'carol', true, '__SYS__|Llamada de voz perdida', undefined, '', 'sent',
+        );
+        expect((await outboxOps()).savePendingOutboxMessage).toHaveBeenCalledWith(
+            'carol', 'call-event-id', '__SYS__|Llamada de voz perdida', undefined,
+        );
+    });
+
     it('rechaza un mensaje demasiado grande sin guardar nada (sin pérdida parcial)', async () => {
         const huge = 'x'.repeat(1_000_001);
         const result = await sendUDPMessage('alice', huge);

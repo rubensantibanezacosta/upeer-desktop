@@ -17,6 +17,7 @@ interface TopHeaderActionsProps {
     onSearch?: () => void;
     onCallAudio?: () => void;
     onCallVideo?: () => void;
+    isSelfChat?: boolean;
 }
 
 export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
@@ -29,6 +30,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
     onSearch,
     onCallAudio,
     onCallVideo,
+    isSelfChat = false,
 }) => (
     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
         {status === 'incoming' && onAccept && (
@@ -42,12 +44,16 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
                 <Tooltip title="Buscar en el chat" variant="soft">
                     <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral" onClick={onSearch}><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
                 </Tooltip>
-                <Tooltip title="Llamada de voz" variant="soft">
-                    <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral" onClick={onCallAudio}><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
-                </Tooltip>
-                <Tooltip title="Videollamada" variant="soft">
-                    <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral" onClick={onCallVideo}><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
-                </Tooltip>
+                {!isSelfChat && (
+                    <>
+                        <Tooltip title="Llamada de voz" variant="soft">
+                            <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral" onClick={onCallAudio}><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Videollamada" variant="soft">
+                            <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral" onClick={onCallVideo}><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
+                        </Tooltip>
+                    </>
+                )}
                 {isGroup && isAdmin && onInviteMembers && (
                     <Tooltip title="Añadir miembros" variant="soft">
                         <IconButton aria-label="Añadir miembros" size="md" variant="plain" color="neutral" onClick={onInviteMembers}>

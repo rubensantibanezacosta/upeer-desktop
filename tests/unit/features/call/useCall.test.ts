@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { useCall } from '../../../../src/features/call/useCall.js';
 import { useCallStore } from '../../../../src/features/call/useCallStore.js';
+import { useNavigationStore } from '../../../../src/store/useNavigationStore.js';
 
 let incomingCallback: ((data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[] }) => void) | undefined;
 let memberJoinedCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 let memberLeftCallback: ((data: { callId: string; peerUpeerId: string }) => void) | undefined;
 let mediaUpdateCallback: ((data: { callId: string; peerUpeerId: string; muted: boolean; cameraEnabled: boolean }) => void) | undefined;
 let endedCallback: ((data: { callId: string; peerUpeerId: string; reason?: string }) => void) | undefined;
+let acceptedCallback: ((data: { callId: string; peerUpeerId: string; connectedAt?: number }) => void) | undefined;
 
 function installBridge(overrides: Record<string, unknown> = {}) {
     incomingCallback = undefined;
@@ -15,6 +17,7 @@ function installBridge(overrides: Record<string, unknown> = {}) {
     memberLeftCallback = undefined;
     mediaUpdateCallback = undefined;
     endedCallback = undefined;
+    acceptedCallback = undefined;
     (globalThis as unknown as { window: unknown }).window = {
         upeer: {
             startCall: vi.fn(async () => ({ success: true, callId: 'c1' })),
@@ -28,7 +31,10 @@ function installBridge(overrides: Record<string, unknown> = {}) {
                 incomingCallback = cb;
                 return () => undefined;
             }),
-            onCallAccepted: vi.fn(() => () => undefined),
+            onCallAccepted: vi.fn((cb: typeof acceptedCallback) => {
+                acceptedCallback = cb;
+                return () => undefined;
+            }),
             onCallEnded: vi.fn((cb: typeof endedCallback) => {
                 endedCallback = cb;
                 return () => undefined;
@@ -61,6 +67,7 @@ function fireIncoming(data: { callId: string; peerUpeerId: string; kind: 'audio'
 describe('useCall', () => {
     beforeEach(() => {
         useCallStore.getState().reset();
+        useNavigationStore.getState().goToChat();
         installBridge();
     });
     afterEach(() => {
@@ -148,6 +155,31 @@ describe('useCall', () => {
         fireIncoming({ callId: 'in-1', peerUpeerId: 'peer9', kind: 'video' });
         expect(result.current.call.phase).toBe('incoming-ringing');
         expect(result.current.call.peerUpeerId).toBe('peer9');
+    });
+
+    it('lleva a llamadas a quien origina cuando recibe la aceptación', async () => {
+        const { result } = renderHook(() => useCall());
+        await act(async () => {
+            await result.current.startCall('peer1', 'audio');
+        });
+        expect(useNavigationStore.getState().appView).toBe('chat');
+
+        act(() => acceptedCallback?.({ callId: 'c1', peerUpeerId: 'peer1' }));
+
+        expect(useNavigationStore.getState().appView).toBe('calls');
+        expect(result.current.call.phase).toBe('connected');
+    });
+
+    it('lleva a llamadas a quien acepta una llamada entrante', async () => {
+        const { result } = renderHook(() => useCall());
+        fireIncoming({ callId: 'in-1', peerUpeerId: 'peer9', kind: 'video' });
+
+        await act(async () => {
+            await result.current.acceptCall('in-1');
+        });
+
+        expect(useNavigationStore.getState().appView).toBe('calls');
+        expect(window.upeer.acceptCall).toHaveBeenCalledWith('in-1');
     });
 
     it('actualiza la membresía del grupo en tiempo real', async () => {

@@ -33,11 +33,12 @@ interface TopHeaderProps {
     onSearch?: () => void;
     onCallAudio?: () => void;
     onCallVideo?: () => void;
+    isSelfChat?: boolean;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
     contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
-    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo, onSearch, onCallAudio, onCallVideo
+    isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo, onSearch, onCallAudio, onCallVideo, isSelfChat
 }) => {
     const avatarFileRef = useRef<HTMLInputElement>(null);
     const [editingName, setEditingName] = useState(false);
@@ -164,7 +165,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 </Box>
             </Box>
 
-            <TopHeaderActions status={status} onAccept={onAccept} contactName={contactName} isGroup={isGroup} isAdmin={isAdmin} onInviteMembers={onInviteMembers} onSearch={onSearch} onCallAudio={onCallAudio} onCallVideo={onCallVideo} />
+            <TopHeaderActions status={status} onAccept={onAccept} contactName={contactName} isGroup={isGroup} isAdmin={isAdmin} onInviteMembers={onInviteMembers} onSearch={onSearch} onCallAudio={onCallAudio} onCallVideo={onCallVideo} isSelfChat={isSelfChat} />
         </Box>
     );
 };

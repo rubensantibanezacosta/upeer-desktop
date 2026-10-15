@@ -204,10 +204,8 @@ export async function sendGroupMessage(
 export async function sendGroupCallEvent(groupId: string, message: string, timestamp: number, messageId: string): Promise<void> {
     const group = getGroupById(groupId);
     const senderId = getMyUPeerId();
-    if (!group || group.status !== 'active' || !group.senderKey) {
-        await saveMessage(messageId, groupId, true, message, undefined, undefined, 'sent', senderId, timestamp);
-        return;
-    }
+    if (!group || group.status !== 'active') throw new Error(`Cannot send call event for inactive group ${groupId}`);
+    if (!group.senderKey) throw new Error(`Cannot encrypt call event for group ${groupId} without sender key`);
 
     const msgId = messageId;
     const signedContent = message.startsWith('__SYS__|') ? message : `__SYS__|${message}`;

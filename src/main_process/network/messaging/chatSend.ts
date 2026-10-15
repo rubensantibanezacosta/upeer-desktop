@@ -97,7 +97,7 @@ export async function sendUDPMessage(
     }
 
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
-    if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return undefined;
+    if (!contact || !['pending', 'connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return undefined;
 
     if (!contact.publicKey) {
         await saveMessage(msgId, upeerId, true, content, replyTo, '', 'sent');

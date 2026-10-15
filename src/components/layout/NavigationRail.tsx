@@ -6,6 +6,7 @@ import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CallIcon from '@mui/icons-material/Call';
+import VideocamIcon from '@mui/icons-material/Videocam';
 
 interface NavigationRailProps {
     myIp: string;
@@ -17,6 +18,7 @@ interface NavigationRailProps {
     onOpenSettings?: () => void;
     onOpenIdentity?: () => void;
     activeView?: 'chat' | 'contacts' | 'calls' | 'settings';
+    activeCallKind?: 'audio' | 'video';
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
@@ -29,6 +31,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     onOpenSettings,
     onOpenIdentity,
     activeView = 'chat',
+    activeCallKind,
 }) => (
     <Box sx={{
         width: '64px',
@@ -80,7 +83,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         onClick={onOpenCalls}
                         sx={{ borderRadius: 'sm' }}
                     >
-                        <CallIcon />
+                        {activeCallKind === 'video' ? <VideocamIcon color="success" /> : <CallIcon color={activeCallKind === 'audio' ? 'success' : undefined} />}
                     </IconButton>
                 </Box>
             </Tooltip>

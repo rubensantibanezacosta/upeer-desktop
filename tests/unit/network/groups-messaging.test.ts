@@ -45,6 +45,10 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     saveRatchetSession: vi.fn(),
 }));
 
+vi.mock('electron', () => ({
+    BrowserWindow: { getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]) },
+}));
+
 vi.mock('../../../src/main_process/security/ratchet.js', () => ({
     x3dhInitiator: vi.fn(() => ({
         ekPub: Buffer.from('33'.repeat(32), 'hex'),
@@ -529,6 +533,44 @@ describe('network/messaging/groups.ts', () => {
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-1' }),
             '11'.repeat(32),
             true
+        );
+    });
+
+    it('envía un evento de llamada de grupo a miembros conectados y lo vaultea para miembros offline', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendGroupCallEvent } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-call',
+            name: 'Grupo',
+            status: 'active',
+            members: ['self-id', 'online-peer', 'offline-peer'],
+            epoch: 4,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((id) => ({
+            upeerId: id,
+            publicKey: 'aa'.repeat(32),
+            status: id === 'offline-peer' ? 'offline' : 'connected',
+            address: `200::${id}`,
+        } as ContactRecord));
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+
+        await sendGroupCallEvent('grp-call', '__SYS__|Llamada de voz perdida', 1234, 'call-event-id');
+
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            'call-event-id', 'grp-call', true, '__SYS__|Llamada de voz perdida', undefined, expect.any(String), 'sent', 'self-id', 1234,
+        );
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::online-peer', expect.objectContaining({ type: 'GROUP_MSG', id: 'call-event-id', groupId: 'grp-call' }), 'aa'.repeat(32), false,
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'offline-peer', expect.objectContaining({ type: 'GROUP_MSG', id: 'call-event-id', groupId: 'grp-call' }), undefined, expect.any(String),
         );
     });
 

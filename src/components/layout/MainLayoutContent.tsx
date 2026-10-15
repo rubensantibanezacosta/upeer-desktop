@@ -12,6 +12,7 @@ import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { NavigationRail } from './NavigationRail.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
 import { useCall } from '../../features/call/useCall.js';
+import { useCallStore } from '../../features/call/useCallStore.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
@@ -114,6 +115,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     setIsInviteGroupMembersOpen,
 }) => {
     const { startCall } = useCall(chatStore.myIdentity?.upeerId);
+    const activeCallKind = useCallStore((state) => Object.values(state.calls).find((call) => call.phase !== 'ended')?.kind);
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
@@ -129,6 +131,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 myAvatar={chatStore.myIdentity?.avatar}
                 myInitial={(chatStore.myIdentity?.alias || chatStore.myIdentity?.upeerId || '?').charAt(0).toUpperCase()}
                 activeView={navigation.appView}
+                activeCallKind={activeCallKind}
                 onOpenChats={() => navigation.goToChat()}
                 onOpenContacts={() => navigation.goToContacts()}
                 onOpenCalls={() => navigation.goToCalls()}
@@ -184,6 +187,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             status={activeContact?.status}
                                             lastSeen={activeContact?.lastSeen}
                                             vouchScore={effectiveVouchScore}
+                                            isSelfChat={targetUpeerId === chatStore.myIdentity?.upeerId}
                                             onDelete={() => handleClearChat(targetUpeerId)}
                                             onShare={() => navigation.setShareModalOpen(true)}
                                             onAccept={isIncomingRequest ? undefined : handleAcceptContact}

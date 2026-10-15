@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { useCallStore } from './useCallStore.js';
+import { useNavigationStore } from '../../store/useNavigationStore.js';
 
 export type { CallKind, CallPhase, ActiveCallView } from './useCallStore.js';
 
@@ -16,6 +17,7 @@ export function useCall(selfUpeerId?: string) {
             window.upeer?.onCallAccepted?.((data) => {
                 useCallStore.getState().markConnected(data.callId, data.connectedAt);
                 useCallStore.getState().setActive(data.callId);
+                useNavigationStore.getState().goToCalls();
             }),
             window.upeer?.onCallEnded?.((data) => {
                 const call = useCallStore.getState().calls[data.callId];
@@ -79,6 +81,7 @@ export function useCall(selfUpeerId?: string) {
         if (result?.success) {
             useCallStore.getState().markConnected(target);
             useCallStore.getState().setActive(target);
+            useNavigationStore.getState().goToCalls();
         }
         return result;
     }, []);

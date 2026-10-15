@@ -118,6 +118,33 @@ describe('registerCallHandlers', () => {
         }
     });
 
+    it('persiste y envía al historial una llamada saliente perdida', async () => {
+        const sender = { send: vi.fn() };
+        getHandler('get-all-calls')({ sender } as never, {});
+        const session = callManager.create('peer1', 'audio', 'outgoing');
+        callManager.end(session.callId, 'no-answer');
+
+        await vi.waitFor(() => expect(messages.saveMessage).toHaveBeenCalledWith(
+            expect.any(String), 'peer1', true, '__SYS__|Llamada de voz perdida', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
+        ));
+        expect(sender.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
+            upeerId: 'peer1', message: 'Llamada de voz perdida', isSystem: true,
+        }));
+        const chatSend = await import('../../../../src/main_process/network/messaging/chatSend.js');
+        expect(chatSend.sendUDPMessage).toHaveBeenCalledWith('peer1', '__SYS__|Llamada de voz perdida', undefined, expect.any(String));
+    });
+
+    it('registra llamada de grupo saliente perdida como evento del grupo', async () => {
+        const groups = await import('../../../../src/main_process/network/messaging/groups.js');
+        const sendGroupCallEvent = vi.spyOn(groups, 'sendGroupCallEvent').mockResolvedValue();
+        const session = callManager.createGroup(['peer1'], 'video', 'grp-call');
+        callManager.end(session.callId, 'no-answer');
+
+        expect(sendGroupCallEvent).toHaveBeenCalledWith(
+            'grp-call', '__SYS__|Videollamada perdida', expect.any(Number), expect.any(String),
+        );
+    });
+
     it('reject-call termina con razón rejected y envía el rechazo', () => {
         const session = callManager.create('peer1', 'audio', 'incoming');
         const handler = getHandler('reject-call');

@@ -8,6 +8,7 @@ vi.mock('@mui/icons-material/DonutLarge', () => ({ default: () => <div data-test
 vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
 vi.mock('@mui/icons-material/Settings', () => ({ default: () => <div data-testid="SettingsIcon" /> }));
 vi.mock('@mui/icons-material/Call', () => ({ default: () => <div data-testid="CallIcon" /> }));
+vi.mock('@mui/icons-material/Videocam', () => ({ default: () => <div data-testid="VideocamIcon" /> }));
 
 import { NavigationRail } from '../../../src/components/layout/NavigationRail';
 
@@ -30,6 +31,22 @@ describe('NavigationRail Component', () => {
         render(<NavigationRail {...defaultProps} onOpenCalls={onOpenCalls} />);
         fireEvent.click(screen.getByRole('button', { name: 'Llamadas' }));
         expect(onOpenCalls).toHaveBeenCalledTimes(1);
+    });
+
+    it('muestra el icono de voz cuando hay una llamada de audio activa', () => {
+        render(<NavigationRail {...defaultProps} activeCallKind="audio" />);
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="CallIcon"]')).not.toBeNull();
+    });
+
+    it('muestra el icono de vídeo cuando hay una videollamada activa', () => {
+        render(<NavigationRail {...defaultProps} activeCallKind="video" />);
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="VideocamIcon"]')).not.toBeNull();
+    });
+
+    it('muestra el icono habitual cuando no hay llamadas activas', () => {
+        render(<NavigationRail {...defaultProps} />);
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="CallIcon"]')).not.toBeNull();
+        expect(screen.queryByTestId('VideocamIcon')).toBeNull();
     });
 
     it('calls onOpenSettings when settings icon is clicked', () => {
