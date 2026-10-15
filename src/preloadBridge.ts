@@ -191,12 +191,13 @@ const fileTransferApi = {
 
 const callApi = {
     startCall: (upeerId: string, kind: 'audio' | 'video') => ipcRenderer.invoke('start-call', { upeerId, kind }),
-    startGroupCall: (members: string[], kind: 'audio' | 'video') => ipcRenderer.invoke('start-group-call', { members, kind }),
+    startGroupCall: (members: string[], kind: 'audio' | 'video', groupId?: string) => ipcRenderer.invoke('start-group-call', { members, kind, groupId }),
     acceptCall: (callId: string) => ipcRenderer.invoke('accept-call', { callId }),
     rejectCall: (callId: string) => ipcRenderer.invoke('reject-call', { callId }),
     endCall: (callId: string) => ipcRenderer.invoke('end-call', { callId }),
     toggleMedia: (callId: string, type: 'mute' | 'camera') => ipcRenderer.invoke('call-toggle-media', { callId, type }),
     sendCallMedia: (callId: string, data: Uint8Array) => ipcRenderer.send('send-call-media', { callId, data }),
+    sendCallSpeakerState: (callId: string, active: boolean) => ipcRenderer.send('send-call-speaker-state', { callId, active }),
     sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => ipcRenderer.invoke('send-call-sdp', { callId, peerUpeerId, sdp }),
     sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => ipcRenderer.invoke('send-call-ice', { callId, peerUpeerId, candidate }),
     getCallDevices: () => navigator.mediaDevices.enumerateDevices()
@@ -258,9 +259,9 @@ const eventApi = {
     onVaultRecoveryStatus: (callback: (data: VaultRecoveryStatusPayload) => void) => subscribe<[VaultRecoveryStatusPayload]>('vault-recovery-status', callback),
     onYggstackAddress: (callback: (address: string) => void) => subscribe('yggstack-address', (address: string) => callback(address)),
     onYggstackStatus: (callback: (status: string, address?: string) => void) => subscribe('yggstack-status', (status: string, address?: string) => callback(status, address)),
-    onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) => subscribe<[{ callId: string; peerUpeerId: string; kind: 'audio' | 'video' }]>('call-incoming', (data) => callback(data)),
+    onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[]; groupId?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[]; groupId?: string }]>('call-incoming', (data) => callback(data)),
     onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-ring', (data) => callback(data)),
-    onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-accepted', (data) => callback(data)),
+    onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string; connectedAt?: number }) => void) => subscribe<[{ callId: string; peerUpeerId: string; connectedAt?: number }]>('call-accepted', (data) => callback(data)),
     onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; reason?: string }]>('call-ended', (data) => callback(data)),
     onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: Uint8Array; timestamp?: unknown; senderUpeerId?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; data: Uint8Array; timestamp?: unknown; senderUpeerId?: string }]>('call-media', (data) => callback(data)),
     onCallSdp: (callback: (data: { callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }) => void) => subscribe<[{ callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }]>('call-sdp', (data) => callback(data)),

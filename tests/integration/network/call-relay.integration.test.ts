@@ -76,6 +76,28 @@ describe('call relay integración (SFU distribuido)', () => {
         expect(relayedPackets.every((packet) => packet.senderUpeerId === 'p1')).toBe(true);
     });
 
+    it('el relay conserva audio y limita a keyframes el vídeo de quienes no son hablantes activos', async () => {
+        scoreMock.mockImplementation(async (id) => (id === 'me' ? 95 : 50));
+        const session = callManager.createGroup(['p1', 'p2', 'p3', 'p4'], 'video');
+        await signaling.recomputeRelay(session.callId);
+        const data = new Uint8Array(17);
+        data[0] = 1;
+        data[16] = 1;
+
+        handleCallPacket('p1', { type: 'CALL_META', callId: session.callId, meta: { type: 'speaker', active: true } }, null);
+        handleCallPacket('p2', { type: 'CALL_MEDIA', callId: session.callId, data, timestamp: Date.now() }, null);
+        expect(sendMock).toHaveBeenCalledTimes(3);
+        sendMock.mockClear();
+        handleCallPacket('p2', { type: 'CALL_MEDIA', callId: session.callId, data, timestamp: Date.now() }, null);
+        expect(sendMock).not.toHaveBeenCalled();
+
+        const audio = new Uint8Array(17);
+        audio[0] = 0;
+        audio[16] = 1;
+        handleCallPacket('p2', { type: 'CALL_MEDIA', callId: session.callId, data: audio, timestamp: Date.now() }, null);
+        expect(sendMock).toHaveBeenCalledTimes(3);
+    });
+
     it('no reenvía media entrante a participantes cuando la llamada ya terminó', () => {
         const session = callManager.createGroup(['p1', 'p2', 'p3'], 'audio');
         callManager.end(session.callId);

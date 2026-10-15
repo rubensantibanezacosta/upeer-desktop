@@ -12,6 +12,7 @@ type CodecFrame = {
 
 type WorkerRequest =
     | { type: 'encode-frame'; kind: CallMediaKind; frame: VideoFrame | AudioData }
+    | { type: 'speaker-detection'; enabled: boolean; captureId: string }
     | { type: 'decode'; kind: CallMediaKind; bytes: ArrayBuffer; timestamp: number; keyFrame: boolean; streamId: string }
     | { type: 'release' };
 
@@ -25,6 +26,9 @@ const encoders = new Map<CallMediaKind, VideoEncoder | AudioEncoder>();
 const decoders = new Map<string, VideoDecoder | AudioDecoder>();
 const decodedFrameQueues = new Map<string, Array<{ kind: CallMediaKind; streamId: string }>>();
 const decoderDiagnostics = new Set<string>();
+const speakerDetectionStreams = new Set<string>();
+let speakerActive = false;
+let lastSpeakerChangeAt = 0;
 
 function reportError(operation: string, cause: unknown): void {
     workerScope.postMessage({ type: 'error', operation, message: cause instanceof Error ? cause.message : String(cause) });
@@ -54,6 +58,7 @@ function getEncoder(kind: CallMediaKind, frame: CodecFrame): VideoEncoder | Audi
 function encodeFrame(frame: VideoFrame | AudioData, kind: CallMediaKind): void {
     try {
         const codecFrame = frame as CodecFrame;
+        if (kind === 'audio' && speakerDetectionStreams.size > 0) detectSpeaker(frame as AudioData);
         const encoder = getEncoder(kind, codecFrame);
         if (kind !== 'audio' && encoder.encodeQueueSize > 1) return;
         const requestKeyFrame = kind !== 'audio' && encoder.encodeQueueSize === 0;
@@ -64,6 +69,26 @@ function encodeFrame(frame: VideoFrame | AudioData, kind: CallMediaKind): void {
     } finally {
         frame.close();
     }
+}
+
+function detectSpeaker(audio: AudioData): void {
+    const samples = audio.numberOfFrames;
+    const pcm = new Float32Array(samples);
+    audio.copyTo(pcm, { planeIndex: 0, format: 'f32-planar' });
+    let energy = 0;
+    for (const sample of pcm) energy += sample * sample;
+    const active = Math.sqrt(energy / Math.max(samples, 1)) > 0.025;
+    const now = Date.now();
+    if (active === speakerActive) {
+        if (!active || now - lastSpeakerChangeAt < 650) return;
+        lastSpeakerChangeAt = now;
+        workerScope.postMessage({ type: 'speaker', active: true });
+        return;
+    }
+    if (now - lastSpeakerChangeAt < (active ? 120 : 650)) return;
+    speakerActive = active;
+    lastSpeakerChangeAt = now;
+    workerScope.postMessage({ type: 'speaker', active });
 }
 
 function decode(request: Extract<WorkerRequest, { type: 'decode' }>): void {
@@ -116,12 +141,20 @@ function release(): void {
     decoders.clear();
     decodedFrameQueues.clear();
     decoderDiagnostics.clear();
+    speakerDetectionStreams.clear();
+    speakerActive = false;
+    lastSpeakerChangeAt = 0;
 }
 
 workerScope.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
     const request = event.data;
     if (request.type === 'release') {
         release();
+        return;
+    }
+    if (request.type === 'speaker-detection') {
+        if (request.enabled) speakerDetectionStreams.add(request.captureId);
+        else speakerDetectionStreams.delete(request.captureId);
         return;
     }
     if (request.type === 'encode-frame') {

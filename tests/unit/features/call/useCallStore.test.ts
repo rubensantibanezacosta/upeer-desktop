@@ -26,4 +26,11 @@ describe('useCallStore', () => {
         useCallStore.getState().setRelayUpeer('c1', undefined);
         expect(useCallStore.getState().calls.c1.relayUpeerId).toBeUndefined();
     });
+
+    it('preserva la hora de conexión recibida del proceso principal', () => {
+        useCallStore.getState().setStarted('c1', 'peer1', 'audio');
+        useCallStore.getState().markConnected('c1', 1234);
+        expect(useCallStore.getState().calls.c1.connectedAt).toBe(1234);
+        expect(useCallStore.getState().connectedAtByCallId.c1).toBe(1234);
+    });
 });

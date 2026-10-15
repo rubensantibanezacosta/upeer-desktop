@@ -92,6 +92,7 @@ export interface IncomingContactRequestEvent {
 
 export interface IncomingDirectMessageEvent extends Omit<RawChatMessage, 'chatUpeerId'> {
     upeerId: string;
+    isSystem?: boolean;
 }
 
 export interface IncomingGroupMessageEvent extends Omit<RawChatMessage, 'chatUpeerId'> {

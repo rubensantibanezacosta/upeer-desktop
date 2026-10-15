@@ -66,7 +66,6 @@ export function useCallMedia(callId: string) {
         const unsubscribe = window.upeer?.onCallMedia?.(handleRemoteMedia);
         return () => {
             unsubscribe?.();
-            localStreamRef.current?.getTracks().forEach((track) => track.stop());
             screenRef.current?.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
             screenRef.current = null;
@@ -95,6 +94,8 @@ export function useCallMedia(callId: string) {
             setLocalStream(stream);
             await session.startCapture(stream, 'audio', (chunk) => {
                 if (generation === captureGenerationRef.current) sendChunk(chunk);
+            }, 'audio', (active) => {
+                if (generation === captureGenerationRef.current) window.upeer.sendCallSpeakerState(callId, active);
             });
             if (video) {
                 await session.startCapture(stream, 'video', (chunk) => {
@@ -116,10 +117,17 @@ export function useCallMedia(callId: string) {
     }, [callId, sendChunk]);
 
     const stopScreenShare = useCallback(() => {
-        screenRef.current?.getTracks().forEach((track) => track.stop());
+        const stream = screenRef.current;
         screenRef.current = null;
+        stream?.getTracks().forEach((track) => track.stop());
+        void sessionRef.current?.stopCapture('screen').catch((cause: unknown) => {
+            console.warn(`Call ${callId} screen capture reader stopped with an error:`, cause);
+        });
+        void sessionRef.current?.stopCapture('screen-audio').catch((cause: unknown) => {
+            console.warn(`Call ${callId} screen audio reader stopped with an error:`, cause);
+        });
         setScreenSharing(false);
-    }, []);
+    }, [callId]);
 
     const startScreenShare = useCallback(async (options: ScreenCaptureOptions): Promise<boolean> => {
         try {
@@ -135,11 +143,16 @@ export function useCallMedia(callId: string) {
                 return false;
             }
             screenRef.current = stream;
-            setScreenSharing(true);
             await session.startCapture(stream, 'screen', sendChunk);
+            if (options.withSystemAudio) await session.startCapture(stream, 'audio', sendChunk, 'screen-audio');
+            screenRef.current = stream;
+            setScreenSharing(true);
             stream.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare);
             return true;
         } catch (cause) {
+            screenRef.current?.getTracks().forEach((track) => track.stop());
+            screenRef.current = null;
+            setScreenSharing(false);
             console.error(`Call ${callId} screen capture failed`, cause);
             return false;
         }
@@ -153,11 +166,12 @@ export function useCallMedia(callId: string) {
         if (session) void session.release();
         localStreamRef.current?.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
+        window.upeer.sendCallSpeakerState(callId, false);
         screenRef.current?.getTracks().forEach((track) => track.stop());
         screenRef.current = null;
         setLocalStream(null);
         setScreenSharing(false);
-    }, []);
+    }, [callId]);
 
     const setVideoEnabled = useCallback((enabled: boolean) => {
         localStreamRef.current?.getVideoTracks().forEach((track) => {

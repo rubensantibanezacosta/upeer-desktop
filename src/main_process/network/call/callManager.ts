@@ -115,7 +115,7 @@ class CallManager {
         return session;
     }
 
-    createGroup(memberUpeerIds: string[], kind: CallMediaKind): CallSession {
+    createGroup(memberUpeerIds: string[], kind: CallMediaKind, groupId?: string): CallSession {
         const callId = createCallId();
         const session: CallSession = {
             callId,
@@ -130,6 +130,7 @@ class CallManager {
             relayFor: [],
             relayUpeerId: undefined,
             isGroup: true,
+            groupId,
             groupMembers: memberUpeerIds.slice(),
         };
         this.sessions.set(callId, session);
@@ -192,7 +193,7 @@ class CallManager {
 
     end(callId: string, reason: CallEndReason = 'local-hangup'): void {
         const session = this.sessions.get(callId);
-        if (!session) {
+        if (!session || session.phase === 'ended') {
             return;
         }
         this.clearTimer(callId);
@@ -276,6 +277,9 @@ class CallManager {
             return;
         }
         session.phase = phase;
+        if (phase === 'connected' && session.connectedAt === undefined) {
+            session.connectedAt = Date.now();
+        }
         if (phase === 'ended') {
             session.endedAt = Date.now();
             session.endReason = endReason;
@@ -296,7 +300,12 @@ class CallManager {
             direction: session.direction,
             endReason: session.endReason,
             isGroup: session.isGroup,
+            groupId: session.groupId,
             groupMembers: session.groupMembers,
+            startedAt: session.startedAt,
+            connectedAt: session.connectedAt,
+            endedAt: session.endedAt,
+            eventWritten: session.eventWritten,
         };
         this.listeners.forEach((listener) => listener(change));
     }

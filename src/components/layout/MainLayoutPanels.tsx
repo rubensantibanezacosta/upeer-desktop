@@ -11,13 +11,10 @@ interface MainLayoutPanelsProps {
     appStore: MainLayoutProps['appStore'];
     chatStore: MainLayoutProps['chatStore'];
     onLockSession: () => void;
-    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[]) => Promise<unknown>;
-    onToggleMute: (callId?: string) => Promise<void>;
-    onToggleCamera: (callId?: string) => Promise<void>;
-    onEndCall: (callId?: string) => Promise<void>;
+    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[], groupId?: string) => Promise<unknown>;
 }
 
-export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession, onStartCall, onToggleMute, onToggleCamera, onEndCall }) => {
+export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession, onStartCall }) => {
     if (navigation.appView === 'settings') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -57,7 +54,7 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
     if (navigation.appView === 'calls') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
-                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} selfUpeerId={chatStore.myIdentity?.upeerId} onStartCall={onStartCall} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEndCall={onEndCall} />
+                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} selfUpeerId={chatStore.myIdentity?.upeerId} onStartCall={onStartCall} />
             </Box>
         );
     }

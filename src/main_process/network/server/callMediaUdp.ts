@@ -7,6 +7,7 @@ import { createMediaVerificationWorker } from './mediaWorker.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { callManager } from '../call/callManager.js';
 import { sendCallMediaTo } from '../call/callSignaling.js';
+import { callFanoutPolicy } from '../call/callFanoutPolicy.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { updateContactStatus, updateLastSeen } from '../../storage/contacts/status.js';
 import { queryOwnVaultsOnReconnect } from '../handlers.js';
@@ -179,7 +180,7 @@ function startMediaWorker(win: BrowserWindow): void {
         }
         const session = callManager.get(data.callId);
         const ownId = getMyUPeerId();
-        if (session?.isGroup && session.relayUpeerId === ownId) {
+        if (session?.isGroup && session.relayUpeerId === ownId && callFanoutPolicy.shouldForwardVideo(data.callId, data.senderUpeerId, media)) {
             for (const member of session.groupMembers) {
                 if (member !== data.senderUpeerId && member !== ownId) sendCallMediaTo(member, data.callId as string, media, data.senderUpeerId);
             }

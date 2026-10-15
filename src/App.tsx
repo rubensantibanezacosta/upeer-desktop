@@ -318,7 +318,9 @@ export default function App() {
                 />
                     <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
                     <CallHost
-                        resolvePeerName={(upeerId) => chatStore.contacts.find((contact) => contact.upeerId === upeerId)?.name || 'Contacto'}
+                        appView={navigation.appView}
+                        contacts={chatStore.contacts}
+                        groups={chatStore.groups}
                     />
                 </div>
             </AppearanceController>

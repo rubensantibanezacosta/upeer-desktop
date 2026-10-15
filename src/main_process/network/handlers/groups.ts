@@ -109,6 +109,7 @@ export async function handleGroupMessage(
             senderName: contact.name,
             isMine: isInternalSync,
             message: displayContent,
+            isSystem: displayContent.startsWith('__SYS__|'),
             replyTo,
             status: isInternalSync ? 'read' : 'delivered',
             timestamp: typeof timestamp === 'number' ? timestamp : Date.now()

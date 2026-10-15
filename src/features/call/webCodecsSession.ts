@@ -5,6 +5,7 @@ export type MediaChunk = { kind: CallMediaKind; bytes: Uint8Array; timestamp: nu
 type WorkerMessage =
     | { type: 'ready' }
     | { type: 'chunk'; kind: CallMediaKind; bytes: ArrayBuffer; timestamp: number; keyFrame: boolean }
+    | { type: 'speaker'; active: boolean }
     | { type: 'decoded'; kind: CallMediaKind; streamId: string; frame: VideoFrame | AudioData }
     | { type: 'diagnostic'; message: string; details: Record<string, unknown> }
     | { type: 'error'; operation: string; message: string };
@@ -20,10 +21,10 @@ function createMediaWorker(): WorkerLike {
 export class WebCodecsSession {
     private worker: WorkerLike | null;
     private ready: Promise<void>;
-    private captureKinds = new Set<CallMediaKind>();
-    private captureReaders = new Map<CallMediaKind, MediaFrameReader>();
+    private captureReaders = new Map<string, MediaFrameReader>();
     private chunkHandlers = new Map<CallMediaKind, (chunk: MediaChunk) => void>();
     private decodedHandlers = new Map<string, (frame: VideoFrame | AudioData) => void>();
+    private speakerHandler: ((active: boolean) => void) | null = null;
 
     constructor(workerFactory: WorkerFactory = createMediaWorker) {
         this.worker = workerFactory();
@@ -47,6 +48,8 @@ export class WebCodecsSession {
             const message = event.data;
             if (message.type === 'chunk') {
                 this.chunkHandlers.get(message.kind)?.({ kind: message.kind, bytes: new Uint8Array(message.bytes), timestamp: message.timestamp, keyFrame: message.keyFrame });
+            } else if (message.type === 'speaker') {
+                this.speakerHandler?.(message.active);
             } else if (message.type === 'decoded') {
                 const handler = this.decodedHandlers.get(`${message.kind}:${message.streamId}`);
                 if (handler) handler(message.frame);
@@ -59,9 +62,9 @@ export class WebCodecsSession {
         });
     }
 
-    async startCapture(stream: MediaStream, kind: CallMediaKind, onChunk: (chunk: MediaChunk) => void): Promise<void> {
+    async startCapture(stream: MediaStream, kind: CallMediaKind, onChunk: (chunk: MediaChunk) => void, captureId: string = kind, onSpeakerState?: (active: boolean) => void): Promise<void> {
         const track = kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
-        if (!track || this.captureKinds.has(kind)) return;
+        if (!track || this.captureReaders.has(captureId)) return;
         await this.ready;
         const Processor = (globalThis as unknown as {
             MediaStreamTrackProcessor?: new (options: { track: MediaStreamTrack }) => { readable: ReadableStream<VideoFrame | AudioData> };
@@ -76,14 +79,25 @@ export class WebCodecsSession {
             throw cause;
         }
         this.chunkHandlers.set(kind, onChunk);
-        this.captureKinds.add(kind);
-        this.captureReaders.set(kind, reader);
-        void this.forwardFrames(reader, kind);
+        if (onSpeakerState) {
+            this.speakerHandler = onSpeakerState;
+            this.worker?.postMessage({ type: 'speaker-detection', enabled: true, captureId });
+        }
+        this.captureReaders.set(captureId, reader);
+        void this.forwardFrames(reader, kind, captureId);
     }
 
-    private async forwardFrames(reader: MediaFrameReader, kind: CallMediaKind): Promise<void> {
+    async stopCapture(captureId: string): Promise<void> {
+        const reader = this.captureReaders.get(captureId);
+        if (!reader) return;
+        this.captureReaders.delete(captureId);
+        this.worker?.postMessage({ type: 'speaker-detection', enabled: false, captureId });
+        await reader.cancel();
+    }
+
+    private async forwardFrames(reader: MediaFrameReader, kind: CallMediaKind, captureId: string): Promise<void> {
         try {
-            while (this.worker && this.captureReaders.get(kind) === reader) {
+            while (this.worker && this.captureReaders.get(captureId) === reader) {
                 const { value, done } = await reader.read();
                 if (done || !value) break;
                 try {
@@ -96,7 +110,7 @@ export class WebCodecsSession {
         } catch (cause) {
             if (this.worker) console.error(`Call media ${kind} frame forwarding failed`, cause);
         } finally {
-            if (this.captureReaders.get(kind) === reader) this.captureReaders.delete(kind);
+            if (this.captureReaders.get(captureId) === reader) this.captureReaders.delete(captureId);
         }
     }
 
@@ -110,13 +124,13 @@ export class WebCodecsSession {
     async release(): Promise<void> {
         const worker = this.worker;
         this.worker = null;
-        this.captureKinds.clear();
         this.captureReaders.forEach((reader) => void reader.cancel().catch((cause: unknown) => {
             console.warn('Call media frame reader stopped before release:', cause);
         }));
         this.captureReaders.clear();
         this.chunkHandlers.clear();
         this.decodedHandlers.clear();
+        this.speakerHandler = null;
         if (!worker) return;
         await this.ready.then(() => worker.postMessage({ type: 'release' })).catch((cause: unknown) => {
             console.warn('Call media worker stopped before release:', cause);

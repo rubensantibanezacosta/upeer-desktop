@@ -14,10 +14,13 @@ export function useCall(selfUpeerId?: string) {
         const unsubs = [
             window.upeer?.onCallIncoming?.((data) => useCallStore.getState().setFromIncoming(data)),
             window.upeer?.onCallAccepted?.((data) => {
-                useCallStore.getState().markAccepted(data.callId);
+                useCallStore.getState().markConnected(data.callId, data.connectedAt);
                 useCallStore.getState().setActive(data.callId);
             }),
-            window.upeer?.onCallEnded?.((data) => useCallStore.getState().markEnded(data.callId, data.reason)),
+            window.upeer?.onCallEnded?.((data) => {
+                const call = useCallStore.getState().calls[data.callId];
+                if (call) useCallStore.getState().markEnded(data.callId, data.reason);
+            }),
             window.upeer?.onCallMediaUpdate?.((data) => {
                 const current = useCallStore.getState().calls[data.callId];
                 if (current) useCallStore.getState().applyMediaUpdate(data.callId, { muted: data.muted, cameraEnabled: data.cameraEnabled });
@@ -46,7 +49,7 @@ export function useCall(selfUpeerId?: string) {
         };
     }, []);
 
-    const startCall = useCallback(async (peerUpeerId: string, kind: 'audio' | 'video', isGroup?: boolean, groupMembers?: string[]) => {
+    const startCall = useCallback(async (peerUpeerId: string, kind: 'audio' | 'video', isGroup?: boolean, groupMembers?: string[], groupId?: string) => {
         if (!isGroup && selfUpeerId && peerUpeerId === selfUpeerId) {
             return { success: false, error: 'No puedes llamarte a ti mismo' };
         }
@@ -55,10 +58,10 @@ export function useCall(selfUpeerId?: string) {
         }
         try {
             const result = isGroup
-                ? await window.upeer.startGroupCall(groupMembers ?? [], kind)
+                ? await window.upeer.startGroupCall(groupMembers ?? [], kind, groupId)
                 : await window.upeer.startCall(peerUpeerId, kind);
             if (result?.success && result.callId) {
-                useCallStore.getState().setStarted(result.callId, peerUpeerId, kind, isGroup, groupMembers);
+                useCallStore.getState().setStarted(result.callId, peerUpeerId, kind, isGroup, groupMembers, groupId);
                 useCallStore.getState().setActive(result.callId);
             }
             return result;
@@ -74,7 +77,7 @@ export function useCall(selfUpeerId?: string) {
         }
         const result = await window.upeer.acceptCall(target);
         if (result?.success) {
-            useCallStore.getState().markAccepted(target);
+            useCallStore.getState().markConnected(target);
             useCallStore.getState().setActive(target);
         }
         return result;

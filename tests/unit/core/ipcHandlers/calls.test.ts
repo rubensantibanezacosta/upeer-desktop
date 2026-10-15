@@ -3,6 +3,7 @@ import { ipcMain } from 'electron';
 import { registerCallHandlers } from '../../../../src/main_process/core/ipcHandlers/calls.js';
 import { callManager } from '../../../../src/main_process/network/call/callManager.js';
 import * as signaling from '../../../../src/main_process/network/call/callSignaling.js';
+import * as messages from '../../../../src/main_process/storage/messages/operations.js';
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }));
 
@@ -20,6 +21,9 @@ vi.mock('../../../../src/main_process/network/call/callSignaling.js', () => ({
 }));
 
 vi.mock('../../../../src/main_process/security/secure-logger.js', () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }));
+vi.mock('../../../../src/main_process/storage/messages/operations.js', () => ({ saveMessage: vi.fn(async () => ({ changes: 1 })) }));
+vi.mock('../../../../src/main_process/storage/contacts/operations.js', () => ({ getContactByUpeerId: vi.fn(() => ({ name: 'Peer' })) }));
+vi.mock('../../../../src/main_process/network/messaging/chatSend.js', () => ({ sendUDPMessage: vi.fn(async () => undefined) }));
 
 type Handler = (event: unknown, payload: Record<string, unknown>) => unknown;
 
@@ -92,6 +96,28 @@ describe('registerCallHandlers', () => {
         expect(signaling.sendCallEnd).toHaveBeenCalledWith('peer1', session.callId);
     });
 
+    it('persiste como mensaje una llamada conectada con su duración', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-10-15T12:00:00.000Z'));
+        try {
+            const sender = { send: vi.fn() };
+            getHandler('get-all-calls')({ sender } as never, {});
+            const session = callManager.create('peer1', 'video', 'outgoing');
+            callManager.connect(session.callId);
+            vi.setSystemTime(new Date('2026-10-15T12:00:05.000Z'));
+            getHandler('end-call')(null, { callId: session.callId });
+
+            await vi.waitFor(() => expect(messages.saveMessage).toHaveBeenCalledWith(
+                expect.any(String), 'peer1', true, '__SYS__|Videollamada · 00:05', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
+            ));
+            expect(sender.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
+                upeerId: 'peer1', message: 'Videollamada · 00:05', isSystem: true,
+            }));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('reject-call termina con razón rejected y envía el rechazo', () => {
         const session = callManager.create('peer1', 'audio', 'incoming');
         const handler = getHandler('reject-call');
@@ -133,4 +159,5 @@ describe('registerCallHandlers', () => {
         handler(null, { callId: session.callId, data: '' });
         expect(signaling.sendCallMedia).not.toHaveBeenCalled();
     });
+
 });

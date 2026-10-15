@@ -4,17 +4,13 @@ import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import type { Contact, Group } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
-import { CallWindow } from './CallWindow.js';
 import type { CallKind } from './useCall.js';
 
 interface CallsPanelProps {
     contacts: Contact[];
     groups: Group[];
     selfUpeerId?: string;
-    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[]) => Promise<unknown>;
-    onToggleMute: (callId?: string) => Promise<void>;
-    onToggleCamera: (callId?: string) => Promise<void>;
-    onEndCall: (callId?: string) => Promise<void>;
+    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[], groupId?: string) => Promise<unknown>;
 }
 
 function callPhaseLabel(phase: string): string {
@@ -24,7 +20,7 @@ function callPhaseLabel(phase: string): string {
     return 'En curso';
 }
 
-export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId, onStartCall, onToggleMute, onToggleCamera, onEndCall }) => {
+export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId, onStartCall }) => {
     const calls = useCallStore((state) => state.calls);
     const isStartingCall = useCallStore((state) => state.isStartingCall);
     const activeCalls = Object.values(calls);
@@ -48,18 +44,17 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                         const contact = contacts.find((item) => item.upeerId === call.peerUpeerId);
                         const name = group?.name || contact?.name || 'Contacto';
                         return (
-                            <Box key={call.callId}>
-                                <Typography level="body-xs" sx={{ mb: 1 }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'} · {callPhaseLabel(call.phase)}</Typography>
-                                <CallWindow
-                                    call={call}
-                                    peerName={name}
-                                    avatar={group?.avatar || contact?.avatar}
-                                    embedded
-                                    onToggleMute={() => void onToggleMute(call.callId)}
-                                    onToggleCamera={() => void onToggleCamera(call.callId)}
-                                    onEnd={() => void onEndCall(call.callId)}
-                                />
-                            </Box>
+                            <Card key={call.callId} variant="outlined">
+                                <CardContent>
+                                    <Stack direction="row" alignItems="center" spacing={2}>
+                                        <Avatar src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography level="title-md">{name}</Typography>
+                                            <Typography level="body-xs">{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'} · {callPhaseLabel(call.phase)}</Typography>
+                                        </Box>
+                                    </Stack>
+                                </CardContent>
+                            </Card>
                         );
                     })}
                 </Stack>
@@ -93,8 +88,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                         <Typography level="title-md">{group.name}</Typography>
                                         <Typography level="body-xs">{group.members.length} miembros</Typography>
                                     </Box>
-                                    <Button aria-label={`Llamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<CallIcon />} onClick={() => void onStartCall(group.groupId, 'audio', true, group.members)}>Llamar</Button>
-                                    <Button aria-label={`Videollamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<VideocamIcon />} onClick={() => void onStartCall(group.groupId, 'video', true, group.members)}>Vídeo</Button>
+                                    <Button aria-label={`Llamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<CallIcon />} onClick={() => void onStartCall(group.groupId, 'audio', true, group.members, group.groupId)}>Llamar</Button>
+                                    <Button aria-label={`Videollamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<VideocamIcon />} onClick={() => void onStartCall(group.groupId, 'video', true, group.members, group.groupId)}>Vídeo</Button>
                                 </Stack>
                             </CardContent>
                         </Card>

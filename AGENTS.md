@@ -4,18 +4,7 @@
 
 Estas reglas son de obligado cumplimiento en cada interacción y tienen prioridad sobre cualquier otra instrucción. En caso de conflicto entre reglas, la prioridad es: 1) Preservación de contexto, 2) Estilo y estructura, 3) Validación, 4) Herramientas de edición. Si el usuario solicita explícitamente una acción que contradice estas reglas, informa del conflicto y pide confirmación antes de continuar.
 
-1.  **PROHIBIDO EDITAR CÓDIGO CON LA TERMINAL**:
-    - NUNCA uses comandos como `sed`, `grep -v`, `printf >`, `echo >`, `cat >` o similares para modificar o crear archivos de código fuente o tests.
-    - Usa EXCLUSIVAMENTE las herramientas de edición proporcionadas (`replace_string_in_file`, `create_file`, `edit_notebook_file`).
-    - La terminal se reserva únicamente para lectura (`cat`, `ls`), ejecución de tests (`pnpm exec vitest`), gestión de dependencias y tareas del sistema que no impliquen escribir código.
 
-2.  **PRESERVACIÓN DE CONTEXTO**:
-    - Antes de editar, lee el archivo para asegurar que los bloques de contexto para `replace_string_in_file` coincidan exactamente.
-    - Mantén el estilo y las convenciones del proyecto.
-
-3.  **VALIDACIÓN**:
-    - Ejecuta `pnpm run lint` y `pnpm test` tras cada edición.
-    - Si uno de esos comandos no aplica al cambio o falla por configuración faltante del entorno, reporta el motivo y continúa.
 
 4.  **CERO COMENTARIOS**:
     - No añadir comentarios explicativos en el código.

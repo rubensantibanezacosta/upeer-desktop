@@ -11,6 +11,8 @@ import {
 } from './callSignaling.js';
 import type { CallMediaKind } from './callTypes.js';
 import { validateCallPacket } from './validationCalls.js';
+import { getGroupById } from '../../storage/groups/operations.js';
+import { callFanoutPolicy } from './callFanoutPolicy.js';
 
 export function handleCallPacket(
     upeerId: string,
@@ -40,13 +42,16 @@ export function handleCallPacket(
             const isGroupOffer = groupMembers.length > 0;
             if (isGroupOffer) {
                 const session = callManager.createGroupIncoming(upeerId, kind, callId, groupMembers);
-                sendCallRing(upeerId, session.callId);
+                const offeredGroupId = typeof data.groupId === 'string' && data.groupId.startsWith('grp-') ? data.groupId : undefined;
+                const group = offeredGroupId ? getGroupById(offeredGroupId) : undefined;
+                session.groupId = group?.members.includes(upeerId) ? offeredGroupId : undefined;
                 win?.webContents.send('call-incoming', {
                     callId: session.callId,
                     peerUpeerId: upeerId,
                     kind: session.kind,
                     isGroup: true,
                     groupMembers: session.groupMembers,
+                    groupId: session.groupId,
                 });
             } else {
                 const session = callManager.create(upeerId, kind, 'incoming', callId);
@@ -66,7 +71,7 @@ export function handleCallPacket(
         case 'CALL_ACCEPT': {
             callManager.accept(callId);
             callManager.connect(callId);
-            win?.webContents.send('call-accepted', { callId, peerUpeerId: upeerId });
+            win?.webContents.send('call-accepted', { callId, peerUpeerId: upeerId, connectedAt: callManager.get(callId)?.connectedAt });
             break;
         }
         case 'CALL_REJECT':
@@ -82,6 +87,7 @@ export function handleCallPacket(
             win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: 'canceled' });
             break;
         case 'CALL_END':
+            callFanoutPolicy.clearSpeaker(callId, upeerId);
             callManager.end(callId, 'remote-end');
             win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: 'remote-end' });
             break;
@@ -96,7 +102,7 @@ export function handleCallPacket(
             // Si este nodo es el relay, reenvía la media al resto de miembros.
             const session = callManager.get(callId);
             const myId = getMyUPeerId();
-            if (session?.isGroup && session.relayUpeerId === myId) {
+            if (session?.isGroup && session.relayUpeerId === myId && callFanoutPolicy.shouldForwardVideo(callId, upeerId, data.data as Uint8Array)) {
                 for (const member of session.groupMembers) {
                     if (member !== upeerId && member !== myId) {
                         sendCallMediaTo(member, callId, data.data as Uint8Array, upeerId);
@@ -132,6 +138,10 @@ export function handleCallPacket(
             if (meta && meta.type === 'relay' && typeof meta.relay === 'string') {
                 callManager.setRelayUpeer(callId, meta.relay);
             }
+            if (meta?.type === 'speaker') {
+                handleSpeakerMeta(callId, upeerId, meta);
+                break;
+            }
             win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta: data.meta });
             break;
         }
@@ -164,6 +174,7 @@ export function handleCallPacket(
             break;
         }
         case 'CALL_LEAVE': {
+            callFanoutPolicy.clearSpeaker(callId, upeerId);
             callManager.leaveGroup(callId, upeerId);
             const session = callManager.get(callId);
             const members = session?.groupMembers ?? [];
@@ -188,4 +199,9 @@ export function handleCallPacket(
             break;
         }
     }
+}
+
+function handleSpeakerMeta(callId: string, speakerId: string, meta: Record<string, unknown>): void {
+    if (typeof meta.active !== 'boolean' || callManager.get(callId)?.relayUpeerId !== getMyUPeerId()) return;
+    callFanoutPolicy.setSpeakerActive(callId, speakerId, meta.active);
 }

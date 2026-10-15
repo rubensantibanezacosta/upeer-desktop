@@ -12,12 +12,15 @@ export interface CallSession {
     muted: boolean;
     cameraEnabled: boolean;
     startedAt: number;
+    connectedAt?: number;
     endedAt?: number;
+    eventWritten?: boolean;
     endReason?: CallEndReason;
     isRelay: boolean;
     relayFor: string[];
     relayUpeerId?: string;
     isGroup: boolean;
+    groupId?: string;
     groupMembers: string[];
 }
 
@@ -29,7 +32,12 @@ export type CallStateChange = {
     direction: CallDirection;
     endReason?: CallEndReason;
     isGroup?: boolean;
+    groupId?: string;
     groupMembers?: string[];
+    startedAt?: number;
+    connectedAt?: number;
+    endedAt?: number;
+    eventWritten?: boolean;
 };
 
 export type CallStateListener = (change: CallStateChange) => void;

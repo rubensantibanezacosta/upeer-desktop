@@ -194,12 +194,13 @@ declare global {
             generateVideoThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
             /** Llamadas de voz/vídeo P2P */
             startCall: (upeerId: string, kind: 'audio' | 'video') => Promise<{ success: boolean; callId?: string; error?: string }>;
-            startGroupCall: (members: string[], kind: 'audio' | 'video') => Promise<{ success: boolean; callId?: string; error?: string }>;
+            startGroupCall: (members: string[], kind: 'audio' | 'video', groupId?: string) => Promise<{ success: boolean; callId?: string; error?: string }>;
             acceptCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             rejectCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
             sendCallMedia: (callId: string, data: Uint8Array) => void;
+            sendCallSpeakerState: (callId: string, active: boolean) => void;
             sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => Promise<{ success: boolean; error?: string }>;
             sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
             getCallDevices: () => Promise<{ success: boolean; devices: Array<{ deviceId: string; kind: string; label: string }>; error?: string }>;
@@ -213,13 +214,14 @@ declare global {
                 cameraEnabled: boolean;
                 isGroup?: boolean;
                 groupMembers?: string[];
+                groupId?: string;
             }> }>;
             joinGroupCall: (callId: string) => Promise<{ success: boolean; connected?: string[]; error?: string }>;
             leaveGroupCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             getCallGroupMembers: (callId: string) => Promise<{ success: boolean; connected: string[]; members: string[] }>;
-            onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video' }) => void) => UpeerUnsubscribe;
+            onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[]; groupId?: string }) => void) => UpeerUnsubscribe;
             onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
-            onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string }) => void) => UpeerUnsubscribe;
+            onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string; connectedAt?: number }) => void) => UpeerUnsubscribe;
             onCallEnded: (callback: (data: { callId: string; peerUpeerId: string; reason?: string }) => void) => UpeerUnsubscribe;
             onCallMedia: (callback: (data: { callId: string; peerUpeerId: string; data: Uint8Array; timestamp?: unknown; senderUpeerId?: string }) => void) => UpeerUnsubscribe;
             onCallSdp: (callback: (data: { callId: string; peerUpeerId: string; sdp: { type: string; sdp?: string; relay?: string } }) => void) => UpeerUnsubscribe;

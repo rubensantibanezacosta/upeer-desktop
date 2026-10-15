@@ -38,14 +38,15 @@ export async function sendCallOffer(peerUpeerId: string, kind: CallMediaKind): P
     return session.callId;
 }
 
-export async function startGroupCall(memberUpeerIds: string[], kind: CallMediaKind): Promise<string> {
-    const session = callManager.createGroup(memberUpeerIds, kind);
+export async function startGroupCall(memberUpeerIds: string[], kind: CallMediaKind, groupId?: string): Promise<string> {
+    const session = callManager.createGroup(memberUpeerIds, kind, groupId);
     for (const member of memberUpeerIds) {
         send(member, {
             type: 'CALL_OFFER',
             callId: session.callId,
             kind,
             groupMembers: memberUpeerIds,
+            groupId,
             timestamp: Date.now(),
         });
     }

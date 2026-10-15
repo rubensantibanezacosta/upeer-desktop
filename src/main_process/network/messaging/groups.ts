@@ -200,3 +200,60 @@ export async function sendGroupMessage(
 
     return { id: msgId, timestamp, savedMessage: payload };
 }
+
+export async function sendGroupCallEvent(groupId: string, message: string, timestamp: number, messageId: string): Promise<void> {
+    const group = getGroupById(groupId);
+    const senderId = getMyUPeerId();
+    if (!group || group.status !== 'active' || !group.senderKey) {
+        await saveMessage(messageId, groupId, true, message, undefined, undefined, 'sent', senderId, timestamp);
+        return;
+    }
+
+    const msgId = messageId;
+    const signedContent = message.startsWith('__SYS__|') ? message : `__SYS__|${message}`;
+    const signature = sign(Buffer.from(signedContent)).toString('hex');
+    await saveMessage(msgId, groupId, true, signedContent, undefined, signature, 'sent', senderId, timestamp);
+    const { ciphertext, nonce } = encryptGroupMessage(signedContent, group.senderKey);
+    const packet = {
+        type: 'GROUP_MSG',
+        id: msgId,
+        groupId,
+        senderUpeerId: senderId,
+        timestamp,
+        content: ciphertext,
+        nonce,
+        epoch: group.epoch,
+    };
+    const signedPacket = {
+        ...packet,
+        signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex'),
+    };
+
+    await runWithConcurrencyMap(Array.from(new Set(group.members)), GROUP_FANOUT_CONCURRENCY, async (memberId) => {
+        const isSelf = memberId === senderId;
+        const rawContact = await getContactByUpeerId(memberId);
+        const contact = rawContact || (isSelf ? { upeerId: senderId, publicKey: getMyPublicKeyHex(), status: 'connected' } : null);
+        if (!contact?.publicKey) return;
+        const status = contact.status;
+        if (status === 'connected') {
+            const address = rawContact?.address;
+            if (typeof address === 'string' && address) sendSecureUDPMessage(address, signedPacket, isSelf ? getMyPublicKey().toString('hex') : contact.publicKey, isSelf);
+            return;
+        }
+        if (isSelf || status === 'offline') {
+            await VaultManager.replicateToVaults(memberId, signedPacket, undefined, crypto.createHash('sha256').update(`group:${msgId}:${memberId}`).digest('hex'));
+        }
+    });
+
+    const { BrowserWindow } = await import('electron');
+    BrowserWindow.getAllWindows()[0]?.webContents.send('receive-group-message', {
+        id: msgId,
+        groupId,
+        senderUpeerId: senderId,
+        isMine: true,
+        message: signedContent.slice(8),
+        isSystem: true,
+        status: 'sent',
+        timestamp,
+    });
+}

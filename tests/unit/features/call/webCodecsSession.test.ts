@@ -69,4 +69,31 @@ describe('WebCodecsSession worker bridge', () => {
         await session.release();
         vi.unstubAllGlobals();
     });
+
+    it('permite capturar y detener un segundo track de audio para el sonido compartido', async () => {
+        const worker = new MockWorker();
+        const makeReader = () => ({ read: vi.fn().mockReturnValue(new Promise(() => undefined)), cancel: vi.fn().mockResolvedValue(undefined) });
+        const readers = [makeReader(), makeReader()];
+        let readerIndex = 0;
+        vi.stubGlobal('MediaStreamTrackProcessor', class {
+            readable = { getReader: () => readers[readerIndex++] };
+            track: MediaStreamTrack;
+
+            constructor(options: { track: MediaStreamTrack }) {
+                this.track = options.track;
+            }
+        });
+        const makeTrack = () => ({ clone: vi.fn(() => ({ stop: vi.fn() })) } as unknown as MediaStreamTrack);
+        const session = new WebCodecsSession(() => worker as unknown as Worker);
+        worker.emit({ type: 'ready' });
+
+        await session.startCapture({ getAudioTracks: () => [makeTrack()] } as unknown as MediaStream, 'audio', vi.fn());
+        await session.startCapture({ getAudioTracks: () => [makeTrack()] } as unknown as MediaStream, 'audio', vi.fn(), 'screen-audio');
+        await session.stopCapture('screen-audio');
+
+        expect(readers[1]?.cancel).toHaveBeenCalledOnce();
+        expect(readers[0]?.cancel).not.toHaveBeenCalled();
+        await session.release();
+        vi.unstubAllGlobals();
+    });
 });

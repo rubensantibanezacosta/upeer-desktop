@@ -37,17 +37,20 @@ describe('CallsPanel', () => {
             status: 'active',
         }];
         const onStartCall = vi.fn().mockResolvedValue({ success: true });
-        const onToggleMute = vi.fn().mockResolvedValue(undefined);
-        const onToggleCamera = vi.fn().mockResolvedValue(undefined);
-        const onEndCall = vi.fn().mockResolvedValue(undefined);
 
         useCallStore.getState().setStarted('call-1', 'peer-1', 'video');
-        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEndCall={onEndCall} />);
+        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} />);
 
-        expect(screen.getAllByText('Ana')).toHaveLength(3);
+        expect(screen.getAllByText('Ana')).toHaveLength(2);
         expect(screen.getByText('Equipo')).toBeDefined();
         expect(screen.getByText('Videollamada · Llamando')).toBeDefined();
         expect(screen.getByRole('button', { name: 'Llamar a Ana' })).toBeDisabled();
         expect(screen.queryByRole('button', { name: 'Llamar a Tú' })).toBeNull();
+
+        cleanup();
+        useCallStore.getState().reset();
+        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} />);
+        screen.getByRole('button', { name: 'Llamar al grupo Equipo' }).click();
+        expect(onStartCall).toHaveBeenCalledWith('group-1', 'audio', true, ['peer-1'], 'group-1');
     });
 });

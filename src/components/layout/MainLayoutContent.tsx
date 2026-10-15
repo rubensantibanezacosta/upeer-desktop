@@ -113,7 +113,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     isContactInfoOpen,
     setIsInviteGroupMembersOpen,
 }) => {
-    const { startCall, toggleMute, toggleCamera, endCall } = useCall(chatStore.myIdentity?.upeerId);
+    const { startCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
@@ -137,7 +137,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
             />
 
             {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (
-                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} onToggleMute={toggleMute} onToggleCamera={toggleCamera} onEndCall={endCall} />
+                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} />
             ) : (
                 <>
                     <Sidebar
@@ -172,8 +172,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
                                             onSearch={() => setIsChatSearchOpen(true)}
-                                            onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members)}
-                                            onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup?.members)}
+                                            onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members, activeGroupId)}
+                                            onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup?.members, activeGroupId)}
                                         />
                                     ) : (
                                         <TopHeader

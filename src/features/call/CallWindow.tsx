@@ -224,10 +224,10 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 top: embedded ? undefined : pos.y,
                 left: embedded ? undefined : pos.x,
                 width: embedded ? '100%' : effWidth,
-                height: embedded ? { xs: 'min(70vh, 680px)', md: 'min(72vh, 760px)' } : effHeight,
-                minHeight: embedded ? 420 : undefined,
-                maxWidth: embedded ? 1100 : undefined,
-                mx: embedded ? 'auto' : undefined,
+                height: embedded ? '100%' : effHeight,
+                minHeight: embedded ? 0 : undefined,
+                maxWidth: embedded ? 'none' : undefined,
+                mx: embedded ? 0 : undefined,
                 zIndex: embedded ? 1 : 1400,
                 backgroundColor: '#1f1f1f',
                 borderRadius: 12,
@@ -297,15 +297,15 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             )}
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
-                {isGroup && isVideoActive ? (
-                    <Box sx={{ width: '100%', height: '100%', overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(110px, 1fr)', gap: 1 }}>
+                {isGroup && (isVideoActive || Boolean(remoteScreen)) ? (
+                    <Box sx={{ width: '100%', height: '100%', minHeight: 0, overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 1 }}>
                         {remoteScreen && (
-                            <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
-                                <canvas ref={attachScreenCanvas} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
+                            <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
+                                <canvas ref={attachScreenCanvas} style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
                                 <Chip size="sm" color="warning" sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreen.slice(0, 8)} comparte pantalla</Chip>
                             </Box>
                         )}
-                        <Box sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
+                        <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
                             {call.cameraEnabled && localStream ? (
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
@@ -318,8 +318,8 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                             </Box>
                         </Box>
                         {remotePeers.map((pid) => (
-                            <Box key={pid} sx={{ position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                <canvas ref={(element) => attachVideoCanvas(pid, element)} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
+                            <Box key={pid} sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                <canvas ref={(element) => attachVideoCanvas(pid, element)} style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
                                 <Box sx={{ position: 'absolute', bottom: 4, left: 6, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
                                     <Typography level="body-xs" sx={{ color: 'white' }}>{pid.slice(0, 8)}</Typography>
                                 </Box>
@@ -333,7 +333,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                             </Box>
                         )}
                     </Box>
-                ) : isVideoActive ? (
+                ) : isVideoActive || remoteScreen ? (
                     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
                         {remoteScreen ? (
                             <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
