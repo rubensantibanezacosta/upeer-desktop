@@ -5,12 +5,17 @@ import VideocamIcon from '@mui/icons-material/Videocam';
 import type { Contact, Group } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
 import type { CallKind } from './useCall.js';
+import { CallWindow } from './CallWindow.js';
+import { useNavigationStore } from '../../store/useNavigationStore.js';
 
 interface CallsPanelProps {
     contacts: Contact[];
     groups: Group[];
     selfUpeerId?: string;
     onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[], groupId?: string) => Promise<unknown>;
+    onToggleCallMute: (callId?: string) => Promise<void>;
+    onToggleCallCamera: (callId?: string) => Promise<void>;
+    onEndCall: (callId?: string) => Promise<void>;
 }
 
 function callPhaseLabel(phase: string): string {
@@ -20,16 +25,36 @@ function callPhaseLabel(phase: string): string {
     return 'En curso';
 }
 
-export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId, onStartCall }) => {
+export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId, onStartCall, onToggleCallMute, onToggleCallCamera, onEndCall }) => {
     const calls = useCallStore((state) => state.calls);
+    const activeCallId = useCallStore((state) => state.activeCallId);
     const isStartingCall = useCallStore((state) => state.isStartingCall);
+    const setActiveCall = useCallStore((state) => state.setActive);
+    const goToCalls = useNavigationStore((state) => state.goToCalls);
     const activeCalls = Object.values(calls);
+    const activeCall = activeCallId ? calls[activeCallId] : undefined;
+    const activeGroup = activeCall?.isGroup ? groups.find((group) => group.groupId === (activeCall.groupId ?? activeCall.peerUpeerId)) : undefined;
+    const activeContact = contacts.find((contact) => contact.upeerId === activeCall?.peerUpeerId);
+    const activeName = activeGroup?.name || activeContact?.name || 'Contacto';
     const availableContacts = contacts.filter((contact) => contact.upeerId !== selfUpeerId && ['connected', 'offline'].includes(contact.status));
     const callUnavailable = isStartingCall || activeCalls.length > 0;
 
     return (
         <Box sx={{ width: '100%', height: '100%', overflow: 'auto', p: { xs: 2, md: 4 } }}>
             <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
+                {activeCall?.callId && (
+                    <Box sx={{ width: '100%', height: 'min(68vh, 720px)', minHeight: 420, overflow: 'hidden', borderRadius: 'lg', bgcolor: '#111', border: '1px solid', borderColor: 'divider' }}>
+                        <CallWindow
+                            call={activeCall}
+                            peerName={activeName}
+                            avatar={activeGroup?.avatar || activeContact?.avatar}
+                            embedded
+                            onToggleMute={() => void onToggleCallMute(activeCall.callId)}
+                            onToggleCamera={() => void onToggleCallCamera(activeCall.callId)}
+                            onEnd={() => void onEndCall(activeCall.callId)}
+                        />
+                    </Box>
+                )}
                 <Box>
                     <Typography level="h2">Llamadas y videollamadas</Typography>
                     <Typography level="body-md" color="neutral">Inicia una llamada con tus contactos o grupos.</Typography>
@@ -44,7 +69,12 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                         const contact = contacts.find((item) => item.upeerId === call.peerUpeerId);
                         const name = group?.name || contact?.name || 'Contacto';
                         return (
-                            <Card key={call.callId} variant="outlined">
+                            <Card key={call.callId} variant="outlined" onClick={() => {
+                                if (call.callId) {
+                                    setActiveCall(call.callId);
+                                    goToCalls();
+                                }
+                            }} sx={{ cursor: 'pointer' }}>
                                 <CardContent>
                                     <Stack direction="row" alignItems="center" spacing={2}>
                                         <Avatar src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>

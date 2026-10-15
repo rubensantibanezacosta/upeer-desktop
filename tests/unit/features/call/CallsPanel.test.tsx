@@ -41,7 +41,8 @@ describe('CallsPanel', () => {
         useCallStore.getState().setStarted('call-1', 'peer-1', 'video');
         render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-id" onStartCall={onStartCall} />);
 
-        expect(screen.getAllByText('Ana')).toHaveLength(2);
+        expect(screen.getAllByText('Ana')).toHaveLength(4);
+        expect(screen.getByRole('button', { name: 'Colgar' })).toBeDefined();
         expect(screen.getByText('Equipo')).toBeDefined();
         expect(screen.getByText('Videollamada · Llamando')).toBeDefined();
         expect(screen.getByRole('button', { name: 'Llamar a Ana' })).toBeDisabled();

@@ -229,13 +229,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 maxWidth: embedded ? 'none' : undefined,
                 mx: embedded ? 0 : undefined,
                 zIndex: embedded ? 1 : 1400,
-                backgroundColor: '#1f1f1f',
-                borderRadius: 12,
-                boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+                backgroundColor: embedded ? '#111' : '#1f1f1f',
+                borderRadius: embedded ? 0 : 12,
+                boxShadow: embedded ? 'none' : '0 8px 40px rgba(0,0,0,0.5)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: embedded ? 'none' : '1px solid rgba(255,255,255,0.12)',
                 color: 'white',
                 userSelect: 'none',
                 cursor: embedded ? 'default' : 'grab',
@@ -248,8 +248,8 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                     alignItems: 'center',
                     gap: 0.5,
                     px: 1.5,
-                    py: 0.75,
-                    backgroundColor: 'rgba(0,0,0,0.25)',
+                    py: embedded ? 1.25 : 0.75,
+                    backgroundColor: embedded ? 'transparent' : 'rgba(0,0,0,0.25)',
                     borderBottom: '1px solid rgba(255,255,255,0.08)',
                     cursor: embedded ? 'default' : 'grab',
                 }}
@@ -296,7 +296,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 </Box>
             )}
 
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1, overflow: 'hidden', gap: 1 }}>
+            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: embedded ? 2 : 1, overflow: 'hidden', gap: 1 }}>
                 {isGroup && (isVideoActive || Boolean(remoteScreen)) ? (
                     <Box sx={{ width: '100%', height: '100%', minHeight: 0, overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 1 }}>
                         {remoteScreen && (
@@ -371,7 +371,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 )}
             </Box>
 
-            <Box data-nodrag="true" sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
+            <Box data-nodrag="true" sx={{ p: embedded ? 2 : 1, pt: embedded ? 1.5 : 1, display: 'flex', justifyContent: 'center', borderTop: embedded ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
                 <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
             </Box>
         </Box>

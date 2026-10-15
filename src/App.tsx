@@ -318,9 +318,7 @@ export default function App() {
                 />
                     <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
                     <CallHost
-                        appView={navigation.appView}
                         contacts={chatStore.contacts}
-                        groups={chatStore.groups}
                     />
                 </div>
             </AppearanceController>

@@ -114,7 +114,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     isContactInfoOpen,
     setIsInviteGroupMembersOpen,
 }) => {
-    const { startCall } = useCall(chatStore.myIdentity?.upeerId);
+    const { startCall, toggleMute, toggleCamera, endCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeCallKind = useCallStore((state) => Object.values(state.calls).find((call) => call.phase !== 'ended')?.kind);
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
@@ -140,7 +140,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
             />
 
             {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (
-                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} />
+                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} onToggleCallMute={toggleMute} onToggleCallCamera={toggleCamera} onEndCall={endCall} />
             ) : (
                 <>
                     <Sidebar
