@@ -187,4 +187,24 @@ describe('registerCallHandlers', () => {
         expect(signaling.sendCallMedia).not.toHaveBeenCalled();
     });
 
+    it('reenvía cambios del estado de compartir pantalla a los miembros de la llamada', () => {
+        const session = callManager.createGroup(['peer1', 'peer2'], 'video');
+        const listener = getListener('send-call-meta');
+
+        listener(null, { callId: session.callId, meta: { type: 'screen-share', active: false } });
+
+        expect(signaling.sendCallMeta).toHaveBeenCalledTimes(2);
+        expect(signaling.sendCallMeta).toHaveBeenCalledWith('peer1', session.callId, { type: 'screen-share', active: false });
+        expect(signaling.sendCallMeta).toHaveBeenCalledWith('peer2', session.callId, { type: 'screen-share', active: false });
+    });
+
+    it('ignora metadatos no admitidos para compartir pantalla', () => {
+        const session = callManager.create('peer1', 'video', 'outgoing');
+        const listener = getListener('send-call-meta');
+
+        listener(null, { callId: session.callId, meta: { type: 'relay', active: false } });
+
+        expect(signaling.sendCallMeta).not.toHaveBeenCalled();
+    });
+
 });

@@ -234,6 +234,18 @@ export function registerCallHandlers(): void {
         sendCallMedia(session.peerUpeerId, callId, data);
     });
 
+    ipcMain.on('send-call-meta', (event, payload: { callId: string; meta: { type: string; active: boolean } }) => {
+        captureRenderer(event);
+        if (!isValidCallId(payload?.callId) || payload?.meta?.type !== 'screen-share' || typeof payload.meta.active !== 'boolean') return;
+        const session = callManager.get(payload.callId);
+        if (!session) return;
+        const members = session.isGroup ? session.groupMembers : [session.peerUpeerId];
+        const myId = getMyUPeerId();
+        for (const member of members) {
+            if (member !== myId) sendCallMeta(member, payload.callId, { type: 'screen-share', active: payload.meta.active });
+        }
+    });
+
     ipcMain.on('send-call-speaker-state', (event, payload) => handleCallMediaSpeakerState(event, payload, captureRenderer));
 
     ipcMain.handle('send-call-sdp', (event, { callId, peerUpeerId, sdp }) => {

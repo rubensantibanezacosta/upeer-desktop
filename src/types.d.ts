@@ -206,6 +206,7 @@ declare global {
             endCall: (callId: string) => Promise<{ success: boolean; error?: string }>;
             toggleMedia: (callId: string, type: 'mute' | 'camera') => Promise<{ success: boolean; error?: string }>;
             sendCallMedia: (callId: string, data: Uint8Array) => void;
+            sendCallMeta: (callId: string, meta: { type: 'screen-share'; active: boolean }) => void;
             sendCallSpeakerState: (callId: string, active: boolean) => void;
             sendCallSdp: (callId: string, peerUpeerId: string, sdp: { type: string; sdp?: string; relay?: string }) => Promise<{ success: boolean; error?: string }>;
             sendCallIce: (callId: string, peerUpeerId: string, candidate: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;

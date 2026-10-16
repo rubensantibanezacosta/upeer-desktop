@@ -161,6 +161,15 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         };
     }, [call.callId, mediaActive, setOnRemoteFrame, drawRemoteVideo, playRemoteAudio]);
 
+    useEffect(() => window.upeer.onCallMeta((data) => {
+        const meta = data.meta as { type?: string; active?: boolean } | undefined;
+        if (data.callId !== call.callId || meta?.type !== 'screen-share' || meta.active !== false) return;
+        setRemoteScreen((current) => current === data.peerUpeerId ? null : current);
+        screenCanvasSourceRef.current = null;
+        const canvas = screenCanvasRef.current;
+        canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    }), [call.callId]);
+
     useEffect(() => {
         if (call.phase !== 'connected') return;
         void setVideoEnabled(call.cameraEnabled);
