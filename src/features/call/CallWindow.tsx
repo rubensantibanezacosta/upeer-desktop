@@ -8,6 +8,8 @@ import type { ActiveCallView } from './useCall.js';
 interface CallWindowProps {
     call: ActiveCallView;
     peerName: string;
+    peerAliases: Record<string, string>;
+    peerAvatars: Record<string, string | undefined>;
     avatar?: string;
     onToggleMute: () => void;
     onToggleCamera: () => void;
@@ -26,7 +28,7 @@ function formatDuration(totalSeconds: number): string {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false }) => {
+export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAliases, peerAvatars, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false }) => {
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
     const [size] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const [startedAt] = useState<number>(Date.now());
@@ -57,6 +59,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
 
     const isVideo = call.kind === 'video';
     const isGroup = call.isGroup === true;
+    const remoteScreenName = remoteScreen ? peerAliases[remoteScreen] || 'Contacto' : '';
     const mediaActive = call.phase === 'negotiating' || call.phase === 'connected';
     const isVideoActive = isVideo && (call.phase === 'negotiating' || call.phase === 'connected');
     const effWidth = size.width;
@@ -201,7 +204,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         window.addEventListener('pointerup', onUp);
     }, [pos]);
 
-    const doShare = useCallback(async (withSystemAudio: boolean) => {
+    const doShare = useCallback(async () => {
         setShowShareOptions(false);
         setScreenShareError(null);
         const result = await window.upeer.getScreenShareSources();
@@ -210,7 +213,6 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             return;
         }
         setScreenShareSources(result.sources);
-        pendingShareAudioRef.current = withSystemAudio;
         setScreenSharePickerOpen(true);
     }, []);
 
@@ -220,8 +222,9 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         });
     }), [startScreenShare]);
 
-    const startSelectedScreenShare = useCallback(async () => {
+    const startSelectedScreenShare = useCallback(async (withSystemAudio: boolean) => {
         setScreenSharePickerOpen(false);
+        pendingShareAudioRef.current = withSystemAudio;
         const result = await window.upeer.requestScreenShareCapture();
         if (!result.success) setScreenShareError('No se pudo confirmar la fuente seleccionada.');
     }, []);
@@ -266,6 +269,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                 }}
                 onPointerDown={handlePointerDown}
             >
+                <Avatar src={avatar} sx={{ width: 32, height: 32, fontSize: 14 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                 <Typography level="body-sm" sx={{ flex: 1, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {peerName}
                 </Typography>
@@ -280,12 +284,11 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             {showShareOptions && (
                 <Box data-nodrag="true" sx={{ position: 'absolute', bottom: 92, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
                     <Typography level="body-xs" sx={{ px: 1, color: 'rgba(255,255,255,0.7)' }}>Compartir pantalla</Typography>
-                    <Box component="button" data-nodrag="true" onClick={() => void doShare(true)} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir con sonido</Box>
-                    <Box component="button" data-nodrag="true" onClick={() => void doShare(false)} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir sin sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => void doShare()} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir pantalla</Box>
                 </Box>
             )}
             {screenShareError && <Typography role="alert" level="body-xs" sx={{ position: 'absolute', bottom: 88, left: 12, right: 12, zIndex: 3, p: 1, borderRadius: 6, bgcolor: '#5f2120', color: 'white' }}>{screenShareError}</Typography>}
-            <ScreenSharePicker open={screenSharePickerOpen} sources={screenShareSources} onClose={() => setScreenSharePickerOpen(false)} onSelect={() => void startSelectedScreenShare()} onError={setScreenShareError} />
+            <ScreenSharePicker open={screenSharePickerOpen} sources={screenShareSources} onClose={() => setScreenSharePickerOpen(false)} onSelect={(withSystemAudio) => void startSelectedScreenShare(withSystemAudio)} onError={setScreenShareError} />
 
             <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: embedded ? 2 : 1, overflow: 'hidden', gap: 1 }}>
                 {isGroup && (isVideoActive || Boolean(remoteScreen)) ? (
@@ -293,7 +296,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                         {remoteScreen && (
                             <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
                                 <canvas ref={attachScreenCanvas} style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
-                                <Chip size="sm" color="warning" sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreen.slice(0, 8)} comparte pantalla</Chip>
+                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10 }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
                             </Box>
                         )}
                         <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
@@ -329,7 +332,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
                         {remoteScreen ? (
                             <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                                 <canvas ref={attachScreenCanvas} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
-                                <Chip size="sm" color="warning" sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreen.slice(0, 8)} comparte pantalla</Chip>
+                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10 }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
                             </Box>
                         ) : remotePeers.length > 0 ? (
                             <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />

@@ -4,17 +4,15 @@ import { ContactsPanel } from './ContactsPanel.js';
 import { SettingsPanel } from '../ui/SettingsPanel.js';
 import { CallsPanel } from '../../features/call/CallsPanel.js';
 import type { MainLayoutProps } from './MainLayout.js';
-import type { CallKind } from '../../features/call/useCall.js';
 
 interface MainLayoutPanelsProps {
     navigation: MainLayoutProps['navigation'];
     appStore: MainLayoutProps['appStore'];
     chatStore: MainLayoutProps['chatStore'];
     onLockSession: () => void;
-    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[], groupId?: string) => Promise<unknown>;
 }
 
-export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession, onStartCall }) => {
+export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, appStore, chatStore, onLockSession }) => {
     if (navigation.appView === 'settings') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -38,6 +36,7 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
                     contacts={chatStore.contacts}
                     groups={chatStore.groups}
                     selectedContactId={chatStore.targetUpeerId}
+                    selfUpeerId={chatStore.myIdentity?.upeerId}
                     onSelectContact={chatStore.setTargetUpeerId}
                     onOpenChat={(upeerId) => {
                         chatStore.setTargetUpeerId(upeerId);
@@ -54,7 +53,7 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
     if (navigation.appView === 'calls') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
-                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} selfUpeerId={chatStore.myIdentity?.upeerId} onStartCall={onStartCall} />
+                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} />
             </Box>
         );
     }

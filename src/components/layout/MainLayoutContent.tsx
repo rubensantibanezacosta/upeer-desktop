@@ -140,7 +140,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
             />
 
             {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (
-                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} onStartCall={startCall} />
+                <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} />
             ) : (
                 <>
                     <Sidebar

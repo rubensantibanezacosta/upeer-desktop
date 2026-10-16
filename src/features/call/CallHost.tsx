@@ -53,6 +53,8 @@ export const CallHost: React.FC<CallHostProps> = ({ appView, contacts, groups })
                     <CallWindow
                         call={call}
                         peerName={peerName}
+                        peerAliases={Object.fromEntries(contacts.map((item) => [item.upeerId, item.alias?.trim() || item.name]))}
+                        peerAvatars={Object.fromEntries(contacts.map((item) => [item.upeerId, item.avatar]))}
                         avatar={group?.avatar || contact?.avatar}
                         embedded
                         onToggleMute={() => void toggleMute(call.callId)}

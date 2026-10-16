@@ -1,16 +1,27 @@
-import React from 'react';
-import { Avatar, Box, Button, Card, CardContent, Divider, Stack, Typography } from '@mui/joy';
-import CallIcon from '@mui/icons-material/Call';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import type { Contact, Group } from '../../types/chat.js';
+import React, { useEffect, useState } from 'react';
+import { Avatar, Box, Card, CardContent, Stack, Typography } from '@mui/joy';
+import type { Contact, Group, RawChatMessage } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
 import type { CallKind } from './useCall.js';
 
 interface CallsPanelProps {
     contacts: Contact[];
     groups: Group[];
-    selfUpeerId?: string;
-    onStartCall: (peerUpeerId: string, kind: CallKind, isGroup?: boolean, groupMembers?: string[], groupId?: string) => Promise<unknown>;
+}
+
+type RecentCall = { id: string; chatId: string; timestamp: number; kind: CallKind; duration: string | null };
+
+function parseRecentCall(message: RawChatMessage, chatId: string): RecentCall | null {
+    const content = message.message.replace(/^__SYS__\|/, '');
+    const match = /^(Llamada de voz|Videollamada)(?: · (\d{2,}:\d{2})| perdida)$/.exec(content);
+    if (!match) return null;
+    return {
+        id: message.id ?? `${chatId}-${message.timestamp}`,
+        chatId,
+        timestamp: message.timestamp,
+        kind: match[1] === 'Videollamada' ? 'video' : 'audio',
+        duration: match[2] ?? null,
+    };
 }
 
 function callPhaseLabel(phase: string): string {
@@ -20,12 +31,38 @@ function callPhaseLabel(phase: string): string {
     return 'En curso';
 }
 
-export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId, onStartCall }) => {
+export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
     const calls = useCallStore((state) => state.calls);
     const isStartingCall = useCallStore((state) => state.isStartingCall);
     const activeCalls = Object.values(calls);
-    const availableContacts = contacts.filter((contact) => contact.upeerId !== selfUpeerId && ['connected', 'offline'].includes(contact.status));
-    const callUnavailable = isStartingCall || activeCalls.length > 0;
+    const [recentCalls, setRecentCalls] = useState<RecentCall[]>([]);
+    const hasActiveCall = isStartingCall || activeCalls.length > 0;
+
+    useEffect(() => {
+        if (hasActiveCall) return;
+        let cancelled = false;
+        const loadRecentCalls = async () => {
+            const conversations = [...contacts.map((contact) => contact.upeerId), ...groups.map((group) => group.groupId)];
+            const results = await Promise.all(conversations.map(async (chatId) => {
+                try {
+                    const messages = await window.upeer.getMessages(chatId);
+                    return messages.map((message) => parseRecentCall(message, chatId)).filter((call): call is RecentCall => call !== null);
+                } catch (cause) {
+                    console.warn(`No se pudo cargar el historial de llamadas de ${chatId}`, cause);
+                    return [];
+                }
+            }));
+            if (!cancelled) setRecentCalls(results.flat().sort((a, b) => b.timestamp - a.timestamp).slice(0, 30));
+        };
+        void loadRecentCalls();
+        return () => { cancelled = true; };
+    }, [hasActiveCall, contacts, groups]);
+
+    const getRecentParticipants = (chatId: string) => {
+        const group = groups.find((item) => item.groupId === chatId);
+        if (group) return group.members.map((memberId) => contacts.find((contact) => contact.upeerId === memberId)?.alias?.trim() || contacts.find((contact) => contact.upeerId === memberId)?.name || 'Contacto').join(', ');
+        return contacts.find((contact) => contact.upeerId === chatId)?.alias?.trim() || contacts.find((contact) => contact.upeerId === chatId)?.name || 'Contacto';
+    };
 
     return (
         <Box sx={{ width: '100%', height: '100%', overflow: 'auto', p: { xs: 2, md: 4 } }}>
@@ -35,11 +72,9 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                     <Typography level="body-md" color="neutral">Inicia una llamada con tus contactos o grupos.</Typography>
                 </Box>
 
-                <Stack spacing={1.5}>
+                {hasActiveCall ? <Stack spacing={1.5}>
                     <Typography level="h3">Llamadas activas</Typography>
-                    {activeCalls.length === 0 ? (
-                        <Card variant="soft"><CardContent><Typography level="body-sm">No hay llamadas activas.</Typography></CardContent></Card>
-                    ) : activeCalls.map((call) => {
+                    {activeCalls.map((call) => {
                         const group = call.isGroup ? groups.find((item) => item.groupId === call.peerUpeerId) : undefined;
                         const contact = contacts.find((item) => item.upeerId === call.peerUpeerId);
                         const name = group?.name || contact?.name || 'Contacto';
@@ -57,44 +92,28 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                             </Card>
                         );
                     })}
-                </Stack>
-
-                <Divider />
-
-                <Stack spacing={1.5}>
-                    <Typography level="h3">Contactos</Typography>
-                    {availableContacts.length === 0 ? <Typography level="body-sm">No hay contactos disponibles para llamar.</Typography> : availableContacts.map((contact) => (
-                        <Card key={contact.upeerId} variant="outlined">
+                </Stack> : <Stack spacing={1.5}>
+                    <Typography level="h3">Llamadas recientes</Typography>
+                    {recentCalls.length === 0 ? <Card variant="soft"><CardContent><Typography level="body-sm">No hay llamadas recientes.</Typography></CardContent></Card> : recentCalls.map((call) => {
+                        const group = groups.find((item) => item.groupId === call.chatId);
+                        const contact = contacts.find((item) => item.upeerId === call.chatId);
+                        const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
+                        const participants = getRecentParticipants(call.chatId);
+                        return <Card key={call.id} variant="outlined">
                             <CardContent>
                                 <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Avatar src={contact.avatar}>{contact.name.charAt(0).toUpperCase()}</Avatar>
-                                    <Typography level="title-md" sx={{ flex: 1 }}>{contact.name}</Typography>
-                                    <Button aria-label={`Llamar a ${contact.name}`} disabled={callUnavailable} variant="soft" startDecorator={<CallIcon />} onClick={() => void onStartCall(contact.upeerId, 'audio')}>Llamar</Button>
-                                    <Button aria-label={`Videollamar a ${contact.name}`} disabled={callUnavailable} variant="soft" startDecorator={<VideocamIcon />} onClick={() => void onStartCall(contact.upeerId, 'video')}>Vídeo</Button>
-                                </Stack>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </Stack>
-
-                <Stack spacing={1.5}>
-                    <Typography level="h3">Grupos</Typography>
-                    {groups.filter((group) => group.status === 'active').map((group) => (
-                        <Card key={group.groupId} variant="outlined">
-                            <CardContent>
-                                <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Avatar src={group.avatar || undefined}>{group.name.charAt(0).toUpperCase()}</Avatar>
+                                    <Avatar src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
                                     <Box sx={{ flex: 1 }}>
-                                        <Typography level="title-md">{group.name}</Typography>
-                                        <Typography level="body-xs">{group.members.length} miembros</Typography>
+                                        <Typography level="title-md">{name}</Typography>
+                                        <Typography level="body-xs">{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'} · {new Date(call.timestamp).toLocaleString()}</Typography>
+                                        <Typography level="body-xs">Participantes: {participants}</Typography>
+                                        <Typography level="body-xs">Duración: {call.duration ?? 'Perdida'}</Typography>
                                     </Box>
-                                    <Button aria-label={`Llamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<CallIcon />} onClick={() => void onStartCall(group.groupId, 'audio', true, group.members, group.groupId)}>Llamar</Button>
-                                    <Button aria-label={`Videollamar al grupo ${group.name}`} disabled={callUnavailable} variant="soft" startDecorator={<VideocamIcon />} onClick={() => void onStartCall(group.groupId, 'video', true, group.members, group.groupId)}>Vídeo</Button>
                                 </Stack>
                             </CardContent>
-                        </Card>
-                    ))}
-                </Stack>
+                        </Card>;
+                    })}
+                </Stack>}
             </Stack>
         </Box>
     );

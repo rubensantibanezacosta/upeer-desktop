@@ -31,13 +31,15 @@ describe('ScreenSharePicker', () => {
         const onSelect = vi.fn();
         render(<ScreenSharePicker open sources={sources} onClose={vi.fn()} onSelect={onSelect} onError={vi.fn()} />);
 
+        expect(screen.getByRole('radio', { name: 'Compartir con sonido' })).toBeChecked();
         expect(screen.getByRole('button', { name: /Pantalla principal/i })).toBeTruthy();
+        fireEvent.click(screen.getByRole('radio', { name: 'Compartir sin sonido' }));
         fireEvent.click(screen.getByRole('tab', { name: 'Ventanas' }));
         const windowButton = screen.getByRole('button', { name: /Navegador/i });
         fireEvent.click(windowButton);
 
         await waitFor(() => expect(selectScreenShareSource).toHaveBeenCalledWith('window:2'));
-        expect(onSelect).toHaveBeenCalledOnce();
+        expect(onSelect).toHaveBeenCalledWith(false);
     });
 
     it('cancela el selector sin confirmar una fuente', () => {

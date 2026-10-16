@@ -32,7 +32,7 @@ const buildMediaResponse = async (filePath: string, range: string | null) => {
         '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',
         '.avi': 'video/x-msvideo', '.mov': 'video/quicktime', '.m4v': 'video/x-m4v',
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-        '.gif': 'image/gif', '.webp': 'image/webp'
+        '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf'
     };
     const contentType = mimeMap[ext] || 'application/octet-stream';
 

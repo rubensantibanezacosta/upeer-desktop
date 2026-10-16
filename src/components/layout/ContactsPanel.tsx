@@ -5,6 +5,8 @@ import { useIsOnline } from '../../hooks/useIsOnline.js';
 import { ContactsPanelList } from './ContactsPanelList.js';
 import { ContactsPanelDetails } from './ContactsPanelDetails.js';
 import { ContactsPanelDeleteDialog } from './ContactsPanelDeleteDialog.js';
+import { useCall } from '../../features/call/useCall.js';
+import { useCallStore } from '../../features/call/useCallStore.js';
 
 interface ContactsPanelProps {
     contacts: Contact[];
@@ -15,6 +17,7 @@ interface ContactsPanelProps {
     onDeleteContact: (upeerId: string) => void;
     onBlockContact: (upeerId: string) => void;
     onUnblockContact: (upeerId: string) => void;
+    selfUpeerId?: string;
 }
 
 export const ContactsPanel: React.FC<ContactsPanelProps> = ({
@@ -26,10 +29,13 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
     onDeleteContact,
     onBlockContact,
     onUnblockContact,
+    selfUpeerId,
 }) => {
     const [filter, setFilter] = useState<'all' | 'blocked'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const { startCall } = useCall(selfUpeerId);
+    const callsUnavailable = useCallStore((state) => state.isStartingCall || Object.keys(state.calls).length > 0);
 
     const visibleContacts = useMemo(
         () => {
@@ -83,6 +89,9 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
                     onBlockContact={onBlockContact}
                     onUnblockContact={onUnblockContact}
                     onDeleteRequest={setConfirmDeleteId}
+                    onCallAudio={(upeerId) => { void startCall(upeerId, 'audio'); }}
+                    onCallVideo={(upeerId) => { void startCall(upeerId, 'video'); }}
+                    callsUnavailable={callsUnavailable}
                 />
             </Box>
 

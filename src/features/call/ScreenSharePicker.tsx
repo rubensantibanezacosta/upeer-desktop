@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Box, Button, DialogTitle, Modal, ModalClose, ModalDialog, Tab, TabList, TabPanel, Tabs, Typography } from '@mui/joy';
+import { Alert, Box, Button, DialogTitle, Modal, ModalClose, ModalDialog, Radio, RadioGroup, Tab, TabList, TabPanel, Tabs, Typography } from '@mui/joy';
 
 type ShareSource = { id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null };
-type Props = { open: boolean; sources: ShareSource[]; onClose: () => void; onSelect: () => void; onError: (message: string) => void };
+type Props = { open: boolean; sources: ShareSource[]; onClose: () => void; onSelect: (withSystemAudio: boolean) => void; onError: (message: string) => void };
 
 export function ScreenSharePicker({ open, sources, onClose, onSelect, onError }: Props) {
     const [sourceType, setSourceType] = useState<'screen' | 'window'>('screen');
+    const [withSystemAudio, setWithSystemAudio] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +24,7 @@ export function ScreenSharePicker({ open, sources, onClose, onSelect, onError }:
                 setLoading(false);
                 return;
             }
-            onSelect();
+            onSelect(withSystemAudio);
         } catch (cause) {
             const message = cause instanceof Error ? cause.message : 'No se pudo seleccionar la fuente.';
             setError(message);
@@ -38,6 +39,10 @@ export function ScreenSharePicker({ open, sources, onClose, onSelect, onError }:
                 <ModalClose sx={{ color: 'white' }} />
                 <DialogTitle sx={{ fontSize: 24, color: 'white' }}>Comparte tu pantalla</DialogTitle>
                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)' }}>Selecciona una pantalla o ventana para compartir.</Typography>
+                <RadioGroup aria-label="Audio del sistema" value={withSystemAudio ? 'with-audio' : 'without-audio'} onChange={(event) => setWithSystemAudio(event.target.value === 'with-audio')} sx={{ display: 'flex', flexDirection: 'row', gap: 2 }}>
+                    <Radio value="with-audio" label="Compartir con sonido" sx={{ color: 'white', '--Radio-labelColor': 'white' }} />
+                    <Radio value="without-audio" label="Compartir sin sonido" sx={{ color: 'white', '--Radio-labelColor': 'white' }} />
+                </RadioGroup>
                 {loading && sources.length === 0 ? <Typography sx={{ py: 6, textAlign: 'center', color: 'white' }}>Buscando pantallas y ventanas…</Typography> : <>
                     <Tabs value={sourceType} onChange={(_event, value) => setSourceType(value as 'screen' | 'window')}>
                         <TabList sx={{ bgcolor: 'transparent', borderBottom: '1px solid rgba(255,255,255,0.16)' }}>

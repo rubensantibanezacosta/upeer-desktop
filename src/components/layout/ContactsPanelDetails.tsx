@@ -17,6 +17,8 @@ import ChatIcon from '@mui/icons-material/Chat';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import CallIcon from '@mui/icons-material/Call';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import type { Contact, Group } from '../../types/chat.js';
 import { getTrustMeta } from './contactInfoHelpers.js';
 import { GroupAvatar } from './groupItemSupport.js';
@@ -30,6 +32,9 @@ interface ContactsPanelDetailsProps {
     onBlockContact: (upeerId: string) => void;
     onUnblockContact: (upeerId: string) => void;
     onDeleteRequest: (upeerId: string) => void;
+    onCallAudio: (upeerId: string) => void;
+    onCallVideo: (upeerId: string) => void;
+    callsUnavailable: boolean;
 }
 
 const formatRelativeDate = (iso?: string | null) => {
@@ -52,6 +57,9 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
     onBlockContact,
     onUnblockContact,
     onDeleteRequest,
+    onCallAudio,
+    onCallVideo,
+    callsUnavailable,
 }) => {
     if (!activeContact) {
         return (
@@ -121,6 +129,8 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                                 <Button variant="outlined" color="neutral" size="sm" startDecorator={<ChatIcon sx={{ fontSize: '15px' }} />} onClick={() => onOpenChat(activeContact.upeerId)} sx={{ borderRadius: 'md', px: 2 }}>
                                     Chatear
                                 </Button>
+                                <Button aria-label={`Llamar a ${activeContact.name}`} variant="outlined" color="neutral" size="sm" startDecorator={<CallIcon sx={{ fontSize: '15px' }} />} disabled={callsUnavailable || activeContact.status === 'blocked'} onClick={() => onCallAudio(activeContact.upeerId)} sx={{ borderRadius: 'md', px: 2 }}>Llamar</Button>
+                                <Button aria-label={`Videollamar a ${activeContact.name}`} variant="outlined" color="neutral" size="sm" startDecorator={<VideocamIcon sx={{ fontSize: '15px' }} />} disabled={callsUnavailable || activeContact.status === 'blocked'} onClick={() => onCallVideo(activeContact.upeerId)} sx={{ borderRadius: 'md', px: 2 }}>Vídeo</Button>
 
                                 {activeContact.status === 'blocked' ? (
                                     <Button variant="outlined" color="neutral" size="sm" startDecorator={<LockOpenIcon sx={{ fontSize: '15px' }} />} onClick={() => onUnblockContact(activeContact.upeerId)} sx={{ borderRadius: 'md', px: 2 }}>
