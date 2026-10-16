@@ -142,7 +142,6 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
         const dayAgo = now - ONE_DAY_MS;
         const todayCount = countRecentVouchesByFrom(vouch.fromId, dayAgo);
         if (todayCount >= MAX_VOUCHES_PER_SENDER_PER_DAY) {
-            debug('Rate limit de vouch excedido', { fromId: vouch.fromId }, 'reputation');
             return false;
         }
 
