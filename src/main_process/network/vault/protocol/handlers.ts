@@ -1,5 +1,5 @@
 import { VaultStoreData, VaultQueryData } from '../../types.js';
-import { saveVaultEntry, getVaultEntriesForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
+import { saveVaultEntry, getVaultEntriesPageForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
 import { security, network, warn, debug } from '../../../security/secure-logger.js';
 import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
@@ -13,6 +13,7 @@ type VaultResponsePacket = {
     entries?: unknown[];
     hasMore?: boolean;
     nextOffset?: number;
+    nextAfterId?: number;
 };
 
 type VaultSendResponse = (ip: string, data: VaultResponsePacket) => void;
@@ -143,30 +144,24 @@ export async function handleVaultQuery(
             }
         }
 
-        const allEntries = await getVaultEntriesForRecipient(data.requesterSid);
+        const page = await getVaultEntriesPageForRecipient(data.requesterSid, data.afterId, VAULT_DELIVERY_PAGE_SIZE + 1);
 
-        if (allEntries.length > 0) {
-            // BUG K fix: paginar la respuesta para evitar paquetes OOM.
-            // Enviamos hasta VAULT_DELIVERY_PAGE_SIZE entradas por respuesta.
-            // El receptor puede re-consultar con offset si hasMore === true.
-            const offset = data.offset ?? 0;
-            const page = allEntries.slice(offset, offset + VAULT_DELIVERY_PAGE_SIZE);
-            const hasMore = offset + VAULT_DELIVERY_PAGE_SIZE < allEntries.length;
+        const hasMore = page.length > VAULT_DELIVERY_PAGE_SIZE;
+        const entries = page.slice(0, VAULT_DELIVERY_PAGE_SIZE);
+        const nextAfterId = hasMore ? entries[entries.length - 1]?.id : undefined;
 
-            network('Delivering vault entries', undefined, {
-                recipient: data.requesterSid,
-                count: page.length,
-                hasMore,
-            }, 'vault');
+        network('Delivering vault entries', undefined, {
+            recipient: data.requesterSid,
+            count: entries.length,
+            hasMore,
+        }, 'vault');
 
-            // Send batch delivery
-            sendResponse(fromAddress, {
-                type: 'VAULT_DELIVERY',
-                entries: page,
-                hasMore,
-                nextOffset: hasMore ? offset + VAULT_DELIVERY_PAGE_SIZE : undefined,
-            });
-        }
+        sendResponse(fromAddress, {
+            type: 'VAULT_DELIVERY',
+            entries,
+            hasMore,
+            nextAfterId,
+        });
     } catch (err) {
         warn('Vault query processing failed', { error: err }, 'vault');
     }

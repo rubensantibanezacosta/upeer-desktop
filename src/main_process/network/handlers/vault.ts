@@ -19,12 +19,6 @@ import { completeVaultRecoverySource, touchVaultRecoverySource } from '../vault/
 
 type VaultSendResponse = (ip: string, data: Record<string, unknown>) => void;
 
-// BUG VAULT-ACK-ACUM: los ACKs se acumulan por fuente de recuperación entre páginas.
-// La paginación borra los shards del custodio al ACKear, así que solo se puede ACKear
-// al completar la última página; si solo se ACKearan los hashes de esa página, los
-// shards de las páginas anteriores quedarían retenidos para siempre en el custodio.
-const pendingAckBySource = new Map<string, Set<string>>();
-
 type VaultEntry = {
     senderSid: string;
     payloadHash?: string;
@@ -35,6 +29,7 @@ type VaultDeliveryPayload = {
     entries?: unknown;
     hasMore?: unknown;
     nextOffset?: unknown;
+    nextAfterId?: unknown;
 };
 
 type VaultOriginContact = {
@@ -90,6 +85,7 @@ export async function handleVaultDelivery(
     // Solo ACK-ar entradas que pasaron integridad y fueron procesadas sin error.
     // Entradas corrompidas o manipuladas NO se ACKên → el custodio las conserva.
     let processedEntries = 0;
+    const processedAckHashes = new Set<string>();
     let reportedIntegrityFailure = false;
     // Shards recibidos en este batch → se dispara el recovery una sola vez por archivo
     // al final del batch (en lugar de por cada shard), evitando escaneos O(N²) en la DB.
@@ -273,12 +269,7 @@ export async function handleVaultDelivery(
                     ? entry.payloadHash
                     : (typeof entry.data === 'string' ? entry.data.slice(0, 64) : '');
                 if (ackHash.length > 0) {
-                    let acc = pendingAckBySource.get(recoverySourceKey);
-                    if (!acc) {
-                        acc = new Set();
-                        pendingAckBySource.set(recoverySourceKey, acc);
-                    }
-                    acc.add(ackHash);
+                    processedAckHashes.add(ackHash);
                 }
             } catch (err) {
                 error('Failed to process delivered vault entry', err, 'vault');
@@ -306,36 +297,25 @@ export async function handleVaultDelivery(
         });
     }
 
-    // ACK solo para entradas que pasaron integridad y fueron procesadas sin error.
-    // Entradas con firma inválida o que lanzaron excepción NO se ACKên.
-    // Si hay más páginas (hasMore), NO se ACKea aún: el ACK borra los shards del
-    // custodio y rompería la paginación por offset (el offset se vuelve inestable
-    // cuando se borran registros entre páginas). Se ACKea al completar la última,
-    // enviando TODOS los hashes acumulados de las páginas anteriores y esta.
-    const hasMore = data.hasMore === true;
-    if (!hasMore) {
-        const accumulated = pendingAckBySource.get(recoverySourceKey);
-        if (accumulated && accumulated.size > 0) {
-            sendResponse(fromAddress, {
-                type: 'VAULT_ACK',
-                payloadHashes: Array.from(accumulated)
-            });
-            pendingAckBySource.delete(recoverySourceKey);
-        }
+    if (processedAckHashes.size > 0) {
+        sendResponse(fromAddress, {
+            type: 'VAULT_ACK',
+            payloadHashes: Array.from(processedAckHashes),
+        });
     }
 
     // BUG O fix: si el custodio indicó que hay más entradas, solicitamos la siguiente página.
     // Sin esto, usuarios con >50 mensajes en vault solo reciben los primeros 50 y el resto
     // queda atrapado en el custodio para siempre.
-    if (data.hasMore === true && typeof data.nextOffset === 'number') {
+    if (data.hasMore === true && typeof data.nextAfterId === 'number') {
         const myId = getMyUPeerId();
         sendResponse(fromAddress, {
             type: 'VAULT_QUERY',
             requesterSid: myId,
-            offset: data.nextOffset,
+            afterId: data.nextAfterId,
         });
         touchVaultRecoverySource(recoverySourceKey, senderSid);
-        debug('Vault delivery: requesting next page', { offset: data.nextOffset, from: senderSid }, 'vault');
+        debug('Vault delivery: requesting next page', { afterId: data.nextAfterId, from: senderSid }, 'vault');
         return;
     }
 

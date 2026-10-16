@@ -6,7 +6,7 @@ import type { VaultQueryData, VaultStoreData } from '../../../src/main_process/n
 
 vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
     saveVaultEntry: vi.fn(),
-    getVaultEntriesForRecipient: vi.fn(),
+    getVaultEntriesPageForRecipient: vi.fn(),
     deleteVaultEntry: vi.fn(),
     getSenderUsage: vi.fn(),
     renewVaultEntry: vi.fn(),
@@ -73,15 +73,34 @@ describe('Vault Protocol Handlers', () => {
 
     describe('handleVaultQuery', () => {
         it('should deliver entries for authorized requester', async () => {
-            const entries = [{ payloadHash: 'h1' }, { payloadHash: 'h2' }];
-            vi.mocked(vaultDb.getVaultEntriesForRecipient).mockResolvedValue(entries as never);
+            const entries = [{ id: 1, payloadHash: 'h1' }, { id: 2, payloadHash: 'h2' }];
+            vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue(entries as never);
 
             await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 type: 'VAULT_DELIVERY',
-                entries: expect.arrayContaining([{ payloadHash: 'h1' }])
+                entries: expect.arrayContaining([{ id: 1, payloadHash: 'h1' }])
             }));
+        });
+
+        it('paginates by stable entry ID and fetches one extra entry to detect continuation', async () => {
+            const entries = Array.from({ length: 121 }, (_, index) => ({ id: index + 121, payloadHash: `h${index + 121}` }));
+            vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue(entries as never);
+
+            await vaultHandlers.handleVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                timestamp: Date.now(),
+                afterId: 120,
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(vaultDb.getVaultEntriesPageForRecipient).toHaveBeenCalledWith(senderSid, 120, 121);
+            expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
+                hasMore: true,
+                nextAfterId: 240,
+                entries: expect.arrayContaining([{ id: 240, payloadHash: 'h240' }]),
+            }));
+            expect(mockSendResponse.mock.calls[0][1].entries).toHaveLength(120);
         });
 
         it('should refuse unauthorized query (senderSid != requesterSid)', async () => {

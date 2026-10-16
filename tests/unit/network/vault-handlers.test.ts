@@ -428,11 +428,32 @@ describe('Vault Delivery Handler', () => {
 
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
-        await handleVaultDelivery(custodianSid, { entries: [entry], hasMore: true, nextOffset: 50 }, mockWin, mockSendResponse, '1.2.3.4');
+        await handleVaultDelivery(custodianSid, { entries: [entry], hasMore: true, nextAfterId: 50 }, mockWin, mockSendResponse, '1.2.3.4');
 
         expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
             type: 'VAULT_QUERY',
-            offset: 50
+            afterId: 50
+        }));
+    });
+
+    it('continues pagination with a stable entry ID cursor', async () => {
+        const entry = {
+            senderSid: 'origin-id',
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'),
+            payloadHash: 'cursor-hash'
+        };
+
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
+
+        await handleVaultDelivery(custodianSid, {
+            entries: [entry],
+            hasMore: true,
+            nextAfterId: 54321,
+        }, mockWin, mockSendResponse, '5.6.7.8');
+
+        expect(mockSendResponse).toHaveBeenCalledWith('5.6.7.8', expect.objectContaining({
+            type: 'VAULT_QUERY',
+            afterId: 54321,
         }));
     });
 
@@ -471,20 +492,26 @@ describe('Vault Delivery Handler', () => {
         }));
     });
 
-    it('ACKea todos los shards acumulados de páginas anteriores en la última página', async () => {
+    it('ACKea cada página procesada antes de solicitar la siguiente usando el cursor', async () => {
         const page1 = { senderSid: 'origin-id', data: Buffer.from('shard-a').toString('hex'), payloadHash: 'p1' };
         const page2 = { senderSid: 'origin-id', data: Buffer.from('shard-b').toString('hex'), payloadHash: 'p2' };
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
 
-        // Página 1 con hasMore → aún NO se ACKea (solo se acumula para no romper el offset).
-        await handleVaultDelivery(custodianSid, { entries: [page1], hasMore: true, nextOffset: 1 }, mockWin, mockSendResponse, '9.9.9.9');
-        expect(mockSendResponse).not.toHaveBeenCalledWith('9.9.9.9', expect.objectContaining({ type: 'VAULT_ACK' }));
-
-        // Última página → ACK con los hashes de AMBAS páginas (p1 acumulado + p2).
-        await handleVaultDelivery(custodianSid, { entries: [page2], hasMore: false }, mockWin, mockSendResponse, '9.9.9.9');
-        expect(mockSendResponse).toHaveBeenCalledWith('9.9.9.9', expect.objectContaining({
+        await handleVaultDelivery(custodianSid, { entries: [page1], hasMore: true, nextAfterId: 1 }, mockWin, mockSendResponse, '9.9.9.9');
+        expect(mockSendResponse).toHaveBeenNthCalledWith(1, '9.9.9.9', {
             type: 'VAULT_ACK',
-            payloadHashes: ['p1', 'p2']
+            payloadHashes: ['p1'],
+        });
+        expect(mockSendResponse).toHaveBeenNthCalledWith(2, '9.9.9.9', expect.objectContaining({
+            type: 'VAULT_QUERY',
+            afterId: 1,
         }));
+
+        mockSendResponse.mockClear();
+        await handleVaultDelivery(custodianSid, { entries: [page2], hasMore: false }, mockWin, mockSendResponse, '9.9.9.9');
+        expect(mockSendResponse).toHaveBeenCalledWith('9.9.9.9', {
+            type: 'VAULT_ACK',
+            payloadHashes: ['p2'],
+        });
     });
 });

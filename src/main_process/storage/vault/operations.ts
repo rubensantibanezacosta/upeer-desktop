@@ -80,6 +80,22 @@ export async function getVaultEntriesForRecipient(recipientSid: string) {
     ).orderBy(vaultStorage.id);
 }
 
+export async function getVaultEntriesPageForRecipient(recipientSid: string, afterId: number | undefined, limit: number) {
+    const db = getDb();
+    const now = Date.now();
+    const conditions = [
+        eq(vaultStorage.recipientSid, recipientSid),
+        gt(vaultStorage.expiresAt, now),
+    ];
+    if (typeof afterId === 'number') {
+        conditions.push(gt(vaultStorage.id, afterId));
+    }
+    return db.select().from(vaultStorage)
+        .where(and(...conditions))
+        .orderBy(vaultStorage.id)
+        .limit(limit);
+}
+
 /**
  * Deletes a specific entry from the vault by its hash.
  * Returns true if an entry was actually deleted.

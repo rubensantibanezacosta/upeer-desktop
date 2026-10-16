@@ -137,12 +137,14 @@ export interface VaultQueryData {
     merkleRoot?: string;
     batchSize?: number;
     offset?: number; // paginación: índice de inicio para la siguiente página
+    afterId?: number;
     payloadHash?: string; // hash específico a consultar (para shards)
 }
 
 export interface VaultDeliveryData {
     entries: VaultStoreData[];
     hasMore: boolean;
+    nextAfterId?: number;
 }
 
 // File transfer interfaces

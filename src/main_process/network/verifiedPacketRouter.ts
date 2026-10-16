@@ -146,6 +146,7 @@ type VaultDeliveryPayload = {
     entries?: unknown;
     hasMore?: unknown;
     nextOffset?: unknown;
+    nextAfterId?: unknown;
 };
 
 type SyncPulsePayload = {
@@ -342,6 +343,7 @@ function toVaultQueryPayload(data: VerifiedPacketData, requesterSid: string): Va
         merkleRoot: typeof data.merkleRoot === 'string' ? data.merkleRoot : undefined,
         batchSize: typeof data.batchSize === 'number' ? data.batchSize : undefined,
         offset: typeof data.offset === 'number' ? data.offset : undefined,
+        afterId: typeof data.afterId === 'number' ? data.afterId : undefined,
         payloadHash: typeof data.payloadHash === 'string' ? data.payloadHash : undefined,
     };
 }
@@ -358,6 +360,7 @@ function toVaultDeliveryPayload(data: VerifiedPacketData): VaultDeliveryPayload 
         entries: data.entries ?? data.vaultData,
         hasMore: data.hasMore,
         nextOffset: data.nextOffset,
+        nextAfterId: data.nextAfterId,
     };
 }
 
