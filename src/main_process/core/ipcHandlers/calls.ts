@@ -47,7 +47,9 @@ export function registerCallHandlers(): void {
                 const duration = change.connectedAt === undefined
                     ? null
                     : formatCallDuration(Math.max(0, Math.floor(((change.endedAt ?? Date.now()) - change.connectedAt) / 1000)));
-                const displayMessage = duration === null ? `${label} perdida` : `${label} · ${duration}`;
+                const displayMessage = duration === null
+                    ? `${label} perdida`
+                    : `${label} · ${duration} · ${change.connectedAt}`;
                 const message = `__SYS__|${displayMessage}`;
                 const eventId = callEventMessageId(change.callId);
                 if (change.isGroup) {

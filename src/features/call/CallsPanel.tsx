@@ -13,12 +13,12 @@ type RecentCall = { id: string; chatId: string; timestamp: number; kind: CallKin
 
 function parseRecentCall(message: RawChatMessage, chatId: string): RecentCall | null {
     const content = message.message.replace(/^__SYS__\|/, '');
-    const match = /^(Llamada de voz|Videollamada)(?: · (\d{2,}:\d{2})| perdida)$/.exec(content);
+    const match = /^(Llamada de voz|Videollamada)(?: · (\d{2,}:\d{2})(?: · (\d{10,}))?| perdida)$/.exec(content);
     if (!match) return null;
     return {
         id: message.id ?? `${chatId}-${message.timestamp}`,
         chatId,
-        timestamp: message.timestamp,
+        timestamp: match[3] ? Number(match[3]) : message.timestamp,
         kind: match[1] === 'Videollamada' ? 'video' : 'audio',
         duration: match[2] ?? null,
     };

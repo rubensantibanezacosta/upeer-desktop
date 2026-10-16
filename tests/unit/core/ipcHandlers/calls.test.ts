@@ -108,10 +108,10 @@ describe('registerCallHandlers', () => {
             getHandler('end-call')(null, { callId: session.callId });
 
             await vi.waitFor(() => expect(messages.saveMessage).toHaveBeenCalledWith(
-                expect.any(String), 'peer1', true, '__SYS__|Videollamada · 00:05', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
+                expect.any(String), 'peer1', true, '__SYS__|Videollamada · 00:05 · 1792065600000', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
             ));
             expect(sender.send).toHaveBeenCalledWith('receive-p2p-message', expect.objectContaining({
-                upeerId: 'peer1', message: 'Videollamada · 00:05', isSystem: true,
+                upeerId: 'peer1', message: 'Videollamada · 00:05 · 1792065600000', isSystem: true,
             }));
         } finally {
             vi.useRealTimers();

@@ -16,10 +16,13 @@ describe('ChatSystemMessage', () => {
     });
 
     it('maqueta eventos de videollamada con su icono', () => {
-        render(<ChatSystemMessage message="Videollamada · 00:42" />);
+        const startedAt = new Date(2026, 9, 16, 9, 30).getTime();
+        render(<ChatSystemMessage message={`Videollamada · 00:42 · ${startedAt}`} />);
 
-        expect(screen.getByRole('note', { name: 'Videollamada, Duración 00:42' })).toBeDefined();
+        const startTime = new Date(startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        expect(screen.getByRole('note', { name: `Videollamada, iniciada a las ${startTime}, Duración 00:42` })).toBeDefined();
         expect(screen.getByTestId('video-call-icon')).toBeDefined();
+        expect(screen.getByText(`Inicio ${startTime}`)).toBeDefined();
     });
 
     it('maqueta llamadas fallidas como perdidas sin duración', () => {
@@ -37,8 +40,9 @@ describe('ChatSystemMessage', () => {
     });
 
     it('parsea solo los formatos de evento de llamada admitidos', () => {
-        expect(parseCallSystemEvent('Videollamada · 01:30')).toEqual({ kind: 'video', duration: '01:30' });
-        expect(parseCallSystemEvent('Llamada de voz perdida')).toEqual({ kind: 'audio', duration: null });
+        expect(parseCallSystemEvent('Videollamada · 01:30')).toEqual({ kind: 'video', duration: '01:30', startedAt: null });
+        expect(parseCallSystemEvent('Videollamada · 01:30 · 1792065600000')).toEqual({ kind: 'video', duration: '01:30', startedAt: 1792065600000 });
+        expect(parseCallSystemEvent('Llamada de voz perdida')).toEqual({ kind: 'audio', duration: null, startedAt: null });
         expect(parseCallSystemEvent('mensaje normal')).toBeNull();
     });
 });

@@ -57,7 +57,7 @@ describe('CallsPanel', () => {
         const contacts: Contact[] = [{ upeerId: 'peer-1', address: 'peer-address', name: 'Ana', alias: 'Anita', status: 'connected' }];
         const groups: Group[] = [];
         window.upeer.getMessages = vi.fn().mockResolvedValue([{
-            id: 'call-event', chatUpeerId: 'peer-1', isMine: true, message: '__SYS__|Videollamada · 02:15', status: 'sent', timestamp: 1710000000000,
+            id: 'call-event', chatUpeerId: 'peer-1', isMine: true, message: '__SYS__|Videollamada · 02:15 · 1710000000000', status: 'sent', timestamp: 1710000000000,
         }]);
 
         render(<CallsPanel contacts={contacts} groups={groups} />);
