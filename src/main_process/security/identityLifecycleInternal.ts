@@ -172,3 +172,50 @@ export function lockSession(): void {
     if (identityState.ephemeralKeyRotationInterval) clearInterval(identityState.ephemeralKeyRotationInterval);
     info('Sesión bloqueada explícitamente.', {}, 'identity');
 }
+
+export function clearIdentityState(): void {
+    if (identityState.secretKey) sodium.sodium_memzero(identityState.secretKey);
+    if (identityState.ephemeralSecretKey) sodium.sodium_memzero(identityState.ephemeralSecretKey);
+    if (identityState.spkSecretKey) sodium.sodium_memzero(identityState.spkSecretKey);
+    identityState.previousSpkEntries.forEach((entry) => sodium.sodium_memzero(entry.spkSk));
+    identityState.previousEphemeralSecretKeys.forEach((secretKey) => sodium.sodium_memzero(secretKey));
+    if (identityState.spkRotationInterval) clearInterval(identityState.spkRotationInterval);
+    if (identityState.ephemeralKeyRotationInterval) clearInterval(identityState.ephemeralKeyRotationInterval);
+    identityState.publicKey = null;
+    identityState.secretKey = null;
+    identityState.upeerId = '';
+    identityState.ephemeralPublicKey = null;
+    identityState.ephemeralSecretKey = null;
+    identityState.spkPublicKey = null;
+    identityState.spkSecretKey = null;
+    identityState.spkId = 0;
+    identityState.spkRotationInterval = null;
+    identityState.previousSpkEntries = [];
+    identityState.previousEphemeralSecretKeys = [];
+    identityState.ephemeralKeyRotationInterval = null;
+    identityState.ephemeralKeyRotationCounter = 0;
+    identityState.dhtSeq = 0;
+    identityState.myAlias = '';
+    identityState.myAvatar = '';
+    identityState.isLocked = true;
+    identityState.isMnemonicBased = false;
+    identityState.mnemonic = null;
+}
+
+export function validateMnemonicIdentity(mnemonic: string): boolean {
+    if (!bip39.validateMnemonic(mnemonic)) return false;
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
+    const secretKey = Buffer.alloc(sodium.crypto_sign_SECRETKEYBYTES);
+    sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed.subarray(0, 32));
+    const expectedId = getUPeerIdFromPublicKey(publicKey);
+    sodium.sodium_memzero(secretKey);
+    return identityState.isMnemonicBased && identityState.upeerId === expectedId;
+}
+
+export function resetIdentityForEmptyDevice(userDataPath: string): void {
+    clearIdentityState();
+    identityState.userDataPath = userDataPath;
+    identityState.dhtStatePath = path.join(userDataPath, 'dht_state.json');
+    identityState.isLocked = true;
+}

@@ -9,6 +9,7 @@ import { ToggleRow } from './shared.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
 import { DeleteAccountModal, RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
 import { DangerZoneSection, RecoverySection, SecurityStatusCard } from './securitySections.js';
+import { resetAccountStores } from '../../../store/resetAccountStores.js';
 
 export const SectionSeguridad: React.FC = () => {
     const [pinEnabled, setPinEnabled] = useState(false);
@@ -123,7 +124,12 @@ export const SectionSeguridad: React.FC = () => {
         const isEnabled = await window.upeer.isPinEnabled();
         if (!isEnabled) {
             if (confirm('¿Estás SEGURO de que quieres eliminar todos tus datos? Esta acción es irreversible.')) {
-                await window.upeer.deleteIdentity();
+                const result = await window.upeer.deleteIdentity();
+                if (!result.success) {
+                    setDeleteError(result.error || 'No se pudieron eliminar los datos locales.');
+                    return;
+                }
+                resetAccountStores();
                 window.location.reload();
             }
             return;
@@ -138,7 +144,12 @@ export const SectionSeguridad: React.FC = () => {
         const isValid = await window.upeer.verifyPin({ pin: currentPin });
         if (isValid) {
             if (confirm('ÚLTIMO AVISO: Se borrarán todos los mensajes, contactos y llaves privadas. ¿Continuar?')) {
-                await window.upeer.deleteIdentity();
+                const result = await window.upeer.deleteIdentity();
+                if (!result.success) {
+                    setDeleteError(result.error || 'No se pudieron eliminar los datos locales.');
+                    return;
+                }
+                resetAccountStores();
                 window.location.reload();
             } else {
                 setDeleteModalOpen(false);

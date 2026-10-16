@@ -22,6 +22,7 @@ export class RepairWorker {
     private static REPAIR_THRESHOLD = 6; // Repair if shards online <= 6 (RS 4+8)
     private static running = false;
     private static interval: NodeJS.Timeout | null = null;
+    private static starter: NodeJS.Timeout | null = null;
 
     static start() {
         if (this.running) return;
@@ -32,11 +33,12 @@ export class RepairWorker {
             clearInterval(this.interval);
             this.interval = null;
         }
-
         info('Vault Repair Worker started (Lazy Mode)', { interval: '4h' }, 'vault');
 
-        // Initial delay to avoid startup congestion
-        setTimeout(() => this.runMaintenance(), 1000 * 60 * 10);
+        this.starter = setTimeout(() => {
+            this.starter = null;
+            return this.runMaintenance();
+        }, 1000 * 60 * 10);
 
         this.interval = setInterval(() => this.runMaintenance(), this.INTERVAL);
     }
@@ -51,6 +53,10 @@ export class RepairWorker {
      *      a los custodios actuales con el nuevo expiresAt.
      */
     static stop() {
+        if (this.starter) {
+            clearTimeout(this.starter);
+            this.starter = null;
+        }
         if (this.interval) {
             clearInterval(this.interval);
             this.interval = null;

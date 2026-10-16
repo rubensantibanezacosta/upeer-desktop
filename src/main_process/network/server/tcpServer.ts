@@ -17,10 +17,13 @@ import {
     setMainWindow,
     getTcpServer,
     setTcpServer,
+    setCallMediaUdpServer,
     setKademliaDHT,
     setDhtMaintenanceTimer,
     getDhtMaintenanceTimer,
     getMainWindow,
+    setNetworkReady,
+    clearSendQueue,
 } from './state.js';
 import { sendSecureUDPMessage } from './transport.js';
 import { drainSendQueue } from './transport.js';
@@ -175,6 +178,7 @@ export function startUDPServer(win: BrowserWindow) {
 
 export function closeUDPServer() {
     closeCallMediaUdpServer();
+    setCallMediaUdpServer(null);
     const timer = getDhtMaintenanceTimer();
     if (timer) {
         clearInterval(timer);
@@ -185,4 +189,8 @@ export function closeUDPServer() {
         tcpServer.close();
         setTcpServer(null);
     }
+    setKademliaDHT(null);
+    setKademliaInstance(null);
+    setNetworkReady(false);
+    clearSendQueue();
 }

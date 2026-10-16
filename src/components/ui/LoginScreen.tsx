@@ -5,6 +5,7 @@ import { HomeStep, SwitchAccountWarnStep } from './login/HomeStep.js';
 import { ImportStep } from './login/ImportStep.js';
 import { LoginShell } from './login/LoginShell.js';
 import type { Screen } from './login/types.js';
+import { resetAccountStores } from '../../store/resetAccountStores.js';
 
 interface LoginScreenProps {
     onUnlocked: () => void;
@@ -88,20 +89,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
     const shellCopy = useMemo(() => getShellCopy(screen, isLocked), [screen, isLocked]);
 
     const handleGenerateMnemonic = async () => {
-        const result = await window.upeer.generateMnemonic();
-        setMnemonic(result.mnemonic.split(' '));
-        setError(null);
-        setScreen('create-generate');
+        setIsLoading(true);
+        try {
+            const result = await window.upeer.generateMnemonic();
+            setMnemonic(result.mnemonic.split(' '));
+            setError(null);
+            setScreen('create-generate');
+        } catch {
+            setError('No se pudo preparar la nueva cuenta. Inténtalo de nuevo.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleSwitchAndNavigate = async (destination: 'create-explain' | 'import') => {
         try {
-            await window.upeer.lockSession();
-            setIsLocked(false);
+            const result = await window.upeer.deleteIdentity();
+            if (!result.success) {
+                setError(result.error || 'No se pudieron eliminar los datos de la cuenta anterior.');
+                setScreen('home');
+                return;
+            }
+            resetAccountStores();
+            setIsLocked(destination === 'import');
             setError(null);
             setScreen(destination);
         } catch {
-            setError('No se pudo cerrar la sesión local actual. Inténtalo de nuevo.');
+            setError('No se pudo eliminar la cuenta local. Inténtalo de nuevo.');
             setScreen('home');
         }
     };
@@ -115,6 +129,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
                 : await window.upeer.createMnemonicIdentity(phrase);
 
             if (result.success) {
+                resetAccountStores();
                 onUnlocked();
             } else {
                 setError('Las palabras no son correctas. Comprueba que estén completas y en orden.');
@@ -132,6 +147,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
         try {
             const result = await window.upeer.createMnemonicIdentity(phrase, alias, avatar);
             if (result.success) {
+                resetAccountStores();
                 onUnlocked();
             } else {
                 setError('No se pudo crear la cuenta. Inténtalo de nuevo.');
@@ -176,7 +192,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
                 <CreateExplainStep
                     onBack={() => setScreen('home')}
                     onGenerate={handleGenerateMnemonic}
-                    isLoading={false}
+                    isLoading={isLoading}
                 />
             )}
 

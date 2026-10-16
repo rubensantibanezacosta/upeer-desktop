@@ -34,7 +34,7 @@ function _deriveDbKey(deviceKey: Buffer): Buffer {
     return dbKey;
 }
 
-export async function initDB(userDataPath: string) {
+export async function initDB(userDataPath: string, createBackup = true) {
     const dbPath = path.join(userDataPath, 'p2p-chat.db');
 
     const deviceKey = _getOrCreateDeviceKey(userDataPath);
@@ -111,8 +111,10 @@ export async function initDB(userDataPath: string) {
     _runOneTimeMigrations(sqlite);
 
     try {
-        performDatabaseBackup(userDataPath);
-        scheduleBackups(userDataPath, 24);
+        if (createBackup) performDatabaseBackup(userDataPath);
+        if (!hasScheduledDatabaseBackup()) {
+            startDatabaseBackupScheduler(userDataPath, 24, createBackup);
+        }
     } catch (err) {
         error('Failed to initialize backup system', err, 'db');
     }
@@ -121,7 +123,7 @@ export async function initDB(userDataPath: string) {
 }
 
 import { closeDatabase } from './shared.js';
-import { performDatabaseBackup, scheduleBackups } from './backup.js';
+import { performDatabaseBackup, startDatabaseBackupScheduler, hasScheduledDatabaseBackup } from './backup.js';
 import type BetterSqlite3Type from 'better-sqlite3-multiple-ciphers';
 
 function _runOneTimeMigrations(sqlite: InstanceType<typeof BetterSqlite3Type>) {

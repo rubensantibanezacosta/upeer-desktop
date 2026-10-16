@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, Input, Button, Stack, Sheet, Avatar } from '@mui/joy';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useChatStore } from '../../store/useChatStore.js';
+import { resetAccountStores } from '../../store/resetAccountStores.js';
 
 interface AppLockProps {
     onUnlock: () => void;
@@ -185,7 +186,18 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock, onTooManyAttempts })
                         startDecorator={<LogoutIcon />}
                         onClick={async () => {
                             if (confirm('Se borrarán todos tus datos locales para iniciar sesión con otra cuenta. ¿Estás seguro?')) {
-                                await window.upeer.deleteIdentity();
+                                try {
+                                    const result = await window.upeer.deleteIdentity();
+                                    if (!result.success) {
+                                        setError(result.error || 'No se pudieron eliminar los datos locales.');
+                                        return;
+                                    }
+                                    resetAccountStores();
+                                    setError('Datos eliminados. La app vuelve a iniciar en un momento.');
+                                    window.location.reload();
+                                } catch (cause) {
+                                    setError(cause instanceof Error ? cause.message : 'No se pudieron eliminar los datos locales.');
+                                }
                             }
                         }}
                         fullWidth

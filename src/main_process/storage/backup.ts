@@ -119,11 +119,11 @@ function cleanupOldBackups(userDataPath: string, maxDays: number): void {
  * @param intervalHours Intervalo en horas (por defecto 24)
  * @returns Función para detener el programa de backups
  */
-export function scheduleBackups(userDataPath: string, intervalHours = 24): () => void {
+export function scheduleBackups(userDataPath: string, intervalHours = 24, createImmediately = true): () => void {
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
     // Realizar backup inmediato al programar
-    performDatabaseBackup(userDataPath);
+    if (createImmediately) performDatabaseBackup(userDataPath);
 
     const interval = setInterval(() => {
         performDatabaseBackup(userDataPath);
@@ -135,6 +135,22 @@ export function scheduleBackups(userDataPath: string, intervalHours = 24): () =>
         clearInterval(interval);
         info('Database backup scheduler stopped', {}, 'backup');
     };
+}
+
+let stopScheduledBackups: (() => void) | null = null;
+
+export function startDatabaseBackupScheduler(userDataPath: string, intervalHours = 24, createImmediately = true): void {
+    stopScheduledBackups?.();
+    stopScheduledBackups = scheduleBackups(userDataPath, intervalHours, createImmediately);
+}
+
+export function stopDatabaseBackupScheduler(): void {
+    stopScheduledBackups?.();
+    stopScheduledBackups = null;
+}
+
+export function hasScheduledDatabaseBackup(): boolean {
+    return stopScheduledBackups !== null;
 }
 
 /**

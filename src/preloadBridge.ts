@@ -119,6 +119,7 @@ const identityApi = {
     createMnemonicIdentity: (mnemonic: string, alias?: string, avatar?: string) => ipcRenderer.invoke('create-mnemonic-identity', { mnemonic, alias, avatar }),
     unlockSession: (mnemonic: string) => ipcRenderer.invoke('unlock-session', { mnemonic }),
     lockSession: () => ipcRenderer.invoke('lock-session'),
+    deleteIdentity: () => ipcRenderer.invoke('delete-identity'),
     setMyAlias: (alias: string) => ipcRenderer.invoke('set-my-alias', { alias }),
     setMyAvatar: (avatar: string) => ipcRenderer.invoke('set-my-avatar', { avatar }),
     getMyReputation: () => ipcRenderer.invoke('get-my-reputation'),

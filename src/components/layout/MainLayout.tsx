@@ -5,6 +5,7 @@ import type { LinkPreview } from '../../types/chat.js';
 import type { ChatMessage, Contact, Group, PendingFile } from '../../types/chat.js';
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
+import { resetAccountStores } from '../../store/resetAccountStores.js';
 import { forwardMessageToTargets, type ForwardTarget } from '../../features/chat/message/forwardMessage.js';
 import type { FileTransferController } from '../../hooks/useFileTransfer.js';
 import type { AppStore } from '../../store/useAppStore.js';
@@ -104,10 +105,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     if (isAppLocked) {
         return (
             <AppLock
-                onUnlock={() => setIsAppLocked(false)}
+                onUnlock={() => {
+                    setIsAppLocked(false);
+                    void window.upeer.identityStatus().then((status) => {
+                        if (status.isMnemonicMode) setAuthenticated(true);
+                    });
+                }}
                 onTooManyAttempts={() => {
                     setIsAppLocked(false);
                     setAuthenticated(false);
+                    resetAccountStores();
                     navigation.goToChat();
                 }}
             />

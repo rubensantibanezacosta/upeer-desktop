@@ -73,6 +73,7 @@ declare global {
             createMnemonicIdentity: (mnemonic: string, alias?: string, avatar?: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;
             unlockSession: (mnemonic: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;
             lockSession: () => Promise<{ success: boolean }>;
+            deleteIdentity: () => Promise<{ success: boolean; error?: string }>;
             // Group API
             getGroups: () => Promise<UpeerGroup[]>;
             createGroup: (name: string, memberUpeerIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;

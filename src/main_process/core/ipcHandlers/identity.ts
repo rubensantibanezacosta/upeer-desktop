@@ -13,15 +13,21 @@ import {
   isSessionLocked,
   isMnemonicMode,
   getMnemonic,
-  sign
+  sign,
+  validateMnemonicIdentity,
 } from '../../security/identity.js';
+import * as bip39 from 'bip39';
 import { verifyAccessPin } from '../../security/pin.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { closeUDPServer, startUDPServer } from '../../network/server/tcpServer.js';
 import { stopPeerManager } from '../../sidecars/peer-manager.js';
 
-import { clearUserData } from '../../storage/shared.js';
+import { deleteAllUserData } from '../../storage/delete-all-user-data.js';
+import { initDB } from '../../storage/init.js';
+import { app } from 'electron';
+import { stopRenewalService } from '../../network/dht/renewal.js';
+import { RepairWorker } from '../../network/vault/repair-worker.js';
 import { getMainWindow } from '../windowManager.js';
 import { warn } from '../../security/secure-logger.js';
 
@@ -29,6 +35,26 @@ import { warn } from '../../security/secure-logger.js';
  * Registra los manejadores IPC relacionados con identidad y autenticación
  */
 export function registerIdentityHandlers(): void {
+  const resetNetworkForIdentityChange = () => {
+    closeUDPServer();
+    stopPeerManager();
+    stopRenewalService();
+    RepairWorker.stop();
+  };
+
+  ipcMain.handle('delete-identity', async () => {
+    try {
+      lockSession();
+      resetNetworkForIdentityChange();
+      await deleteAllUserData(app.getPath('userData'));
+      await initDB(app.getPath('userData'));
+      return { success: true };
+    } catch (err) {
+      warn('Failed to delete all local account data', { err: String(err) }, 'identity');
+      return { success: false, error: 'No se pudieron eliminar todos los datos locales' };
+    }
+  });
+
   ipcMain.handle('get-my-identity', () => {
     // La dirección de identidad ahora proviene del sidecar yggstack (SOCKS5 user-space)
     // en lugar de la interfaz TUN/TAP del sistema operativo.
@@ -156,21 +182,27 @@ export function registerIdentityHandlers(): void {
   });
 
   ipcMain.handle('create-mnemonic-identity', async (event, { mnemonic, alias, avatar }) => {
-    // Si ya había una identidad activa (cambio de cuenta), cerrar la red y limpiar datos
-    if (isMnemonicMode()) {
-      closeUDPServer();
-      stopPeerManager();
-      clearUserData();
-    }
     const mnemonicToUse = mnemonic || generateMnemonic();
+    if (!bip39.validateMnemonic(mnemonicToUse)) {
+      return { success: false, error: 'Invalid mnemonic phrase' };
+    }
+    if (isMnemonicMode()) {
+      const isSameIdentity = validateMnemonicIdentity(mnemonicToUse);
+      if (!isSameIdentity) {
+        resetNetworkForIdentityChange();
+        lockSession();
+        await deleteAllUserData(app.getPath('userData'));
+        await initDB(app.getPath('userData'));
+      }
+    }
     const success = unlockWithMnemonic(mnemonicToUse);
     if (success) {
       if (alias) setMyAlias(alias);
       if (avatar) setMyAvatar(avatar);
       const mainWindow = getMainWindow();
-      if (mainWindow) {
-        startUDPServer(mainWindow);
-      }
+      if (mainWindow) startUDPServer(mainWindow);
+      const { startRenewalService } = await import('../../network/dht/renewal.js');
+      startRenewalService();
       return { success: true, mnemonic: mnemonicToUse };
     }
     return { success: false, error: 'Identity initialization failed' };
@@ -179,9 +211,10 @@ export function registerIdentityHandlers(): void {
   ipcMain.handle('unlock-session', async (event, { mnemonic }) => {
     const successResult = await unlockWithMnemonic(mnemonic);
     if (successResult) {
-      // Kick off network services now that we have a valid identity
       const mainWindow = getMainWindow();
       if (mainWindow) startUDPServer(mainWindow);
+      const { startRenewalService } = await import('../../network/dht/renewal.js');
+      startRenewalService();
       return { success: true };
     }
     return { success: false, error: 'Mnemonic unlock failed' };
