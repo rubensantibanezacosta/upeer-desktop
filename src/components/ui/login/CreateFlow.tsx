@@ -57,11 +57,19 @@ interface CreateGenerateStepProps {
 export const CreateGenerateStep: React.FC<CreateGenerateStepProps> = ({ mnemonic, onBack, onConfirm, onRegenerate }) => {
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState('');
 
     const handleCopy = async () => {
-        await navigator.clipboard.writeText(mnemonic.join(' '));
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 2200);
+        try {
+            const result = await window.upeer.writeClipboardText(mnemonic.join(' '));
+            if (!result.success) throw new Error(result.error || 'Motivo no disponible');
+            setCopied(true);
+            setCopyError('');
+            window.setTimeout(() => setCopied(false), 2200);
+        } catch (cause) {
+            setCopied(false);
+            setCopyError(cause instanceof Error ? cause.message : String(cause));
+        }
     };
 
     return (
@@ -78,6 +86,8 @@ export const CreateGenerateStep: React.FC<CreateGenerateStepProps> = ({ mnemonic
             </Alert>
 
             <CreateFlowMnemonicPanel mnemonic={mnemonic} revealed={revealed} onReveal={() => setRevealed(true)} />
+
+            {copyError && <Alert color="danger" variant="soft">No se pudieron copiar las palabras ({copyError}). Anótalas manualmente en un lugar seguro.</Alert>}
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
                 <Button

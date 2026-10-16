@@ -17,11 +17,12 @@ interface ProfileQrModalProps {
     open: boolean;
     fullId: string;
     copied: boolean;
+    copyError: string;
     onClose: () => void;
     onCopy: () => void;
 }
 
-export const ProfileQrModal: React.FC<ProfileQrModalProps> = ({ open, fullId, copied, onClose, onCopy }) => (
+export const ProfileQrModal: React.FC<ProfileQrModalProps> = ({ open, fullId, copied, copyError, onClose, onCopy }) => (
     <Modal open={open} onClose={onClose}>
         <ModalDialog variant="outlined" sx={{ maxWidth: 380, width: '90%', alignItems: 'center', textAlign: 'center', gap: 2 }}>
             <ModalClose />
@@ -36,6 +37,7 @@ export const ProfileQrModal: React.FC<ProfileQrModalProps> = ({ open, fullId, co
             <Button fullWidth variant={copied ? 'soft' : 'outlined'} color={copied ? 'success' : 'neutral'} startDecorator={copied ? <DoneIcon /> : <ContentCopyIcon />} onClick={onCopy} sx={{ transition: 'all 0.2s' }}>
                 {copied ? '¡Copiado!' : 'Copiar dirección'}
             </Button>
+            {copyError && <Typography level="body-xs" color="danger">No se pudo copiar al portapapeles: {copyError}</Typography>}
         </ModalDialog>
     </Modal>
 );

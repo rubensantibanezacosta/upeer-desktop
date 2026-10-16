@@ -225,12 +225,13 @@ export const ProfileStatsSection: React.FC<ProfileStatsSectionProps> = ({ myRepu
 interface ProfileAddressSectionProps {
     fullId: string;
     copied: boolean;
+    copyError: string;
     onCopy: () => void;
     onShowQr: () => void;
     onToggleInfo: (key: InfoKey) => void;
 }
 
-export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fullId, copied, onCopy, onShowQr, onToggleInfo }) => (
+export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fullId, copied, copyError, onCopy, onShowQr, onToggleInfo }) => (
     <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
             <FingerprintIcon sx={{ fontSize: '16px', opacity: 0.45 }} />
@@ -246,6 +247,7 @@ export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fu
                 {copied ? '¡Copiado!' : 'Copiar'}
             </Button>
         </Box>
+        {copyError && <Typography level="body-xs" color="danger" sx={{ mt: 1 }}>No se pudo copiar al portapapeles: {copyError}</Typography>}
     </Box>
 );
 

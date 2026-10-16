@@ -17,6 +17,7 @@ import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils
 
 export const CopyableField: React.FC<{ label: string; value: string; onInfo?: () => void }> = ({ label, value, onInfo }) => {
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState('');
     return (
         <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
@@ -50,10 +51,17 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
                         size="sm"
                         variant="plain"
                         color={copied ? 'success' : 'neutral'}
-                        onClick={() => {
-                            navigator.clipboard.writeText(value);
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
+                        onClick={async () => {
+                            try {
+                                const result = await window.upeer.writeClipboardText(value);
+                                if (!result.success) throw new Error(result.error || 'Motivo no disponible');
+                                setCopied(true);
+                                setCopyError('');
+                                setTimeout(() => setCopied(false), 2000);
+                            } catch (cause) {
+                                setCopied(false);
+                                setCopyError(cause instanceof Error ? cause.message : String(cause));
+                            }
                         }}
                     >
                         {copied
@@ -63,6 +71,7 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
                     </IconButton>
                 </Tooltip>
             </Box>
+            {copyError && <Typography level="body-xs" color="danger">No se pudo copiar al portapapeles: {copyError}</Typography>}
         </Box>
     );
 };

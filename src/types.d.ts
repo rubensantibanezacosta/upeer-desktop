@@ -38,6 +38,7 @@ declare global {
 
     interface Window {
         upeer: {
+            writeClipboardText: (text: string) => Promise<{ success: boolean; error?: string }>;
             getMyNetworkAddress: () => Promise<string>;
             getMessages: (upeerId: string) => Promise<UpeerChatMessage[]>;
             searchMessages: (query: string) => Promise<UpeerChatMessage[]>;

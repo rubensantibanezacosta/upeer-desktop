@@ -36,6 +36,7 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     const [activeInfo, setActiveInfo] = useState<InfoKey | null>(null);
     const [showQR, setShowQR] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const toggleInfo = (key: InfoKey) =>
@@ -45,10 +46,17 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     const fullId = identity ? `${identity.upeerId}@${addr}` : '';
     const displayName = alias || identity?.upeerId || 'Mi cuenta';
 
-    const handleCopy = useCallback(() => {
-        navigator.clipboard.writeText(fullId);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = useCallback(async () => {
+        try {
+            const result = await window.upeer.writeClipboardText(fullId);
+            if (!result.success) throw new Error(result.error || 'Motivo no disponible');
+            setCopied(true);
+            setCopyError('');
+            setTimeout(() => setCopied(false), 2000);
+        } catch (cause) {
+            setCopied(false);
+            setCopyError(cause instanceof Error ? cause.message : String(cause));
+        }
     }, [fullId]);
 
     useEffect(() => {
@@ -127,9 +135,9 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
                 onAliasSave={saveAlias}
             />
             <ProfileStatsSection myReputation={myReputation} vaultStats={vaultStats} fmtBytes={fmtBytes} onToggleInfo={toggleInfo} />
-            <ProfileAddressSection fullId={fullId} copied={copied} onCopy={handleCopy} onShowQr={() => setShowQR(true)} onToggleInfo={toggleInfo} />
+            <ProfileAddressSection fullId={fullId} copied={copied} copyError={copyError} onCopy={handleCopy} onShowQr={() => setShowQR(true)} onToggleInfo={toggleInfo} />
             <ProfileTechnicalSection identityId={identity?.upeerId} publicKey={identity?.publicKey} networkAddress={networkAddress} onToggleInfo={toggleInfo} />
-            <ProfileQrModal open={showQR} fullId={fullId} copied={copied} onClose={() => setShowQR(false)} onCopy={handleCopy} />
+            <ProfileQrModal open={showQR} fullId={fullId} copied={copied} copyError={copyError} onClose={() => setShowQR(false)} onCopy={handleCopy} />
             <ProfileInfoModal activeInfo={activeInfo} onClose={() => setActiveInfo(null)} />
         </Box>
     );

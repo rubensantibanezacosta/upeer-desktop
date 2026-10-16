@@ -108,6 +108,7 @@ const persistSelectedFile = (file: File) => {
 };
 
 const identityApi = {
+    writeClipboardText: (text: string) => ipcRenderer.invoke('write-clipboard-text', text),
     getMyNetworkAddress: () => ipcRenderer.invoke('get-ygg-ip'),
     getMyIdentity: () => ipcRenderer.invoke('get-my-identity'),
     getVaultStats: () => ipcRenderer.invoke('get-vault-stats'),
