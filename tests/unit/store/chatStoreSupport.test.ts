@@ -47,6 +47,13 @@ describe('chatStoreSupport', () => {
         expect(m.date).toBe(1000);
     });
 
+    it('mapContactMessage normaliza eventos de llamada persistidos como mensajes de sistema', () => {
+        const m = mapContactMessage(msg({ message: '__SYS__|Videollamada · 00:27' }) as never);
+
+        expect(m.message).toBe('Videollamada · 00:27');
+        expect(m.isSystem).toBe(true);
+    });
+
     it('mapGroupMessage usa mi identidad para mis mensajes y el contacto para los ajenos', () => {
         const mine = mapGroupMessage('grp-1', msg({ isMine: true }), [], { name: 'Yo' } as never);
         expect(mine.senderName).toBe('Yo');

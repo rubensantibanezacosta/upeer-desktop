@@ -67,6 +67,13 @@ describe('ContactItem Component', () => {
         expect(screen.getByText('Hello!')).toBeDefined();
     });
 
+    it('shows call event preview without the internal system prefix', () => {
+        render(<ContactItem {...defaultProps} contact={{ ...mockContact, lastMessage: '__SYS__|Videollamada · 00:27' }} />);
+
+        expect(screen.getByText('Videollamada · 00:27')).toBeDefined();
+        expect(screen.queryByText('__SYS__|Videollamada · 00:27')).toBeNull();
+    });
+
     it('shows unread count badge', () => {
         const contactWithUnread = {
             ...mockContact,

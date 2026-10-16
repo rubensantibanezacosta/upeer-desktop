@@ -15,6 +15,7 @@ import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
+import { parseCallSystemEvent } from '../../features/chat/chatAreaSupport.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 
 const parseJsonMessage = (message: string) => {
@@ -80,6 +81,17 @@ export const renderPendingLabel = (contact: Contact) => (
 export const renderLastMessagePreview = (contact: Contact, highlight: string) => {
     if (!contact.lastMessage) {
         return '';
+    }
+    const systemMessage = contact.lastMessage.startsWith('__SYS__|')
+        ? contact.lastMessage.slice(8)
+        : contact.lastMessage;
+    const callEvent = parseCallSystemEvent(systemMessage);
+    if (callEvent) {
+        const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
+        return callEvent.duration ? `${label} · ${callEvent.duration}` : `${label} perdida`;
+    }
+    if (systemMessage !== contact.lastMessage) {
+        return systemMessage;
     }
     const contactCardSummary = getContactCardSummary(contact.lastMessage);
     if (contactCardSummary) {

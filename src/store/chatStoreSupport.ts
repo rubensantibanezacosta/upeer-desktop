@@ -40,19 +40,23 @@ export const insertMessageChronologically = (messages: ChatMessage[], nextMessag
     return copy;
 };
 
-export const mapContactMessage = (message: RawChatMessage): ChatMessage => ({
-    id: message.id,
-    upeerId: message.chatUpeerId,
-    isMine: !!message.isMine,
-    message: message.message,
-    status: message.status,
-    timestamp: formatMessageTimestamp(message.timestamp),
-    replyTo: message.replyTo,
-    reactions: message.reactions,
-    isEdited: !!message.isEdited,
-    isDeleted: !!message.isDeleted,
-    date: message.timestamp,
-});
+export const mapContactMessage = (message: RawChatMessage): ChatMessage => {
+    const isSystem = message.message?.startsWith('__SYS__|') ?? false;
+    return {
+        id: message.id,
+        upeerId: message.chatUpeerId,
+        isMine: !!message.isMine,
+        message: isSystem ? message.message?.slice(8) : message.message,
+        isSystem: isSystem || undefined,
+        status: message.status,
+        timestamp: formatMessageTimestamp(message.timestamp),
+        replyTo: message.replyTo,
+        reactions: message.reactions,
+        isEdited: !!message.isEdited,
+        isDeleted: !!message.isDeleted,
+        date: message.timestamp,
+    };
+};
 
 export const mapGroupMessage = (
     chatId: string,
@@ -61,13 +65,14 @@ export const mapGroupMessage = (
     myIdentity: MyIdentity | null,
 ): ChatMessage => {
     const sender = message.isMine ? myIdentity : contacts.find((contact) => contact.upeerId === message.senderUpeerId);
+    const isSystem = message.message?.startsWith('__SYS__|') ?? false;
     return {
         id: message.id,
         upeerId: chatId,
         groupId: chatId,
         isMine: !!message.isMine,
-        message: message.message?.startsWith('__SYS__|') ? message.message.slice(8) : message.message,
-        isSystem: message.message?.startsWith('__SYS__|') || undefined,
+        message: isSystem ? message.message?.slice(8) : message.message,
+        isSystem: isSystem || undefined,
         status: message.status,
         timestamp: formatMessageTimestamp(message.timestamp),
         replyTo: message.replyTo,
@@ -95,7 +100,8 @@ export const buildSearchResults = (raw: RawChatMessage[], contacts: Contact[], g
             upeerId: message.chatUpeerId,
             groupId: isGroup ? message.chatUpeerId : undefined,
             isMine: !!message.isMine,
-            message: message.message,
+            message: message.message?.startsWith('__SYS__|') ? message.message.slice(8) : message.message,
+            isSystem: message.message?.startsWith('__SYS__|') || undefined,
             status: message.status,
             timestamp: formatMessageTimestamp(message.timestamp),
             senderName: conversationName,
