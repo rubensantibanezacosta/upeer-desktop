@@ -193,6 +193,12 @@ declare global {
             persistInternalAsset: (data: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             generateVideoThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
             /** Llamadas de voz/vídeo P2P */
+            getScreenShareSources: () => Promise<{ success: boolean; sources: Array<{ id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null }>; error?: string }>;
+            selectScreenShareSource: (sourceId: string) => Promise<{ success: boolean }>;
+            cancelScreenShareSelection: () => Promise<{ success: boolean }>;
+            requestScreenShareCapture: () => Promise<{ success: boolean }>;
+            onScreenShareCaptureRequested: (callback: () => void) => UpeerUnsubscribe;
+            onScreenShareSourceSelected: (callback: (sourceId: string | null) => void) => UpeerUnsubscribe;
             startCall: (upeerId: string, kind: 'audio' | 'video') => Promise<{ success: boolean; callId?: string; error?: string }>;
             startGroupCall: (members: string[], kind: 'audio' | 'video', groupId?: string) => Promise<{ success: boolean; callId?: string; error?: string }>;
             acceptCall: (callId: string) => Promise<{ success: boolean; error?: string }>;

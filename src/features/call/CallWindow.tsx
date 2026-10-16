@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Box, Chip, Typography } from '@mui/joy';
 import { CallControls } from './CallControls.js';
+import { ScreenSharePicker } from './ScreenSharePicker.js';
 import { useCallMedia } from './useCallMedia.js';
 import type { ActiveCallView } from './useCall.js';
 
@@ -16,19 +17,6 @@ interface CallWindowProps {
 
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 560;
-
-const shareOptionSx = {
-    textAlign: 'left' as const,
-    border: 'none',
-    background: 'transparent',
-    color: 'white',
-    cursor: 'pointer',
-    fontSize: 12,
-    px: 1.5,
-    py: 0.5,
-    borderRadius: 6,
-    '&:hover': { backgroundColor: 'rgba(255,255,255,0.12)' },
-};
 
 const remoteCanvasDiagnostics = new Set<string>();
 
@@ -55,6 +43,10 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
     const [remoteScreen, setRemoteScreen] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [showShareOptions, setShowShareOptions] = useState(false);
+    const [screenSharePickerOpen, setScreenSharePickerOpen] = useState(false);
+    const [screenShareError, setScreenShareError] = useState<string | null>(null);
+    const [screenShareSources, setScreenShareSources] = useState<Array<{ id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null }>>([]);
+    const pendingShareAudioRef = useRef(true);
     const { setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = useCallMedia(call.callId ?? '');
     useEffect(() => {
         const timer = setInterval(() => {
@@ -200,14 +192,30 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
         window.addEventListener('pointerup', onUp);
     }, [pos]);
 
-    const doShare = useCallback((target: 'screen' | 'window', withSystemAudio: boolean) => {
+    const doShare = useCallback(async (withSystemAudio: boolean) => {
         setShowShareOptions(false);
-        if (screenSharing) {
-            stopScreenShare();
-        } else {
-            void startScreenShare({ target, withSystemAudio });
+        setScreenShareError(null);
+        const result = await window.upeer.getScreenShareSources();
+        if (!result.success || result.sources.length === 0) {
+            setScreenShareError(result.error ?? 'No se encontraron pantallas o ventanas disponibles.');
+            return;
         }
-    }, [screenSharing, startScreenShare, stopScreenShare]);
+        setScreenShareSources(result.sources);
+        pendingShareAudioRef.current = withSystemAudio;
+        setScreenSharePickerOpen(true);
+    }, []);
+
+    useEffect(() => window.upeer.onScreenShareCaptureRequested(() => {
+        void startScreenShare({ target: 'screen', withSystemAudio: pendingShareAudioRef.current }).then((started) => {
+            if (!started) setScreenShareError('No se pudo iniciar la captura de pantalla.');
+        });
+    }), [startScreenShare]);
+
+    const startSelectedScreenShare = useCallback(async () => {
+        setScreenSharePickerOpen(false);
+        const result = await window.upeer.requestScreenShareCapture();
+        if (!result.success) setScreenShareError('No se pudo confirmar la fuente seleccionada.');
+    }, []);
 
     return (
 
@@ -263,12 +271,12 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, avatar, 
             {showShareOptions && (
                 <Box data-nodrag="true" sx={{ position: 'absolute', bottom: 92, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
                     <Typography level="body-xs" sx={{ px: 1, color: 'rgba(255,255,255,0.7)' }}>Compartir pantalla</Typography>
-                    <Box component="button" data-nodrag="true" onClick={() => doShare('screen', true)} sx={shareOptionSx}>Pantalla con sonido</Box>
-                    <Box component="button" data-nodrag="true" onClick={() => doShare('screen', false)} sx={shareOptionSx}>Pantalla sin sonido</Box>
-                    <Box component="button" data-nodrag="true" onClick={() => doShare('window', true)} sx={shareOptionSx}>Ventana con sonido</Box>
-                    <Box component="button" data-nodrag="true" onClick={() => doShare('window', false)} sx={shareOptionSx}>Ventana sin sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => void doShare(true)} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir con sonido</Box>
+                    <Box component="button" data-nodrag="true" onClick={() => void doShare(false)} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir sin sonido</Box>
                 </Box>
             )}
+            {screenShareError && <Typography role="alert" level="body-xs" sx={{ position: 'absolute', bottom: 88, left: 12, right: 12, zIndex: 3, p: 1, borderRadius: 6, bgcolor: '#5f2120', color: 'white' }}>{screenShareError}</Typography>}
+            <ScreenSharePicker open={screenSharePickerOpen} sources={screenShareSources} onClose={() => setScreenSharePickerOpen(false)} onSelect={() => void startSelectedScreenShare()} onError={setScreenShareError} />
 
             <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: embedded ? 2 : 1, overflow: 'hidden', gap: 1 }}>
                 {isGroup && (isVideoActive || Boolean(remoteScreen)) ? (

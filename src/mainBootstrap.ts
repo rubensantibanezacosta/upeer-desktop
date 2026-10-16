@@ -9,6 +9,7 @@ import { registerIdentityHandlers } from './main_process/core/ipcHandlers/identi
 import { registerMessageHandlers } from './main_process/core/ipcHandlers/messages.js';
 import { registerNetworkHandlers } from './main_process/core/ipcHandlers/network.js';
 import { registerSecurityHandlers } from './main_process/core/ipcHandlers/security.js';
+import { registerScreenShareHandlers } from './main_process/core/ipcHandlers/screenShare.js';
 import { registerVaultHandlers } from './main_process/core/ipcHandlers/vault.js';
 
 export const registerMediaScheme = () => {
@@ -40,4 +41,5 @@ export const registerIpcHandlers = () => {
     registerVaultHandlers();
     registerSecurityHandlers();
     registerDeviceHandlers();
+    registerScreenShareHandlers();
 };

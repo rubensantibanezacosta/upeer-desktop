@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box } from '@mui/joy';
+import callSoundUrl from '../../../resources/sound/call-sound.mp3?url';
 import { CallIncomingModal } from './CallIncomingModal.js';
 import { CallWindow } from './CallWindow.js';
 import { useCall } from './useCall.js';
@@ -15,10 +16,24 @@ interface CallHostProps {
 export const CallHost: React.FC<CallHostProps> = ({ appView, contacts, groups }) => {
     const { activeCalls, acceptCall, rejectCall, toggleMute, toggleCamera, endCall } = useCall();
     const incoming = activeCalls.find((c) => c.phase === 'incoming-ringing' && c.callId);
+    const incomingCallId = incoming?.callId;
     const call = activeCalls.find((item) => item.callId);
     const group = call?.isGroup ? groups.find((item) => item.groupId === (call.groupId ?? call.peerUpeerId)) : undefined;
     const contact = contacts.find((item) => item.upeerId === call?.peerUpeerId);
     const peerName = group?.name || contact?.name || 'Contacto';
+
+    useEffect(() => {
+        if (!incomingCallId) return;
+        const audio = new Audio(callSoundUrl);
+        audio.loop = true;
+        void audio.play().catch((cause: unknown) => {
+            console.warn('No se pudo reproducir el sonido de llamada entrante', cause);
+        });
+        return () => {
+            audio.pause();
+            audio.currentTime = 0;
+        };
+    }, [incomingCallId]);
 
     return (
         <>

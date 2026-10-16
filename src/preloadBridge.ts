@@ -190,6 +190,12 @@ const fileTransferApi = {
 };
 
 const callApi = {
+    getScreenShareSources: () => ipcRenderer.invoke('get-screen-share-sources'),
+    selectScreenShareSource: (sourceId: string) => ipcRenderer.invoke('select-screen-share-source', sourceId),
+    cancelScreenShareSelection: () => ipcRenderer.invoke('cancel-screen-share-selection'),
+    requestScreenShareCapture: () => ipcRenderer.invoke('request-screen-share-capture'),
+    onScreenShareCaptureRequested: (callback: () => void) => subscribe('request-screen-share-capture', callback),
+    onScreenShareSourceSelected: (callback: (sourceId: string | null) => void) => subscribe<[string | null]>('screen-share-source-selected', callback),
     startCall: (upeerId: string, kind: 'audio' | 'video') => ipcRenderer.invoke('start-call', { upeerId, kind }),
     startGroupCall: (members: string[], kind: 'audio' | 'video', groupId?: string) => ipcRenderer.invoke('start-group-call', { members, kind, groupId }),
     acceptCall: (callId: string) => ipcRenderer.invoke('accept-call', { callId }),

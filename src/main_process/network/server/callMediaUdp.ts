@@ -144,7 +144,11 @@ function startMediaWorker(win: BrowserWindow): void {
         error('CALL_MEDIA verifier utility process error', cause, 'call');
     });
     worker.on?.('exit', (code) => {
-        error('CALL_MEDIA verifier utility process exited', { exitCode: code }, 'call');
+        if (code === 0) {
+            info('CALL_MEDIA verifier utility process stopped', { exitCode: code }, 'call');
+            return;
+        }
+        error('CALL_MEDIA verifier utility process exited unexpectedly', { exitCode: code }, 'call');
     });
     workerPort.on('message', ({ data }: { data: { type: string; senderUpeerId: string; senderYggAddress?: string; callId?: string; media?: ArrayBuffer; timestamp?: number } }) => {
         if (data.type === 'diagnostic') {
