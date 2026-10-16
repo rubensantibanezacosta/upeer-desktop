@@ -63,9 +63,9 @@ describe('CallsPanel', () => {
         render(<CallsPanel contacts={contacts} groups={groups} />);
 
         await waitFor(() => expect(screen.getByText('Anita')).toBeDefined());
-        expect(screen.getByText(/Videollamada ·/)).toBeDefined();
-        expect(screen.getByText('Participantes: Anita')).toBeDefined();
-        expect(screen.getByText('Duración: 02:15')).toBeDefined();
+        expect(screen.getByText('Videollamada')).toBeDefined();
+        expect(screen.getByText('02:15')).toBeDefined();
+        expect(screen.getByText(new Date(1710000000000).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' · ' + new Date(1710000000000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))).toBeDefined();
         expect(screen.queryByText('Contactos')).toBeNull();
     });
 });

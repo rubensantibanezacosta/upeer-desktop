@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Box, Card, CardContent, Stack, Typography } from '@mui/joy';
+import { Avatar, Box, Card, CardContent, Chip, Stack, Typography } from '@mui/joy';
+import CallIcon from '@mui/icons-material/Call';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Contact, Group, RawChatMessage } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
 import type { CallKind } from './useCall.js';
@@ -99,15 +102,33 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                         const contact = contacts.find((item) => item.upeerId === call.chatId);
                         const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
                         const participants = getRecentParticipants(call.chatId);
-                        return <Card key={call.id} variant="outlined">
+                        const CallIconComponent = call.kind === 'video' ? VideocamIcon : CallIcon;
+                        const callDate = new Date(call.timestamp);
+                        const dateLabel = callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                        const timeLabel = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return <Card key={call.id} variant="outlined" sx={{ transition: 'transform 160ms ease, box-shadow 160ms ease', '&:hover': { transform: 'translateY(-2px)', boxShadow: 'sm' } }}>
                             <CardContent>
                                 <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Avatar src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography level="title-md">{name}</Typography>
-                                        <Typography level="body-xs">{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'} · {new Date(call.timestamp).toLocaleString()}</Typography>
-                                        <Typography level="body-xs">Participantes: {participants}</Typography>
-                                        <Typography level="body-xs">Duración: {call.duration ?? 'Perdida'}</Typography>
+                                    <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                                        <Avatar size="lg" src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        <Box sx={{ position: 'absolute', right: -5, bottom: -3, display: 'grid', placeItems: 'center', width: 24, height: 24, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.surface' }}>
+                                            <CallIconComponent sx={{ fontSize: 14 }} />
+                                        </Box>
+                                    </Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                                            <Typography level="title-md" noWrap>{name}</Typography>
+                                            <Typography level="body-xs" sx={{ color: 'text.tertiary', whiteSpace: 'nowrap' }}>{dateLabel} · {timeLabel}</Typography>
+                                        </Stack>
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.5 }}>
+                                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+                                                <Typography level="body-sm" sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
+                                                {group && <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>· {participants}</Typography>}
+                                            </Stack>
+                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : 'danger'} startDecorator={call.duration ? <AccessTimeIcon /> : undefined}>
+                                                {call.duration ? call.duration : 'Perdida'}
+                                            </Chip>
+                                        </Stack>
                                     </Box>
                                 </Stack>
                             </CardContent>
