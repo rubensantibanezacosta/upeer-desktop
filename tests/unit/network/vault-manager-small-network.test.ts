@@ -121,6 +121,34 @@ describe('vault manager small-network attachment cases', () => {
         );
     });
 
+    it('queries a custodian address only once when DHT and contacts resolve to the same peer', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+        const keyStore = await import('../../../src/main_process/network/dht/kademlia/store.js');
+
+        const address = '200::peer-1';
+        const kademlia = {
+            findClosestContacts: vi.fn(() => []),
+            storeValue: vi.fn(async () => undefined),
+            findValue: vi.fn(async () => ({ value: { custodians: ['peer-1'] } })),
+            findLocationBlock: vi.fn(async () => ({ address: address.toUpperCase() })),
+        };
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(kademlia as never);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
+            { upeerId: 'peer-1', address, status: 'connected' },
+        ] as never);
+        vi.spyOn(keyStore, 'createVaultPointerKey').mockReturnValue(Buffer.from('pointer-key'));
+
+        await VaultManager.queryOwnVaults();
+
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+            address.toUpperCase(),
+            expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' }),
+        );
+    });
+
     it('does not query anyone when the network only contains self', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const transport = await import('../../../src/main_process/network/server/transport.js');

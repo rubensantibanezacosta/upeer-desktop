@@ -201,6 +201,14 @@ export class VaultManager {
             ? [knownPeers[0]]
             : [];
         const queriedAddresses = new Set<string>();
+        const queryAddress = async (address: string, source: string) => {
+            const normalizedAddress = address.trim().toLowerCase();
+            if (!normalizedAddress || queriedAddresses.has(normalizedAddress)) {
+                return;
+            }
+            queriedAddresses.add(normalizedAddress);
+            await this.sendVaultQuery(address, queryPacket, source, context);
+        };
 
         const queryPacket = {
             type: 'VAULT_QUERY',
@@ -222,7 +230,7 @@ export class VaultManager {
                         try {
                             const addr = await kademlia.findLocationBlock(custodianId);
                             if (addr && addr.address) {
-                                await this.sendVaultQuery(addr.address, queryPacket, `custodian ${custodianId}`, context);
+                                await queryAddress(addr.address, `custodian ${custodianId}`);
                             }
                         } catch (err) {
                             debug('Could not find self-custodian location', { custodianId }, 'vault');
@@ -235,15 +243,11 @@ export class VaultManager {
         }
 
         for (const friend of onlineFriends) {
-            queriedAddresses.add(friend.address);
-            await this.sendVaultQuery(friend.address, queryPacket, `online friend ${friend.upeerId ?? friend.address}`, context);
+            await queryAddress(friend.address, `online friend ${friend.upeerId ?? friend.address}`);
         }
 
         for (const peer of fallbackSinglePeer) {
-            if (queriedAddresses.has(peer.address)) {
-                continue;
-            }
-            await this.sendVaultQuery(peer.address, queryPacket, `single known peer ${peer.upeerId ?? peer.address}`, context);
+            await queryAddress(peer.address, `single known peer ${peer.upeerId ?? peer.address}`);
         }
     }
 }
