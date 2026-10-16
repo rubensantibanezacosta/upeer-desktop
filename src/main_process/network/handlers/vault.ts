@@ -50,6 +50,9 @@ type VaultInnerPacket = {
     [key: string]: unknown;
 };
 
+const pendingVaultFileCustodians = new Map<string, Map<string, Set<string>>>();
+const vouchedVaultFiles = new Set<string>();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
 }
@@ -66,11 +69,15 @@ export async function handleVaultDelivery(
     fromAddress: string
 ) {
     const recoverySourceKey = typeof fromAddress === 'string' && fromAddress.length > 0 ? fromAddress : senderSid;
+    const activeVaultFiles = pendingVaultFileCustodians.get(recoverySourceKey);
 
     // BUG AJ fix: custodio malicioso podría enviar data.entries = null o un array
     // de 100 000 entradas, reventando el for-of o saturando CPU/mem en el loop.
     // Validar tipo y aplicar límite duro antes de iterar.
     if (!Array.isArray(data.entries)) {
+        if (activeVaultFiles) {
+            pendingVaultFileCustodians.delete(recoverySourceKey);
+        }
         completeVaultRecoverySource(recoverySourceKey);
         security('VAULT_DELIVERY: entries no es un array', { from: senderSid }, 'vault');
         return;
@@ -79,6 +86,12 @@ export async function handleVaultDelivery(
     const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES).filter(isVaultEntry);
 
     touchVaultRecoverySource(recoverySourceKey, senderSid);
+
+    let sourceVaultFiles = activeVaultFiles;
+    if (!sourceVaultFiles) {
+        sourceVaultFiles = new Map<string, Set<string>>();
+        pendingVaultFileCustodians.set(recoverySourceKey, sourceVaultFiles);
+    }
 
     debug('Handling vault delivery', { count: entries.length, from: senderSid }, 'vault');
 
@@ -234,10 +247,6 @@ export async function handleVaultDelivery(
                     // Raw Data / Shards
                     if (typeof entry.payloadHash === 'string' && entry.payloadHash.startsWith('shard:')) {
                         debug('Received file shard from vault', { cid: entry.payloadHash }, 'vault');
-                        issueVouch(senderSid, VouchType.VAULT_CHUNK).catch((err) => {
-                            warn('Failed to issue vault chunk vouch', { senderSid, err: String(err) }, 'reputation');
-                        });
-
                         // For shards, we store them as assets. 
                         // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)
                         const parts = entry.payloadHash.split(':');
@@ -256,12 +265,17 @@ export async function handleVaultDelivery(
                                 Date.now() + SHARD_TTL_MS
                             );
                             await trackDistributedAsset(fileHash, entry.payloadHash, shardIndex, 12, myId, segmentIndex);
+                            const custodians = sourceVaultFiles.get(fileHash) ?? new Set<string>();
+                            custodians.add(senderSid);
+                            sourceVaultFiles.set(fileHash, custodians);
                             recoveredFileHashes.add(fileHash);
                         }
                     }
                 }
                 // Llegamos aquí sin 'continue' ni excepción → entrada procesada correctamente.
-                processedEntries += 1;
+                if (typeof entry.payloadHash !== 'string' || !entry.payloadHash.startsWith('shard:')) {
+                    processedEntries += 1;
+                }
                 // Usar payloadHash si existe, o calcular hash del data como fallback.
                 // Esto asegura que incluso entradas sin payloadHash explícito (como CHAT
                 // packets) reciban ACK y no sean retransmitidas infinitamente por el custodio.
@@ -318,6 +332,27 @@ export async function handleVaultDelivery(
         debug('Vault delivery: requesting next page', { afterId: data.nextAfterId, from: senderSid }, 'vault');
         return;
     }
+
+    for (const [fileHash, custodians] of sourceVaultFiles) {
+        const completedTransfer = fileTransferManager.getAllTransfers().some((transfer) =>
+            transfer.direction === 'receiving'
+            && transfer.fileHash === fileHash
+            && transfer.state === 'completed'
+        );
+        if (completedTransfer) {
+            for (const custodianId of custodians) {
+                const vouchKey = `${custodianId}:${fileHash}`;
+                if (!vouchedVaultFiles.has(vouchKey)) {
+                    vouchedVaultFiles.add(vouchKey);
+                    issueVouch(custodianId, VouchType.VAULT_CHUNK).catch((err) => {
+                        vouchedVaultFiles.delete(vouchKey);
+                        warn('Failed to issue completed vault file vouch', { custodianId, fileHash, err: String(err) }, 'reputation');
+                    });
+                }
+            }
+        }
+    }
+    pendingVaultFileCustodians.delete(recoverySourceKey);
 
     completeVaultRecoverySource(recoverySourceKey);
 }

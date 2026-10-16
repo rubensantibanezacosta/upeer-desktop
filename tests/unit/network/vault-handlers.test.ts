@@ -36,7 +36,8 @@ vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
 vi.mock('../../../src/main_process/network/file-transfer/transfer-manager.js', () => ({
     fileTransferManager: {
         handleMessage: vi.fn(),
-        tryRecoverVaultTransferByFileHash: vi.fn()
+        tryRecoverVaultTransferByFileHash: vi.fn(),
+        getAllTransfers: vi.fn().mockReturnValue([]),
     }
 }));
 
@@ -299,6 +300,41 @@ describe('Vault Delivery Handler', () => {
 
         expect(fileTransferManager.handleMessage).toHaveBeenCalledWith('origin-id', '1.2.3.4', expect.objectContaining({ type: 'FILE_OFFER' }));
         expect(fileTransferManager.tryRecoverVaultTransferByFileHash).not.toHaveBeenCalled();
+    });
+
+    it('does not vouch shard custodians until the recovered file is complete', async () => {
+        const shardEntry = {
+            senderSid: 'origin-id',
+            payloadHash: 'shard:complete-file:0:0',
+            data: 'some-hex-data',
+        };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
+        vi.mocked(fileTransferManager.getAllTransfers).mockReturnValue([]);
+
+        await handleVaultDelivery(custodianSid, { entries: [shardEntry] }, mockWin, mockSendResponse, 'complete-file-source');
+        expect(vouches.issueVouch).not.toHaveBeenCalledWith(custodianSid, 'VAULT_RETRIEVED');
+        expect(vouches.issueVouch).not.toHaveBeenCalledWith(custodianSid, 'VAULT_CHUNK');
+    });
+
+    it('vouches a shard custodian once after the recovered file completes', async () => {
+        const shardEntry = {
+            senderSid: 'origin-id',
+            payloadHash: 'shard:completed-file:0:0',
+            data: 'some-hex-data',
+        };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(publicContact);
+        vi.mocked(fileTransferManager.getAllTransfers).mockReturnValue([{
+            fileId: 'completed-file-id',
+            fileHash: 'completed-file',
+            direction: 'receiving',
+            state: 'completed',
+        } as never]);
+
+        await handleVaultDelivery(custodianSid, { entries: [shardEntry] }, mockWin, mockSendResponse, 'completed-file-source');
+        await vi.waitFor(() => expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'VAULT_CHUNK'));
+        await handleVaultDelivery(custodianSid, { entries: [shardEntry] }, mockWin, mockSendResponse, 'completed-file-source');
+
+        expect(vouches.issueVouch.mock.calls.filter(([id, type]) => id === custodianSid && type === 'VAULT_CHUNK')).toHaveLength(1);
     });
 
     it('should trigger vault attachment recovery after FILE_PROPOSAL entries', async () => {
