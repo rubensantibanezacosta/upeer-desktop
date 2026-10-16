@@ -109,11 +109,10 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
         msgId,
         emoji,
         remove,
-        senderUpeerId: myId,
         ...(isGroup ? { chatUpeerId: upeerId } : {}),
     };
     const signature = sign(Buffer.from(canonicalStringify(data)));
-    const signedData = { ...data, signature: signature.toString('hex') };
+    const signedData = { ...data, senderUpeerId: myId, signature: signature.toString('hex') };
     const myPublicKey = getMyPublicKey().toString('hex');
 
     if (isGroup) {
@@ -128,9 +127,12 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
                     sendSecureUDPMessage(address, signedData, contact.publicKey);
                 }
             } else if (contact?.publicKey && ['offline', 'disconnected'].includes(contact.status ?? '')) {
-                import('../vault/manager.js').then(({ VaultManager }) => {
-                    VaultManager.replicateToVaults(memberId, signedData);
-                });
+                try {
+                    const { VaultManager } = await import('../vault/manager.js');
+                    await VaultManager.replicateToVaults(memberId, signedData);
+                } catch (cause) {
+                    error('Failed to vault group chat reaction', { memberId, msgId, cause: String(cause) }, 'vault');
+                }
             }
         }
 
@@ -139,9 +141,12 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
             sendSecureUDPMessage(address, signedData, myPublicKey, true);
         }
         if (selfAddresses.length < 1) {
-            import('../vault/manager.js').then(({ VaultManager }) => {
-                VaultManager.replicateToVaults(myId, signedData);
-            });
+            try {
+                const { VaultManager } = await import('../vault/manager.js');
+                await VaultManager.replicateToVaults(myId, signedData);
+            } catch (cause) {
+                error('Failed to vault self-synced group chat reaction', { msgId, cause: String(cause) }, 'vault');
+            }
         }
         return;
     }
@@ -157,10 +162,13 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
         sendSecureUDPMessage(address, signedData, myPublicKey, true);
     }
 
-    import('../vault/manager.js').then(({ VaultManager }) => {
-        VaultManager.replicateToVaults(upeerId, signedData);
+    try {
+        const { VaultManager } = await import('../vault/manager.js');
+        await VaultManager.replicateToVaults(upeerId, signedData);
         if (selfAddresses.length < 1) {
-            VaultManager.replicateToVaults(myId, signedData);
+            await VaultManager.replicateToVaults(myId, signedData);
         }
-    });
+    } catch (cause) {
+        error('Failed to vault chat reaction', { upeerId, msgId, cause: String(cause) }, 'vault');
+    }
 }

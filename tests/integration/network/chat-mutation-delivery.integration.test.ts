@@ -173,9 +173,30 @@ describe('no-pérdida de eventos de mutación (edición, borrado, reacción, rea
         await sendChatReaction('bob', 'msg-1', '👍', false);
 
         expect((await reactionsOps()).saveReaction).toHaveBeenCalled();
+        const replicatedPacket = vi.mocked((await vault()).VaultManager.replicateToVaults).mock.calls[0][1];
         expect((await vault()).VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'bob',
             expect.objectContaining({ type: 'CHAT_REACTION', msgId: 'msg-1', emoji: '👍' }),
+        );
+        expect(replicatedPacket).toEqual(expect.objectContaining({ senderUpeerId: 'self-id', signature: '736967' }));
+        expect((await import('../../../src/main_process/network/utils.js')).canonicalStringify).toHaveBeenCalledWith({
+            type: 'CHAT_REACTION',
+            msgId: 'msg-1',
+            emoji: '👍',
+            remove: false,
+        });
+    });
+
+    it('persiste la eliminación de una reacción (CHAT_REACTION remove) a un contacto offline en vault', async () => {
+        vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(offlineContact as never);
+
+        const { sendChatReaction } = await import('../../../src/main_process/network/messaging/chatInteractions.js');
+        await sendChatReaction('bob', 'msg-1', '👍', true);
+
+        expect((await reactionsOps()).deleteReaction).toHaveBeenCalledWith('msg-1', 'self-id', '👍');
+        expect((await vault()).VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'bob',
+            expect.objectContaining({ type: 'CHAT_REACTION', msgId: 'msg-1', emoji: '👍', remove: true }),
         );
     });
 
