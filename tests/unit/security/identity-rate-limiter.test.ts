@@ -71,13 +71,13 @@ describe('IdentityRateLimiter', () => {
 
     it('should keep base capacity for direct contacts even with low score', async () => {
         vi.mocked(reputation.computeScore).mockReturnValue(10);
-        const l = new IdentityRateLimiter({ 'VAULT_DELIVERY': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 } });
+        const l = new IdentityRateLimiter({ 'VAULT_DELIVERY': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 } });
         await warmDirectContacts(l);
 
         let count = 0;
         while (l.checkIdentityOnly('direct-peer', 'VAULT_DELIVERY')) count++;
 
-        expect(count).toBe(20);
+        expect(count).toBe(100);
     });
 
     it('should refill tokens', async () => {

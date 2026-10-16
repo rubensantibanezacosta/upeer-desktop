@@ -200,6 +200,18 @@ describe('no-pérdida de eventos de mutación (edición, borrado, reacción, rea
         );
     });
 
+    it('no replica una reacción offline si el contacto no tiene clave pública', async () => {
+        vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue({
+            ...offlineContact,
+            publicKey: null,
+        } as never);
+
+        const { sendChatReaction } = await import('../../../src/main_process/network/messaging/chatInteractions.js');
+        await sendChatReaction('bob', 'msg-1', '👍', true);
+
+        expect((await vault()).VaultManager.replicateToVaults).not.toHaveBeenCalled();
+    });
+
     it('persiste el receipt de lectura (READ) en vault', async () => {
         vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(offlineContact as never);
 

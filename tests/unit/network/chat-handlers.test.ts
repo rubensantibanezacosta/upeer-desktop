@@ -629,6 +629,30 @@ describe('Chat Handlers', () => {
                 remove: false
             });
         });
+
+        it('should delete a self-synced reaction using the local identity', async () => {
+            const myId = 'my-peer-id';
+            const data: ChatReactionData = {
+                id: '12345678-1234-1234-1234-123456789012',
+                emoji: '💾',
+                remove: true,
+                chatUpeerId: 'peer-chat',
+                isInternalSync: true,
+            };
+            vi.mocked(identity.getMyUPeerId).mockReturnValue(myId);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: 'peer-chat', isMine: 1 } as never);
+
+            await handleChatReaction(myId, data, mockWin);
+
+            expect(reactionsOps.deleteReaction).toHaveBeenCalledWith(data.id, myId, '💾');
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-reaction-updated', {
+                msgId: data.id,
+                upeerId: myId,
+                chatUpeerId: 'peer-chat',
+                emoji: '💾',
+                remove: true
+            });
+        });
     });
 
     describe('handleChatClear', () => {

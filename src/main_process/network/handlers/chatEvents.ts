@@ -251,10 +251,11 @@ export async function handleChatReaction(
     if (isDelete) {
         const emojiToRemove = data.emojiToDelete || data.emoji;
         if (typeof emojiToRemove !== 'string' || !emojiToRemove) return;
-        deleteReaction(messageId, upeerId, emojiToRemove);
+        const actorUpeerId = isInternalSync ? myId : upeerId;
+        deleteReaction(messageId, actorUpeerId, emojiToRemove);
         win?.webContents.send('message-reaction-updated', {
             msgId: messageId,
-            upeerId,
+            upeerId: actorUpeerId,
             chatUpeerId,
             emoji: emojiToRemove,
             remove: true,
@@ -264,10 +265,11 @@ export async function handleChatReaction(
 
     const emoji = data.emoji || data.reaction;
     if (typeof emoji !== 'string' || !emoji) return;
-    saveReaction(messageId, upeerId, emoji);
+    const actorUpeerId = isInternalSync ? myId : upeerId;
+    saveReaction(messageId, actorUpeerId, emoji);
     win?.webContents.send('message-reaction-updated', {
         msgId: messageId,
-        upeerId,
+        upeerId: actorUpeerId,
         chatUpeerId,
         emoji,
         remove: false,

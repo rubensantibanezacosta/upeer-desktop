@@ -857,6 +857,44 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
         expect((reactions.reactions as Array<{ emoji: string }>).some((r) => r.emoji === '👍')).toBe(true);
     });
 
+    it('recovery offline->online: quitar reacción (CHAT_REACTION remove) vaulteada se aplica al reconectar', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::a': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeA = new PeerProcess('200::a');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeA, nodeB);
+
+        await nodeA.start({ routing });
+        const aId = nodeA.info?.upeerId || '';
+        const bInfo = await nodeB.start({ routing });
+        await nodeA.addPeer(nodeB, '200::b');
+        await nodeB.addPeer(nodeA, '200::a');
+        await sleep(200);
+
+        const send = await nodeA.request('sendMessage', { to: bInfo.upeerId, content: 'quitar reacción offline' });
+        const msgId = (send.result as { id: string }).id;
+        await nodeA.request('sendChatReaction', { upeerId: bInfo.upeerId, msgId, emoji: '👍', remove: false });
+        await sleep(500);
+
+        await nodeB.request('setVaultOffline', { value: true });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'disconnected' });
+        await sleep(200);
+        await nodeA.request('sendChatReaction', { upeerId: bInfo.upeerId, msgId, emoji: '👍', remove: true });
+        await sleep(1500);
+
+        await nodeB.request('setVaultOffline', { value: false });
+        await nodeA.request('setContactStatus', { upeerId: bInfo.upeerId, status: 'connected' });
+        await nodeB.request('setContactStatus', { upeerId: aId, status: 'connected' });
+        await sleep(300);
+        await nodeB.request('queryOwnVaults');
+        await sleep(5000);
+
+        const reactions = await nodeB.request('getReactions', { id: msgId });
+        expect((reactions.reactions as Array<{ emoji: string }>).some((r) => r.emoji === '👍')).toBe(false);
+    });
+
     it('recovery offline->online: recibo de lectura (READ) vaulteado se aplica al reconectar', { timeout: 30000 }, async () => {
         const routing = {
             '200::a': await freePort(),
