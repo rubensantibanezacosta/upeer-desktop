@@ -67,6 +67,7 @@ export function useCallMedia(callId: string) {
         return () => {
             unsubscribe?.();
             screenRef.current?.getTracks().forEach((track) => track.stop());
+            localStreamRef.current?.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
             screenRef.current = null;
             captureGenerationRef.current += 1;
@@ -164,8 +165,7 @@ export function useCallMedia(callId: string) {
     const stopLocalCapture = useCallback(() => {
         captureGenerationRef.current += 1;
         const session = sessionRef.current;
-        const replacementSession = new WebCodecsSession();
-        sessionRef.current = replacementSession;
+        sessionRef.current = null;
         if (session) void session.release();
         localStreamRef.current?.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
