@@ -180,5 +180,22 @@ describe('Security - Double Ratchet & X3DH', () => {
         const result = ratchetDecrypt(stateBob, header, corruptedCipher, nonce);
         expect(result).toBeNull();
     });
+
+    it('should preserve a skipped message key after a corrupted out-of-order packet', () => {
+        const { sharedSecret, ekPub } = x3dhInitiator(aliceIkSk, aliceIkPk, bobIkPk, bobSpkPk);
+        const bobSecret = x3dhResponder(bobIkSk, bobSpkSk, aliceIkPk, ekPub);
+        const stateAlice = ratchetInitAlice(sharedSecret, bobSpkPk);
+        const stateBob = ratchetInitBob(bobSecret, bobSpkPk, bobSpkSk);
+        const messages = [
+            ratchetEncrypt(stateAlice, Buffer.from('first')),
+            ratchetEncrypt(stateAlice, Buffer.from('second')),
+        ];
+
+        expect(ratchetDecrypt(stateBob, messages[1].header, messages[1].ciphertext, messages[1].nonce)?.toString()).toBe('second');
+
+        const corruptedCipher = (parseInt(messages[0].ciphertext.slice(0, 2), 16) ^ 0xFF).toString(16).padStart(2, '0') + messages[0].ciphertext.slice(2);
+        expect(ratchetDecrypt(stateBob, messages[0].header, corruptedCipher, messages[0].nonce)).toBeNull();
+        expect(ratchetDecrypt(stateBob, messages[0].header, messages[0].ciphertext, messages[0].nonce)?.toString()).toBe('first');
+    });
 });
 

@@ -4,6 +4,8 @@ import { registerCallHandlers } from '../../../../src/main_process/core/ipcHandl
 import { callManager } from '../../../../src/main_process/network/call/callManager.js';
 import * as signaling from '../../../../src/main_process/network/call/callSignaling.js';
 import * as messages from '../../../../src/main_process/storage/messages/operations.js';
+import * as chatSend from '../../../../src/main_process/network/messaging/chatSend.js';
+import { getContactByUpeerId } from '../../../../src/main_process/storage/contacts/operations.js';
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }));
 
@@ -152,6 +154,30 @@ describe('registerCallHandlers', () => {
         expect(session.phase).toBe('ended');
         expect(session.endReason).toBe('rejected');
         expect(signaling.sendCallReject).toHaveBeenCalledWith('peer1', session.callId);
+    });
+
+    it('registra la llamada entrante rechazada sin reenviarla al emisor', async () => {
+        const session = callManager.create('peer1', 'video', 'incoming');
+        const handler = getHandler('reject-call');
+        handler(null, { callId: session.callId });
+
+        await vi.waitFor(() => expect(messages.saveMessage).toHaveBeenCalledWith(
+            expect.any(String), 'peer1', true, '__SYS__|Videollamada rechazada', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
+        ));
+        expect(getContactByUpeerId).not.toHaveBeenCalled();
+        expect(chatSend.sendUDPMessage).not.toHaveBeenCalled();
+    });
+
+    it('registra la llamada perdida del emisor y la envía mediante entrega de chat', async () => {
+        const session = callManager.create('peer1', 'video', 'outgoing');
+        callManager.end(session.callId, 'no-answer');
+
+        await vi.waitFor(() => expect(chatSend.sendUDPMessage).toHaveBeenCalledWith(
+            'peer1', '__SYS__|Videollamada perdida', undefined, expect.any(String),
+        ));
+        expect(messages.saveMessage).toHaveBeenCalledWith(
+            expect.any(String), 'peer1', true, '__SYS__|Videollamada perdida', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
+        );
     });
 
     it('call-toggle-media alterna mute y envía la actualización', () => {

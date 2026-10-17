@@ -2,7 +2,7 @@
  * Operaciones de base de datos para sesiones Double Ratchet.
  * La tabla `ratchet_sessions` está protegida por SQLCipher.
  */
-import { getDb, getSchema, eq } from '../shared.js';
+import { getDb, getSchema, eq, and } from '../shared.js';
 import {
     serializeState,
     deserializeState,
@@ -11,13 +11,13 @@ import {
 } from '../../security/ratchet.js';
 
 /** Cargar la sesión ratchet de un contacto, o null si no existe. */
-export function getRatchetSession(upeerId: string): { state: RatchetState, spkIdUsed: number | null } | null {
+export function getRatchetSession(upeerId: string, contextId = 'direct'): { state: RatchetState, spkIdUsed: number | null } | null {
     const db = getDb();
     const schema = getSchema();
 
     const row = db.select()
         .from(schema.ratchetSessions)
-        .where(eq(schema.ratchetSessions.upeerId, upeerId))
+        .where(and(eq(schema.ratchetSessions.upeerId, upeerId), eq(schema.ratchetSessions.contextId, contextId)))
         .get() as { state: string, spkIdUsed: number | null } | undefined;
 
     if (!row) return null;
@@ -34,7 +34,7 @@ export function getRatchetSession(upeerId: string): { state: RatchetState, spkId
 }
 
 /** Guardar (crear o actualizar) la sesión ratchet de un contacto. */
-export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUsed?: number | null): void {
+export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUsed?: number | null, contextId = 'direct'): void {
     const db = getDb();
     const schema = getSchema();
     const now = Date.now();
@@ -43,21 +43,24 @@ export function saveRatchetSession(upeerId: string, state: RatchetState, spkIdUs
 
     db.insert(schema.ratchetSessions).values({
         upeerId,
+        contextId,
         state: serialized,
         spkIdUsed: spkIdUsed ?? null,
         establishedAt: now,
         updatedAt: now,
     }).onConflictDoUpdate({
-        target: schema.ratchetSessions.upeerId,
+            target: [schema.ratchetSessions.upeerId, schema.ratchetSessions.contextId],
         set: { state: serialized, spkIdUsed: spkIdUsed ?? null, updatedAt: now },
     }).run();
 }
 
 /** Eliminar la sesión ratchet (reset de sesión). */
-export function deleteRatchetSession(upeerId: string): void {
+export function deleteRatchetSession(upeerId: string, contextId?: string): void {
     const db = getDb();
     const schema = getSchema();
     db.delete(schema.ratchetSessions)
-        .where(eq(schema.ratchetSessions.upeerId, upeerId))
+        .where(contextId
+            ? and(eq(schema.ratchetSessions.upeerId, upeerId), eq(schema.ratchetSessions.contextId, contextId))
+            : eq(schema.ratchetSessions.upeerId, upeerId))
         .run();
 }

@@ -72,11 +72,11 @@ async function decryptDoubleRatchetContent(
     const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
 
     try {
-        const { getRatchetSession, saveRatchetSession, deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
+        const { getRatchetSession, saveRatchetSession } = await import('../../storage/ratchet/operations.js');
         const { x3dhResponder, ratchetInitBob, ratchetDecrypt } = await import('../../security/ratchet.js');
         const { getMyIdentitySkBuffer, getSpkBySpkId } = await import('../../security/identity.js');
 
-        const sessionResult = getRatchetSession(upeerId);
+        const sessionResult = getRatchetSession(upeerId, 'direct');
         let session = sessionResult?.state;
         let usedSpkId = sessionResult?.spkIdUsed;
 
@@ -89,7 +89,8 @@ async function decryptDoubleRatchetContent(
 
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { x3dhSpkId, upeerId }, 'security');
-                throw new Error('spk-not-found');
+                sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+                return null;
             }
 
             const sharedSecret = x3dhResponder(bobIkSk, spkEntry.spkSk, aliceIkPk, aliceEkPk);
@@ -115,11 +116,11 @@ async function decryptDoubleRatchetContent(
 
         const plaintext = ratchetDecrypt(session, ratchetHeader, data.content, nonce);
         if (plaintext) {
-            saveRatchetSession(upeerId, session, usedSpkId);
+            saveRatchetSession(upeerId, session, usedSpkId, 'direct');
             return plaintext.toString('utf-8');
         }
 
-        if (data.x3dhInit) {
+        if (!sessionResult && data.x3dhInit) {
             const { ekPub, ikPub, spkId: x3dhSpkId } = data.x3dhInit;
             const spkEntry = getSpkBySpkId(x3dhSpkId);
             if (spkEntry) {
@@ -131,26 +132,21 @@ async function decryptDoubleRatchetContent(
                 sharedSecret.fill(0);
                 const retry = ratchetDecrypt(freshSession, ratchetHeader, data.content, nonce);
                 if (retry) {
-                    saveRatchetSession(upeerId, freshSession, x3dhSpkId);
+                    saveRatchetSession(upeerId, freshSession, x3dhSpkId, 'direct');
                     info('DR race resolved: replaced stale Alice session with Bob session', { upeerId }, 'security');
                     return retry.toString('utf-8');
                 }
             }
-            deleteRatchetSession(upeerId);
+
             sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
             error('Double Ratchet decrypt returned null after x3dh retry', { upeerId }, 'security');
             return null;
         }
 
-        deleteRatchetSession(upeerId);
-        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
-        error('Double Ratchet decrypt returned null', { upeerId }, 'security');
+        error('Double Ratchet decrypt returned null; preserving the existing session', { upeerId }, 'security');
         return null;
     } catch (err) {
-        const { deleteRatchetSession } = await import('../../storage/ratchet/operations.js');
-        deleteRatchetSession(upeerId);
-        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
-        error('Double Ratchet decrypt failed, sent DR_RESET', err, 'security');
+        error('Double Ratchet decrypt failed; preserving the existing session', err, 'security');
         return null;
     }
 }

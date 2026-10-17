@@ -4,11 +4,7 @@ import {
 } from '../../security/identity.js';
 import { ratchetDecrypt, ratchetInitBob, x3dhResponder } from '../../security/ratchet.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
-import {
-    deleteRatchetSession,
-    getRatchetSession,
-    saveRatchetSession,
-} from '../../storage/ratchet/operations.js';
+import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
 
 type DoubleRatchetPayload = {
     content?: string;
@@ -17,10 +13,18 @@ type DoubleRatchetPayload = {
     x3dhInit?: X3DHInitPacket;
 };
 
+export type RatchetContext = 'direct' | `group:${string}`;
+
+const createResetPacket = (contextId: RatchetContext) => ({
+    type: 'DR_RESET',
+    ratchetContext: contextId,
+} as const);
+
 export async function decryptDoubleRatchetPayload(
     upeerId: string,
     data: DoubleRatchetPayload,
-    onReset?: () => void | Promise<void>,
+    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
+    contextId: RatchetContext = 'direct',
 ): Promise<string | null> {
     if (
         typeof data.content !== 'string'
@@ -31,7 +35,7 @@ export async function decryptDoubleRatchetPayload(
     }
 
     try {
-        const sessionResult = getRatchetSession(upeerId);
+        const sessionResult = getRatchetSession(upeerId, contextId);
         let session = sessionResult?.state;
         let usedSpkId = sessionResult?.spkIdUsed;
 
@@ -39,8 +43,7 @@ export async function decryptDoubleRatchetPayload(
             const { ekPub, ikPub, spkId } = data.x3dhInit;
             const spkEntry = getSpkBySpkId(spkId);
             if (!spkEntry) {
-                deleteRatchetSession(upeerId);
-                await onReset?.();
+                await onReset?.(createResetPacket(contextId));
                 return null;
             }
 
@@ -56,17 +59,17 @@ export async function decryptDoubleRatchetPayload(
         }
 
         if (!session) {
-            await onReset?.();
+            await onReset?.(createResetPacket(contextId));
             return null;
         }
 
         const plaintext = ratchetDecrypt(session, data.ratchetHeader, data.content, data.nonce);
         if (plaintext) {
-            saveRatchetSession(upeerId, session, usedSpkId);
+            saveRatchetSession(upeerId, session, usedSpkId, contextId);
             return plaintext.toString('utf-8');
         }
 
-        if (data.x3dhInit) {
+        if (!sessionResult && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
             const spkEntry = getSpkBySpkId(spkId);
             if (spkEntry) {
@@ -80,18 +83,14 @@ export async function decryptDoubleRatchetPayload(
                 sharedSecret.fill(0);
                 const retry = ratchetDecrypt(freshSession, data.ratchetHeader, data.content, data.nonce);
                 if (retry) {
-                    saveRatchetSession(upeerId, freshSession, spkId);
+                    saveRatchetSession(upeerId, freshSession, spkId, contextId);
                     return retry.toString('utf-8');
                 }
             }
         }
 
-        deleteRatchetSession(upeerId);
-        await onReset?.();
         return null;
     } catch {
-        deleteRatchetSession(upeerId);
-        await onReset?.();
         return null;
     }
 }

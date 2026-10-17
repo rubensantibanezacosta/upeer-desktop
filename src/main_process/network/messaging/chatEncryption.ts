@@ -50,13 +50,14 @@ export async function encryptChatPayload(
     upeerId: string,
     payload: string,
     contact: ChatEncryptionContact,
+    contextId = 'direct',
 ): Promise<EncryptedChatPayload> {
     const contactPublicKey = contact.publicKey;
     if (!contactPublicKey) {
         throw new DoubleRatchetUnavailableError('missing-public-key');
     }
 
-    const sessionResult = getRatchetSession(upeerId);
+    const sessionResult = getRatchetSession(upeerId, contextId);
     let session = sessionResult?.state;
     let usedSpkId = sessionResult?.spkIdUsed;
     let x3dhInit: EncryptedChatPayload['x3dhInit'];
@@ -89,7 +90,7 @@ export async function encryptChatPayload(
     }
 
     const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8')) as RatchetEncryptResult;
-    saveRatchetSession(upeerId, session, usedSpkId);
+    saveRatchetSession(upeerId, session, usedSpkId, contextId);
 
     return {
         content: encrypted.ciphertext,

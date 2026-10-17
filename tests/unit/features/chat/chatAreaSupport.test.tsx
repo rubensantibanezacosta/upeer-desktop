@@ -32,6 +32,13 @@ describe('ChatSystemMessage', () => {
         expect(screen.getByText('Llamada perdida')).toBeDefined();
     });
 
+    it('maqueta llamadas entrantes rechazadas', () => {
+        render(<ChatSystemMessage message="Videollamada rechazada" />);
+
+        expect(screen.getByRole('note', { name: 'Videollamada, Llamada rechazada' })).toBeDefined();
+        expect(screen.getByText('Llamada rechazada')).toBeDefined();
+    });
+
     it('mantiene como texto los demás mensajes de sistema', () => {
         render(<ChatSystemMessage message="Ana se unió al grupo" />);
 
@@ -40,9 +47,10 @@ describe('ChatSystemMessage', () => {
     });
 
     it('parsea solo los formatos de evento de llamada admitidos', () => {
-        expect(parseCallSystemEvent('Videollamada · 01:30')).toEqual({ kind: 'video', duration: '01:30', startedAt: null });
-        expect(parseCallSystemEvent('Videollamada · 01:30 · 1792065600000')).toEqual({ kind: 'video', duration: '01:30', startedAt: 1792065600000 });
-        expect(parseCallSystemEvent('Llamada de voz perdida')).toEqual({ kind: 'audio', duration: null, startedAt: null });
+        expect(parseCallSystemEvent('Videollamada · 01:30')).toEqual({ kind: 'video', duration: '01:30', startedAt: null, outcome: null });
+        expect(parseCallSystemEvent('Videollamada · 01:30 · 1792065600000')).toEqual({ kind: 'video', duration: '01:30', startedAt: 1792065600000, outcome: null });
+        expect(parseCallSystemEvent('Llamada de voz perdida')).toEqual({ kind: 'audio', duration: null, startedAt: null, outcome: 'missed' });
+        expect(parseCallSystemEvent('Videollamada rechazada')).toEqual({ kind: 'video', duration: null, startedAt: null, outcome: 'rejected' });
         expect(parseCallSystemEvent('mensaje normal')).toBeNull();
     });
 });

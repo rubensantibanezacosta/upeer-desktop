@@ -68,4 +68,16 @@ describe('CallsPanel', () => {
         expect(screen.getByText(new Date(1710000000000).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' · ' + new Date(1710000000000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))).toBeDefined();
         expect(screen.queryByText('Contactos')).toBeNull();
     });
+
+    it('renders rejected calls distinctly in recent calls', async () => {
+        const contacts: Contact[] = [{ upeerId: 'peer-1', address: 'peer-address', name: 'Ana', status: 'connected' }];
+        window.upeer.getMessages = vi.fn().mockResolvedValue([{
+            id: 'rejected-call', chatUpeerId: 'peer-1', isMine: true, message: '__SYS__|Videollamada rechazada', status: 'sent', timestamp: 1710000000000,
+        }]);
+
+        render(<CallsPanel contacts={contacts} groups={[]} />);
+
+        await waitFor(() => expect(screen.getByText('Rechazada')).toBeDefined());
+        expect(screen.getByText('Videollamada')).toBeDefined();
+    });
 });

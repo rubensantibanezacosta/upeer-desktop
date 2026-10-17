@@ -95,6 +95,7 @@ type IdentityUpdatePayload = {
 
 type SyncResetPayload = {
     signedPreKey?: SignedPreKeyPayload | unknown;
+    ratchetContext?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -409,5 +410,8 @@ export function validateIdentityUpdate(data: IdentityUpdatePayload): ValidationR
 }
 
 export function validateDrReset(data: SyncResetPayload): ValidationResult {
+    if (data.ratchetContext !== undefined && (typeof data.ratchetContext !== 'string' || data.ratchetContext.length > 256)) {
+        return { valid: false, error: 'Invalid ratchetContext' };
+    }
     return validateSignedPreKey(data.signedPreKey);
 }

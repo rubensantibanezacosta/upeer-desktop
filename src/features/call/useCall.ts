@@ -58,6 +58,7 @@ export function useCall(selfUpeerId?: string) {
         if (!useCallStore.getState().beginCall()) {
             return { success: false, error: 'Ya hay una llamada activa o en curso' };
         }
+        useNavigationStore.getState().goToCalls();
         try {
             const result = isGroup
                 ? await window.upeer.startGroupCall(groupMembers ?? [], kind, groupId)

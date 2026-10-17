@@ -55,9 +55,9 @@ export async function handleGroupInvite(
     try {
         const contact = await getContactByUpeerId(upeerId);
         senderDisplayName = contact?.name || contact?.alias || upeerId;
-        const inner = await decryptGroupControlPayload(upeerId, data, async () => {
+        const inner = await decryptGroupControlPayload(upeerId, data, async (reset) => {
             if (!fromAddress || !sendResponse) return;
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
         });
         if (!inner) {
             security('GROUP_INVITE: decryption failed', { upeerId, groupId }, 'security');

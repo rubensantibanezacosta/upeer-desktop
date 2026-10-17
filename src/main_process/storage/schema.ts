@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -141,13 +141,16 @@ export const reputationVouches = sqliteTable('reputation_vouches', {
 // ── Double Ratchet: estado de sesión por contacto ─────────────────────────────
 // Protegido por SQLCipher. Contiene material de clave sensible (dhsSk).
 export const ratchetSessions = sqliteTable('ratchet_sessions', {
-    upeerId: text('upeer_id').primaryKey(),   // un estado por contacto
+    upeerId: text('upeer_id').notNull(),
+    contextId: text('context_id').notNull().default('direct'),
     state: text('state').notNull(),                   // JSON SerializedRatchetState
     // Nuestro SPK que se usó para establecer esta sesión (para poder rotar)
     spkIdUsed: integer('spk_id_used'),
     establishedAt: integer('established_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
-});
+}, (table) => ({
+    peerContextPk: primaryKey({ columns: [table.upeerId, table.contextId] }),
+}));
 
 // ── Pending Outbox: mensajes en espera de clave pública del destinatario ───────
 // Cuando Alice quiere escribir a Bob pero aún no tiene su clave pública

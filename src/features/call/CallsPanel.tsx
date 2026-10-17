@@ -12,11 +12,11 @@ interface CallsPanelProps {
     groups: Group[];
 }
 
-type RecentCall = { id: string; chatId: string; timestamp: number; kind: CallKind; duration: string | null };
+type RecentCall = { id: string; chatId: string; timestamp: number; kind: CallKind; duration: string | null; rejected: boolean };
 
 function parseRecentCall(message: RawChatMessage, chatId: string): RecentCall | null {
     const content = message.message.replace(/^__SYS__\|/, '');
-    const match = /^(Llamada de voz|Videollamada)(?: · (\d{2,}:\d{2})(?: · (\d{10,}))?| perdida)$/.exec(content);
+    const match = /^(Llamada de voz|Videollamada)(?: · (\d{2,}:\d{2})(?: · (\d{10,}))?| (perdida|rechazada))$/.exec(content);
     if (!match) return null;
     return {
         id: message.id ?? `${chatId}-${message.timestamp}`,
@@ -24,6 +24,7 @@ function parseRecentCall(message: RawChatMessage, chatId: string): RecentCall | 
         timestamp: match[3] ? Number(match[3]) : message.timestamp,
         kind: match[1] === 'Videollamada' ? 'video' : 'audio',
         duration: match[2] ?? null,
+        rejected: match[4] === 'rechazada',
     };
 }
 
@@ -125,8 +126,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                                                 <Typography level="body-sm" sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
                                                 {group && <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>· {participants}</Typography>}
                                             </Stack>
-                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : 'danger'} startDecorator={call.duration ? <AccessTimeIcon /> : undefined}>
-                                                {call.duration ? call.duration : 'Perdida'}
+                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <AccessTimeIcon /> : undefined}>
+                                                {call.duration ? call.duration : call.rejected ? 'Rechazada' : 'Perdida'}
                                             </Chip>
                                         </Stack>
                                     </Box>

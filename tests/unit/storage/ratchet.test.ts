@@ -37,6 +37,7 @@ const mockDb: MockDb = {
 const mockSchema = {
     ratchetSessions: {
         upeerId: 'upeerId',
+        contextId: 'contextId',
         state: 'state',
         spkIdUsed: 'spkIdUsed',
         establishedAt: 'establishedAt',
@@ -47,7 +48,8 @@ const mockSchema = {
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => mockDb,
     getSchema: () => mockSchema,
-    eq: (a: unknown, b: unknown) => ({ column: a, value: b })
+    eq: (a: unknown, b: unknown) => ({ column: a, value: b }),
+    and: (...conditions: unknown[]) => ({ and: conditions }),
 }));
 
 vi.mock('../../../src/main_process/security/ratchet.js', () => ({
@@ -102,6 +104,7 @@ describe('Ratchet Storage Unit Tests', () => {
         expect(mockDb.insert).toHaveBeenCalledWith(mockSchema.ratchetSessions);
         expect(mockDb.values).toHaveBeenCalledWith(expect.objectContaining({
             upeerId,
+            contextId: 'direct',
             spkIdUsed: 101
         }));
         expect(mockRun).toHaveBeenCalled();
@@ -111,5 +114,15 @@ describe('Ratchet Storage Unit Tests', () => {
         deleteRatchetSession(upeerId);
         expect(mockDb.delete).toHaveBeenCalledWith(mockSchema.ratchetSessions);
         expect(mockRun).toHaveBeenCalled();
+    });
+
+    it('should delete only the requested ratchet context', () => {
+        deleteRatchetSession(upeerId, 'group:group-id');
+        expect(mockDb.where).toHaveBeenCalledWith({
+            and: [
+                { column: mockSchema.ratchetSessions.upeerId, value: upeerId },
+                { column: mockSchema.ratchetSessions.contextId, value: 'group:group-id' },
+            ],
+        });
     });
 });

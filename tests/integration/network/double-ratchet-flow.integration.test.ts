@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { deserializeState, serializeState } from '../../../src/main_process/security/ratchetState.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../../src/main_process/security/ratchetShared.js';
 
 type Role = 'alice' | 'bob';
@@ -13,6 +14,9 @@ const identities = {
     alice: {
         publicKeyHex: '11'.repeat(32),
         secretKey: Buffer.alloc(32, 1),
+        spkPk: Buffer.alloc(32, 7),
+        spkSk: Buffer.alloc(32, 8),
+        spkId: 98,
     },
     bob: {
         publicKeyHex: '22'.repeat(32),
@@ -62,18 +66,27 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
         if (currentRole === 'bob' && spkId === identities.bob.spkId) {
             return { spkPk: identities.bob.spkPk, spkSk: identities.bob.spkSk };
         }
+        if (currentRole === 'alice' && spkId === identities.alice.spkId) {
+            return { spkPk: identities.alice.spkPk, spkSk: identities.alice.spkSk };
+        }
         return null;
     }),
     sign: vi.fn(() => Buffer.from('sig')),
 }));
 
 vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
-    getRatchetSession: vi.fn((upeerId: string) => ratchetStores[currentRole].get(upeerId) ?? null),
-    saveRatchetSession: vi.fn((upeerId: string, state: unknown, spkIdUsed?: number | null) => {
-        ratchetStores[currentRole].set(upeerId, { state, spkIdUsed });
+    getRatchetSession: vi.fn((upeerId: string, contextId = 'direct') => {
+        const record = ratchetStores[currentRole].get(`${contextId}:${upeerId}`);
+        return record ? deserializeState(serializeState(record.state as never, record.spkIdUsed)) : null;
     }),
-    deleteRatchetSession: vi.fn((upeerId: string) => {
-        ratchetStores[currentRole].delete(upeerId);
+    saveRatchetSession: vi.fn((upeerId: string, state: unknown, spkIdUsed?: number | null, contextId = 'direct') => {
+        const serialized = serializeState(state as never, spkIdUsed);
+        ratchetStores[currentRole].set(`${contextId}:${upeerId}`, { state: deserializeState(serialized).state, spkIdUsed });
+    }),
+    deleteRatchetSession: vi.fn((upeerId: string, contextId?: string) => {
+        for (const key of ratchetStores[currentRole].keys()) {
+            if (key === `${contextId}:${upeerId}` || (!contextId && key.endsWith(`:${upeerId}`))) ratchetStores[currentRole].delete(key);
+        }
     }),
 }));
 
@@ -109,13 +122,13 @@ describe('Double Ratchet flow integration', () => {
             spkId: identities.bob.spkId,
             ikPub: identities.alice.publicKeyHex,
         });
-        expect(ratchetStores.alice.get('bob-peer')).toBeDefined();
+        expect(ratchetStores.alice.get('direct:bob-peer')).toBeDefined();
 
         setRole('bob');
         const firstPlaintext = await decryptDoubleRatchetPayload('alice-peer', firstDecryptPayload);
 
         expect(firstPlaintext).toBe('hola bob');
-        expect(ratchetStores.bob.get('alice-peer')).toBeDefined();
+        expect(ratchetStores.bob.get('direct:alice-peer')).toBeDefined();
 
         setRole('alice');
         const secondPacket = await encryptChatPayload('bob-peer', 'segundo mensaje', {
@@ -132,6 +145,85 @@ describe('Double Ratchet flow integration', () => {
         const secondPlaintext = await decryptDoubleRatchetPayload('alice-peer', secondDecryptPayload);
 
         expect(secondPlaintext).toBe('segundo mensaje');
+    });
+
+    it('preserves the ratchet when a vaulted group invite is replayed after out-of-order delivery', async () => {
+        const { encryptChatPayload } = await import('../../../src/main_process/network/messaging/chatEncryption.js');
+        const { decryptDoubleRatchetPayload } = await import('../../../src/main_process/network/handlers/doubleRatchetDecrypt.js');
+        const { decryptGroupControlPayload } = await import('../../../src/main_process/network/handlers/groupControlShared.js');
+        const groupPayload = JSON.stringify({
+            groupName: 'Grupo test',
+            members: ['alice-peer', 'bob-peer'],
+            epoch: 1,
+            senderKey: '55'.repeat(32),
+        });
+
+        setRole('alice');
+        const beforeGroup = await encryptChatPayload('bob-peer', 'privado antes del grupo', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(beforeGroup))).toBe('privado antes del grupo');
+
+        setRole('alice');
+        const groupInvite = await encryptChatPayload('bob-peer', groupPayload, {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        }, 'group:group-test');
+        const privateAfterInvite = await encryptChatPayload('bob-peer', 'privado después de la invitación', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+
+        expect(ratchetStores.alice.has('group:group-test:bob-peer')).toBe(true);
+        expect(ratchetStores.alice.has('direct:bob-peer')).toBe(true);
+
+        setRole('bob');
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(privateAfterInvite))).toBe('privado después de la invitación');
+
+        const delayedInvite = await decryptGroupControlPayload('alice-peer', {
+            groupId: 'group-test',
+            payload: groupInvite.content,
+            nonce: groupInvite.nonce,
+            ratchetHeader: groupInvite.ratchetHeader,
+            x3dhInit: normalizeX3dhInit(groupInvite.x3dhInit),
+        });
+        expect(delayedInvite).toEqual(JSON.parse(groupPayload));
+        expect(ratchetStores.bob.has('group:group-test:alice-peer')).toBe(true);
+        expect(ratchetStores.bob.has('direct:alice-peer')).toBe(true);
+
+        const { getRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const ratchetBeforeReplay = getRatchetSession('alice-peer', 'group:group-test');
+        expect(ratchetBeforeReplay).toBeTruthy();
+        const reset = vi.fn();
+        setRole('bob');
+        const replayedVaultInvite = await decryptGroupControlPayload('alice-peer', {
+            groupId: 'group-test',
+            payload: groupInvite.content,
+            nonce: groupInvite.nonce,
+            ratchetHeader: groupInvite.ratchetHeader,
+        }, reset);
+        expect(replayedVaultInvite).toBeNull();
+        expect(reset).not.toHaveBeenCalled();
+        expect(ratchetStores.bob.has('group:group-test:alice-peer')).toBe(true);
+        expect(ratchetStores.bob.has('direct:alice-peer')).toBe(true);
+        setRole('bob');
+        const ratchetAfterReplay = getRatchetSession('alice-peer', 'group:group-test');
+        expect(ratchetAfterReplay?.state.nr).toBe(ratchetBeforeReplay?.state.nr);
+        expect(ratchetAfterReplay?.state.dhsPk.equals(ratchetBeforeReplay?.state.dhsPk ?? Buffer.alloc(0))).toBe(true);
+        expect(getRatchetSession('alice-peer', 'direct')).toBeTruthy();
+
+        const nextPrivate = await encryptChatPayload('bob-peer', 'privado tras replay del vault', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(nextPrivate))).toBe('privado tras replay del vault');
     });
 
     it('vaults offline chat packets with DR metadata and without legacy fields', async () => {

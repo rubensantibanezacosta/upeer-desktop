@@ -157,17 +157,31 @@ describe('useCall', () => {
         expect(result.current.call.peerUpeerId).toBe('peer9');
     });
 
-    it('lleva a llamadas a quien origina cuando recibe la aceptación', async () => {
+    it('lleva a llamadas inmediatamente al iniciar una llamada', async () => {
+        let resolveStart: ((value: { success: boolean; callId: string }) => void) | undefined;
+        installBridge({
+            startCall: vi.fn(() => new Promise((resolve) => {
+                resolveStart = resolve;
+            })),
+        });
         const { result } = renderHook(() => useCall());
         await act(async () => {
-            await result.current.startCall('peer1', 'audio');
+            void result.current.startCall('peer1', 'audio');
+            await Promise.resolve();
         });
-        expect(useNavigationStore.getState().appView).toBe('chat');
+        expect(useNavigationStore.getState().appView).toBe('calls');
+        await act(async () => resolveStart?.({ success: true, callId: 'c1' }));
+    });
 
-        act(() => acceptedCallback?.({ callId: 'c1', peerUpeerId: 'peer1' }));
+    it('mantiene la sección de llamadas y termina el inicio cuando IPC falla', async () => {
+        installBridge({ startCall: vi.fn(async () => ({ success: false, error: 'Contact unavailable' })) });
+        const { result } = renderHook(() => useCall());
+        await act(async () => {
+            await result.current.startCall('peer1', 'video');
+        });
 
         expect(useNavigationStore.getState().appView).toBe('calls');
-        expect(result.current.call.phase).toBe('connected');
+        expect(useCallStore.getState().isStartingCall).toBe(false);
     });
 
     it('lleva a llamadas a quien acepta una llamada entrante', async () => {

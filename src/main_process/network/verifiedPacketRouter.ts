@@ -580,7 +580,8 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             break;
         case 'DR_RESET': {
             const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
-            deleteRatchetSession(upeerId);
+            const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
+            deleteRatchetSession(upeerId, ratchetContext);
             if (isSignedPreKeyPayload(data.signedPreKey)) {
                 const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
                 const spkValid = verify(
@@ -595,9 +596,9 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             }
             const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
             const { retryPendingEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');
-            const retried = await retryPendingDirectMessages(upeerId);
-            const retriedEncrypted = await retryPendingEncryptedOperations(upeerId);
-            info('DR session reset by peer', { upeerId }, 'security');
+            const retried = ratchetContext === 'direct' ? await retryPendingDirectMessages(upeerId) : 0;
+            const retriedEncrypted = ratchetContext === 'direct' ? await retryPendingEncryptedOperations(upeerId) : 0;
+            info('DR session reset by peer', { upeerId, ratchetContext }, 'security');
             if (retried > 0) {
                 info('Retried pending direct messages after DR_RESET', { upeerId, retried }, 'security');
             }

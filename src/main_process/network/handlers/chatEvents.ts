@@ -157,9 +157,9 @@ export async function handleChatEdit(
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
     const newContent = data.ratchetHeader
-        ? await decryptDoubleRatchetPayload(upeerId, data, async () => {
+        ? await decryptDoubleRatchetPayload(upeerId, data, async (reset) => {
             if (!fromAddress || !sendResponse) return;
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
         })
         : await resolveEditedContent(upeerId, data);
     if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {

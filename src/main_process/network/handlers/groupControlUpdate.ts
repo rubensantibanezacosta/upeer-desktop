@@ -40,9 +40,9 @@ export async function handleGroupUpdate(
     let senderKey: string | undefined;
 
     try {
-        const inner = await decryptGroupControlPayload(senderUpeerId, data, async () => {
+        const inner = await decryptGroupControlPayload(senderUpeerId, data, async (reset) => {
             if (!fromAddress || !sendResponse) return;
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
         });
         if (!inner) {
             security('GROUP_UPDATE: decryption failed', { senderUpeerId, groupId }, 'security');

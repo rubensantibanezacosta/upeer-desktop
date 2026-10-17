@@ -88,7 +88,7 @@ export const buildEncryptedGroupPacket = async (
     targetUpeerId: string,
     contact: GroupDeliveryContact,
 ) => {
-    const encrypted = await encryptChatPayload(targetUpeerId, sensitivePayload, contact);
+    const encrypted = await encryptChatPayload(targetUpeerId, sensitivePayload, contact, `group:${groupId}`);
 
     return {
         type,

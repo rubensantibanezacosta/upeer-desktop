@@ -38,17 +38,19 @@ export function registerCallHandlers(): void {
         if (change.phase === 'ended') {
             callFanoutPolicy.removeCall(change.callId);
             const session = callManager.get(change.callId);
-            const isMissedOutgoingCall = change.direction === 'outgoing'
+            const isMissedCall = change.direction === 'outgoing'
                 && change.connectedAt === undefined
                 && ['no-answer', 'error', 'rejected', 'busy'].includes(change.endReason ?? '');
-            if (session && !session.eventWritten && (change.connectedAt !== undefined || isMissedOutgoingCall)) {
+            const isIncomingRejectedCall = change.direction === 'incoming' && change.endReason === 'rejected';
+            if (session && !session.eventWritten && (change.connectedAt !== undefined || isMissedCall || isIncomingRejectedCall)) {
                 session.eventWritten = true;
                 const label = change.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
+                const displayOutcome = isIncomingRejectedCall ? `${label} rechazada` : `${label} perdida`;
                 const duration = change.connectedAt === undefined
                     ? null
                     : formatCallDuration(Math.max(0, Math.floor(((change.endedAt ?? Date.now()) - change.connectedAt) / 1000)));
                 const displayMessage = duration === null
-                    ? `${label} perdida`
+                    ? displayOutcome
                     : `${label} · ${duration} · ${change.connectedAt}`;
                 const message = `__SYS__|${displayMessage}`;
                 const eventId = callEventMessageId(change.callId);
@@ -73,7 +75,9 @@ export function registerCallHandlers(): void {
                                 timestamp,
                                 isSystem: true,
                             });
-                            const peer = getContactByUpeerId(change.peerUpeerId);
+                            const shouldNotifyPeer = (change.direction === 'outgoing' && change.endReason !== 'rejected')
+                                || (change.direction === 'incoming' && change.connectedAt !== undefined);
+                            const peer = shouldNotifyPeer ? getContactByUpeerId(change.peerUpeerId) : undefined;
                             if (peer) void sendUDPMessage(change.peerUpeerId, message, undefined, eventId);
                         })
                         .catch((cause: unknown) => console.error(`Failed to save call event with ${change.peerUpeerId}`, cause));

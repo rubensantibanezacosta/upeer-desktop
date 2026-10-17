@@ -1,6 +1,6 @@
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
-import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
+import { decryptDoubleRatchetPayload, type RatchetContext } from './doubleRatchetDecrypt.js';
 
 export type GroupPayload = {
     groupName?: string;
@@ -46,21 +46,24 @@ export function updateGroupEphemeralKeyIfValid(upeerId: string, ephemeralPublicK
 export async function decryptGroupControlPayload(
     upeerId: string,
     data: GroupControlPacket,
-    onReset?: () => void | Promise<void>,
+    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
 ): Promise<GroupPayload | null> {
     if (data.ratchetHeader) {
+        const reset = onReset
+            ? async (packet: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => onReset({
+                ...packet,
+                ratchetContext: `group:${data.groupId}`,
+            })
+            : undefined;
         const doubleRatchetContent = await decryptDoubleRatchetPayload(upeerId, {
             content: data.payload,
             nonce: data.nonce,
             ratchetHeader: data.ratchetHeader,
             x3dhInit: data.x3dhInit,
-        }, onReset);
-        if (doubleRatchetContent) {
-            return JSON.parse(doubleRatchetContent) as GroupPayload;
-        }
-    }
-    if (typeof data.nonce === 'string' || typeof data.payload === 'string') {
-        await onReset?.();
+        }, reset, `group:${data.groupId}`);
+        return doubleRatchetContent
+            ? JSON.parse(doubleRatchetContent) as GroupPayload
+            : null;
     }
     return null;
 }

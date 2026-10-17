@@ -100,9 +100,32 @@ describe('network/verifiedPacketRouter.ts', () => {
             sendResponse: vi.fn(),
         });
 
-        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id');
+        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'direct');
         expect(contactKeys.updateContactSignedPreKey).toHaveBeenCalledWith('peer-id', 'bb'.repeat(32), 'cc'.repeat(64), 9);
         expect(chatRetry.retryPendingDirectMessages).toHaveBeenCalledWith('peer-id');
         expect(encryptedRetry.retryPendingEncryptedOperations).toHaveBeenCalledWith('peer-id');
+    });
+
+    it('limits a group DR_RESET to that group session without retrying direct messages', async () => {
+        const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
+        const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const chatRetry = await import('../../../src/main_process/network/messaging/chatRetry.js');
+        const encryptedRetry = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+
+        vi.mocked(identity.verify).mockReturnValue(true);
+        await routeVerifiedPacket({
+            upeerId: 'peer-id',
+            contact: { publicKey: 'aa'.repeat(32) },
+            data: { type: 'DR_RESET', ratchetContext: 'group:group-id' },
+            signature: 'sig',
+            rinfo: { address: '200::9', port: 1234 },
+            win: null,
+            sendResponse: vi.fn(),
+        });
+
+        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'group:group-id');
+        expect(chatRetry.retryPendingDirectMessages).not.toHaveBeenCalled();
+        expect(encryptedRetry.retryPendingEncryptedOperations).not.toHaveBeenCalled();
     });
 });

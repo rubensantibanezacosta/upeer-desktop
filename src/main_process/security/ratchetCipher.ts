@@ -29,13 +29,61 @@ function trySkippedKey(state: RatchetState, header: RatchetHeader, ciphertextHex
     const key = `${header.dh}:${header.n}`;
     const mk = state.skipped.get(key);
     if (!mk) return null;
-    state.skipped.delete(key);
 
     const ct = Buffer.from(ciphertextHex, 'hex');
     const plaintext = Buffer.alloc(ct.length - sodium.crypto_secretbox_MACBYTES);
     const ok = sodium.crypto_secretbox_open_easy(plaintext, ct, Buffer.from(nonceHex, 'hex'), mk);
+    if (!ok) return null;
+
+    state.skipped.delete(key);
     sodium.sodium_memzero(mk);
-    return ok ? plaintext : null;
+    return plaintext;
+}
+
+function hasConsumedMessage(state: RatchetState, header: RatchetHeader): boolean {
+    return Boolean(state.dhr && header.dh === state.dhr.toString('hex') && header.n < state.nr);
+}
+
+function snapshotRatchetState(state: RatchetState): RatchetState {
+    return {
+        rk: Buffer.from(state.rk),
+        cks: state.cks ? Buffer.from(state.cks) : null,
+        ckr: state.ckr ? Buffer.from(state.ckr) : null,
+        ns: state.ns,
+        nr: state.nr,
+        pn: state.pn,
+        dhsPk: Buffer.from(state.dhsPk),
+        dhsSk: Buffer.from(state.dhsSk),
+        dhr: state.dhr ? Buffer.from(state.dhr) : null,
+        skipped: new Map(Array.from(state.skipped, ([key, messageKey]) => [key, Buffer.from(messageKey)])),
+    };
+}
+
+function clearRatchetSnapshot(snapshot: RatchetState): void {
+    sodium.sodium_memzero(snapshot.rk);
+    if (snapshot.cks) sodium.sodium_memzero(snapshot.cks);
+    if (snapshot.ckr) sodium.sodium_memzero(snapshot.ckr);
+    sodium.sodium_memzero(snapshot.dhsSk);
+    for (const messageKey of snapshot.skipped.values()) sodium.sodium_memzero(messageKey);
+}
+
+function restoreRatchetState(state: RatchetState, snapshot: RatchetState): void {
+    for (const messageKey of state.skipped.values()) sodium.sodium_memzero(messageKey);
+    sodium.sodium_memzero(state.rk);
+    if (state.cks) sodium.sodium_memzero(state.cks);
+    if (state.ckr) sodium.sodium_memzero(state.ckr);
+    sodium.sodium_memzero(state.dhsSk);
+
+    state.rk = snapshot.rk;
+    state.cks = snapshot.cks;
+    state.ckr = snapshot.ckr;
+    state.ns = snapshot.ns;
+    state.nr = snapshot.nr;
+    state.pn = snapshot.pn;
+    state.dhsPk = snapshot.dhsPk;
+    state.dhsSk = snapshot.dhsSk;
+    state.dhr = snapshot.dhr;
+    state.skipped = snapshot.skipped;
 }
 
 function skipKeys(state: RatchetState, until: number): void {
@@ -105,32 +153,50 @@ export function ratchetDecrypt(
         !/^[0-9a-fA-F]+$/.test(ciphertextHex)
     ) return null;
 
+    const snapshot = snapshotRatchetState(state);
     const skippedResult = trySkippedKey(state, header, ciphertextHex, nonceHex);
-    if (skippedResult) return skippedResult;
+    if (skippedResult) {
+        clearRatchetSnapshot(snapshot);
+        return skippedResult;
+    }
+    if (hasConsumedMessage(state, header)) {
+        clearRatchetSnapshot(snapshot);
+        return null;
+    }
 
     const msgDhPk = Buffer.from(header.dh, 'hex');
     const needsDhStep = !state.dhr || !msgDhPk.equals(state.dhr);
 
     if (needsDhStep) {
         if (state.ckr && header.pn - state.nr > MAX_SKIP) {
+            clearRatchetSnapshot(snapshot);
             throw new Error('Ratchet: demasiados mensajes saltados (pre-DH step, pn)');
         }
     }
     const nrAfterDhStep = needsDhStep ? 0 : state.nr;
     if (header.n - nrAfterDhStep > MAX_SKIP) {
+        clearRatchetSnapshot(snapshot);
         throw new Error('Ratchet: demasiados mensajes saltados (pre-skipKeys, n)');
     }
 
-    if (needsDhStep) {
-        if (state.ckr) {
-            skipKeys(state, header.pn);
+    try {
+        if (needsDhStep) {
+            if (state.ckr) {
+                skipKeys(state, header.pn);
+            }
+            dhRatchetStep(state, msgDhPk);
         }
-        dhRatchetStep(state, msgDhPk);
+
+        skipKeys(state, header.n);
+    } catch (err) {
+        restoreRatchetState(state, snapshot);
+        throw err;
     }
 
-    skipKeys(state, header.n);
-
-    if (!state.ckr) return null;
+    if (!state.ckr) {
+        restoreRatchetState(state, snapshot);
+        return null;
+    }
     const [mk, nextCkr] = chainStep(state.ckr);
 
     const ct = Buffer.from(ciphertextHex, 'hex');
@@ -142,9 +208,11 @@ export function ratchetDecrypt(
         state.ckr = nextCkr;
         state.nr++;
         sodium.sodium_memzero(mk);
+        clearRatchetSnapshot(snapshot);
         return plaintext;
     }
 
     sodium.sodium_memzero(mk);
+    restoreRatchetState(state, snapshot);
     return null;
 }

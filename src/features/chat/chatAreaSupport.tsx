@@ -3,16 +3,21 @@ import { Box, Typography } from '@mui/joy';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
 
-type CallSystemEvent = { kind: 'audio' | 'video'; duration: string | null; startedAt: number | null };
+type CallSystemEvent = { kind: 'audio' | 'video'; duration: string | null; startedAt: number | null; outcome: 'missed' | 'rejected' | null };
 
 export function parseCallSystemEvent(message: string): CallSystemEvent | null {
-    const missedMatch = /^(Llamada de voz|Videollamada) perdida$/.exec(message);
+    const missedMatch = /^(Llamada de voz|Videollamada) (perdida|rechazada)$/.exec(message);
     if (missedMatch) {
-        return { kind: missedMatch[1] === 'Videollamada' ? 'video' : 'audio', duration: null, startedAt: null };
+        return {
+            kind: missedMatch[1] === 'Videollamada' ? 'video' : 'audio',
+            duration: null,
+            startedAt: null,
+            outcome: missedMatch[2] === 'rechazada' ? 'rejected' : 'missed',
+        };
     }
     const match = /^(Llamada de voz|Videollamada) · (\d{2,}:\d{2})(?: · (\d{10,}))?$/.exec(message);
     if (!match) return null;
-    return { kind: match[1] === 'Videollamada' ? 'video' : 'audio', duration: match[2], startedAt: match[3] ? Number(match[3]) : null };
+    return { kind: match[1] === 'Videollamada' ? 'video' : 'audio', duration: match[2], startedAt: match[3] ? Number(match[3]) : null, outcome: null };
 }
 
 export const formatChatDateLabel = (date: number) => {
@@ -57,7 +62,7 @@ export const ChatSystemMessage: React.FC<ChatSystemMessageProps> = ({ message })
     if (callEvent) {
         const Icon = callEvent.kind === 'video' ? VideocamIcon : CallIcon;
         const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
-        const outcome = callEvent.duration ? `Duración ${callEvent.duration}` : 'Llamada perdida';
+        const outcome = callEvent.duration ? `Duración ${callEvent.duration}` : callEvent.outcome === 'rejected' ? 'Llamada rechazada' : 'Llamada perdida';
         const startTime = callEvent.startedAt === null
             ? null
             : new Date(callEvent.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

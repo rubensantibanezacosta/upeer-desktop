@@ -88,7 +88,8 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
     const callEvent = parseCallSystemEvent(systemMessage);
     if (callEvent) {
         const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
-        return callEvent.duration ? `${label} · ${callEvent.duration}` : `${label} perdida`;
+        if (callEvent.duration) return `${label} · ${callEvent.duration}`;
+        return callEvent.outcome === 'rejected' ? `${label} rechazada` : `${label} perdida`;
     }
     if (systemMessage !== contact.lastMessage) {
         return systemMessage;
