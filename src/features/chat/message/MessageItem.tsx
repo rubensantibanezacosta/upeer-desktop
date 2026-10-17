@@ -110,7 +110,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             size="sm"
                             src={msg.senderAvatar}
                             variant="soft"
-                            sx={{ mt: 0.5, borderRadius: 'sm', width: 28, height: 28, flexShrink: 0 }}
+                            sx={{ mt: 0.5, borderRadius: 'md', width: 28, height: 28, flexShrink: 0 }}
                         >
                             {msg.senderName ? msg.senderName[0].toUpperCase() : '?'}
                         </Avatar>

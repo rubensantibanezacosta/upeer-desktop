@@ -110,7 +110,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                                             sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' }, px: 2, py: 1.5 }}
                                         >
                                             <ListItemDecorator sx={{ mr: 1.5 }}>
-                                                <Avatar size="sm" src={msg.senderAvatar || undefined} sx={{ borderRadius: 'sm' }}>
+                                                <Avatar size="sm" src={msg.senderAvatar || undefined} sx={{ borderRadius: 'md' }}>
                                                     {!msg.senderAvatar && <ChatBubbleOutlineIcon />}
                                                 </Avatar>
                                             </ListItemDecorator>

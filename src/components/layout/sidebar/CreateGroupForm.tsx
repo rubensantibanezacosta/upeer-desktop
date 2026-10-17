@@ -85,7 +85,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                     sx={{
                         position: 'relative', cursor: 'pointer',
                         width: 80, height: 80,
-                        borderRadius: 'lg',
+                        borderRadius: 'md',
                         overflow: 'hidden',
                         border: '2px dashed',
                         borderColor: 'divider',
@@ -95,7 +95,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                     <Avatar
                         src={groupAvatar}
                         sx={{
-                            width: '100%', height: '100%', borderRadius: 'lg',
+                            width: '100%', height: '100%', borderRadius: 'md',
                             background: groupAvatar ? undefined : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))'
                         }}
                     >
@@ -181,7 +181,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                                             onChange={() => toggleMember(c.upeerId)}
                                             size="sm"
                                         />
-                                        <Avatar size="sm" variant="soft" src={c.avatar || undefined}>
+                                        <Avatar size="sm" variant="soft" src={c.avatar || undefined} sx={{ borderRadius: 'md' }}>
                                             {c.name.charAt(0).toUpperCase()}
                                         </Avatar>
                                         <Typography level="body-sm" sx={{ fontWeight: isChecked ? 600 : 400 }}>

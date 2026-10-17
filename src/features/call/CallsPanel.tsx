@@ -85,7 +85,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                             <Card key={call.callId} variant="outlined">
                                 <CardContent>
                                     <Stack direction="row" alignItems="center" spacing={2}>
-                                        <Avatar src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        <Avatar src={group?.avatar || contact?.avatar} sx={{ borderRadius: 'md' }}>{name.charAt(0).toUpperCase()}</Avatar>
                                         <Box sx={{ flex: 1 }}>
                                             <Typography level="title-md">{name}</Typography>
                                             <Typography level="body-xs">{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'} · {callPhaseLabel(call.phase)}</Typography>
@@ -110,7 +110,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                             <CardContent>
                                 <Stack direction="row" alignItems="center" spacing={2}>
                                     <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                                        <Avatar size="lg" src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        <Avatar size="lg" src={group?.avatar || contact?.avatar} sx={{ borderRadius: 'md' }}>{name.charAt(0).toUpperCase()}</Avatar>
                                         <Box sx={{ position: 'absolute', right: -5, bottom: -3, display: 'grid', placeItems: 'center', width: 24, height: 24, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.surface' }}>
                                             <CallIconComponent sx={{ fontSize: 14 }} />
                                         </Box>
