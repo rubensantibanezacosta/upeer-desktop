@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Avatar, Tooltip } from '@mui/joy';
+import { Box, IconButton, Avatar, Tooltip, Badge } from '@mui/joy';
 import ChatIcon from '@mui/icons-material/Chat';
 import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
@@ -19,6 +19,7 @@ interface NavigationRailProps {
     onOpenIdentity?: () => void;
     activeView?: 'chat' | 'contacts' | 'calls' | 'settings';
     activeCallKind?: 'audio' | 'video';
+    unreadChatCount?: number;
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
@@ -32,6 +33,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     onOpenIdentity,
     activeView = 'chat',
     activeCallKind,
+    unreadChatCount = 0,
 }) => (
     <Box sx={{
         width: '64px',
@@ -48,16 +50,24 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         zIndex: 10
     }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1 }}>
-            <Tooltip title="Chats" placement="right">
+            <Tooltip title={unreadChatCount > 0 ? `Chats · ${unreadChatCount} sin leer` : 'Chats'} placement="right">
                 <Box>
                     <IconButton
-                        aria-label="Chats"
+                        aria-label={unreadChatCount > 0 ? `Chats, ${unreadChatCount} sin leer` : 'Chats'}
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
                         onClick={onOpenChats}
                         sx={{ borderRadius: 'sm' }}
                     >
-                        <ChatIcon />
+                        <Badge
+                            badgeContent={unreadChatCount > 99 ? '99+' : unreadChatCount}
+                            invisible={unreadChatCount < 1}
+                            color="danger"
+                            size="sm"
+                            sx={{ '& .MuiBadge-badge': { top: 1, right: 1, fontSize: '10px', minWidth: 16, height: 16, px: 0.4 } }}
+                        >
+                            <ChatIcon />
+                        </Badge>
                     </IconButton>
                 </Box>
             </Tooltip>

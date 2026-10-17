@@ -26,6 +26,17 @@ describe('NavigationRail Component', () => {
         expect(screen.getByTestId('CallIcon')).toBeDefined();
     });
 
+    it('muestra la cantidad de chats sin leer en el badge', () => {
+        render(<NavigationRail {...defaultProps} unreadChatCount={4} />);
+        expect(screen.getByRole('button', { name: 'Chats, 4 sin leer' })).toBeDefined();
+        expect(screen.getByText('4')).toBeDefined();
+    });
+
+    it('limita el badge a 99+', () => {
+        render(<NavigationRail {...defaultProps} unreadChatCount={120} />);
+        expect(screen.getByText('99+')).toBeDefined();
+    });
+
     it('calls onOpenCalls when the calls item is clicked', () => {
         const onOpenCalls = vi.fn();
         render(<NavigationRail {...defaultProps} onOpenCalls={onOpenCalls} />);

@@ -13,6 +13,7 @@ import { NavigationRail } from './NavigationRail.js';
 import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreviewOverlay.js';
 import { useCall } from '../../features/call/useCall.js';
 import { useCallStore } from '../../features/call/useCallStore.js';
+import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
@@ -116,6 +117,17 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
 }) => {
     const { startCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeCallKind = useCallStore((state) => Object.values(state.calls).find((call) => call.phase !== 'ended')?.kind);
+    const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
+    const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
+    const unreadChatCount = chatStore.contacts.filter((contact) =>
+        contact.status !== 'blocked' && (
+            contactPrefs[contact.upeerId]?.unread ||
+            (!contact.lastMessageIsMine && !!contact.lastMessage && contact.lastMessageStatus !== 'read')
+        )
+    ).length + chatStore.groups.filter((group) =>
+        groupPrefs[group.groupId]?.unread ||
+        (!group.lastMessageIsMine && !!group.lastMessage && group.lastMessageStatus !== 'read')
+    ).length;
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
@@ -132,6 +144,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 myInitial={(chatStore.myIdentity?.alias || chatStore.myIdentity?.upeerId || '?').charAt(0).toUpperCase()}
                 activeView={navigation.appView}
                 activeCallKind={activeCallKind}
+                unreadChatCount={unreadChatCount}
                 onOpenChats={() => navigation.goToChat()}
                 onOpenContacts={() => navigation.goToContacts()}
                 onOpenCalls={() => navigation.goToCalls()}
