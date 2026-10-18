@@ -413,5 +413,8 @@ export function validateDrReset(data: SyncResetPayload): ValidationResult {
     if (data.ratchetContext !== undefined && (typeof data.ratchetContext !== 'string' || data.ratchetContext.length > 256)) {
         return { valid: false, error: 'Invalid ratchetContext' };
     }
+    if (data.ratchetContext !== undefined && data.ratchetContext !== 'direct' && !/^group:[^:]+$/.test(data.ratchetContext)) {
+        return { valid: false, error: 'Invalid ratchetContext format' };
+    }
     return validateSignedPreKey(data.signedPreKey);
 }

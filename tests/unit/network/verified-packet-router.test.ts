@@ -7,6 +7,11 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     setMyAvatar: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/security/ratchetSessionQueue.js', () => ({
+    ratchetSessionQueueKey: (upeerId: string, contextId: string) => `${upeerId}:${contextId}`,
+    withRatchetSessionLock: async (_key: string, operation: () => Promise<unknown>) => operation(),
+}));
+
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -118,7 +123,11 @@ describe('network/verifiedPacketRouter.ts', () => {
         await routeVerifiedPacket({
             upeerId: 'peer-id',
             contact: { publicKey: 'aa'.repeat(32) },
-            data: { type: 'DR_RESET', ratchetContext: 'group:group-id' },
+            data: {
+                type: 'DR_RESET',
+                ratchetContext: 'group:group-id',
+                signedPreKey: { spkPub: 'bb'.repeat(32), spkSig: 'cc'.repeat(64), spkId: 9 },
+            },
             signature: 'sig',
             rinfo: { address: '200::9', port: 1234 },
             win: null,

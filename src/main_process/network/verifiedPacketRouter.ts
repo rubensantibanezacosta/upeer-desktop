@@ -582,6 +582,20 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             break;
         case 'DR_RESET': {
             if (!contact.publicKey) break;
+            if (!isSignedPreKeyPayload(data.signedPreKey)) {
+                warn('Rejected DR_RESET without a valid signed prekey payload', { upeerId }, 'security');
+                break;
+            }
+            const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
+            const spkValid = verify(
+                Buffer.from(spkPub, 'hex'),
+                Buffer.from(spkSig, 'hex'),
+                Buffer.from(contact.publicKey, 'hex')
+            );
+            if (!spkValid) {
+                warn('Rejected DR_RESET with an invalid signed prekey signature', { upeerId }, 'security');
+                break;
+            }
             const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
             const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
             if (ratchetContext !== 'direct' && !/^group:[^:]+$/.test(ratchetContext)) break;
@@ -589,17 +603,9 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             const { ratchetSessionQueueKey, withRatchetSessionLock } = await import('../security/ratchetSessionQueue.js');
             await withRatchetSessionLock(ratchetSessionQueueKey(upeerId, ratchetContext), async () => {
                 deleteRatchetSession(upeerId, ratchetContext);
-                if (isSignedPreKeyPayload(data.signedPreKey)) {
-                    const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
-                    const spkValid = verify(
-                        Buffer.from(spkPub, 'hex'),
-                        Buffer.from(spkSig, 'hex'),
-                        Buffer.from(contact.publicKey ?? '', 'hex')
-                    );
-                    if (spkValid) {
-                        const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
-                        updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
-                    }
+                const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
+                if (!contact.signedPreKeyId || newSpkId > contact.signedPreKeyId) {
+                    updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
                 }
                 const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
                 const { retryPendingEncryptedOperations, retryPendingGroupEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');

@@ -176,6 +176,64 @@ describe('Double Ratchet flow integration', () => {
         expect(secondPlaintext).toBe('segundo mensaje');
     });
 
+    it('recovers an existing stale session only after a fresh X3DH packet decrypts', async () => {
+        const { encryptChatPayload } = await import('../../../src/main_process/network/messaging/chatEncryption.js');
+        const { decryptDoubleRatchetPayload } = await import('../../../src/main_process/network/handlers/doubleRatchetDecrypt.js');
+
+        setRole('alice');
+        const initialPacket = await encryptChatPayload('bob-peer', 'initial', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(initialPacket))).toBe('initial');
+        const staleSession = ratchetStores.bob.get('direct:alice-peer');
+        expect(staleSession).toBeDefined();
+
+        setRole('alice');
+        ratchetStores.alice.delete('direct:bob-peer');
+        const restartedPacket = await encryptChatPayload('bob-peer', 'transparent recovery', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(restartedPacket))).toBe('transparent recovery');
+        expect(ratchetStores.bob.get('direct:alice-peer')?.state).not.toEqual(staleSession?.state);
+    });
+
+    it('preserves a stale session when a fresh X3DH packet fails authentication', async () => {
+        const { encryptChatPayload } = await import('../../../src/main_process/network/messaging/chatEncryption.js');
+        const { decryptDoubleRatchetPayload } = await import('../../../src/main_process/network/handlers/doubleRatchetDecrypt.js');
+
+        setRole('alice');
+        const initialPacket = await encryptChatPayload('bob-peer', 'initial', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(initialPacket))).toBe('initial');
+        const stateBeforeFailure = JSON.stringify(serializeState(
+            ratchetStores.bob.get('direct:alice-peer')?.state as never,
+        ));
+
+        setRole('alice');
+        ratchetStores.alice.delete('direct:bob-peer');
+        const restartedPacket = await encryptChatPayload('bob-peer', 'must not replace', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        restartedPacket.content = `${'ff'.repeat(16)}${restartedPacket.content.slice(32)}`;
+        setRole('bob');
+
+        expect(await decryptDoubleRatchetPayload('alice-peer', toDecryptPayload(restartedPacket))).toBeNull();
+        expect(JSON.stringify(serializeState(ratchetStores.bob.get('direct:alice-peer')?.state as never))).toBe(stateBeforeFailure);
+    });
+
     it('consumes a retransmitted packet with the same ID before acknowledging a lost-ACK retry', async () => {
         const { encryptChatPayload } = await import('../../../src/main_process/network/messaging/chatEncryption.js');
         const { handleChatMessage } = await import('../../../src/main_process/network/handlers/chat.js');

@@ -72,7 +72,7 @@ describe('verifiedPacketRouter DR_RESET edges', () => {
         vi.clearAllMocks();
     });
 
-    it('no actualiza la SPK si la firma del peer es inválida, pero limpia y reintenta', async () => {
+    it('preserva la sesión y no reintenta si la firma de la SPK del reset es inválida', async () => {
         const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
         const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
         const contactKeys = await import('../../../src/main_process/storage/contacts/keys.js');
@@ -101,9 +101,28 @@ describe('verifiedPacketRouter DR_RESET edges', () => {
             sendResponse: vi.fn(),
         });
 
-        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'direct');
+        expect(ratchetOps.deleteRatchetSession).not.toHaveBeenCalled();
         expect(contactKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
-        expect(chatRetry.retryPendingDirectMessages).toHaveBeenCalledWith('peer-id');
-        expect(encryptedRetry.retryPendingEncryptedOperations).toHaveBeenCalledWith('peer-id');
+        expect(chatRetry.retryPendingDirectMessages).not.toHaveBeenCalled();
+        expect(encryptedRetry.retryPendingEncryptedOperations).not.toHaveBeenCalled();
+    });
+
+    it('preserva la sesión si falta la SPK firmada', async () => {
+        const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
+        const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+
+        vi.mocked(identity.verify).mockReturnValue(true);
+        await routeVerifiedPacket({
+            upeerId: 'peer-id',
+            contact: { publicKey: 'aa'.repeat(32) },
+            data: { type: 'DR_RESET' },
+            signature: 'sig',
+            rinfo: { address: '200::9', port: 1234 },
+            win: null,
+            sendResponse: vi.fn(),
+        });
+
+        expect(ratchetOps.deleteRatchetSession).not.toHaveBeenCalled();
     });
 });

@@ -1,12 +1,10 @@
-import {
-    getMyIdentitySkBuffer,
-    getSpkBySpkId,
-} from '../../security/identity.js';
+import { getMyIdentitySkBuffer, getSpkBySpkId } from '../../security/identity.js';
 import { ratchetDecrypt, ratchetInitBob, x3dhResponder } from '../../security/ratchet.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 import { serializeState } from '../../security/ratchet.js';
+import { warn } from '../../security/secure-logger.js';
 
 type DoubleRatchetPayload = {
     content?: string;
@@ -86,7 +84,12 @@ async function decryptDoubleRatchetPayloadUnlocked(
             return plaintext.toString('utf-8');
         }
 
-        if (!sessionResult && data.x3dhInit) {
+        const canRecoverFromFreshX3dh = Boolean(
+            data.x3dhInit
+            && data.ratchetHeader.n === 0
+            && data.ratchetHeader.dh !== session?.dhr?.toString('hex'),
+        );
+        if (canRecoverFromFreshX3dh && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
             const spkEntry = getSpkBySpkId(spkId);
             if (spkEntry) {
@@ -104,13 +107,30 @@ async function decryptDoubleRatchetPayloadUnlocked(
                     const currentState = currentSession ? JSON.stringify(serializeState(currentSession.state, currentSession.spkIdUsed)) : null;
                     if (currentState !== initialState) return null;
                     saveRatchetSession(upeerId, freshSession, spkId, contextId);
+                    warn('Recovered stale Double Ratchet session from authenticated X3DH restart', {
+                        upeerId,
+                        contextId,
+                        previousSessionPresent: Boolean(sessionResult),
+                    }, 'security');
                     return retry.toString('utf-8');
                 }
             }
         }
 
+        warn('Double Ratchet authentication failed; persisted session was preserved', {
+            upeerId,
+            contextId,
+            sessionPresent: Boolean(sessionResult),
+            x3dhInitPresent: Boolean(data.x3dhInit),
+            headerN: data.ratchetHeader.n,
+        }, 'security');
         return null;
-    } catch {
+    } catch (cause) {
+        warn('Double Ratchet decrypt operation failed; persisted session was preserved', {
+            upeerId,
+            contextId,
+            reason: cause instanceof Error ? cause.message : String(cause),
+        }, 'security');
         return null;
     }
 }
