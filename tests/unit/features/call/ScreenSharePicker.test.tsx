@@ -32,6 +32,8 @@ describe('ScreenSharePicker', () => {
         render(<ScreenSharePicker open sources={sources} onClose={vi.fn()} onSelect={onSelect} onError={vi.fn()} />);
 
         expect(screen.getByRole('radio', { name: 'Compartir con sonido' })).toBeChecked();
+        const audioOptions = screen.getByRole('radiogroup', { name: 'Audio del sistema' });
+        expect(audioOptions).toHaveStyle({ flexDirection: 'row', alignItems: 'center' });
         expect(screen.getByRole('button', { name: /Pantalla principal/i })).toBeTruthy();
         fireEvent.click(screen.getByRole('radio', { name: 'Compartir sin sonido' }));
         fireEvent.click(screen.getByRole('tab', { name: 'Ventanas' }));

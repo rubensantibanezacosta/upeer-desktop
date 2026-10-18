@@ -44,7 +44,6 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
     const [remotePeers, setRemotePeers] = useState<string[]>([]);
     const [remoteScreen, setRemoteScreen] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [showShareOptions, setShowShareOptions] = useState(false);
     const [screenSharePickerOpen, setScreenSharePickerOpen] = useState(false);
     const [screenShareError, setScreenShareError] = useState<string | null>(null);
     const [screenShareSources, setScreenShareSources] = useState<Array<{ id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null }>>([]);
@@ -210,7 +209,6 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
     }, [pos]);
 
     const doShare = useCallback(async () => {
-        setShowShareOptions(false);
         setScreenShareError(null);
         const result = await window.upeer.getScreenShareSources();
         if (!result.success || result.sources.length === 0) {
@@ -284,12 +282,6 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                 )}
             </Box>
 
-            {showShareOptions && (
-                <Box data-nodrag="true" sx={{ position: 'absolute', bottom: 92, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 8, backgroundColor: '#2a2a2a', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
-                    <Typography level="body-xs" sx={{ px: 1, color: 'rgba(255,255,255,0.7)' }}>Compartir pantalla</Typography>
-                    <Box component="button" data-nodrag="true" onClick={() => void doShare()} sx={{ border: 0, bgcolor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left', p: 1 }}>Compartir pantalla</Box>
-                </Box>
-            )}
             {screenShareError && <Typography role="alert" level="body-xs" sx={{ position: 'absolute', bottom: 88, left: 12, right: 12, zIndex: 3, p: 1, borderRadius: 6, bgcolor: '#5f2120', color: 'white' }}>{screenShareError}</Typography>}
             <ScreenSharePicker open={screenSharePickerOpen} sources={screenShareSources} onClose={() => setScreenSharePickerOpen(false)} onSelect={(withSystemAudio) => void startSelectedScreenShare(withSystemAudio)} onError={setScreenShareError} />
 
@@ -372,9 +364,8 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                 <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} screenSharing={screenSharing} onToggleScreenShare={() => {
                     if (screenSharing) {
                         stopScreenShare();
-                        setShowShareOptions(false);
                     } else {
-                        setShowShareOptions((previous) => !previous);
+                        void doShare();
                     }
                 }} onToggleMute={onToggleMute} onToggleCamera={onToggleCamera} onEnd={onEnd} />
             </Box>

@@ -40,9 +40,9 @@ export function ScreenSharePicker({ open, sources, onClose, onSelect, onError }:
                 <ModalClose sx={{ color: 'white' }} />
                 <DialogTitle sx={{ fontSize: 24, color: 'white' }}>Comparte tu pantalla</DialogTitle>
                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)' }}>Selecciona una pantalla o ventana para compartir.</Typography>
-                <RadioGroup aria-label="Audio del sistema" value={withSystemAudio ? 'with-audio' : 'without-audio'} onChange={(event) => setWithSystemAudio(event.target.value === 'with-audio')} sx={{ display: 'flex', flexDirection: 'row', gap: 2 }}>
-                    <Radio value="with-audio" label="Compartir con sonido" sx={{ color: 'white', '--Radio-labelColor': 'white' }} />
-                    <Radio value="without-audio" label="Compartir sin sonido" sx={{ color: 'white', '--Radio-labelColor': 'white' }} />
+                <RadioGroup aria-label="Audio del sistema" value={withSystemAudio ? 'with-audio' : 'without-audio'} onChange={(event) => setWithSystemAudio(event.target.value === 'with-audio')} sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
+                    <Radio value="with-audio" label="Compartir con sonido" sx={{ display: 'flex', alignItems: 'center', minHeight: 36, m: 0, py: 0, color: 'white', '--Radio-labelColor': 'white', '& .MuiRadio-radio': { alignSelf: 'center' } }} />
+                    <Radio value="without-audio" label="Compartir sin sonido" sx={{ display: 'flex', alignItems: 'center', minHeight: 36, m: 0, py: 0, color: 'white', '--Radio-labelColor': 'white', '& .MuiRadio-radio': { alignSelf: 'center' } }} />
                 </RadioGroup>
                 {loading && sources.length === 0 ? <Typography sx={{ py: 6, textAlign: 'center', color: 'white' }}>Buscando pantallas y ventanas…</Typography> : <>
                     <Tabs value={sourceType} onChange={(_event, value) => setSourceType(value as 'screen' | 'window')}>
