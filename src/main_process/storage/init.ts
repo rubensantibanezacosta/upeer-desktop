@@ -8,6 +8,7 @@ import * as schema from './schema.js';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { error } from '../security/secure-logger.js';
 import { setDatabase } from './shared.js';
+import { app } from 'electron';
 
 // ── SQLCipher key derivation ──────────────────────────────────────────────────
 // Derived from a per-device random key (always available, even before mnemonic
@@ -90,20 +91,16 @@ export async function initDB(userDataPath: string, createBackup = true) {
     const db = drizzle(sqlite, { schema });
 
     try {
-        let migrationsPath = path.join(process.cwd(), 'drizzle');
-
-        try {
-            const { app: electronApp } = await import('electron');
-            if (electronApp?.isPackaged) {
-                migrationsPath = path.join(process.resourcesPath, 'drizzle');
-            }
-        } catch (_e) {
-            // Ignored, might be running in a test environment without electron
+        const migrationsPath = app.isPackaged
+            ? path.join(process.resourcesPath, 'drizzle')
+            : path.join(app.getAppPath(), 'drizzle');
+        if (!fs.existsSync(path.join(migrationsPath, 'meta', '_journal.json'))) {
+            throw new Error(`Drizzle migration journal not found at ${migrationsPath}`);
         }
-
         migrate(db, { migrationsFolder: migrationsPath });
     } catch (err) {
         error('Error en migraciones', err, 'db');
+        throw err;
     }
 
     setDatabase(db, sqlite);

@@ -4,6 +4,7 @@ import BetterSqlite3 from 'better-sqlite3-multiple-ciphers';
 import fs from 'node:fs';
 import { setDatabase } from '../../../src/main_process/storage/shared.js';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { app } from 'electron';
 
 // Mock dependencies
 vi.mock('better-sqlite3-multiple-ciphers', () => {
@@ -23,6 +24,13 @@ vi.mock('node:path', () => ({
         join: (...args: string[]) => args.join('/'),
         resolve: (...args: string[]) => args.join('/')
     }
+}));
+
+vi.mock('electron', () => ({
+    app: {
+        isPackaged: false,
+        getAppPath: vi.fn(() => '/mock/app'),
+    },
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -66,6 +74,9 @@ describe('Storage Init Unit Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(migrate).mockReset();
+        vi.mocked(app.getAppPath).mockReturnValue('/mock/app');
+        Object.defineProperty(app, 'isPackaged', { configurable: true, value: false });
         // BUG DB-TEST fix: transaction() debe devolver una función ejecutable.
         // Sin esto, el mock devuelve undefined y cualquier test que llame
         // a sqlite.transaction(fn)() falla con "is not a function".
@@ -96,10 +107,34 @@ describe('Storage Init Unit Tests', () => {
         expect(mockSqlite.pragma).toHaveBeenCalledWith(expect.stringContaining('key ='));
         expect(setDatabase).toHaveBeenCalled();
         expect(migrate).toHaveBeenCalled();
+        expect(migrate).toHaveBeenCalledWith(expect.anything(), {
+            migrationsFolder: '/mock/app/drizzle',
+        });
+    });
+
+    it('should use packaged resources for migrations', async () => {
+        vi.mocked(app.getAppPath).mockReturnValue('/ignored/app');
+        Object.defineProperty(app, 'isPackaged', { configurable: true, value: true });
+        Object.defineProperty(process, 'resourcesPath', { configurable: true, value: '/mock/resources' });
+
+        await initDB('/mock/path');
+
+        expect(migrate).toHaveBeenCalledWith(expect.anything(), {
+            migrationsFolder: '/mock/resources/drizzle',
+        });
+    });
+
+    it('should fail initialization when migrations fail', async () => {
+        vi.mocked(migrate).mockImplementation(() => {
+            throw new Error('Migration failed');
+        });
+
+        await expect(initDB('/mock/path')).rejects.toThrow('Migration failed');
+        expect(setDatabase).not.toHaveBeenCalled();
     });
 
     it('should create new device key if not exists', async () => {
-        vi.mocked(fs).existsSync.mockReturnValue(false);
+        vi.mocked(fs).existsSync.mockImplementation((filePath) => String(filePath).endsWith('/meta/_journal.json'));
 
         await initDB('/mock/path');
 
