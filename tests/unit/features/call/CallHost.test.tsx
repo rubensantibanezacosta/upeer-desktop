@@ -2,13 +2,14 @@ import React from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCallStore } from '../../../../src/features/call/useCallStore.js';
+import { useNavigationStore } from '../../../../src/store/useNavigationStore.js';
 
 const audioMocks = vi.hoisted(() => ({ play: vi.fn(), pause: vi.fn() }));
 const audioInstances: Array<{ loop: boolean; currentTime: number; src: string }> = [];
 
 vi.mock('../../../../resources/sound/call-sound.mp3?url', () => ({ default: '/call-sound.mp3' }));
 vi.mock('../../../../src/features/call/CallIncomingModal.js', () => ({ CallIncomingModal: () => null }));
-vi.mock('../../../../src/features/call/CallWindow.js', () => ({ CallWindow: () => null }));
+vi.mock('../../../../src/features/call/CallWindow.js', () => ({ CallWindow: ({ compact, onExpand }: { compact?: boolean; onExpand?: () => void }) => <button data-testid="call-window" data-compact={String(compact)} onClick={onExpand}>Abrir llamada</button> }));
 vi.mock('../../../../src/features/call/useCall.js', () => ({
     useCall: () => ({
         activeCalls: Object.values(useCallStore((state) => state.calls)),
@@ -37,11 +38,13 @@ describe('CallHost incoming ringtone', () => {
             }
         });
         useCallStore.getState().reset();
+        useNavigationStore.getState().goToChat();
     });
 
     afterEach(() => {
         cleanup();
         useCallStore.getState().reset();
+        useNavigationStore.getState().goToChat();
         vi.unstubAllGlobals();
     });
 
@@ -60,5 +63,15 @@ describe('CallHost incoming ringtone', () => {
         rerender(<CallHost appView="chat" contacts={[]} groups={[]} />);
 
         expect(audioMocks.pause).toHaveBeenCalledOnce();
+    });
+
+    it('muestra la llamada compacta en Chats y abre la vista completa al pulsarla', () => {
+        const { rerender, getByTestId } = render(<CallHost appView="chat" contacts={[]} groups={[]} />);
+        act(() => useCallStore.getState().setStarted('active-1', 'peer-1', 'video'));
+        rerender(<CallHost appView="chat" contacts={[]} groups={[]} />);
+
+        expect(getByTestId('call-window').getAttribute('data-compact')).toBe('true');
+        act(() => getByTestId('call-window').click());
+        expect(useNavigationStore.getState().appView).toBe('calls');
     });
 });

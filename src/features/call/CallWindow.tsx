@@ -15,6 +15,8 @@ interface CallWindowProps {
     onToggleCamera: () => void;
     onEnd: () => void;
     embedded?: boolean;
+    compact?: boolean;
+    onExpand?: () => void;
 }
 
 const DEFAULT_WIDTH = 360;
@@ -28,7 +30,7 @@ function formatDuration(totalSeconds: number): string {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAliases, peerAvatars, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false }) => {
+export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAliases, peerAvatars, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false, compact = false, onExpand }) => {
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
     const [size] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const [startedAt] = useState<number>(Date.now());
@@ -263,12 +265,12 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                     alignItems: 'center',
                     gap: 0.5,
                     px: 1.5,
-                    py: embedded ? 1.25 : 0.75,
+                py: embedded ? 1.25 : 0.75,
                     backgroundColor: embedded ? 'transparent' : 'rgba(0,0,0,0.25)',
                     borderBottom: '1px solid rgba(255,255,255,0.08)',
                     cursor: embedded ? 'default' : 'grab',
                 }}
-                onPointerDown={handlePointerDown}
+                onPointerDown={embedded ? undefined : handlePointerDown}
             >
                 <Avatar src={avatar} sx={{ width: 32, height: 32, fontSize: 14, borderRadius: 'md' }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                 <Typography level="body-sm" sx={{ flex: 1, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -280,6 +282,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                 {screenSharing && (
                     <Chip size="sm" variant="solid" color="warning">Compartiendo</Chip>
                 )}
+                {compact && <Chip component="button" size="sm" variant="soft" color="neutral" onClick={onExpand}>Abrir</Chip>}
             </Box>
 
             {screenShareError && <Typography role="alert" level="body-xs" sx={{ position: 'absolute', bottom: 88, left: 12, right: 12, zIndex: 3, p: 1, borderRadius: 6, bgcolor: '#5f2120', color: 'white' }}>{screenShareError}</Typography>}
@@ -360,7 +363,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                 )}
             </Box>
 
-            <Box data-nodrag="true" sx={{ p: embedded ? 2 : 1, pt: embedded ? 1.5 : 1, display: 'flex', justifyContent: 'center', borderTop: embedded ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+            <Box data-nodrag="true" sx={{ p: compact ? 0.75 : embedded ? 2 : 1, pt: compact ? 0.5 : embedded ? 1.5 : 1, display: 'flex', justifyContent: 'center', borderTop: embedded || compact ? '1px solid rgba(255,255,255,0.08)' : 'none', '& button': compact ? { width: 40, height: 40, minWidth: 40 } : undefined }}>
                 <CallControls muted={call.muted} cameraEnabled={call.cameraEnabled} showCamera={isVideo} screenSharing={screenSharing} onToggleScreenShare={() => {
                     if (screenSharing) {
                         stopScreenShare();
