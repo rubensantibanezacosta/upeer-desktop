@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Contact, Group } from '../../../../src/types/chat.js';
 vi.mock('../../../../src/features/call/useCallMedia.js', () => ({
@@ -15,11 +15,17 @@ vi.mock('../../../../src/features/call/useCallMedia.js', () => ({
 }));
 import { CallsPanel } from '../../../../src/features/call/CallsPanel.js';
 import { useCallStore } from '../../../../src/features/call/useCallStore.js';
+const { startCall } = vi.hoisted(() => ({ startCall: vi.fn() }));
+
+vi.mock('../../../../src/features/call/useCall.js', () => ({
+    useCall: () => ({ startCall }),
+}));
 
 describe('CallsPanel', () => {
     const originalUpeer = window.upeer;
 
     beforeEach(() => {
+        startCall.mockReset();
         Object.defineProperty(window, 'upeer', { configurable: true, value: { ...originalUpeer, getMessages: vi.fn().mockResolvedValue([]) } });
     });
     afterEach(() => {
@@ -79,5 +85,32 @@ describe('CallsPanel', () => {
 
         await waitFor(() => expect(screen.getByText('Rechazada')).toBeDefined());
         expect(screen.getByText('Videollamada')).toBeDefined();
+    });
+
+    it('allows calling back in audio or video to a recent contact', async () => {
+        const contacts: Contact[] = [{ upeerId: 'peer-1', address: 'peer-address', name: 'Ana', status: 'connected' }];
+        window.upeer.getMessages = vi.fn().mockResolvedValue([{
+            id: 'recent-call', chatUpeerId: 'peer-1', isMine: true, message: '__SYS__|Llamada de voz perdida', status: 'sent', timestamp: 1710000000000,
+        }]);
+        render(<CallsPanel contacts={contacts} groups={[]} selfUpeerId="self-1" />);
+
+        const audioButton = await screen.findByRole('button', { name: 'Llamada de voz a Ana' });
+        fireEvent.click(audioButton);
+        fireEvent.click(screen.getByRole('button', { name: 'Videollamada a Ana' }));
+
+        expect(startCall).toHaveBeenNthCalledWith(1, 'peer-1', 'audio');
+        expect(startCall).toHaveBeenNthCalledWith(2, 'peer-1', 'video');
+    });
+
+    it('restarts a recent group call without including the local identity', async () => {
+        const contacts: Contact[] = [{ upeerId: 'peer-1', address: 'peer-address', name: 'Ana', status: 'connected' }];
+        const groups: Group[] = [{ groupId: 'grp-team', name: 'Equipo', adminUpeerId: 'peer-1', members: ['self-1', 'peer-1'], status: 'active' }];
+        window.upeer.getMessages = vi.fn().mockImplementation(async (chatId: string) => chatId === 'grp-team' ? [{
+            id: 'recent-group-call', chatUpeerId: 'grp-team', isMine: true, message: '__SYS__|Videollamada perdida', status: 'sent', timestamp: 1710000000000,
+        }] : []);
+        render(<CallsPanel contacts={contacts} groups={groups} selfUpeerId="self-1" />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Videollamada a Equipo' }));
+
+        expect(startCall).toHaveBeenCalledWith('grp-team', 'video', true, ['peer-1'], 'grp-team');
     });
 });

@@ -64,6 +64,7 @@ vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({
 
 vi.mock('../../../src/main_process/network/messaging/encryptedOperationRetry.js', () => ({
     retryPendingEncryptedOperations: vi.fn(),
+    retryPendingGroupEncryptedOperations: vi.fn(),
 }));
 
 describe('network/verifiedPacketRouter.ts', () => {
@@ -106,7 +107,7 @@ describe('network/verifiedPacketRouter.ts', () => {
         expect(encryptedRetry.retryPendingEncryptedOperations).toHaveBeenCalledWith('peer-id');
     });
 
-    it('limits a group DR_RESET to that group session without retrying direct messages', async () => {
+    it('retries only pending encrypted operations for the reset group session', async () => {
         const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
         const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
         const chatRetry = await import('../../../src/main_process/network/messaging/chatRetry.js');
@@ -127,5 +128,6 @@ describe('network/verifiedPacketRouter.ts', () => {
         expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'group:group-id');
         expect(chatRetry.retryPendingDirectMessages).not.toHaveBeenCalled();
         expect(encryptedRetry.retryPendingEncryptedOperations).not.toHaveBeenCalled();
+        expect(encryptedRetry.retryPendingGroupEncryptedOperations).toHaveBeenCalledWith('peer-id', 'group-id');
     });
 });

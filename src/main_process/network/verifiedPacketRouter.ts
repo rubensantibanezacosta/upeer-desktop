@@ -584,30 +584,37 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             if (!contact.publicKey) break;
             const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
             const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
-            deleteRatchetSession(upeerId, ratchetContext);
-            if (isSignedPreKeyPayload(data.signedPreKey)) {
-                const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
-                const spkValid = verify(
-                    Buffer.from(spkPub, 'hex'),
-                    Buffer.from(spkSig, 'hex'),
-                    Buffer.from(contact.publicKey, 'hex')
-                );
-                if (spkValid) {
-                    const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
-                    updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
+            if (ratchetContext !== 'direct' && !/^group:[^:]+$/.test(ratchetContext)) break;
+            const groupId = ratchetContext.startsWith('group:') ? ratchetContext.slice('group:'.length) : undefined;
+            const { ratchetSessionQueueKey, withRatchetSessionLock } = await import('../security/ratchetSessionQueue.js');
+            await withRatchetSessionLock(ratchetSessionQueueKey(upeerId, ratchetContext), async () => {
+                deleteRatchetSession(upeerId, ratchetContext);
+                if (isSignedPreKeyPayload(data.signedPreKey)) {
+                    const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
+                    const spkValid = verify(
+                        Buffer.from(spkPub, 'hex'),
+                        Buffer.from(spkSig, 'hex'),
+                        Buffer.from(contact.publicKey ?? '', 'hex')
+                    );
+                    if (spkValid) {
+                        const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
+                        updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
+                    }
                 }
-            }
-            const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
-            const { retryPendingEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');
-            const retried = ratchetContext === 'direct' ? await retryPendingDirectMessages(upeerId) : 0;
-            const retriedEncrypted = ratchetContext === 'direct' ? await retryPendingEncryptedOperations(upeerId) : 0;
-            info('DR session reset by peer', { upeerId, ratchetContext }, 'security');
-            if (retried > 0) {
-                info('Retried pending direct messages after DR_RESET', { upeerId, retried }, 'security');
-            }
-            if (retriedEncrypted > 0) {
-                info('Retried pending encrypted operations after DR_RESET', { upeerId, retriedEncrypted }, 'security');
-            }
+                const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
+                const { retryPendingEncryptedOperations, retryPendingGroupEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');
+                const retried = ratchetContext === 'direct' ? await retryPendingDirectMessages(upeerId) : 0;
+                const retriedEncrypted = ratchetContext === 'direct'
+                    ? await retryPendingEncryptedOperations(upeerId)
+                    : groupId ? await retryPendingGroupEncryptedOperations(upeerId, groupId) : 0;
+                info('DR session reset by peer', { upeerId, ratchetContext }, 'security');
+                if (retried > 0) {
+                    info('Retried pending direct messages after DR_RESET', { upeerId, retried }, 'security');
+                }
+                if (retriedEncrypted > 0) {
+                    info('Retried pending encrypted operations after DR_RESET', { upeerId, ratchetContext, retriedEncrypted }, 'security');
+                }
+            });
             break;
         }
         case 'CALL_OFFER':

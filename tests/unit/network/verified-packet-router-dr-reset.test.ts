@@ -64,6 +64,7 @@ vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({
 
 vi.mock('../../../src/main_process/network/messaging/encryptedOperationRetry.js', () => ({
     retryPendingEncryptedOperations: vi.fn(),
+    retryPendingGroupEncryptedOperations: vi.fn(),
 }));
 
 describe('verifiedPacketRouter DR_RESET edges', () => {

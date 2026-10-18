@@ -105,8 +105,8 @@ export function ratchetInitBob(sharedSecret: Buffer, bobSpkPk: Buffer, bobSpkSk:
         ns: 0,
         nr: 0,
         pn: 0,
-        dhsPk: bobSpkPk,
-        dhsSk: bobSpkSk,
+        dhsPk: Buffer.from(bobSpkPk),
+        dhsSk: Buffer.from(bobSpkSk),
         dhr: null,
         skipped: new Map(),
     };

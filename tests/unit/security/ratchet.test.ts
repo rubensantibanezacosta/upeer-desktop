@@ -197,5 +197,23 @@ describe('Security - Double Ratchet & X3DH', () => {
         expect(ratchetDecrypt(stateBob, messages[0].header, corruptedCipher, messages[0].nonce)).toBeNull();
         expect(ratchetDecrypt(stateBob, messages[0].header, messages[0].ciphertext, messages[0].nonce)?.toString()).toBe('first');
     });
+
+    it('keeps the signed prekey buffers intact when initializing Bob', () => {
+        const spkPublicKey = Buffer.from(bobSpkPk);
+        const spkSecretKey = Buffer.from(bobSpkSk);
+        const state = ratchetInitBob(Buffer.alloc(32, 4), spkPublicKey, spkSecretKey);
+
+        expect(state.dhsPk).not.toBe(spkPublicKey);
+        expect(state.dhsSk).not.toBe(spkSecretKey);
+        expect(state.dhsPk).toEqual(spkPublicKey);
+        expect(state.dhsSk).toEqual(spkSecretKey);
+
+        const { sharedSecret } = x3dhInitiator(aliceIkSk, aliceIkPk, bobIkPk, spkPublicKey);
+        const alice = ratchetInitAlice(sharedSecret, spkPublicKey);
+        const message = ratchetEncrypt(alice, Buffer.from('preserved SPK'));
+
+        expect(ratchetDecrypt(state, message.header, message.ciphertext, message.nonce)?.toString()).toBe('preserved SPK');
+        expect(spkSecretKey).toEqual(bobSpkSk);
+    });
 });
 

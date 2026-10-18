@@ -29,6 +29,7 @@ import {
 } from './groupControlSupport.js';
 import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
 import { runWithConcurrencyMap } from '../concurrency.js';
+import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 
 function getGroupMemberPublicKeys(memberIds: string[], knownKeys: Record<string, string> = {}): Record<string, string> {
     const memberPublicKeys: Record<string, string> = Object.fromEntries(
@@ -73,7 +74,9 @@ async function sendGroupInvitePacket(
         group.avatar ?? undefined,
         getGroupMemberPublicKeys(group.members, group.memberPublicKeys ?? {}),
     );
-    const packet = await buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, targetUpeerId, contact);
+    const retryKey = `group:${group.groupId}:invite:${group.epoch}`;
+    const packet = await withRatchetSessionLock(ratchetSessionQueueKey(targetUpeerId, `group:${group.groupId}`), () =>
+        buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, targetUpeerId, contact));
     const signedPacket = buildSignedPacket(packet, myId);
     await deliverGroupPacket({
         targetUpeerId,
@@ -87,10 +90,10 @@ async function sendGroupInvitePacket(
     });
 
     if (contact.status === 'connected' && options?.registerRetry !== false) {
-        registerEncryptedOperationRetry(targetUpeerId, `group-invite:${group.groupId}:${group.epoch}`, async () => {
-            await sendGroupInvitePacket(group, targetUpeerId, { skipVault: true, registerRetry: false });
-        });
+        registerEncryptedOperationRetry(targetUpeerId, retryKey, () =>
+            sendGroupInvitePacket(group, targetUpeerId, { skipVault: true, registerRetry: false }));
     }
+
 }
 
 async function broadcastGroupUpdatePacket(
@@ -117,7 +120,9 @@ async function broadcastGroupUpdatePacket(
             const contact = await resolveGroupContact(memberUpeerId);
             if (!contact?.publicKey) return;
 
-            const packet = await buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact);
+            const retryKey = `group:${group.groupId}:update:${group.epoch}:${memberUpeerId}`;
+            const packet = await withRatchetSessionLock(ratchetSessionQueueKey(memberUpeerId, `group:${group.groupId}`), () =>
+                buildEncryptedGroupPacket('GROUP_UPDATE', group.groupId, myId, sensitivePayload, memberUpeerId, contact));
             const signedPacket = buildSignedPacket(packet, myId);
             await deliverGroupPacket({
                 targetUpeerId: memberUpeerId,
@@ -131,10 +136,10 @@ async function broadcastGroupUpdatePacket(
             });
 
             if (contact.status === 'connected' && options?.registerRetry !== false) {
-                registerEncryptedOperationRetry(memberUpeerId, `group-update:${group.groupId}:${signedPacket.signature}`, async () => {
-                    await broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false });
-                });
+                registerEncryptedOperationRetry(memberUpeerId, retryKey, () =>
+                    broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false }));
             }
+
         } catch (err) {
             warn('Failed to deliver GROUP_UPDATE to member', { groupId: group.groupId, memberUpeerId, err: String(err) }, 'network');
         }
@@ -151,6 +156,12 @@ export async function rotateGroupAfterMemberRemoval(groupId: string, removedUpee
 
     const nextSenderState = rotateGroupSenderState(group.epoch);
     updateGroupCrypto(groupId, nextSenderState);
+
+    const { clearPendingGroupEncryptedOperations } = await import('./encryptedOperationRetry.js');
+    for (const memberId of group.members) {
+        clearPendingGroupEncryptedOperations(memberId, groupId);
+    }
+    clearPendingGroupEncryptedOperations(removedUpeerId, groupId);
 
     const updatedGroup = ensureGroupState(getGroupById(groupId) as GroupRecord);
     if (!updatedGroup) return;

@@ -47,4 +47,35 @@ describe('encryptedOperationRetry', () => {
         expect(secondPass).toBe(0);
         expect(retryFn).not.toHaveBeenCalled();
     });
+
+    it('retries and removes only operations belonging to the requested group', async () => {
+        const retryModule = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const requestedGroupRetry = vi.fn().mockResolvedValue(undefined);
+        const otherGroupRetry = vi.fn().mockResolvedValue(undefined);
+
+        retryModule.registerEncryptedOperationRetry('peer-a', 'group:group-a:invite:1', requestedGroupRetry);
+        retryModule.registerEncryptedOperationRetry('peer-a', 'group:group-b:invite:1', otherGroupRetry);
+
+        const retried = await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-a');
+        const otherRetried = await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-b');
+
+        expect(retried).toBe(1);
+        expect(otherRetried).toBe(1);
+        expect(requestedGroupRetry).toHaveBeenCalledOnce();
+        expect(otherGroupRetry).toHaveBeenCalledOnce();
+    });
+
+    it('clears stale pending operations for a group when its sender key rotates', async () => {
+        const retryModule = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const removedGroupRetry = vi.fn().mockResolvedValue(undefined);
+        const retainedGroupRetry = vi.fn().mockResolvedValue(undefined);
+
+        retryModule.registerEncryptedOperationRetry('peer-a', 'group:group-a:invite:1', removedGroupRetry);
+        retryModule.registerEncryptedOperationRetry('peer-a', 'group:group-b:invite:1', retainedGroupRetry);
+
+        expect(retryModule.clearPendingGroupEncryptedOperations('peer-a', 'group-a')).toBe(1);
+        expect(await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-b')).toBe(1);
+        expect(removedGroupRetry).not.toHaveBeenCalled();
+        expect(retainedGroupRetry).toHaveBeenCalledOnce();
+    });
 });

@@ -141,6 +141,15 @@ export async function handleGroupInvite(
             return;
         }
 
+        if (epoch < existing.epoch) {
+            security('Stale GROUP_INVITE ignored', { sender: upeerId, groupId, epoch, currentEpoch: existing.epoch }, 'security');
+            return;
+        }
+        if (epoch === existing.epoch && senderKey !== existing.senderKey) {
+            security('GROUP_INVITE with conflicting senderKey for same epoch', { sender: upeerId, groupId, epoch }, 'security');
+            return;
+        }
+
         const memberKeysChanged = Object.entries(scopedMemberKeys).some(([memberId, publicKey]) =>
             existing.memberPublicKeys?.[memberId] !== publicKey,
         );

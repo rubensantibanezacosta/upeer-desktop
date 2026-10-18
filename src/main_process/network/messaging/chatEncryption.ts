@@ -4,6 +4,7 @@ import {
 } from '../../security/identity.js';
 import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
 import { x3dhInitiator, ratchetEncrypt, ratchetInitAlice } from '../../security/ratchet.js';
+import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 
 type RatchetEncryptHeader = {
     dh: string;
@@ -52,50 +53,52 @@ export async function encryptChatPayload(
     contact: ChatEncryptionContact,
     contextId = 'direct',
 ): Promise<EncryptedChatPayload> {
-    const contactPublicKey = contact.publicKey;
-    if (!contactPublicKey) {
-        throw new DoubleRatchetUnavailableError('missing-public-key');
-    }
-
-    const sessionResult = getRatchetSession(upeerId, contextId);
-    let session = sessionResult?.state;
-    let usedSpkId = sessionResult?.spkIdUsed;
-    let x3dhInit: EncryptedChatPayload['x3dhInit'];
-
-    if (!session) {
-        if (!contact.signedPreKey) {
-            throw new DoubleRatchetUnavailableError('missing-signed-prekey');
-        }
-        if (typeof contact.signedPreKeyId !== 'number') {
-            throw new DoubleRatchetUnavailableError('missing-signed-prekey-id');
+    return withRatchetSessionLock(ratchetSessionQueueKey(upeerId, contextId), async () => {
+        const contactPublicKey = contact.publicKey;
+        if (!contactPublicKey) {
+            throw new DoubleRatchetUnavailableError('missing-public-key');
         }
 
-        const myIdentitySecretKey = getMyIdentitySkBuffer();
-        const myIdentityPublicKey = Buffer.from(getMyPublicKeyHex(), 'hex');
-        const bobIdentityPublicKey = Buffer.from(contactPublicKey, 'hex');
-        const bobSignedPreKey = Buffer.from(contact.signedPreKey, 'hex');
-        const { ekPub, sharedSecret } = x3dhInitiator(myIdentitySecretKey, myIdentityPublicKey, bobIdentityPublicKey, bobSignedPreKey);
-        session = ratchetInitAlice(sharedSecret, bobSignedPreKey);
-        sharedSecret.fill(0);
-        usedSpkId = contact.signedPreKeyId;
-        x3dhInit = {
-            ekPub: ekPub.toString('hex'),
-            spkId: usedSpkId,
-            ikPub: myIdentityPublicKey.toString('hex'),
+        const sessionResult = getRatchetSession(upeerId, contextId);
+        let session = sessionResult?.state;
+        let usedSpkId = sessionResult?.spkIdUsed;
+        let x3dhInit: EncryptedChatPayload['x3dhInit'];
+
+        if (!session) {
+            if (!contact.signedPreKey) {
+                throw new DoubleRatchetUnavailableError('missing-signed-prekey');
+            }
+            if (typeof contact.signedPreKeyId !== 'number') {
+                throw new DoubleRatchetUnavailableError('missing-signed-prekey-id');
+            }
+
+            const myIdentitySecretKey = getMyIdentitySkBuffer();
+            const myIdentityPublicKey = Buffer.from(getMyPublicKeyHex(), 'hex');
+            const bobIdentityPublicKey = Buffer.from(contactPublicKey, 'hex');
+            const bobSignedPreKey = Buffer.from(contact.signedPreKey, 'hex');
+            const { ekPub, sharedSecret } = x3dhInitiator(myIdentitySecretKey, myIdentityPublicKey, bobIdentityPublicKey, bobSignedPreKey);
+            session = ratchetInitAlice(sharedSecret, bobSignedPreKey);
+            sharedSecret.fill(0);
+            usedSpkId = contact.signedPreKeyId;
+            x3dhInit = {
+                ekPub: ekPub.toString('hex'),
+                spkId: usedSpkId,
+                ikPub: myIdentityPublicKey.toString('hex'),
+            };
+        }
+
+        if (!session) {
+            throw new DoubleRatchetUnavailableError('no-session');
+        }
+
+        const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8')) as RatchetEncryptResult;
+        saveRatchetSession(upeerId, session, usedSpkId, contextId);
+
+        return {
+            content: encrypted.ciphertext,
+            nonce: encrypted.nonce,
+            ratchetHeader: encrypted.header,
+            ...(x3dhInit ? { x3dhInit } : {}),
         };
-    }
-
-    if (!session) {
-        throw new DoubleRatchetUnavailableError('no-session');
-    }
-
-    const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8')) as RatchetEncryptResult;
-    saveRatchetSession(upeerId, session, usedSpkId, contextId);
-
-    return {
-        content: encrypted.ciphertext,
-        nonce: encrypted.nonce,
-        ratchetHeader: encrypted.header,
-        ...(x3dhInit ? { x3dhInit } : {}),
-    };
+    });
 }

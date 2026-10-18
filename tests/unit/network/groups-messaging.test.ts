@@ -290,7 +290,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
-        const { retryPendingEncryptedOperations } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const { retryPendingGroupEncryptedOperations } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
@@ -313,7 +313,7 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(sendSecureUDPMessage).mockClear();
 
-        const retried = await retryPendingEncryptedOperations('peer-online');
+        const retried = await retryPendingGroupEncryptedOperations('peer-online', 'grp-1');
 
         expect(retried).toBe(1);
         expect(sendSecureUDPMessage).toHaveBeenCalledWith(

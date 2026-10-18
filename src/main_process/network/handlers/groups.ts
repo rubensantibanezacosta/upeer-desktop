@@ -39,11 +39,6 @@ export async function handleGroupMessage(
     const myId = getMyUPeerId();
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
 
-    if (isInternalSync && id && _UUID_RE.test(String(id))) {
-        const existing = await getMessageById(id);
-        if (existing) return;
-    }
-
     // BUG CA fix: si el grupo no existe localmente, rechazar el mensaje en lugar
     // de crear un grupo fantasma. Un peer arbitrario podía enviar GROUP_MSG con
     // un groupId desconocido y auto-crearse miembro, pasando el check de membresía
@@ -70,6 +65,24 @@ export async function handleGroupMessage(
 
     if (existingGroup.epoch !== epoch || !existingGroup.senderKey) {
         security('GROUP_MSG con epoch desconocido', { sender: upeerId, groupId, epoch }, 'security');
+        return;
+    }
+
+    const existingMessage = id && _UUID_RE.test(String(id)) ? await getMessageById(id) : undefined;
+    if (existingMessage) {
+        if (existingMessage.chatUpeerId !== groupId) {
+            security('GROUP_MSG ID collision across conversations', { sender: upeerId, groupId, id }, 'security');
+            return;
+        }
+        const replayedContent = decryptGroupMessage(nonce, content, existingGroup.senderKey);
+        if (replayedContent === null || replayedContent !== existingMessage.message) {
+            security('GROUP_MSG replay did not match stored plaintext', { sender: upeerId, groupId, id }, 'security');
+            return;
+        }
+        if (!isInternalSync && senderAddress) {
+            const { sendSecureUDPMessage } = await import('../server/transport.js');
+            sendSecureUDPMessage(senderAddress, { type: 'GROUP_ACK', id, groupId });
+        }
         return;
     }
 

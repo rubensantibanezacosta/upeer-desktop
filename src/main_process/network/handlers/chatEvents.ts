@@ -19,6 +19,7 @@ import { warn, security } from '../../security/secure-logger.js';
 import { clearPendingDirectMessage } from '../messaging/chatRetry.js';
 import { isValidMessageId } from './chatShared.js';
 import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
+import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 
 type ChatEventMessageRecord = {
     id?: string;
@@ -88,7 +89,8 @@ async function resolveEditedContent(upeerId: string, data: EditableChatPayload):
     }
 
     if (data.ratchetHeader) {
-        const doubleRatchetContent = await decryptDoubleRatchetPayload(upeerId, data);
+        const doubleRatchetContent = await withRatchetSessionLock(ratchetSessionQueueKey(upeerId), () =>
+            decryptDoubleRatchetPayload(upeerId, data));
         if (doubleRatchetContent) {
             return doubleRatchetContent;
         }
@@ -156,24 +158,26 @@ export async function handleChatEdit(
     const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
 
-    const newContent = data.ratchetHeader
-        ? await decryptDoubleRatchetPayload(upeerId, data, async (reset) => {
-            if (!fromAddress || !sendResponse) return;
-            sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
-        })
-        : await resolveEditedContent(upeerId, data);
-    if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {
-        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
-    }
-    if (typeof newContent !== 'string') return;
+    await withRatchetSessionLock(ratchetSessionQueueKey(upeerId), async () => {
+        const newContent = data.ratchetHeader
+            ? await decryptDoubleRatchetPayload(upeerId, data, async (reset) => {
+                if (!fromAddress || !sendResponse) return;
+                sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
+            })
+            : await resolveEditedContent(upeerId, data);
+        if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {
+            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        }
+        if (typeof newContent !== 'string') return;
 
-    updateMessageContent(messageId, newContent, signature, data.version);
-    win?.webContents.send('message-updated', {
-        id: messageId,
-        upeerId,
-        chatUpeerId,
-        content: newContent,
-        signature,
+        updateMessageContent(messageId, newContent, signature, data.version);
+        win?.webContents.send('message-updated', {
+            id: messageId,
+            upeerId,
+            chatUpeerId,
+            content: newContent,
+            signature,
+        });
     });
 }
 

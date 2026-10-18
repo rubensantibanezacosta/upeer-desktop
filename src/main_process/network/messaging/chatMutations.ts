@@ -100,9 +100,14 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
                 sendSecureUDPMessage(address, signedData, contact.publicKey);
             }
             if (options?.registerRetry !== false) {
-                registerEncryptedOperationRetry(targetId, `chat-update:${msgId}`, async () => {
-                    await broadcastUpdate(targetId, isGroupContext, { skipVault: true, registerRetry: false });
-                });
+                registerEncryptedOperationRetry(targetId, `chat-update:${msgId}`, () =>
+                    import('../../security/ratchetSessionQueue.js').then(({ ratchetSessionQueueKey, withRatchetSessionLock }) =>
+                        withRatchetSessionLock(ratchetSessionQueueKey(targetId), () => broadcastUpdate(
+                            targetId,
+                            isGroupContext,
+                            { skipVault: true, registerRetry: false },
+                        ))),
+                );
             }
         }
         if (!options?.skipVault) {

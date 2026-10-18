@@ -53,7 +53,7 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
     if (navigation.appView === 'calls') {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
-                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} />
+                <CallsPanel contacts={chatStore.contacts} groups={chatStore.groups} selfUpeerId={chatStore.myIdentity?.upeerId} />
             </Box>
         );
     }

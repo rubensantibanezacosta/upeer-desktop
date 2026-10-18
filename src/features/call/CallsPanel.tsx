@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Box, Card, CardContent, Chip, Stack, Typography } from '@mui/joy';
+import { Avatar, Box, Card, CardContent, Chip, IconButton, Stack, Tooltip, Typography } from '@mui/joy';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Contact, Group, RawChatMessage } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
-import type { CallKind } from './useCall.js';
+import { useCall } from './useCall.js';
 
 interface CallsPanelProps {
     contacts: Contact[];
     groups: Group[];
+    selfUpeerId?: string;
 }
 
+type CallKind = 'audio' | 'video';
 type RecentCall = { id: string; chatId: string; timestamp: number; kind: CallKind; duration: string | null; rejected: boolean };
 
 function parseRecentCall(message: RawChatMessage, chatId: string): RecentCall | null {
@@ -35,7 +37,8 @@ function callPhaseLabel(phase: string): string {
     return 'En curso';
 }
 
-export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
+export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUpeerId }) => {
+    const { startCall } = useCall(selfUpeerId);
     const calls = useCallStore((state) => state.calls);
     const isStartingCall = useCallStore((state) => state.isStartingCall);
     const activeCalls = Object.values(calls);
@@ -104,6 +107,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                         const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
                         const participants = getRecentParticipants(call.chatId);
                         const CallIconComponent = call.kind === 'video' ? VideocamIcon : CallIcon;
+                        const groupMembers = group?.members.filter((memberId) => memberId !== selfUpeerId) ?? [];
+                        const canCallBack = group ? groupMembers.length > 0 : Boolean(contact && contact.upeerId !== selfUpeerId);
                         const callDate = new Date(call.timestamp);
                         const dateLabel = callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
                         const timeLabel = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -119,7 +124,21 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups }) => {
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
                                             <Typography level="title-md" noWrap>{name}</Typography>
-                                            <Typography level="body-xs" sx={{ color: 'text.tertiary', whiteSpace: 'nowrap' }}>{dateLabel} · {timeLabel}</Typography>
+                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                <Typography level="body-xs" sx={{ color: 'text.tertiary', whiteSpace: 'nowrap' }}>{dateLabel} · {timeLabel}</Typography>
+                                                <Tooltip title="Volver a llamar por voz">
+                                                    <span><IconButton size="sm" variant="soft" color="success" aria-label={`Llamada de voz a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
+                                                        if (group) void startCall(group.groupId, 'audio', true, groupMembers, group.groupId);
+                                                        else if (contact) void startCall(contact.upeerId, 'audio');
+                                                    }}><CallIcon /></IconButton></span>
+                                                </Tooltip>
+                                                <Tooltip title="Volver a llamar por vídeo">
+                                                    <span><IconButton size="sm" variant="soft" color="primary" aria-label={`Videollamada a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
+                                                        if (group) void startCall(group.groupId, 'video', true, groupMembers, group.groupId);
+                                                        else if (contact) void startCall(contact.upeerId, 'video');
+                                                    }}><VideocamIcon /></IconButton></span>
+                                                </Tooltip>
+                                            </Stack>
                                         </Stack>
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.5 }}>
                                             <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>

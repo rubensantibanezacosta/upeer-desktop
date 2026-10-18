@@ -7,6 +7,8 @@ import * as identity from '../../../src/main_process/security/identity.js';
 import * as reputation from '../../../src/main_process/security/reputation/vouches.js';
 import * as ratchet from '../../../src/main_process/security/ratchet.js';
 import * as chatRetry from '../../../src/main_process/network/messaging/chatRetry.js';
+import * as doubleRatchetDecrypt from '../../../src/main_process/network/handlers/doubleRatchetDecrypt.js';
+import { commitRatchetIncomingMessage } from '../../../src/main_process/storage/ratchet/incomingMessageTransaction.js';
 
 type ChatWindow = NonNullable<Parameters<typeof handleChatMessage>[3]>;
 type ChatContact = Parameters<typeof handleChatMessage>[1];
@@ -65,10 +67,18 @@ vi.mock('../../../src/main_process/security/ratchet.js', async () => {
     };
 });
 
+vi.mock('../../../src/main_process/network/handlers/doubleRatchetDecrypt.js', () => ({
+    decryptDoubleRatchetPayload: vi.fn(async () => null),
+}));
+
 vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     getRatchetSession: vi.fn(() => null),
     saveRatchetSession: vi.fn(),
     deleteRatchetSession: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/ratchet/incomingMessageTransaction.js', () => ({
+    commitRatchetIncomingMessage: vi.fn(() => ({ changes: 1 })),
 }));
 
 vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({
@@ -214,7 +224,7 @@ describe('Chat Handlers', () => {
                 content: 'repetido'
             };
 
-            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id } as never);
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.id, chatUpeerId: senderId } as never);
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
@@ -302,17 +312,89 @@ describe('Chat Handlers', () => {
 
             await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
-            expect(messagesOps.saveMessage).toHaveBeenCalledWith(
-                expect.any(String),
-                senderId,
-                false,
-                'dr-decrypted-content',
-                undefined,
-                'sig',
-                'delivered',
-                senderId,
-                undefined
-            );
+            expect(commitRatchetIncomingMessage).toHaveBeenCalledWith(expect.objectContaining({
+                chatUpeerId: senderId,
+                message: 'dr-decrypted-content',
+                status: 'delivered',
+            }), expect.anything(), 99);
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+        });
+
+        it('decrypts a re-encrypted retry with the same ID before acknowledging its ratchet step', async () => {
+            const messageId = '12345678-1234-1234-1234-123456789012';
+            const data: ChatMessageData = {
+                id: messageId,
+                content: 'retry-ciphertext',
+                nonce: 'retry-nonce',
+                ratchetHeader: { pn: 0, n: 1, dh: 'pub-a' },
+                x3dhInit: { ikPub: '11'.repeat(32), ekPub: '22'.repeat(32), spkId: 99 },
+            };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({
+                id: messageId,
+                chatUpeerId: senderId,
+                isMine: 0,
+                message: 'decrypted retry',
+            } as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from('decrypted retry'));
+            vi.mocked(ratchet.ratchetInitBob).mockReturnValue({ nr: 0 } as never);
+            vi.mocked(identity.getSpkBySpkId).mockReturnValue({ spkPk: Buffer.alloc(32), spkSk: Buffer.alloc(32) } as never);
+            vi.mocked(identity.getMyIdentitySkBuffer).mockReturnValue(Buffer.alloc(64));
+
+            await handleChatMessage(senderId, mockContact, data, mockWin, 'sig', '1.2.3.4', mockSendResponse);
+
+            expect(commitRatchetIncomingMessage).toHaveBeenCalledWith(expect.objectContaining({
+                id: messageId,
+                chatUpeerId: senderId,
+                message: 'decrypted retry',
+            }), expect.anything(), 99);
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-p2p-message', expect.anything());
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', { type: 'ACK', id: messageId, status: 'delivered' });
+        });
+
+        it('reinitializes Bob from retry X3DH metadata after the session was reset', async () => {
+            const messageId = '12345678-1234-1234-1234-123456789012';
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({
+                id: messageId,
+                chatUpeerId: senderId,
+                message: 'retry plaintext',
+            } as never);
+            vi.mocked(ratchet.ratchetInitBob).mockReturnValue({} as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from('retry plaintext'));
+            vi.mocked(identity.getSpkBySpkId).mockReturnValue({ spkPk: Buffer.alloc(32), spkSk: Buffer.alloc(32) } as never);
+            vi.mocked(identity.getMyIdentitySkBuffer).mockReturnValue(Buffer.alloc(64));
+
+            await handleChatMessage(senderId, mockContact, {
+                id: messageId,
+                content: 'retry-ciphertext',
+                nonce: 'retry-nonce',
+                ratchetHeader: { pn: 0, n: 0, dh: 'pub-a' },
+                x3dhInit: { ikPub: '11'.repeat(32), ekPub: '22'.repeat(32), spkId: 99 },
+            }, mockWin, 'sig', '1.2.3.4', mockSendResponse);
+
+            expect(ratchet.ratchetInitBob).toHaveBeenCalledOnce();
+            expect(commitRatchetIncomingMessage).toHaveBeenCalledWith(expect.objectContaining({ id: messageId }), expect.anything(), 99);
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', { type: 'ACK', id: messageId, status: 'delivered' });
+        });
+
+        it('does not acknowledge a duplicate whose ciphertext cannot be decrypted before requesting reset', async () => {
+            const messageId = '12345678-1234-1234-1234-123456789012';
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({
+                id: messageId,
+                chatUpeerId: senderId,
+                message: 'original plaintext',
+            } as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(null);
+
+            await handleChatMessage(senderId, mockContact, {
+                id: messageId,
+                content: 'bad-retry',
+                nonce: 'nonce',
+                ratchetHeader: { pn: 0, n: 1, dh: 'pub-a' },
+            }, mockWin, 'sig', '1.2.3.4', mockSendResponse);
+
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
+            expect(mockSendResponse).not.toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'ACK' }));
         });
 
         it('should handle X3DH error when SPK is missing', async () => {
@@ -322,6 +404,7 @@ describe('Chat Handlers', () => {
                 ratchetHeader: { dh: 'a'.repeat(64), pn: 0, n: 0 },
                 x3dhInit: { ikPub: 'b'.repeat(64), ekPub: 'c'.repeat(64), spkId: 404 }
             };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue(undefined);
 
             vi.mocked(identity.getSpkBySpkId).mockReturnValue(null);
 
@@ -413,7 +496,7 @@ describe('Chat Handlers', () => {
         });
 
         it('should decrypt Double Ratchet chat updates when a session already exists', async () => {
-            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+            vi.mocked(doubleRatchetDecrypt.decryptDoubleRatchetPayload).mockResolvedValue('edit dr');
             const data = {
                 msgId: '12345678-1234-1234-1234-123456789012',
                 content: 'a'.repeat(32),
@@ -423,16 +506,12 @@ describe('Chat Handlers', () => {
             } as ChatEditData;
 
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
-            vi.mocked(ratchetOps.getRatchetSession).mockReturnValue({ state: {} as never, spkIdUsed: 7 } as never);
-            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from('edit dr'));
-
             await handleChatEdit(senderId, data, mockWin, 'edit-sig-dr');
 
-            expect(ratchet.ratchetDecrypt).toHaveBeenCalledWith(
-                expect.any(Object),
-                data.ratchetHeader,
-                data.content,
-                data.nonce
+            expect(doubleRatchetDecrypt.decryptDoubleRatchetPayload).toHaveBeenCalledWith(
+                senderId,
+                data,
+                expect.any(Function),
             );
             expect(messagesOps.updateMessageContent).toHaveBeenCalledWith(data.msgId, 'edit dr', 'edit-sig-dr', 6);
         });
@@ -469,7 +548,11 @@ describe('Chat Handlers', () => {
             };
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: data.msgId, chatUpeerId: senderId, isMine: 0 } as never);
             vi.mocked(ratchetOps.getRatchetSession).mockReturnValue(null);
-            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(null);
+            vi.mocked(doubleRatchetDecrypt.decryptDoubleRatchetPayload).mockResolvedValue(null);
+            vi.mocked(doubleRatchetDecrypt.decryptDoubleRatchetPayload).mockImplementationOnce(async (_upeerId, _payload, onReset) => {
+                await onReset?.({ type: 'DR_RESET', ratchetContext: 'direct' });
+                return null;
+            });
 
             await handleChatEdit(senderId, data, mockWin, 'edit-sig', '1.2.3.4', mockSendResponse);
 

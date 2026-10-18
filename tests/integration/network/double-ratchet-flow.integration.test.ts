@@ -9,6 +9,7 @@ const ratchetStores: Record<Role, Map<string, SessionRecord>> = {
     alice: new Map(),
     bob: new Map(),
 };
+const messageStores = new Map<string, { id: string; chatUpeerId: string; message: string; isMine: number }>();
 
 const identities = {
     alice: {
@@ -61,6 +62,8 @@ const toDecryptPayload = (packet: {
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyIdentitySkBuffer: vi.fn(() => identities[currentRole].secretKey),
+    getMyUPeerId: vi.fn(() => `${currentRole}-peer`),
+    getMySignedPreKeyBundle: vi.fn(() => ({ spkPub: '33'.repeat(32), spkSig: '44'.repeat(64), spkId: identities[currentRole].spkId })),
     getMyPublicKeyHex: vi.fn(() => identities[currentRole].publicKeyHex),
     getSpkBySpkId: vi.fn((spkId: number) => {
         if (currentRole === 'bob' && spkId === identities.bob.spkId) {
@@ -72,6 +75,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
         return null;
     }),
     sign: vi.fn(() => Buffer.from('sig')),
+    verify: vi.fn(() => true),
 }));
 
 vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
@@ -90,16 +94,41 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     }),
 }));
 
+vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
+    getMessageById: vi.fn((id: string) => messageStores.get(id)),
+    saveMessage: vi.fn(async (id: string, chatUpeerId: string, isMine: boolean, message: string) => {
+        messageStores.set(id, { id, chatUpeerId, message, isMine: Number(isMine) });
+        return { changes: 1 };
+    }),
+}));
+
+vi.mock('../../../src/main_process/storage/ratchet/incomingMessageTransaction.js', () => ({
+    commitRatchetIncomingMessage: vi.fn((message, state, spkIdUsed) => {
+        ratchetStores[currentRole].set(`direct:${message.chatUpeerId}`, {
+            state: deserializeState(serializeState(state, spkIdUsed)).state,
+            spkIdUsed,
+        });
+        messageStores.set(message.id, { ...message, isMine: Number(message.isMine) });
+        return { changes: 1 };
+    }),
+}));
+
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
     VaultManager: {
         replicateToVaults: vi.fn(async () => 1),
     },
 }));
 
+vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
+    issueVouch: vi.fn(async () => undefined),
+    VouchType: { HANDSHAKE: 'HANDSHAKE' },
+}));
+
 describe('Double Ratchet flow integration', () => {
     beforeEach(() => {
         ratchetStores.alice.clear();
         ratchetStores.bob.clear();
+        messageStores.clear();
         setRole('alice');
         vi.clearAllMocks();
     });
@@ -145,6 +174,74 @@ describe('Double Ratchet flow integration', () => {
         const secondPlaintext = await decryptDoubleRatchetPayload('alice-peer', secondDecryptPayload);
 
         expect(secondPlaintext).toBe('segundo mensaje');
+    });
+
+    it('consumes a retransmitted packet with the same ID before acknowledging a lost-ACK retry', async () => {
+        const { encryptChatPayload } = await import('../../../src/main_process/network/messaging/chatEncryption.js');
+        const { handleChatMessage } = await import('../../../src/main_process/network/handlers/chat.js');
+        const { getMessageById } = await import('../../../src/main_process/storage/messages/operations.js');
+        const sendResponse = vi.fn();
+        const window = { webContents: { send: vi.fn() }, isFocused: () => true } as never;
+        const contact = { upeerId: 'alice-peer', name: 'Alice' };
+        const messageId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+        setRole('alice');
+        const original = await encryptChatPayload('bob-peer', 'message after lost ACK', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        await handleChatMessage('alice-peer', contact, {
+            id: messageId,
+            content: original.content,
+            nonce: original.nonce,
+            ratchetHeader: original.ratchetHeader,
+            x3dhInit: normalizeX3dhInit(original.x3dhInit),
+        }, window, 'sig', '200::alice', sendResponse);
+
+        expect(sendResponse).toHaveBeenCalledWith('200::alice', expect.objectContaining({ type: 'ACK', id: messageId }));
+        const firstSession = ratchetStores.bob.get('direct:alice-peer');
+        expect(firstSession).toBeDefined();
+        const ratchetModule = await import('../../../src/main_process/security/ratchet.js');
+        const initBob = vi.spyOn(ratchetModule, 'ratchetInitBob');
+
+        sendResponse.mockClear();
+        await handleChatMessage('alice-peer', contact, {
+            id: messageId,
+            content: original.content,
+            nonce: original.nonce,
+            ratchetHeader: original.ratchetHeader,
+            x3dhInit: normalizeX3dhInit(original.x3dhInit),
+        }, window, 'sig', '200::alice', sendResponse);
+        expect(sendResponse).toHaveBeenCalledWith('200::alice', expect.objectContaining({ type: 'ACK', id: messageId }));
+        expect(ratchetStores.bob.get('direct:alice-peer')?.state).toEqual(firstSession?.state);
+        initBob.mockRestore();
+
+        setRole('alice');
+        ratchetStores.alice.delete('direct:bob-peer');
+        const retryAfterReset = await encryptChatPayload('bob-peer', 'message after lost ACK', {
+            publicKey: identities.bob.publicKeyHex,
+            signedPreKey: identities.bob.spkPk.toString('hex'),
+            signedPreKeyId: identities.bob.spkId,
+        });
+        setRole('bob');
+        ratchetStores.bob.delete('direct:alice-peer');
+
+        sendResponse.mockClear();
+        await handleChatMessage('alice-peer', contact, {
+            id: messageId,
+            content: retryAfterReset.content,
+            nonce: retryAfterReset.nonce,
+            ratchetHeader: retryAfterReset.ratchetHeader,
+            x3dhInit: normalizeX3dhInit(retryAfterReset.x3dhInit),
+        }, window, 'sig', '200::alice', sendResponse);
+
+        expect(ratchetStores.bob.get('direct:alice-peer')).toBeDefined();
+        expect(sendResponse).toHaveBeenCalledWith('200::alice', expect.objectContaining({ type: 'ACK', id: messageId }));
+        expect(getMessageById).toHaveBeenCalled();
+        expect(messageStores.get(messageId)?.message).toBe('message after lost ACK');
+        expect(firstSession).toBeDefined();
     });
 
     it('preserves the ratchet when a vaulted group invite is replayed after out-of-order delivery', async () => {

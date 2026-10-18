@@ -5,6 +5,8 @@ import {
 import { ratchetDecrypt, ratchetInitBob, x3dhResponder } from '../../security/ratchet.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
+import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
+import { serializeState } from '../../security/ratchet.js';
 
 type DoubleRatchetPayload = {
     content?: string;
@@ -26,6 +28,20 @@ export async function decryptDoubleRatchetPayload(
     onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
     contextId: RatchetContext = 'direct',
 ): Promise<string | null> {
+    return withRatchetSessionLock(ratchetSessionQueueKey(upeerId, contextId), () => decryptDoubleRatchetPayloadUnlocked(
+        upeerId,
+        data,
+        onReset,
+        contextId,
+    ));
+}
+
+async function decryptDoubleRatchetPayloadUnlocked(
+    upeerId: string,
+    data: DoubleRatchetPayload,
+    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
+    contextId: RatchetContext = 'direct',
+): Promise<string | null> {
     if (
         typeof data.content !== 'string'
         || typeof data.nonce !== 'string'
@@ -36,6 +52,7 @@ export async function decryptDoubleRatchetPayload(
 
     try {
         const sessionResult = getRatchetSession(upeerId, contextId);
+        const initialState = sessionResult ? JSON.stringify(serializeState(sessionResult.state, sessionResult.spkIdUsed)) : null;
         let session = sessionResult?.state;
         let usedSpkId = sessionResult?.spkIdUsed;
 
@@ -83,6 +100,9 @@ export async function decryptDoubleRatchetPayload(
                 sharedSecret.fill(0);
                 const retry = ratchetDecrypt(freshSession, data.ratchetHeader, data.content, data.nonce);
                 if (retry) {
+                    const currentSession = getRatchetSession(upeerId, contextId);
+                    const currentState = currentSession ? JSON.stringify(serializeState(currentSession.state, currentSession.spkIdUsed)) : null;
+                    if (currentState !== initialState) return null;
                     saveRatchetSession(upeerId, freshSession, spkId, contextId);
                     return retry.toString('utf-8');
                 }
