@@ -13,6 +13,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
     updateGroupInfo: vi.fn(),
+    updateGroupMemberPublicKeys: vi.fn(),
     updateGroupMembers: vi.fn(),
 }));
 
@@ -105,7 +106,8 @@ describe('group invite membership validation', () => {
             [senderId, 'my-id'],
             'active',
             undefined,
-            expect.objectContaining({ epoch: 1, senderKey: 'c'.repeat(64) })
+            expect.objectContaining({ epoch: 1, senderKey: 'c'.repeat(64) }),
+            {},
         );
         expect(vouches.issueVouch).not.toHaveBeenCalled();
         expect(mockWin.webContents.send).toHaveBeenCalledWith('group-invite-received', expect.objectContaining({

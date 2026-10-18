@@ -1,11 +1,17 @@
 import crypto from 'node:crypto';
 import {
+    getUPeerIdFromPublicKey,
+    getMyPublicKeyHex,
     getMyUPeerId,
 } from '../../security/identity.js';
 import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import {
+    getContactByUpeerId,
+} from '../../storage/contacts/operations.js';
+import {
     deleteGroup,
     getGroupById,
+    updateGroupMemberPublicKeys,
     saveGroup,
     updateGroupCrypto,
     updateGroupInfo,
@@ -24,6 +30,30 @@ import {
 import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
 import { runWithConcurrencyMap } from '../concurrency.js';
 
+function getGroupMemberPublicKeys(memberIds: string[], knownKeys: Record<string, string> = {}): Record<string, string> {
+    const memberPublicKeys: Record<string, string> = Object.fromEntries(
+        Object.entries(knownKeys).filter(([memberId, publicKey]) =>
+            memberIds.includes(memberId)
+            && /^[0-9a-f]{64}$/i.test(publicKey)
+            && getUPeerIdFromPublicKey(Buffer.from(publicKey, 'hex')) === memberId,
+        ),
+    );
+    const myId = getMyUPeerId();
+    const myPublicKey = getMyPublicKeyHex();
+    if (memberIds.includes(myId) && /^[0-9a-f]{64}$/i.test(myPublicKey)) {
+        memberPublicKeys[myId] = myPublicKey.toLowerCase();
+    }
+    for (const memberId of memberIds) {
+        const contact = getContactByUpeerId(memberId);
+        if (contact?.publicKey
+            && /^[0-9a-f]{64}$/i.test(contact.publicKey)
+            && getUPeerIdFromPublicKey(Buffer.from(contact.publicKey, 'hex')) === memberId) {
+            memberPublicKeys[memberId] = contact.publicKey.toLowerCase();
+        }
+    }
+    return memberPublicKeys;
+}
+
 const GROUP_FANOUT_CONCURRENCY = 8;
 
 async function sendGroupInvitePacket(
@@ -40,7 +70,8 @@ async function sendGroupInvitePacket(
         group.members,
         group.epoch,
         group.senderKey,
-        group.avatar ?? undefined
+        group.avatar ?? undefined,
+        getGroupMemberPublicKeys(group.members, group.memberPublicKeys ?? {}),
     );
     const packet = await buildEncryptedGroupPacket('GROUP_INVITE', group.groupId, myId, sensitivePayload, targetUpeerId, contact);
     const signedPacket = buildSignedPacket(packet, myId);
@@ -64,7 +95,7 @@ async function sendGroupInvitePacket(
 
 async function broadcastGroupUpdatePacket(
     group: GroupRecord,
-    fields: { name?: string; avatar?: string | null; members?: string[]; epoch?: number; senderKey?: string },
+    fields: { name?: string; avatar?: string | null; members?: string[]; memberPublicKeys?: Record<string, string>; epoch?: number; senderKey?: string },
     targetMembers: string[],
     options?: { skipVault?: boolean; registerRetry?: boolean }
 ): Promise<void> {
@@ -73,6 +104,10 @@ async function broadcastGroupUpdatePacket(
         ...(fields.name !== undefined ? { groupName: fields.name } : {}),
         ...(fields.avatar !== undefined ? { avatar: fields.avatar } : {}),
         ...(fields.members !== undefined ? { members: fields.members } : {}),
+        memberPublicKeys: getGroupMemberPublicKeys(fields.members ?? group.members, {
+            ...(group.memberPublicKeys ?? {}),
+            ...(fields.memberPublicKeys ?? {}),
+        }),
         ...(fields.epoch !== undefined ? { epoch: fields.epoch } : {}),
         ...(fields.senderKey !== undefined ? { senderKey: fields.senderKey } : {}),
     });
@@ -165,6 +200,8 @@ export async function inviteToGroup(groupId: string, upeerId: string): Promise<v
     const nextSenderState = rotateGroupSenderState(group.epoch);
 
     updateGroupMembers(groupId, newMembers);
+    const memberPublicKeys = getGroupMemberPublicKeys(newMembers, group.memberPublicKeys ?? {});
+    updateGroupMemberPublicKeys(groupId, memberPublicKeys);
     updateGroupCrypto(groupId, nextSenderState);
 
     const updatedGroup = ensureGroupState(getGroupById(groupId) as GroupRecord);

@@ -30,6 +30,26 @@ describe('network/groupPayload.ts', () => {
         expect(sharpMock).not.toHaveBeenCalled();
     });
 
+    it('includes group member identity keys in the encrypted invite payload', async () => {
+        const { buildGroupInvitePayload } = await import('../../../src/main_process/network/groupPayload.js');
+        const memberPublicKeys = { peer: 'ab'.repeat(32) };
+
+        const payload = await buildGroupInvitePayload('Grupo', ['admin', 'peer'], 1, 'c'.repeat(64), undefined, memberPublicKeys);
+
+        expect(JSON.parse(payload).memberPublicKeys).toEqual(memberPublicKeys);
+    });
+
+    it('preserves group identities when the invite avatar must be removed', async () => {
+        const { buildGroupInvitePayload } = await import('../../../src/main_process/network/groupPayload.js');
+        const memberPublicKeys = { peer: 'ab'.repeat(32) };
+        const avatar = `data:image/png;base64,${Buffer.alloc(70_000, 4).toString('base64')}`;
+        toBufferMock.mockRejectedValue(new Error('sharp-failed'));
+
+        const payload = await buildGroupInvitePayload('Grupo', ['admin', 'peer'], 1, 'c'.repeat(64), avatar, memberPublicKeys);
+
+        expect(JSON.parse(payload)).toMatchObject({ memberPublicKeys });
+    });
+
     it('shrinks invite avatar before dropping it', async () => {
         const { buildGroupInvitePayload } = await import('../../../src/main_process/network/groupPayload.js');
         toBufferMock.mockResolvedValue(Buffer.alloc(4_000, 7));

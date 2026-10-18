@@ -34,6 +34,7 @@ const mockSchema = {
         epoch: 'epoch',
         senderKey: 'senderKey',
         senderKeyCreatedAt: 'senderKeyCreatedAt',
+        memberPublicKeys: 'memberPublicKeys',
         createdAt: 'createdAt',
         avatar: 'avatar'
     },
@@ -51,12 +52,20 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     desc: (a: unknown) => ({ column: a, order: 'desc' })
 }));
 
+vi.mock('../../../src/main_process/security/identity.js', () => ({
+    getUPeerIdFromPublicKey: (publicKey: Buffer) => publicKey.toString('hex') === 'ab'.repeat(32) ? 'peer' : 'not-peer',
+}));
+
 describe('Groups Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockRun.mockReset();
         mockGet.mockReset();
         mockAll.mockReset();
+        mockGet.mockImplementation((...args: unknown[]) => {
+            if (args.length > 0) return undefined;
+            return { groupId: 'group1', members: '["user1","user2"]', memberPublicKeys: '{}', status: 'active' };
+        });
     });
 
     it('should save or update a group', () => {
@@ -86,6 +95,14 @@ describe('Groups Operations', () => {
         expect(result?.name).toBe('Test');
     });
 
+    it('parses group member identity keys and defaults legacy rows to an empty roster', () => {
+        mockGet.mockReturnValueOnce({ groupId: 'group1', members: '["peer"]', memberPublicKeys: JSON.stringify({ peer: 'ab'.repeat(32), outsider: 'cd'.repeat(32) }), status: 'active' });
+        expect(groupsOps.getGroupById('group1')?.memberPublicKeys).toEqual({ peer: 'ab'.repeat(32) });
+
+        mockGet.mockReturnValueOnce({ groupId: 'legacy', members: '[]', status: 'active' });
+        expect(groupsOps.getGroupById('legacy')?.memberPublicKeys).toEqual({});
+    });
+
     it('should list all groups with last message', () => {
         const rawGroups = [
             { groupId: 'g1', name: 'G1', members: '[]', status: 'active', isFavorite: true },
@@ -110,7 +127,7 @@ describe('Groups Operations', () => {
         groupsOps.updateGroupMembers('group1', ['user1', 'user3']);
 
         expect(mockDb.update).toHaveBeenCalled();
-        expect(mockDb.set).toHaveBeenCalledWith({ members: '["user1","user3"]' });
+        expect(mockDb.set).toHaveBeenCalledWith({ members: '["user1","user3"]', memberPublicKeys: '{}' });
         expect(mockRun).toHaveBeenCalled();
     });
 

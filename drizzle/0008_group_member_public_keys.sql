@@ -1,0 +1,1 @@
+ALTER TABLE `groups` ADD `member_public_keys` text DEFAULT '{}' NOT NULL;

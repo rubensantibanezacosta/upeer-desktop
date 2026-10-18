@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { deleteGroup, getGroupById, updateGroupCrypto, updateGroupInfo, updateGroupMembers } from '../../storage/groups/operations.js';
+import { deleteGroup, getGroupById, updateGroupCrypto, updateGroupInfo, updateGroupMemberPublicKeys, updateGroupMembers } from '../../storage/groups/operations.js';
 import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { getMySignedPreKeyBundle, getMyUPeerId } from '../../security/identity.js';
 import { security, warn } from '../../security/secure-logger.js';
@@ -10,6 +10,7 @@ import {
     normalizeAvatarForCompare,
     sameMembers,
     updateGroupEphemeralKeyIfValid,
+    validMemberPublicKeys,
 } from './groupControlShared.js';
 
 export async function handleGroupUpdate(
@@ -36,6 +37,7 @@ export async function handleGroupUpdate(
 
     const fields: { name?: string; avatar?: string | null } = {};
     let members: string[] | undefined;
+    let memberPublicKeys: Record<string, string> | undefined;
     let epoch: number | undefined;
     let senderKey: string | undefined;
 
@@ -59,6 +61,9 @@ export async function handleGroupUpdate(
         }
         if (Array.isArray(inner.members) && inner.members.length <= 500) {
             members = inner.members;
+        }
+        if (inner.memberPublicKeys !== undefined) {
+            memberPublicKeys = validMemberPublicKeys(inner.memberPublicKeys);
         }
         if (inner.epoch !== undefined && isValidGroupEpoch(inner.epoch)) {
             epoch = inner.epoch;
@@ -89,7 +94,13 @@ export async function handleGroupUpdate(
     const sameAvatar = fields.avatar === undefined || normalizeAvatarForCompare(fields.avatar) === normalizeAvatarForCompare(group.avatar);
     const sameMemberSet = !members || sameMembers(members, group.members);
     const sameEpochState = epoch === undefined || (epoch === group.epoch && senderKey === group.senderKey);
-    if (sameName && sameAvatar && sameMemberSet && sameEpochState) {
+    const nextMembers = new Set(members ?? group.members);
+    const mergedMemberKeys = {
+        ...Object.fromEntries(Object.entries(group.memberPublicKeys ?? {}).filter(([memberId]) => nextMembers.has(memberId))),
+        ...Object.fromEntries(Object.entries(memberPublicKeys ?? {}).filter(([memberId]) => nextMembers.has(memberId))),
+    };
+    const sameMemberKeys = JSON.stringify(mergedMemberKeys) === JSON.stringify(group.memberPublicKeys ?? {});
+    if (sameName && sameAvatar && sameMemberSet && sameEpochState && sameMemberKeys) {
         return;
     }
 
@@ -103,6 +114,9 @@ export async function handleGroupUpdate(
     if (members) {
         updateGroupMembers(groupId, members);
     }
+    if (memberPublicKeys || members) {
+        updateGroupMemberPublicKeys(groupId, mergedMemberKeys);
+    }
     if (epoch !== undefined && senderKey !== undefined) {
         updateGroupCrypto(groupId, { epoch, senderKey, senderKeyCreatedAt: Date.now() });
     }
@@ -110,7 +124,7 @@ export async function handleGroupUpdate(
         updateGroupInfo(groupId, fields);
     }
 
-    if (Object.keys(fields).length === 0 && !members && epoch === undefined) return;
+    if (Object.keys(fields).length === 0 && !members && !memberPublicKeys && epoch === undefined) return;
 
     win?.webContents.send('group-updated', {
         groupId,

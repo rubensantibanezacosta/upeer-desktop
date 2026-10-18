@@ -15,7 +15,7 @@ import type { RatchetHeader } from '../security/ratchetShared.js';
 const vaultQueryThrottle = new Map<string, number>();
 
 type VerifiedContact = {
-    publicKey: string;
+    publicKey?: string;
     signedPreKeyId?: number | null;
     name?: string;
     alias?: string;
@@ -454,7 +454,7 @@ async function handlePingProfileUpdate(upeerId: string, contact: VerifiedContact
     }
     if (isSignedPreKeyPayload(data.signedPreKey)) {
         const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
-        if (!contact.signedPreKeyId || newSpkId > contact.signedPreKeyId) {
+        if (contact.publicKey && (!contact.signedPreKeyId || newSpkId > contact.signedPreKeyId)) {
             const spkValid = verify(
                 Buffer.from(spkPub, 'hex'),
                 Buffer.from(spkSig, 'hex'),
@@ -477,11 +477,13 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
     switch (data.type) {
         case 'PING':
             sendResponse(rinfo.address, { type: 'PONG' });
-            maybeQueryVaultsForPeer(upeerId);
-            await handlePingProfileUpdate(upeerId, contact, data);
+            if (contact.publicKey) {
+                maybeQueryVaultsForPeer(upeerId);
+                await handlePingProfileUpdate(upeerId, contact, data);
+            }
             break;
         case 'PONG':
-            maybeQueryVaultsForPeer(upeerId);
+            if (contact.publicKey) maybeQueryVaultsForPeer(upeerId);
             break;
         case 'VAULT_STORE':
             await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, toVaultStorePayload(data, upeerId), rinfo.address, sendResponse);
@@ -579,6 +581,7 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             handleReputationDeliver(upeerId, toReputationDeliverPayload(data));
             break;
         case 'DR_RESET': {
+            if (!contact.publicKey) break;
             const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
             const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
             deleteRatchetSession(upeerId, ratchetContext);

@@ -8,9 +8,9 @@ import {
 } from '../../../src/main_process/network/handlers/groups.js';
 import * as groupsOps from '../../../src/main_process/storage/groups/operations.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
-import * as contactKeysOps from '../../../src/main_process/storage/contacts/keys.js';
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
+import * as groupControlShared from '../../../src/main_process/network/handlers/groupControlShared.js';
 
 type GroupWindow = NonNullable<Parameters<typeof handleGroupMessage>[3]>;
 type GroupContact = Parameters<typeof handleGroupMessage>[1];
@@ -38,6 +38,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
     updateGroupInfo: vi.fn(),
+    updateGroupMemberPublicKeys: vi.fn(),
     updateGroupMembers: vi.fn(),
 }));
 
@@ -68,6 +69,9 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMySignedPreKeyBundle: vi.fn(() => ({ spkPub: 'ab'.repeat(32), spkSig: 'cd'.repeat(64), spkId: 7 })),
     getSpkBySpkId: vi.fn(),
     verify: vi.fn(),
+    getUPeerIdFromPublicKey: vi.fn((publicKey: Buffer) => publicKey.toString('hex').startsWith('a')
+        ? 'sender-upeer-id'
+        : publicKey.toString('hex').startsWith('b') ? 'my-id' : 'unknown-member'),
     getMyUPeerId: vi.fn().mockReturnValue('my-id'),
 }));
 
@@ -105,6 +109,11 @@ vi.mock('../../../src/main_process/network/groupState.js', () => ({
     isValidGroupEpoch: vi.fn((epoch: number) => Number.isInteger(epoch) && epoch > 0),
     isValidGroupSenderKey: vi.fn((senderKey: string) => typeof senderKey === 'string' && senderKey.length === 64),
 }));
+
+vi.mock('../../../src/main_process/network/handlers/groupControlShared.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../src/main_process/network/handlers/groupControlShared.js')>();
+    return { ...actual, updateGroupEphemeralKeyIfValid: vi.fn() };
+});
 
 describe('Group Handlers Final Coverage', () => {
     const mockWin = { webContents: { send: vi.fn() } } as unknown as GroupWindow;
@@ -218,7 +227,7 @@ describe('Group Handlers Final Coverage', () => {
                 ephemeralPublicKey: 'a'.repeat(64)
             } as GroupInviteData, mockWin);
 
-            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
+            expect(groupControlShared.updateGroupEphemeralKeyIfValid).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
             expect(identity.decrypt).not.toHaveBeenCalled();
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
         });
@@ -274,7 +283,8 @@ describe('Group Handlers Final Coverage', () => {
                 [senderId, 'my-id'],
                 'active',
                 undefined,
-                expect.objectContaining({ epoch: 1, senderKey: 'c'.repeat(64) })
+                expect.objectContaining({ epoch: 1, senderKey: 'c'.repeat(64) }),
+                {}
             );
         });
 
@@ -284,6 +294,7 @@ describe('Group Handlers Final Coverage', () => {
             vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
                 groupId,
                 members: [senderId, 'my-id'],
+                memberPublicKeys: {},
                 adminUpeerId: 'actual-admin',
                 epoch: 1,
                 senderKey: 'd'.repeat(64)
@@ -326,12 +337,50 @@ describe('Group Handlers Final Coverage', () => {
             expect(mockWin.webContents.send).not.toHaveBeenCalledWith('group-invite-received', expect.anything());
         });
 
+        it('stores member public keys from an admin-authenticated invite', async () => {
+            const ratchet = await import('../../../src/main_process/security/ratchet.js');
+            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
+            const innerPayload = JSON.stringify({
+                groupName: 'Grupo test',
+                members: [senderId, 'my-id', 'unknown-member'],
+                memberPublicKeys: {
+                    [senderId]: 'a'.repeat(64),
+                    'my-id': 'b'.repeat(64),
+                    'unknown-member': 'c'.repeat(64),
+                    outsider: 'd'.repeat(64),
+                },
+                epoch: 1,
+                senderKey: 'c'.repeat(64),
+            });
+            vi.mocked(ratchetOps.getRatchetSession).mockReturnValue({ state: {} as never, spkIdUsed: 3 } as never);
+            vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from(innerPayload));
+            vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId: senderId,
+                payload: 'packet',
+                nonce: 'nonce',
+                ratchetHeader: { dh: 'd'.repeat(64), pn: 0, n: 1 },
+            } as GroupInviteData, mockWin);
+
+            expect(groupsOps.saveGroup).toHaveBeenCalledWith(
+                groupId,
+                'Grupo test',
+                senderId,
+                [senderId, 'my-id', 'unknown-member'],
+                'active',
+                undefined,
+                expect.objectContaining({ epoch: 1 }),
+                { [senderId]: 'a'.repeat(64), 'my-id': 'b'.repeat(64), 'unknown-member': 'c'.repeat(64) },
+            );
+        });
+
         it('should send DR_RESET when group invite ratchet decrypt fails', async () => {
             const ratchet = await import('../../../src/main_process/security/ratchet.js');
             const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
-            vi.mocked(identity.decrypt).mockReturnValue(null);
-            vi.mocked(identity.decryptWithIdentityKey).mockReturnValue(null);
             vi.mocked(ratchetOps.getRatchetSession).mockReturnValue(null);
             vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(null);
 
@@ -359,7 +408,7 @@ describe('Group Handlers Final Coverage', () => {
                 nonce: 'bb',
                 ephemeralPublicKey: 'a'.repeat(64)
             } as GroupUpdateData, mockWin);
-            expect(contactKeysOps.updateContactEphemeralPublicKey).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
+            expect(groupControlShared.updateGroupEphemeralKeyIfValid).toHaveBeenCalledWith(senderId, 'a'.repeat(64));
             expect(identity.decrypt).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
         });
@@ -395,16 +444,17 @@ describe('Group Handlers Final Coverage', () => {
                 useRecipientEphemeral: false,
             } as GroupUpdateData, mockWin);
 
+            expect(identity.decrypt).not.toHaveBeenCalled();
             expect(identity.decryptWithIdentityKey).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
         });
 
         it('should decrypt Double Ratchet group updates when a session already exists', async () => {
-            const ratchet = await import('../../../src/main_process/security/ratchet.js');
-            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
             const inner = JSON.stringify({ groupName: 'DR Name' });
 
             vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, adminUpeerId: senderId, epoch: 1, senderKey: 'd'.repeat(64), members: [senderId, 'my-id'] }));
+            const ratchet = await import('../../../src/main_process/security/ratchet.js');
+            const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
             vi.mocked(ratchetOps.getRatchetSession).mockReturnValue({ state: {} as never, spkIdUsed: 3 } as never);
             vi.mocked(ratchet.ratchetDecrypt).mockReturnValue(Buffer.from(inner));
 

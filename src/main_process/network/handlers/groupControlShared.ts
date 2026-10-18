@@ -1,3 +1,4 @@
+import { getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { decryptDoubleRatchetPayload, type RatchetContext } from './doubleRatchetDecrypt.js';
@@ -5,6 +6,7 @@ import { decryptDoubleRatchetPayload, type RatchetContext } from './doubleRatche
 export type GroupPayload = {
     groupName?: string;
     members?: string[];
+    memberPublicKeys?: Record<string, string>;
     avatar?: string | null;
     epoch?: number;
     senderKey?: string;
@@ -28,6 +30,15 @@ export function sameMembers(left: string[], right: string[]): boolean {
     const leftSorted = [...left].sort();
     const rightSorted = [...right].sort();
     return leftSorted.every((value, index) => value === rightSorted[index]);
+}
+
+export function validMemberPublicKeys(value: unknown): Record<string, string> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter(([upeerId, publicKey]) =>
+        typeof publicKey === 'string'
+        && /^[0-9a-f]{64}$/i.test(publicKey)
+        && getUPeerIdFromPublicKey(Buffer.from(publicKey, 'hex')) === upeerId,
+    ).map(([upeerId, publicKey]) => [upeerId, (publicKey as string).toLowerCase()]));
 }
 
 export function normalizeAvatarForCompare(value: string | undefined | null): string | null {

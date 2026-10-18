@@ -19,6 +19,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
     updateGroupMembers: vi.fn(),
+    updateGroupMemberPublicKeys: vi.fn(),
     updateGroupInfo: vi.fn(),
 }));
 
@@ -514,9 +515,10 @@ describe('network/messaging/groups.ts', () => {
             groupId: 'grp-1',
             name: 'Grupo',
             status: 'active',
-            members: ['self-id'],
+            members: ['self-id', 'online-peer', 'offline-peer'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
+            memberPublicKeys: {},
         } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(getKademliaInstance).mockReturnValue({

@@ -13,6 +13,7 @@ import { validateMessage } from '../security/validation.js';
 import {
     getContactByUpeerId,
 } from '../storage/contacts/operations.js';
+import { getGroupById } from '../storage/groups/operations.js';
 import {
     updateContactLocation,
 } from '../storage/contacts/location.js';
@@ -181,11 +182,25 @@ export async function handlePacket(
         const upeerId = senderUpeerId;
         if (!upeerId) return;
 
-        const contact = await getContactByUpeerId(upeerId) as { publicKey?: string; status?: string; address?: string } | undefined;
-        if (!contact || !contact.publicKey || contact.status === 'blocked') {
+        const directContact = await getContactByUpeerId(upeerId) as { publicKey?: string; status?: string; address?: string } | undefined;
+        const groupMessage = pktType === 'GROUP_MSG' && typeof data.groupId === 'string'
+            ? getGroupById(data.groupId)
+            : null;
+        const groupPublicKey = groupMessage?.status === 'active' && groupMessage.members.includes(upeerId)
+            ? groupMessage.memberPublicKeys?.[upeerId]
+            : undefined;
+        const publicKey = directContact?.publicKey ?? groupPublicKey;
+        if (!publicKey || directContact?.status === 'blocked') {
             security('Origin unknown, blocked or missing key', { upeerId, ip: rinfo.address, type: pktType }, 'network');
             return;
         }
+        const contact = {
+            ...(directContact ?? {}),
+            publicKey,
+            address: directContact?.address,
+            status: directContact?.status,
+        };
+        const updatePresence = Boolean(directContact);
 
         // Debug logging for FILE_CHUNK
         if (pktType === 'FILE_CHUNK') {
@@ -216,20 +231,20 @@ export async function handlePacket(
             verified = verify(
                 Buffer.from(canonicalStringify(payloadForVerification)),
                 Buffer.from(signature, 'hex'),
-                Buffer.from(contact.publicKey, 'hex')
+                Buffer.from(publicKey, 'hex')
             );
         } else {
             verified = verify(
                 Buffer.from(canonicalStringify(payloadForVerification)),
                 Buffer.from(signature, 'hex'),
-                Buffer.from(contact.publicKey, 'hex')
+                Buffer.from(publicKey, 'hex')
             );
             if (!verified && senderYggAddress !== undefined) {
                 const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
                 verified = verify(
                     Buffer.from(canonicalStringify(legacyPayload)),
                     Buffer.from(signature, 'hex'),
-                    Buffer.from(contact.publicKey, 'hex')
+                    Buffer.from(publicKey, 'hex')
                 );
             }
         }
@@ -256,13 +271,13 @@ export async function handlePacket(
 
         // 3. SOVEREIGN ROAMING
         const YGG_ADDR_RE = /^[23][0-9a-f]{2}:/i;
-        if (contact.address !== rinfo.address && YGG_ADDR_RE.test(rinfo.address)) {
+        if (directContact && contact.address !== rinfo.address && YGG_ADDR_RE.test(rinfo.address)) {
             updateContactLocation(upeerId, rinfo.address);
         }
 
-        if (pktType !== 'CALL_MEDIA') {
+        if (pktType !== 'CALL_MEDIA' && updatePresence) {
             const nowIso = new Date().toISOString();
-            if (isReconnectState(contact.status)) {
+            if (directContact && isReconnectState(contact.status)) {
                 updateContactStatus(upeerId, 'connected');
                 queryOwnVaultsOnReconnect(upeerId);
             }
@@ -277,7 +292,7 @@ export async function handlePacket(
 
         await routeVerifiedPacket({
             upeerId,
-            contact: contact as { publicKey: string; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
+            contact: contact as { publicKey?: string; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
             data: data as NetworkPacket,
             signature,
             rinfo,

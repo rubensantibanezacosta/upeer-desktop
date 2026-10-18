@@ -4,6 +4,7 @@ import { IdentityRateLimiter } from '../../../src/main_process/security/identity
 import * as validation from '../../../src/main_process/security/validation.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
+import * as groupsOps from '../../../src/main_process/storage/groups/operations.js';
 import * as contactHandlers from '../../../src/main_process/network/handlers/contacts.js';
 import * as chatHandlers from '../../../src/main_process/network/handlers/chat.js';
 import * as groupHandlers from '../../../src/main_process/network/handlers/groups.js';
@@ -27,6 +28,9 @@ vi.mock('../../../src/main_process/security/identity.js');
 vi.mock('../../../src/main_process/security/validation.js');
 vi.mock('../../../src/main_process/security/secure-logger.js');
 vi.mock('../../../src/main_process/storage/contacts/operations.js');
+vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
+    getGroupById: vi.fn(),
+}));
 vi.mock('../../../src/main_process/storage/contacts/location.js');
 vi.mock('../../../src/main_process/storage/contacts/status.js');
 vi.mock('../../../src/main_process/network/handlers/contacts.js');
@@ -205,6 +209,66 @@ describe('network/handlers.ts - handlePacket', () => {
 
         await handlePacket(msg, mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
         expect(groupHandlers.handleGroupMessage).toHaveBeenCalled();
+    });
+
+    it('verifies GROUP_MSG from a non-contact using the group roster key without creating a contact', async () => {
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
+        vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'group1',
+            name: 'Group',
+            adminUpeerId: 'admin',
+            members: ['peer1', 'me'],
+            memberPublicKeys: { peer1: 'ab'.repeat(32) },
+            status: 'active',
+            epoch: 1,
+        });
+
+        const packet = {
+            type: 'GROUP_MSG',
+            senderUpeerId: 'peer1',
+            signature: 'cd'.repeat(64),
+            groupId: 'group1',
+            content: 'ciphertext',
+            nonce: '11'.repeat(24),
+            epoch: 1,
+        };
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(identity.verify).toHaveBeenCalledWith(expect.any(Buffer), expect.any(Buffer), Buffer.from('ab'.repeat(32), 'hex'));
+        expect(groupHandlers.handleGroupMessage).toHaveBeenCalledWith('peer1', expect.anything(), expect.anything(), mockWin, mockRinfo.address);
+        expect(contactsOps.getContactByUpeerId).toHaveBeenCalledWith('peer1');
+    });
+
+    it('rejects GROUP_MSG from a blocked non-contact even if its group roster key is valid', async () => {
+        const blockedContact = { ...connectedContact, status: 'blocked' } as NonNullable<KnownContact>;
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(blockedContact);
+        const packet = { type: 'GROUP_MSG', senderUpeerId: 'peer1', signature: 'cd'.repeat(64), groupId: 'group1', content: 'ciphertext', nonce: '11'.repeat(24), epoch: 1 };
+
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(identity.verify).not.toHaveBeenCalled();
+        expect(groupHandlers.handleGroupMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not use group roster keys for private CHAT packets', async () => {
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'group1',
+            name: 'Group',
+            adminUpeerId: 'admin',
+            members: ['peer1', 'me'],
+            memberPublicKeys: { peer1: 'ab'.repeat(32) },
+            status: 'active',
+            epoch: 1,
+        });
+        const packet = { type: 'CHAT', senderUpeerId: 'peer1', signature: 'cd'.repeat(64), content: 'ciphertext', nonce: '11'.repeat(24) };
+
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(groupsOps.getGroupById).not.toHaveBeenCalled();
+        expect(identity.verify).not.toHaveBeenCalled();
+        expect(chatHandlers.handleChatMessage).not.toHaveBeenCalled();
     });
 
     it('should handle FILE_PROPOSAL and delegate to fileTransferManager', async () => {

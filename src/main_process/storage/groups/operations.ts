@@ -1,4 +1,5 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
+import { getUPeerIdFromPublicKey } from '../../security/identity.js';
 
 export interface GroupRecord {
     groupId: string;
@@ -10,6 +11,7 @@ export interface GroupRecord {
     epoch: number;
     senderKey?: string | null;
     senderKeyCreatedAt?: number | null;
+    memberPublicKeys?: Record<string, string>;
     avatar?: string | null;
     createdAt?: number | null;
     lastMessage?: string;
@@ -24,8 +26,9 @@ export interface GroupCryptoState {
     senderKeyCreatedAt?: number;
 }
 
-type GroupRow = Omit<GroupRecord, 'members'> & {
+type GroupRow = Omit<GroupRecord, 'members' | 'memberPublicKeys'> & {
     members: string;
+    memberPublicKeys?: string | null;
 };
 
 type LastGroupMessageRow = {
@@ -48,17 +51,33 @@ type GroupCryptoUpdate = {
 
 function parseGroup(raw: GroupRow): GroupRecord {
     let members: string[] = [];
+    let memberPublicKeys: Record<string, string> = {};
     try {
         members = JSON.parse(raw.members || '[]');
     } catch {
         members = [];
+    }
+    try {
+        const parsed = JSON.parse(raw.memberPublicKeys || '{}');
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            memberPublicKeys = Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => {
+                const [upeerId, publicKey] = entry;
+                return members.includes(upeerId)
+                    && typeof publicKey === 'string'
+                    && /^[0-9a-f]{64}$/i.test(publicKey)
+                    && getUPeerIdFromPublicKey(Buffer.from(publicKey, 'hex')) === upeerId;
+            }));
+        }
+    } catch {
+        memberPublicKeys = {};
     }
     return {
         ...raw,
         epoch: typeof raw.epoch === 'number' ? raw.epoch : 1,
         senderKey: typeof raw.senderKey === 'string' ? raw.senderKey : null,
         senderKeyCreatedAt: typeof raw.senderKeyCreatedAt === 'number' ? raw.senderKeyCreatedAt : null,
-        members
+        members,
+        memberPublicKeys,
     };
 }
 
@@ -69,7 +88,8 @@ export function saveGroup(
     members: string[],
     status: 'active' | 'invited' = 'active',
     avatar?: string,
-    cryptoState?: GroupCryptoState
+    cryptoState?: GroupCryptoState,
+    memberPublicKeys: Record<string, string> = {},
 ): void {
     const db = getDb();
     const schema = getSchema();
@@ -78,6 +98,7 @@ export function saveGroup(
         name,
         adminUpeerId,
         members: JSON.stringify(members),
+        memberPublicKeys: JSON.stringify(memberPublicKeys),
         status,
         epoch: cryptoState?.epoch ?? 1,
         ...(cryptoState?.senderKey !== undefined ? { senderKey: cryptoState.senderKey } : {}),
@@ -90,6 +111,7 @@ export function saveGroup(
             name,
             adminUpeerId,
             members: JSON.stringify(members),
+            memberPublicKeys: JSON.stringify(memberPublicKeys),
             status,
             ...(cryptoState?.epoch !== undefined ? { epoch: cryptoState.epoch } : {}),
             ...(cryptoState?.senderKey !== undefined ? { senderKey: cryptoState.senderKey } : {}),
@@ -157,10 +179,39 @@ export function getGroupById(groupId: string): GroupRecord | null {
 }
 
 export function updateGroupMembers(groupId: string, members: string[]): void {
+    const group = getGroupById(groupId);
+    const db = getDb();
+    const schema = getSchema();
+    const memberSet = new Set(members);
+    const memberPublicKeys = Object.fromEntries(
+        Object.entries(group?.memberPublicKeys ?? {}).filter(([memberId]) => memberSet.has(memberId)),
+    );
+    db.update(schema.groups)
+        .set({ members: JSON.stringify(members), memberPublicKeys: JSON.stringify(memberPublicKeys) })
+        .where(eq(schema.groups.groupId, groupId))
+        .run();
+}
+
+export function mergeGroupMemberPublicKeys(groupId: string, entries: Record<string, string>): void {
+    const group = getGroupById(groupId);
+    if (!group) return;
+    const memberSet = new Set(group.members);
+    const memberPublicKeys = { ...(group.memberPublicKeys ?? {}) };
+    for (const [upeerId, publicKey] of Object.entries(entries)) {
+        if (memberSet.has(upeerId)
+            && /^[0-9a-f]{64}$/i.test(publicKey)
+            && getUPeerIdFromPublicKey(Buffer.from(publicKey, 'hex')) === upeerId) {
+            memberPublicKeys[upeerId] = publicKey.toLowerCase();
+        }
+    }
+    updateGroupMemberPublicKeys(groupId, memberPublicKeys);
+}
+
+export function updateGroupMemberPublicKeys(groupId: string, memberPublicKeys: Record<string, string>): void {
     const db = getDb();
     const schema = getSchema();
     db.update(schema.groups)
-        .set({ members: JSON.stringify(members) })
+        .set({ memberPublicKeys: JSON.stringify(memberPublicKeys) })
         .where(eq(schema.groups.groupId, groupId))
         .run();
 }

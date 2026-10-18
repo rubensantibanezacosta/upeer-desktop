@@ -50,6 +50,13 @@
       "when": 1792254075512,
       "tag": "0007_ratchet_contexts",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792262092125,
+      "tag": "0008_group_member_public_keys",
+      "breakpoints": true
     }
   ]
 }

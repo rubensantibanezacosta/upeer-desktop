@@ -22,6 +22,7 @@ export const groups = sqliteTable('groups', {
     epoch: integer('epoch').notNull().default(1),
     senderKey: text('sender_key'),
     senderKeyCreatedAt: integer('sender_key_created_at'),
+    memberPublicKeys: text('member_public_keys').notNull().default('{}'),
     createdAt: integer('created_at').notNull(), // Unix ms
     // ── Resiliencia de vaciado de chat (Anti-Zombi) para Grupos ─────────────
     lastClearedAt: integer('last_cleared_at').notNull().default(0), // unix timestamp ms

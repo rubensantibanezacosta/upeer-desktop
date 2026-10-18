@@ -8,6 +8,7 @@ import {
     saveGroup,
     updateGroupCrypto,
     updateGroupInfo,
+    updateGroupMemberPublicKeys,
     updateGroupMembers,
 } from '../../storage/groups/operations.js';
 import { saveMessage } from '../../storage/messages/operations.js';
@@ -22,6 +23,7 @@ import {
     normalizeAvatarForCompare,
     sameMembers,
     updateGroupEphemeralKeyIfValid,
+    validMemberPublicKeys,
 } from './groupControlShared.js';
 
 interface GroupInvitePacket extends GroupPayload {
@@ -47,6 +49,7 @@ export async function handleGroupInvite(
 
     let groupName: string;
     let members: string[];
+    let memberPublicKeys: Record<string, string> = {};
     let avatar: string | undefined;
     let epoch: number;
     let senderKey: string;
@@ -66,6 +69,7 @@ export async function handleGroupInvite(
 
         groupName = inner.groupName ?? '';
         members = Array.isArray(inner.members) ? inner.members : [];
+        memberPublicKeys = validMemberPublicKeys(inner.memberPublicKeys);
         epoch = inner.epoch as number;
         senderKey = inner.senderKey ?? '';
 
@@ -106,6 +110,10 @@ export async function handleGroupInvite(
 
     const existing = getGroupById(groupId);
     const isNewGroup = !existing;
+    const scopedMemberKeys = Object.fromEntries(
+        Object.entries({ ...(existing?.memberPublicKeys ?? {}), ...memberPublicKeys })
+            .filter(([memberId]) => members.includes(memberId)),
+    );
     if (!existing) {
         saveGroup(
             groupId,
@@ -114,7 +122,8 @@ export async function handleGroupInvite(
             members || [upeerId],
             'active',
             avatar,
-            { epoch, senderKey, senderKeyCreatedAt: Date.now() }
+            { epoch, senderKey, senderKeyCreatedAt: Date.now() },
+            scopedMemberKeys,
         );
     } else {
         if (existing.epoch > epoch) {
@@ -132,17 +141,24 @@ export async function handleGroupInvite(
             return;
         }
 
+        const memberKeysChanged = Object.entries(scopedMemberKeys).some(([memberId, publicKey]) =>
+            existing.memberPublicKeys?.[memberId] !== publicKey,
+        );
         if (
             existing.epoch === epoch
             && existing.senderKey === senderKey
             && existing.name === groupName
             && sameMembers(existing.members, members || [upeerId])
             && normalizeAvatarForCompare(existing.avatar) === normalizeAvatarForCompare(avatar)
+            && !memberKeysChanged
         ) {
             return;
         }
 
         updateGroupMembers(groupId, members || [upeerId]);
+        if (Object.keys(memberPublicKeys).length > 0) {
+            updateGroupMemberPublicKeys(groupId, scopedMemberKeys);
+        }
         updateGroupCrypto(groupId, { epoch, senderKey, senderKeyCreatedAt: Date.now() });
         if (existing.name !== groupName || avatar !== undefined) {
             updateGroupInfo(groupId, {
