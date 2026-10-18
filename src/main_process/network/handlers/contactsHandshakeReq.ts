@@ -167,9 +167,12 @@ export async function handleHandshakeReq(
 
     if (isAlreadyConnected || isPendingByUs) {
         win?.webContents.send('contact-presence', { upeerId: senderUpeerId, lastSeen: new Date().toISOString() });
-        import('../messaging/contacts.js').then(({ acceptContactRequest }) => {
-            void acceptContactRequest(senderUpeerId, publicKey).catch(err => error('Failed to auto-accept known contact', err, 'network'));
-        }).catch(err => error('Failed to auto-accept known contact', err, 'network'));
+        try {
+            const { acceptContactRequest } = await import('../messaging/contacts.js');
+            await acceptContactRequest(senderUpeerId, publicKey, rinfo.address);
+        } catch (err) {
+            error('Failed to auto-accept known contact', err, 'network');
+        }
         return;
     }
 

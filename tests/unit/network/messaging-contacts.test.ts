@@ -114,4 +114,21 @@ describe('network/messaging/contacts.ts', () => {
         );
         expect(VaultManager.queryOwnVaults).toHaveBeenCalled();
     });
+
+    it('acceptContactRequest responde a la dirección de la solicitud aunque difiera de la guardada', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-1',
+            address: '200::old-address',
+        } as never);
+
+        const { acceptContactRequest } = await import('../../../src/main_process/network/messaging/contacts.js');
+        await acceptContactRequest('peer-1', 'aa'.repeat(32), '200::request-source');
+
+        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::request-source',
+            expect.objectContaining({ type: 'HANDSHAKE_ACCEPT' }),
+        );
+    });
 });

@@ -49,6 +49,10 @@ vi.mock('../../../src/main_process/storage/shared', () => ({
     getSchema: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/messaging/contacts.js', () => ({
+    acceptContactRequest: vi.fn(async () => undefined),
+}));
+
 vi.mock('../../../src/main_process/security/identity', () => ({
     verify: vi.fn(() => true),
     getUPeerIdFromPublicKey: vi.fn((pk) => "peer-" + pk.toString('hex').slice(0, 8)),
@@ -137,6 +141,7 @@ describe('Contact Handlers', () => {
         it('should handle re-handshake from already connected contact', async () => {
             const data: HandshakeReqData = { publicKey: validPubKey, alias: 'Alice (updated)' };
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(connectedContact);
+            const { acceptContactRequest } = await import('../../../src/main_process/network/messaging/contacts.js');
 
             await handleHandshakeReq(data, 'sig', senderUpeerId, senderYggAddress, rinfo, mockWin, mockSendResponse, '1.2.3.4');
 
@@ -152,6 +157,7 @@ describe('Contact Handlers', () => {
                 undefined,
                 undefined
             );
+            expect(acceptContactRequest).toHaveBeenCalledWith(senderUpeerId, validPubKey, rinfo.address);
         });
 
         it('should block handshake if contact is blocked', async () => {

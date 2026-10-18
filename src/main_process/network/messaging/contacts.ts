@@ -24,15 +24,15 @@ export async function sendContactRequest(targetIp: string) {
     sendSecureUDPMessage(targetIp, data);
 }
 
-export async function acceptContactRequest(upeerId: string, publicKey: string) {
+export async function acceptContactRequest(upeerId: string, publicKey: string, replyAddress?: string) {
     const contact = await getContactByUpeerId(upeerId);
     if (!contact) return;
 
+    const targetAddress = replyAddress || contact.address;
+    if (!targetAddress) throw new Error('Cannot accept contact request without a destination address');
+
     updateContactPublicKey(upeerId, publicKey);
     updateContactStatus(upeerId, 'connected');
-
-    const win = getMainWindow();
-    win?.webContents.send('contact-handshake-finished', { upeerId });
 
     const data = {
         type: 'HANDSHAKE_ACCEPT',
@@ -43,7 +43,8 @@ export async function acceptContactRequest(upeerId: string, publicKey: string) {
         avatar: getMyAvatar() || undefined,
         addresses: (await import('../utils.js')).getNetworkAddresses()
     };
-    sendSecureUDPMessage(contact.address, data);
+    sendSecureUDPMessage(targetAddress, data);
+    getMainWindow()?.webContents.send('contact-handshake-finished', { upeerId });
 
     void VaultManager.queryOwnVaults().catch(() => undefined);
 }
