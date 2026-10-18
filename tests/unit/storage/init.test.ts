@@ -51,6 +51,10 @@ vi.mock('../../../src/main_process/storage/backup.js', () => ({
     scheduleBackups: vi.fn()
 }));
 
+vi.mock('../../../src/main_process/storage/legacy-drizzle-adoption.js', () => ({
+    adoptLegacyDrizzleSchema: vi.fn(),
+}));
+
 // Mock sodium-native
 vi.mock('sodium-native', () => ({
     default: {

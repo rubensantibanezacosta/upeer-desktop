@@ -9,6 +9,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { error } from '../security/secure-logger.js';
 import { setDatabase } from './shared.js';
 import { app } from 'electron';
+import { adoptLegacyDrizzleSchema } from './legacy-drizzle-adoption.js';
 
 // ── SQLCipher key derivation ──────────────────────────────────────────────────
 // Derived from a per-device random key (always available, even before mnemonic
@@ -97,6 +98,7 @@ export async function initDB(userDataPath: string, createBackup = true) {
         if (!fs.existsSync(path.join(migrationsPath, 'meta', '_journal.json'))) {
             throw new Error(`Drizzle migration journal not found at ${migrationsPath}`);
         }
+        adoptLegacyDrizzleSchema(sqlite as never, migrationsPath);
         migrate(db, { migrationsFolder: migrationsPath });
     } catch (err) {
         error('Error en migraciones', err, 'db');
