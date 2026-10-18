@@ -24,6 +24,7 @@ export function ScreenSharePicker({ open, sources, onClose, onSelect, onError }:
                 setLoading(false);
                 return;
             }
+            setLoading(false);
             onSelect(withSystemAudio);
         } catch (cause) {
             const message = cause instanceof Error ? cause.message : 'No se pudo seleccionar la fuente.';

@@ -49,7 +49,12 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
     const [screenShareError, setScreenShareError] = useState<string | null>(null);
     const [screenShareSources, setScreenShareSources] = useState<Array<{ id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null }>>([]);
     const pendingShareAudioRef = useRef(true);
-    const { setOnRemoteFrame, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = useCallMedia(call.callId ?? '');
+    const { setOnRemoteFrame, setOnScreenShareError, localStream, startScreenShare, stopScreenShare, screenSharing, setVideoEnabled, setAudioEnabled } = useCallMedia(call.callId ?? '');
+
+    useEffect(() => {
+        setOnScreenShareError(setScreenShareError);
+        return () => setOnScreenShareError(null);
+    }, [setOnScreenShareError]);
     useEffect(() => {
         const timer = setInterval(() => {
             setSeconds(Math.floor((Date.now() - startedAt) / 1000));
@@ -217,15 +222,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
     }, []);
 
     useEffect(() => window.upeer.onScreenShareCaptureRequested(() => {
-        void startScreenShare({ target: 'screen', withSystemAudio: pendingShareAudioRef.current }).then((started) => {
-            if (!started) setScreenShareError('No se pudo iniciar la captura de pantalla.');
-        });
+        void startScreenShare({ target: 'screen', withSystemAudio: pendingShareAudioRef.current });
     }), [startScreenShare]);
 
     const startSelectedScreenShare = useCallback(async (withSystemAudio: boolean) => {
         setScreenSharePickerOpen(false);
         pendingShareAudioRef.current = withSystemAudio;
-        const result = await window.upeer.requestScreenShareCapture();
+        const result = await window.upeer.requestScreenShareCapture(withSystemAudio);
         if (!result.success) setScreenShareError('No se pudo confirmar la fuente seleccionada.');
     }, []);
 

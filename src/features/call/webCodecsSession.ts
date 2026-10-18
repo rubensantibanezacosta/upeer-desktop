@@ -15,6 +15,7 @@ export type VideoQuality = { bitrate: number; framerate: number };
 type WorkerLike = Pick<Worker, 'addEventListener' | 'removeEventListener' | 'postMessage' | 'terminate'>;
 type WorkerFactory = () => WorkerLike;
 type MediaFrameReader = ReadableStreamDefaultReader<VideoFrame | AudioData>;
+type CaptureTrack = MediaStreamTrack & { stop: () => void };
 
 function createMediaWorker(): WorkerLike {
     return new Worker(new URL('./mediaCodec.worker.ts', import.meta.url), { type: 'module' });
@@ -24,6 +25,7 @@ export class WebCodecsSession {
     private worker: WorkerLike | null;
     private ready: Promise<void>;
     private captureReaders = new Map<string, MediaFrameReader>();
+    private captureTracks = new Map<string, CaptureTrack>();
     private chunkHandlers = new Map<CallMediaKind, (chunk: MediaChunk) => void>();
     private decodedHandlers = new Map<string, (frame: VideoFrame | AudioData) => void>();
     private speakerHandler: ((active: boolean) => void) | null = null;
@@ -86,15 +88,19 @@ export class WebCodecsSession {
             this.worker?.postMessage({ type: 'speaker-detection', enabled: true, captureId });
         }
         this.captureReaders.set(captureId, reader);
+        this.captureTracks.set(captureId, clonedTrack);
         void this.forwardFrames(reader, kind, captureId);
     }
 
     async stopCapture(captureId: string): Promise<void> {
         const reader = this.captureReaders.get(captureId);
-        if (!reader) return;
         this.captureReaders.delete(captureId);
         this.worker?.postMessage({ type: 'speaker-detection', enabled: false, captureId });
-        await reader.cancel();
+        const track = this.captureTracks.get(captureId);
+        this.captureTracks.delete(captureId);
+        track?.stop();
+        if (reader) await reader.cancel();
+        this.worker?.postMessage({ type: 'stop-capture', captureId, kind: captureId === 'screen' ? 'screen' : 'audio' });
     }
 
     setVideoQuality(quality: VideoQuality): void {
@@ -134,6 +140,8 @@ export class WebCodecsSession {
             console.warn('Call media frame reader stopped before release:', cause);
         }));
         this.captureReaders.clear();
+        this.captureTracks.forEach((track) => track.stop());
+        this.captureTracks.clear();
         this.chunkHandlers.clear();
         this.decodedHandlers.clear();
         this.speakerHandler = null;

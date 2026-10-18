@@ -15,6 +15,7 @@ type WorkerRequest =
     | { type: 'encode-frame'; kind: CallMediaKind; frame: VideoFrame | AudioData; captureId: string }
     | { type: 'video-quality'; quality: { bitrate: number; framerate: number } }
     | { type: 'speaker-detection'; enabled: boolean; captureId: string }
+    | { type: 'stop-capture'; captureId: string; kind: CallMediaKind }
     | { type: 'decode'; kind: CallMediaKind; bytes: ArrayBuffer; timestamp: number; keyFrame: boolean; streamId: string }
     | { type: 'release' };
 
@@ -184,6 +185,18 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerRequest>) => 
     if (request.type === 'speaker-detection') {
         if (request.enabled) speakerDetectionStreams.add(request.captureId);
         else speakerDetectionStreams.delete(request.captureId);
+        return;
+    }
+    if (request.type === 'stop-capture') {
+        const audioEncoder = audioEncoders.get(request.captureId);
+        if (audioEncoder && audioEncoder.state !== 'closed') audioEncoder.close();
+        audioEncoders.delete(request.captureId);
+        if (request.kind !== 'audio') {
+            const encoder = encoders.get(request.kind);
+            if (encoder && encoder.state !== 'closed') encoder.close();
+            encoders.delete(request.kind);
+            lastVideoKeyFrameAt.delete(request.kind);
+        }
         return;
     }
     if (request.type === 'video-quality') {

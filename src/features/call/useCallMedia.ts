@@ -6,6 +6,7 @@ import { adaptCallQuality, CallQualityMonitor, type CallQualityLevel, type Quali
 
 type ScreenCaptureOptions = { target: 'screen' | 'window'; withSystemAudio: boolean };
 export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown, peerUpeerId: string) => void;
+export type ScreenShareErrorHandler = (message: string) => void;
 
 const remoteMediaDiagnostics = new Set<string>();
 
@@ -21,6 +22,7 @@ export function useCallMedia(callId: string) {
     const qualityRef = useRef<CallQualityLevel>({ bitrate: 700_000, framerate: 24 });
     const qualityProbeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const onRemoteFrameRef = useRef<RemoteFrameHandler | null>(null);
+    const onScreenShareErrorRef = useRef<ScreenShareErrorHandler | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [screenSharing, setScreenSharing] = useState(false);
 
@@ -173,18 +175,20 @@ export function useCallMedia(callId: string) {
         screenRef.current = null;
         window.upeer.sendCallMeta(callId, { type: 'screen-share', active: false });
         stream?.getTracks().forEach((track) => track.stop());
-        void sessionRef.current?.stopCapture('screen').catch((cause: unknown) => {
+        const session = sessionRef.current;
+        void session?.stopCapture('screen').catch((cause: unknown) => {
             console.warn(`Call ${callId} screen capture reader stopped with an error:`, cause);
         });
-        void sessionRef.current?.stopCapture('screen-audio').catch((cause: unknown) => {
+        void session?.stopCapture('screen-audio').catch((cause: unknown) => {
             console.warn(`Call ${callId} screen audio reader stopped with an error:`, cause);
         });
         setScreenSharing(false);
     }, [callId]);
 
     const startScreenShare = useCallback(async (options: ScreenCaptureOptions): Promise<boolean> => {
+        let stream: MediaStream | null = null;
         try {
-            const stream = await (navigator.mediaDevices as unknown as {
+            stream = await (navigator.mediaDevices as unknown as {
                 getDisplayMedia: (opts: Record<string, unknown>) => Promise<MediaStream>;
             }).getDisplayMedia({
                 video: { displaySurface: options.target === 'window' ? 'window' : 'monitor', frameRate: 15 },
@@ -198,19 +202,35 @@ export function useCallMedia(callId: string) {
             screenRef.current = stream;
             await session.startCapture(stream, 'screen', sendChunk);
             if (options.withSystemAudio) await session.startCapture(stream, 'audio', sendChunk, 'screen-audio');
+            if (options.withSystemAudio && stream.getAudioTracks().length === 0) {
+                throw new Error('El sistema no proporcionó una pista de audio para la pantalla compartida.');
+            }
             screenRef.current = stream;
             setScreenSharing(true);
             window.upeer.sendCallMeta(callId, { type: 'screen-share', active: true });
             stream.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare);
             return true;
         } catch (cause) {
-            screenRef.current?.getTracks().forEach((track) => track.stop());
+            const failedStream = screenRef.current ?? stream;
             screenRef.current = null;
+            failedStream?.getTracks().forEach((track) => track.stop());
+            await sessionRef.current?.stopCapture('screen').catch((stopCause: unknown) => {
+                console.warn(`Call ${callId} screen capture cleanup failed:`, stopCause);
+            });
+            await sessionRef.current?.stopCapture('screen-audio').catch((stopCause: unknown) => {
+                console.warn(`Call ${callId} screen audio cleanup failed:`, stopCause);
+            });
             setScreenSharing(false);
+            const message = cause instanceof Error ? cause.message : 'No se pudo iniciar la captura de pantalla.';
             console.error(`Call ${callId} screen capture failed`, cause);
+            onScreenShareErrorRef.current?.(message);
             return false;
         }
     }, [callId, sendChunk, stopScreenShare]);
+
+    const setOnScreenShareError = useCallback((handler: ScreenShareErrorHandler | null) => {
+        onScreenShareErrorRef.current = handler;
+    }, []);
 
     const stopLocalCapture = useCallback(() => {
         captureGenerationRef.current += 1;
@@ -263,6 +283,7 @@ export function useCallMedia(callId: string) {
         screenSharing,
         localStream,
         setOnRemoteFrame,
+        setOnScreenShareError,
         setVideoEnabled,
         setAudioEnabled,
         enabled: call?.phase === 'connected',

@@ -93,6 +93,7 @@ describe('WebCodecsSession worker bridge', () => {
 
         expect(readers[1]?.cancel).toHaveBeenCalledOnce();
         expect(readers[0]?.cancel).not.toHaveBeenCalled();
+        expect(worker.messages.some(({ message }) => (message as { type?: string; captureId?: string }).type === 'stop-capture' && (message as { captureId?: string }).captureId === 'screen-audio')).toBe(true);
         await session.release();
         vi.unstubAllGlobals();
     });

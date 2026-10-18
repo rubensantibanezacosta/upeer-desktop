@@ -1,7 +1,7 @@
 import { desktopCapturer, ipcMain, type BrowserWindow, type DesktopCapturerSource } from 'electron';
 
 type ScreenShareSource = { id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null };
-type PendingSelection = { sources: Map<string, DesktopCapturerSource>; selected: DesktopCapturerSource | null; timeout: NodeJS.Timeout; captureRequested: boolean; resolveCapture: (() => void) | null; rejectCapture: ((error: Error) => void) | null };
+type PendingSelection = { sources: Map<string, DesktopCapturerSource>; selected: DesktopCapturerSource | null; timeout: NodeJS.Timeout; captureRequested: boolean; withSystemAudio: boolean; resolveCapture: (() => void) | null; rejectCapture: ((error: Error) => void) | null };
 
 const pendingSelections = new Map<number, PendingSelection>();
 
@@ -26,10 +26,11 @@ export function registerScreenShareHandlers(): void {
         return { success: true };
     });
 
-    ipcMain.handle('request-screen-share-capture', async (event) => {
+    ipcMain.handle('request-screen-share-capture', async (event, withSystemAudio: boolean) => {
         const pending = pendingSelections.get(event.sender.id);
         if (!pending?.selected) return { success: false };
         pending.captureRequested = true;
+        pending.withSystemAudio = withSystemAudio;
         const captured = new Promise<boolean>((resolve, reject) => {
             const timeout = setTimeout(() => resolve(false), 10_000);
             pending.resolveCapture = () => {
@@ -57,7 +58,7 @@ export function registerScreenShareHandlers(): void {
 }
 
 export function setupScreenSharePicker(mainWindow: BrowserWindow): void {
-    mainWindow.webContents.session.setDisplayMediaRequestHandler(async (_request, callback) => {
+    mainWindow.webContents.session.setDisplayMediaRequestHandler(async (request, callback) => {
         const senderId = mainWindow.webContents.id;
         const pending = pendingSelections.get(senderId);
         if (!pending) {
@@ -67,7 +68,7 @@ export function setupScreenSharePicker(mainWindow: BrowserWindow): void {
         const source = pending.captureRequested ? pending.selected : null;
         pendingSelections.delete(senderId);
         clearTimeout(pending.timeout);
-        callback(source ? { video: source } : {});
+        callback(source ? { video: source, ...(request.audioRequested && pending.withSystemAudio ? { audio: 'loopback' as const } : {}) } : {});
         pending.resolveCapture?.();
         pending.rejectCapture?.(new Error('Screen share selection was cancelled'));
         if (!pending.captureRequested) mainWindow.webContents.send('screen-share-source-selected', null);
@@ -95,6 +96,6 @@ function toScreenShareSource(source: DesktopCapturerSource): ScreenShareSource {
 function replacePendingSelection(senderId: number, sources: DesktopCapturerSource[]): void {
     const existing = pendingSelections.get(senderId);
     if (existing) clearTimeout(existing.timeout);
-    const pending: PendingSelection = { sources: new Map(sources.map((source) => [source.id, source])), selected: null, timeout: setTimeout(() => pendingSelections.delete(senderId), 120_000), captureRequested: false, resolveCapture: null, rejectCapture: null };
+    const pending: PendingSelection = { sources: new Map(sources.map((source) => [source.id, source])), selected: null, timeout: setTimeout(() => pendingSelections.delete(senderId), 120_000), captureRequested: false, withSystemAudio: false, resolveCapture: null, rejectCapture: null };
     pendingSelections.set(senderId, pending);
 }

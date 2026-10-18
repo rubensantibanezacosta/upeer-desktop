@@ -198,7 +198,7 @@ declare global {
             getScreenShareSources: () => Promise<{ success: boolean; sources: Array<{ id: string; name: string; type: 'screen' | 'window'; thumbnail: string; appIcon: string | null }>; error?: string }>;
             selectScreenShareSource: (sourceId: string) => Promise<{ success: boolean }>;
             cancelScreenShareSelection: () => Promise<{ success: boolean }>;
-            requestScreenShareCapture: () => Promise<{ success: boolean }>;
+            requestScreenShareCapture: (withSystemAudio: boolean) => Promise<{ success: boolean }>;
             onScreenShareCaptureRequested: (callback: () => void) => UpeerUnsubscribe;
             onScreenShareSourceSelected: (callback: (sourceId: string | null) => void) => UpeerUnsubscribe;
             startCall: (upeerId: string, kind: 'audio' | 'video') => Promise<{ success: boolean; callId?: string; error?: string }>;
