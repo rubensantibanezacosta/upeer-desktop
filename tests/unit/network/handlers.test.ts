@@ -30,6 +30,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js');
 vi.mock('../../../src/main_process/storage/contacts/operations.js');
 vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     getGroupById: vi.fn(),
+    mergeGroupMemberPublicKeys: vi.fn(),
 }));
 vi.mock('../../../src/main_process/storage/contacts/location.js');
 vi.mock('../../../src/main_process/storage/contacts/status.js');
@@ -239,6 +240,38 @@ describe('network/handlers.ts - handlePacket', () => {
         expect(identity.verify).toHaveBeenCalledWith(expect.any(Buffer), expect.any(Buffer), Buffer.from('ab'.repeat(32), 'hex'));
         expect(groupHandlers.handleGroupMessage).toHaveBeenCalledWith('peer1', expect.anything(), expect.anything(), mockWin, mockRinfo.address);
         expect(contactsOps.getContactByUpeerId).toHaveBeenCalledWith('peer1');
+    });
+
+    it('verifies and caches a group sender key included in GROUP_MSG when the roster key is missing', async () => {
+        const senderPublicKey = 'ab'.repeat(32);
+        vi.mocked(identity.getUPeerIdFromPublicKey).mockReturnValue('peer1');
+        vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'group1',
+            name: 'Group',
+            adminUpeerId: 'admin',
+            members: ['peer1', 'me'],
+            memberPublicKeys: {},
+            status: 'active',
+            epoch: 1,
+        });
+
+        const packet = {
+            type: 'GROUP_MSG',
+            senderUpeerId: 'peer1',
+            senderPublicKey,
+            signature: 'cd'.repeat(64),
+            groupId: 'group1',
+            content: 'ciphertext',
+            nonce: '11'.repeat(24),
+            epoch: 1,
+        };
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
+        expect(identity.verify).toHaveBeenCalledWith(expect.any(Buffer), expect.any(Buffer), Buffer.from(senderPublicKey, 'hex'));
+        expect(groupsOps.mergeGroupMemberPublicKeys).toHaveBeenCalledWith('group1', { peer1: senderPublicKey });
+        expect(groupHandlers.handleGroupMessage).toHaveBeenCalled();
     });
 
     it('rejects GROUP_MSG from a blocked non-contact even if its group roster key is valid', async () => {

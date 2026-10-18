@@ -5,6 +5,7 @@ import type { NetworkPacket } from './types.js';
 import { IdentityRateLimiter } from '../security/identity-rate-limiter.js';
 import {
     decryptSealed,
+    getUPeerIdFromPublicKey,
     verify
 } from '../security/identity.js';
 
@@ -13,7 +14,7 @@ import { validateMessage } from '../security/validation.js';
 import {
     getContactByUpeerId,
 } from '../storage/contacts/operations.js';
-import { getGroupById } from '../storage/groups/operations.js';
+import { getGroupById, mergeGroupMemberPublicKeys } from '../storage/groups/operations.js';
 import {
     updateContactLocation,
 } from '../storage/contacts/location.js';
@@ -186,8 +187,13 @@ export async function handlePacket(
         const groupMessage = pktType === 'GROUP_MSG' && typeof data.groupId === 'string'
             ? getGroupById(data.groupId)
             : null;
+        const candidateGroupPublicKey = typeof data.senderPublicKey === 'string'
+            && /^[0-9a-f]{64}$/i.test(data.senderPublicKey)
+            && getUPeerIdFromPublicKey(Buffer.from(data.senderPublicKey, 'hex')) === upeerId
+            ? data.senderPublicKey.toLowerCase()
+            : undefined;
         const groupPublicKey = groupMessage?.status === 'active' && groupMessage.members.includes(upeerId)
-            ? groupMessage.memberPublicKeys?.[upeerId]
+            ? groupMessage.memberPublicKeys?.[upeerId] ?? candidateGroupPublicKey
             : undefined;
         const publicKey = directContact?.publicKey ?? groupPublicKey;
         if (!publicKey || directContact?.status === 'blocked') {
@@ -262,6 +268,9 @@ export async function handlePacket(
             return;
         } else if (pktType === 'FILE_CHUNK') {
             debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
+        }
+        if (pktType === 'GROUP_MSG' && groupMessage && !groupMessage.memberPublicKeys?.[upeerId] && groupPublicKey) {
+            mergeGroupMemberPublicKeys(data.groupId as string, { [upeerId]: groupPublicKey });
         }
         if (pktType === 'CALL_MEDIA' && binaryMediaHash) return;
         // Apply identity-based rate limiting
