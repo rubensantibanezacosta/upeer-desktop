@@ -36,7 +36,11 @@ export class UINotifier {
     }
 
     notifyFailed(transfer: FileTransfer, reason: string) {
-        this.safeSend('file-transfer-failed', { ...this.mapToUI(transfer), reason });
+        const messageId = transfer.messageId || transfer.fileId;
+        this.safeSend('file-transfer-failed', { ...this.mapToUI(transfer), fileId: messageId, messageId, reason });
+        if (transfer.direction === 'sending') {
+            this.notifyStatusUpdated(messageId, 'failed');
+        }
     }
 
     notifyStatusUpdated(id: string, status: string) {

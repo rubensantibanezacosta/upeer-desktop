@@ -54,6 +54,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
         isMine = true,
         filePath?: string,
         isVoiceNote?: boolean,
+        initialStatus = 'sent',
     ) => {
         const timestamp = Date.now();
         const messageContent = JSON.stringify({
@@ -79,7 +80,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
                 groupId: upeerId,
                 isMine,
                 message: messageContent,
-                status: 'sent',
+                status: initialStatus,
                 timestamp: formatMessageTimestamp(timestamp),
                 replyTo: replyTo?.id,
                 senderUpeerId: isMine ? myIdentity?.upeerId : undefined,
@@ -94,7 +95,7 @@ export const createChatTransferActions = (set: ChatSet, get: ChatGet) => ({
                 upeerId,
                 isMine,
                 message: messageContent,
-                status: isMine && upeerId === get().myIdentity?.upeerId ? 'read' : 'sent',
+                status: isMine && upeerId === get().myIdentity?.upeerId ? 'read' : initialStatus,
                 timestamp: formatMessageTimestamp(timestamp),
                 replyTo: replyTo?.id,
                 date: timestamp,

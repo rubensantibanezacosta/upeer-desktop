@@ -10,9 +10,10 @@ interface AudioPlayerProps {
     isMe: boolean;
     timestamp?: string;
     status?: string;
+    onRetry?: () => void;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, isMe, timestamp, status }) => {
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, isMe, timestamp, status, onRetry }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const wavesurferRef = useRef<WaveSurfer | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -127,7 +128,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, isMe, timestamp, 
                             <Typography level="body-xs" sx={{ color: isMe ? 'rgba(255,255,255,0.7)' : 'text.tertiary', fontSize: '10px' }}>
                                 {timestamp}
                             </Typography>
-                            {isMe && <MessageStatus status={status || 'sent'} />}
+                            {isMe && <MessageStatus status={status || 'sent'} onRetry={onRetry} />}
                         </Box>
                     )}
                 </Box>

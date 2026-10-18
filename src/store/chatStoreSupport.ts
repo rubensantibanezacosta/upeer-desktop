@@ -133,7 +133,7 @@ export const updateTransferMessageContent = (message: ChatMessage, fileId: strin
     }
     try {
         const parsed = JSON.parse(message.message);
-        if (parsed.type !== 'file' || (parsed.transferId !== fileId && parsed.fileId !== fileId)) {
+        if (parsed.type !== 'file' || (parsed.transferId !== fileId && parsed.fileId !== fileId && message.id !== fileId)) {
             return message;
         }
         // parseMessage lee el estado del adjunto de `state` (no de `transferState`). Al

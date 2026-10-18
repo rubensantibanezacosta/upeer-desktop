@@ -10,7 +10,7 @@ type FileDialogFilter = {
 };
 
 interface FileTransferApi {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
 }
 
 export function useFilePersistence(fileTransfer: FileTransferApi) {
@@ -150,9 +150,10 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         });
 
         if (result.success && result.fileId) {
-            const tempHash = `voicemail-${Date.now()}`;
-            addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, tempHash, '', '', true, finalPath, true);
+            addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, result.fileId, '', '', true, finalPath, true, 'pending');
+            return;
         }
+        throw new Error(result.error || 'No se pudo iniciar el envío de la nota de voz');
     };
 
     return {

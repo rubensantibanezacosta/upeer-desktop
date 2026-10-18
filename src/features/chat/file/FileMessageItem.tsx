@@ -66,7 +66,13 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
     const [isDownloading, setIsDownloading] = useState(false);
     if (data.isVoiceNote) {
         const audioUrl = (fullPath || savedPath) || '';
-        return <AudioPlayer url={isTransferComplete && audioUrl ? toMediaUrl(audioUrl) : ''} isMe={isMe} timestamp={timestamp} status={status} />;
+        return <AudioPlayer
+            url={isTransferComplete && audioUrl ? toMediaUrl(audioUrl) : ''}
+            isMe={isMe}
+            timestamp={timestamp}
+            status={isTransferFailed ? 'failed' : status}
+            onRetry={() => onRetry?.(fileId)}
+        />;
     }
 
     const isImage = mimeType.startsWith('image/');

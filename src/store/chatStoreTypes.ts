@@ -63,7 +63,7 @@ export interface ChatActions {
     setPendingFiles: (files: PendingFile[]) => void;
     setIsDragging: (dragging: boolean) => void;
     handleRetryMessage: (msgId: string) => Promise<void>;
-    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string, isVoiceNote?: boolean) => void;
+    addFileTransferMessage: (upeerId: string, fileId: string, fileName: string, fileSize: number, mimeType: string, fileHash: string, thumbnail?: string, caption?: string, isMine?: boolean, filePath?: string, isVoiceNote?: boolean, initialStatus?: string) => void;
     updateFileTransferMessage: (fileId: string, updates: TransferMessageUpdates) => void;
     initListeners: () => void;
 }
