@@ -142,13 +142,21 @@ export async function handleVaultDelivery(
                         const { signature: _sig, isInternalSync: _intSync, ...groupData } = innerPacket;
                         verifiedData = groupData;
                     }
+                    const verificationPayloads = innerPacket.type === 'GROUP_MSG'
+                        ? [verifiedData]
+                        : [
+                            verifiedData,
+                            ...(typeof innerPacket.senderUpeerId === 'string' && innerPacket.senderUpeerId === entry.senderSid
+                                ? [{ ...verifiedData, senderUpeerId: innerPacket.senderUpeerId }]
+                                : []),
+                        ];
                     const isInnerValid = isFileTransferPacket
                         ? verifyFileTransferPacketSignature(innerPacket, originalContact.publicKey)
-                        : verify(
-                            Buffer.from(canonicalStringify(verifiedData)),
+                        : verificationPayloads.some((payload) => verify(
+                            Buffer.from(canonicalStringify(payload)),
                             Buffer.from(innerSig, 'hex'),
                             Buffer.from(originalContact.publicKey, 'hex')
-                        );
+                        ));
 
                     if (!isInnerValid) {
                         security('Vault delivery integrity failure!', { originalSender: entry.senderSid, custodian: senderSid }, 'vault');

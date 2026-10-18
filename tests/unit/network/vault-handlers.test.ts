@@ -124,13 +124,32 @@ describe('Vault Delivery Handler', () => {
         };
 
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
-        vi.mocked(identity.verify).mockReturnValueOnce(false);
+        vi.mocked(identity.verify).mockReturnValue(false);
 
         await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
 
         expect(identity.verify).toHaveBeenCalled();
         const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
         expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
+    });
+
+    it('should verify a self-sync packet signed with senderUpeerId and reject an invalid signature', async () => {
+        const innerPacket = { type: 'CHAT', id: 'sync-id', senderUpeerId: 'origin-id', signature: 'inner-sig' };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(identity.verify).mockImplementation((payload) => payload.toString().includes('senderUpeerId'));
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatMessage).toHaveBeenCalledOnce();
+
+        vi.mocked(identity.verify).mockReturnValue(false);
+        vi.mocked(chatModule.handleChatMessage).mockClear();
+        await handleVaultDelivery(custodianSid, { entries: [{ ...entry, data: Buffer.from(JSON.stringify({ ...innerPacket, id: 'invalid-id' })).toString('hex') }] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
+        expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'INTEGRITY_FAIL');
     });
 
     it('should emit a single integrity failure vouch per delivery batch', async () => {
