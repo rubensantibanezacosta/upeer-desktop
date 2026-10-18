@@ -83,7 +83,7 @@ describe('group fan-out concurrency', () => {
                 upeerId,
                 status: 'connected',
                 publicKey: 'aa'.repeat(32),
-                address: `200::${upeerId}`,
+                address: '200:0:0:0:0:0:0:1',
                 knownAddresses: '[]',
             } as never;
         });
@@ -115,8 +115,8 @@ describe('group fan-out concurrency', () => {
         } as never);
         vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => {
             if (upeerId === 'self-id') return { upeerId, status: 'connected', publicKey: '11'.repeat(32), knownAddresses: '[]' } as never;
-            if (upeerId === 'peer-online') return { upeerId, status: 'connected', publicKey: 'aa'.repeat(32), address: '200::online', knownAddresses: '[]' } as never;
-            return { upeerId, status: 'disconnected', publicKey: 'bb'.repeat(32), address: '200::offline', knownAddresses: '[]' } as never;
+            if (upeerId === 'peer-online') return { upeerId, status: 'connected', publicKey: 'aa'.repeat(32), address: '200:0:0:0:0:0:0:10', knownAddresses: '[]' } as never;
+            return { upeerId, status: 'disconnected', publicKey: 'bb'.repeat(32), address: '200:0:0:0:0:0:0:11', knownAddresses: '[]' } as never;
         });
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
 

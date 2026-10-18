@@ -41,6 +41,11 @@ vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
     getKademliaInstance: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/network/locationBlocks.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../src/main_process/network/locationBlocks.js')>();
+    return { ...actual, verifyLocationBlockWithDHT: vi.fn() };
+});
+
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
     VaultManager: {
         replicateToVaults: vi.fn(),
@@ -110,13 +115,11 @@ describe('groups fan-out edge cases', () => {
             '200::10',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-edge', senderUpeerId: 'self-id' }),
             'aa'.repeat(32),
-            false
         );
         expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::11',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-edge', senderUpeerId: 'self-id' }),
             'aa'.repeat(32),
-            false
         );
         expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
             '200::other-device',
@@ -131,5 +134,70 @@ describe('groups fan-out edge cases', () => {
             undefined,
             expect.any(String)
         );
+    });
+
+    it('envía a un miembro del roster sin contacto usando una ubicación DHT verificada', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const dht = await import('../../../src/main_process/network/dht/handlers.js');
+        const locationBlocks = await import('../../../src/main_process/network/locationBlocks.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+        const publicKey = 'aa'.repeat(32);
+        const location = { address: '200::2', addresses: ['200::2'], dhtSeq: 4, expiresAt: Date.now() + 60_000, signature: 'bb'.repeat(64) };
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-roster-only',
+            name: 'Grupo',
+            adminUpeerId: 'self-id',
+            status: 'active',
+            members: ['self-id', 'member-id'],
+            memberPublicKeys: { 'member-id': publicKey },
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as never);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
+        vi.mocked(dht.getKademliaInstance).mockReturnValue({ findLocationBlock: vi.fn().mockResolvedValue(location) } as never);
+        vi.mocked(locationBlocks.verifyLocationBlockWithDHT).mockResolvedValue(true);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
+
+        await sendGroupMessage('grp-roster-only', 'hola miembro');
+
+        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+            '200::2',
+            expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-roster-only' }),
+            publicKey,
+        );
+    });
+
+    it('rechaza el envío al miembro sin contacto si la ubicación DHT no está firmada por su clave', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const dht = await import('../../../src/main_process/network/dht/handlers.js');
+        const locationBlocks = await import('../../../src/main_process/network/locationBlocks.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const location = { address: '200::3', dhtSeq: 1, expiresAt: Date.now() + 60_000, signature: 'ff'.repeat(64) };
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-invalid-location',
+            name: 'Grupo',
+            adminUpeerId: 'self-id',
+            status: 'active',
+            members: ['self-id', 'member-id'],
+            memberPublicKeys: { 'member-id': 'aa'.repeat(32) },
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as never);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
+        vi.mocked(dht.getKademliaInstance).mockReturnValue({ findLocationBlock: vi.fn().mockResolvedValue(location) } as never);
+        vi.mocked(locationBlocks.verifyLocationBlockWithDHT).mockResolvedValue(false);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as never);
+
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+        await sendGroupMessage('grp-invalid-location', 'no falsificar');
+
+        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalledWith('200::3', expect.anything(), expect.anything());
     });
 });

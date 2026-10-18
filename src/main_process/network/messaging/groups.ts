@@ -24,9 +24,69 @@ import { sendSecureUDPMessage } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { VaultManager } from '../vault/manager.js';
 import { runWithConcurrencyMap } from '../concurrency.js';
+import type { LocationBlock } from '../types.js';
+import { validateAddress } from '../addressing.js';
+import { verifyLocationBlockWithDHT } from '../locationBlocks.js';
 export { createGroup, inviteToGroup, updateGroup, leaveGroup } from './groupControl.js';
 
 const GROUP_FANOUT_CONCURRENCY = 8;
+
+type GroupMemberContact = {
+    upeerId: string;
+    publicKey?: string;
+    status: string;
+    address?: string | null;
+    knownAddresses?: string | string[] | null;
+};
+
+async function resolveGroupMemberDelivery(group: NonNullable<ReturnType<typeof getGroupById>>, memberUpeerId: string): Promise<{ contact: GroupMemberContact; addresses: string[]; resolvedViaDht: boolean } | null> {
+    const rawContact = await getContactByUpeerId(memberUpeerId) as GroupMemberContact | undefined;
+    const isSelf = memberUpeerId === getMyUPeerId();
+    const publicKey = rawContact?.publicKey || group.memberPublicKeys?.[memberUpeerId] || (isSelf ? getMyPublicKeyHex() : undefined);
+    if (!publicKey || rawContact?.status === 'blocked') return null;
+
+    const contact: GroupMemberContact = rawContact
+        ? { ...rawContact, publicKey }
+        : { upeerId: memberUpeerId, publicKey, status: isSelf ? 'connected' : 'disconnected' };
+    const addresses: string[] = [];
+    let resolvedViaDht = false;
+    const addAddress = (address: string) => {
+        try {
+            validateAddress(address);
+            if (!addresses.includes(address)) addresses.push(address);
+        } catch {
+            warn('Rejected invalid group member address', { groupId: group.groupId, memberUpeerId }, 'network');
+        }
+    };
+
+    if (typeof rawContact?.address === 'string' && rawContact.address) addAddress(rawContact.address);
+    const knownAddresses = rawContact?.knownAddresses;
+    if (Array.isArray(knownAddresses)) {
+        knownAddresses.forEach((address) => { if (typeof address === 'string') addAddress(address); });
+    } else if (typeof knownAddresses === 'string') {
+        try {
+            const parsed: unknown = JSON.parse(knownAddresses);
+            if (Array.isArray(parsed)) parsed.forEach((address) => { if (typeof address === 'string') addAddress(address); });
+        } catch {
+            warn('Failed to parse known addresses for group member', { groupId: group.groupId, memberUpeerId }, 'network');
+        }
+    }
+
+    if (addresses.length === 0 && !isSelf) {
+        try {
+            const { getKademliaInstance } = await import('../dht/handlers.js');
+            const location = await getKademliaInstance()?.findLocationBlock(memberUpeerId) as LocationBlock | null | undefined;
+            if (location && await verifyLocationBlockWithDHT(memberUpeerId, location, publicKey)) {
+                for (const address of location.addresses ?? [location.address]) addAddress(address);
+                resolvedViaDht = addresses.length > 0;
+            }
+        } catch (err) {
+            warn('Failed to resolve group member through DHT', { groupId: group.groupId, memberUpeerId, err: String(err) }, 'network');
+        }
+    }
+
+    return addresses.length > 0 || isSelf ? { contact, addresses, resolvedViaDht } : null;
+}
 
 /**
  * Send a text message to a group (fan-out to each member).
@@ -93,61 +153,32 @@ export async function sendGroupMessage(
 
     await runWithConcurrencyMap(uniqueMembers, GROUP_FANOUT_CONCURRENCY, async (memberUpeerId) => {
         const isSelf = memberUpeerId === myId;
-        const rawContact = await getContactByUpeerId(memberUpeerId);
-        const contact = rawContact || (isSelf
-            ? {
-                upeerId: myId,
-                publicKey: getMyPublicKeyHex(),
-                status: 'connected',
-                knownAddresses: '[]'
+        if (isSelf) {
+            const selfContact = await resolveGroupMemberDelivery(group, memberUpeerId);
+            if (!selfContact) return;
+            const selfAddresses = [...selfContact.addresses];
+            for (const address of selfAddresses) {
+                sendSecureUDPMessage(address, packet, getMyPublicKey().toString('hex'), true);
             }
-            : null);
-        if (!contact || (memberUpeerId !== myId && contact.status !== 'connected') || !contact.publicKey) return;
-
-        const addresses: string[] = [];
-        if (rawContact?.address) addresses.push(rawContact.address);
-
-        if (memberUpeerId === myId) {
             try {
                 const { getKademliaInstance } = await import('../dht/handlers.js');
                 const kademlia = getKademliaInstance();
                 const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
-                if (kademlia) {
-                    const selfNodes = kademlia.findClosestContacts(myId, 20)
-                        .filter(n => n.upeerId === myId && n.address !== myYggAddress);
-                    for (const node of selfNodes) {
-                        if (!addresses.includes(node.address)) addresses.push(node.address);
-                    }
+                for (const node of kademlia?.findClosestContacts(myId, 20).filter((entry) => entry.upeerId === myId && entry.address !== myYggAddress) ?? []) {
+                    if (selfAddresses.includes(node.address)) continue;
+                    selfAddresses.push(node.address);
+                    sendSecureUDPMessage(node.address, packet, getMyPublicKey().toString('hex'), true);
                 }
             } catch (err) {
                 warn('Failed to discover self addresses for group fan-out', { groupId, err: String(err) }, 'network');
             }
+            return;
         }
 
-        try {
-            const knownAddressesValue = contact.knownAddresses ?? '[]';
-            let knownAddresses: string[] = [];
-            if (Array.isArray(knownAddressesValue)) {
-                knownAddresses = knownAddressesValue;
-            } else if (typeof knownAddressesValue === 'string') {
-                try {
-                    const parsed = JSON.parse(knownAddressesValue);
-                    if (Array.isArray(parsed)) knownAddresses = parsed.filter((item): item is string => typeof item === 'string');
-                } catch {
-                    knownAddresses = [];
-                }
-            }
-            for (const addr of knownAddresses) {
-                if (!addresses.includes(addr)) addresses.push(addr);
-            }
-        } catch (err) {
-            warn('Failed to parse knownAddresses for group fan-out', { groupId, memberUpeerId, err: String(err) }, 'network');
-        }
-
-        const myPublicKey = getMyPublicKey().toString('hex');
-        for (const addr of addresses) {
-            const targetSealedKey = isSelf ? myPublicKey : contact.publicKey;
-            sendSecureUDPMessage(addr, packet, targetSealedKey, isSelf);
+        const resolved = await resolveGroupMemberDelivery(group, memberUpeerId);
+        if (!resolved || (resolved.contact.status !== 'connected' && !resolved.resolvedViaDht)) return;
+        for (const address of resolved.addresses) {
+            sendSecureUDPMessage(address, packet, resolved.contact.publicKey);
         }
     });
 
