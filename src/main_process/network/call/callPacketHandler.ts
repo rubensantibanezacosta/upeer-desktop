@@ -143,6 +143,40 @@ export function handleCallPacket(
                 handleSpeakerMeta(callId, upeerId, meta);
                 break;
             }
+            if (meta?.type === 'quality-probe' || meta?.type === 'quality-probe-ack') {
+                const session = callManager.get(callId);
+                const target = typeof meta.target === 'string' ? meta.target : '';
+                const sentAt = meta.sentAt;
+                const origin = typeof meta.origin === 'string' ? meta.origin : upeerId;
+                if (!session || !target || typeof sentAt !== 'number' || !Number.isSafeInteger(sentAt) || sentAt > Date.now() || Date.now() - sentAt > 15_000) break;
+                const myId = getMyUPeerId();
+                if (session.isGroup && target !== myId && target !== session.relayUpeerId && !session.groupMembers.includes(target)) break;
+                if (!session.isGroup && target !== myId && target !== session.peerUpeerId) break;
+                if (meta.type === 'quality-probe') {
+                    if (target === myId) {
+                        win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta: { type: 'quality-probe', target: myId, origin, sentAt } });
+                    } else if (session.isGroup && session.relayUpeerId === myId && session.groupMembers.includes(target)) {
+                        sendCallMeta(target, callId, meta);
+                    }
+                } else {
+                    if (target === myId) win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta });
+                    else if (session.isGroup && session.relayUpeerId === myId && session.groupMembers.includes(target)) sendCallMeta(target, callId, meta);
+                }
+                break;
+            }
+            if (meta?.type === 'quality-feedback') {
+                const session = callManager.get(callId);
+                const target = typeof meta.target === 'string' ? meta.target : '';
+                const source = typeof meta.source === 'string' ? meta.source : upeerId;
+                if (!session || !target || (!session.groupMembers.includes(upeerId) && upeerId !== session.peerUpeerId)) break;
+                if (session?.isGroup && session.relayUpeerId === getMyUPeerId()) {
+                    if (target === getMyUPeerId()) win?.webContents.send('call-meta', { callId, peerUpeerId: source, meta });
+                    else if (session.groupMembers.includes(target)) sendCallMeta(target, callId, meta);
+                } else if (!session.isGroup && target === getMyUPeerId()) {
+                    win?.webContents.send('call-meta', { callId, peerUpeerId: source, meta });
+                }
+                break;
+            }
             win?.webContents.send('call-meta', { callId, peerUpeerId: upeerId, meta: data.meta });
             break;
         }

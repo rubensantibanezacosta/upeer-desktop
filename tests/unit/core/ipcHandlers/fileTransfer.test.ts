@@ -126,7 +126,7 @@ describe('start-file-transfer multi-send a grupo', () => {
     });
 
     it('inicia el envío a un contacto offline para permitir el failover al vault', async () => {
-        vi.mocked(getGroupById).mockReturnValue(undefined);
+        vi.mocked(getGroupById).mockReturnValue(null);
         vi.mocked(getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-offline',
             publicKey: 'aa',
@@ -153,7 +153,7 @@ describe('start-file-transfer multi-send a grupo', () => {
     });
 
     it('rechaza el envío cuando el contacto está bloqueado', async () => {
-        vi.mocked(getGroupById).mockReturnValue(undefined);
+        vi.mocked(getGroupById).mockReturnValue(null);
         vi.mocked(getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-blocked',
             address: '200::blocked',

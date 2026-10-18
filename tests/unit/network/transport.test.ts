@@ -180,7 +180,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         sendSecureUDPMessage('200::peer', { type: 'CALL_ACCEPT', callId: 'call-1' });
 
         expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledTimes(1);
-        expect(callMediaUdp.sendCallMediaDatagram.mock.calls[0]?.[0]).toBe('200::peer');
+        expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledWith('200::peer', expect.any(Buffer));
         await new Promise(resolve => setTimeout(resolve, 20));
         expect(mockSocket.write).toHaveBeenCalledTimes(1);
     });

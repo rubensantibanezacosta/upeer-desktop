@@ -334,7 +334,8 @@ describe('Vault Delivery Handler', () => {
         await vi.waitFor(() => expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'VAULT_CHUNK'));
         await handleVaultDelivery(custodianSid, { entries: [shardEntry] }, mockWin, mockSendResponse, 'completed-file-source');
 
-        expect(vouches.issueVouch.mock.calls.filter(([id, type]) => id === custodianSid && type === 'VAULT_CHUNK')).toHaveLength(1);
+        expect(vouches.issueVouch).toHaveBeenCalledTimes(1);
+        expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'VAULT_CHUNK');
     });
 
     it('should trigger vault attachment recovery after FILE_PROPOSAL entries', async () => {

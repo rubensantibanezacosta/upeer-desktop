@@ -10,6 +10,8 @@ type WorkerMessage =
     | { type: 'diagnostic'; message: string; details: Record<string, unknown> }
     | { type: 'error'; operation: string; message: string };
 
+export type VideoQuality = { bitrate: number; framerate: number };
+
 type WorkerLike = Pick<Worker, 'addEventListener' | 'removeEventListener' | 'postMessage' | 'terminate'>;
 type WorkerFactory = () => WorkerLike;
 type MediaFrameReader = ReadableStreamDefaultReader<VideoFrame | AudioData>;
@@ -95,13 +97,17 @@ export class WebCodecsSession {
         await reader.cancel();
     }
 
+    setVideoQuality(quality: VideoQuality): void {
+        this.worker?.postMessage({ type: 'video-quality', quality });
+    }
+
     private async forwardFrames(reader: MediaFrameReader, kind: CallMediaKind, captureId: string): Promise<void> {
         try {
             while (this.worker && this.captureReaders.get(captureId) === reader) {
                 const { value, done } = await reader.read();
                 if (done || !value) break;
                 try {
-                    this.worker?.postMessage({ type: 'encode-frame', kind, frame: value }, [value]);
+                    this.worker?.postMessage({ type: 'encode-frame', kind, frame: value, captureId }, [value]);
                 } catch (cause) {
                     value.close();
                     throw cause;

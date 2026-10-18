@@ -240,11 +240,60 @@ export function registerCallHandlers(): void {
         sendCallMedia(session.peerUpeerId, callId, data);
     });
 
-    ipcMain.on('send-call-meta', (event, payload: { callId: string; meta: { type: string; active: boolean } }) => {
+    ipcMain.on('send-call-meta', (event, payload: { callId: string; meta: Record<string, unknown> }) => {
         captureRenderer(event);
-        if (!isValidCallId(payload?.callId) || payload?.meta?.type !== 'screen-share' || typeof payload.meta.active !== 'boolean') return;
+        if (!isValidCallId(payload?.callId) || !payload.meta || typeof payload.meta !== 'object') return;
         const session = callManager.get(payload.callId);
         if (!session) return;
+        if (payload.meta.type === 'quality-feedback') {
+            const { mediaKind, lossRatio, jitterMs, sendBitrate, target } = payload.meta;
+            if (
+                typeof target !== 'string' || target.length === 0 || target.length > 128
+                || (session.isGroup && target !== getMyUPeerId() && target !== session.relayUpeerId && !session.groupMembers.includes(target) && target !== session.peerUpeerId)
+                || !session.isGroup && target !== session.peerUpeerId
+                || (mediaKind !== 'audio' && mediaKind !== 'video' && mediaKind !== 'screen')
+                || typeof lossRatio !== 'number' || !Number.isFinite(lossRatio) || lossRatio < 0 || lossRatio > 1
+                || typeof jitterMs !== 'number' || !Number.isFinite(jitterMs) || jitterMs < 0 || jitterMs > 60_000
+                || typeof sendBitrate !== 'number' || !Number.isFinite(sendBitrate) || sendBitrate < 0 || sendBitrate > 100_000_000
+            ) return;
+            const senderId = getMyUPeerId();
+            if (payload.meta.type === 'quality-feedback') {
+                const routedMeta = { ...payload.meta, source: senderId };
+                if (session.isGroup && session.relayUpeerId) {
+                    if (session.relayUpeerId === senderId) {
+                        if (target === senderId) event.sender.send('call-meta', { callId: payload.callId, peerUpeerId: senderId, meta: routedMeta });
+                        else sendCallMeta(target, payload.callId, routedMeta);
+                    } else sendCallMeta(session.relayUpeerId, payload.callId, routedMeta);
+                } else sendCallMeta(target, payload.callId, routedMeta);
+            } else sendCallMeta(target, payload.callId, payload.meta);
+            return;
+        }
+        if (payload.meta.type === 'quality-probe' || payload.meta.type === 'quality-probe-ack') {
+            const { target, sentAt } = payload.meta;
+            if (typeof target !== 'string' || target.length === 0 || target.length > 128 || typeof sentAt !== 'number' || !Number.isSafeInteger(sentAt) || sentAt > Date.now() || Date.now() - sentAt > 15_000) return;
+            const myId = getMyUPeerId();
+            if (session.isGroup && target !== myId && target !== session.relayUpeerId && !session.groupMembers.includes(target)) return;
+            if (!session.isGroup && target !== myId && target !== session.peerUpeerId) return;
+            if (payload.meta.type === 'quality-probe') {
+                const routedMeta = { ...payload.meta, origin: myId };
+                const nextHop = session.isGroup && session.relayUpeerId && session.relayUpeerId !== myId ? session.relayUpeerId : target;
+                if (session.isGroup && session.relayUpeerId === myId) {
+                    if (target === myId) event.sender.send('call-meta', { callId: payload.callId, peerUpeerId: myId, meta: routedMeta });
+                    else if (session.groupMembers.includes(target)) sendCallMeta(target, payload.callId, routedMeta);
+                } else if (nextHop === myId) {
+                    event.sender.send('call-meta', { callId: payload.callId, peerUpeerId: myId, meta: routedMeta });
+                } else sendCallMeta(nextHop, payload.callId, routedMeta);
+            } else {
+                const routedMeta = { ...payload.meta, origin: target };
+                if (session.relayUpeerId === myId) {
+                    if (target === myId) event.sender.send('call-meta', { callId: payload.callId, peerUpeerId: myId, meta: routedMeta });
+                    else if (session.groupMembers.includes(target)) sendCallMeta(target, payload.callId, routedMeta);
+                } else if (session.isGroup && session.relayUpeerId && session.relayUpeerId !== myId) sendCallMeta(session.relayUpeerId, payload.callId, routedMeta);
+                else if (target === session.peerUpeerId) sendCallMeta(target, payload.callId, routedMeta);
+            }
+            return;
+        }
+        if (payload.meta.type !== 'screen-share' || typeof payload.meta.active !== 'boolean') return;
         const members = session.isGroup ? session.groupMembers : [session.peerUpeerId];
         const myId = getMyUPeerId();
         for (const member of members) {

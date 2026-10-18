@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { decodeMediaFrame, encodeMediaFrame, type CallMediaKind } from './mediaChunker.js';
 import { useCallStore } from './useCallStore.js';
 import { WebCodecsSession, type MediaChunk } from './webCodecsSession.js';
+import { adaptCallQuality, CallQualityMonitor, type CallQualityLevel, type QualityFeedback } from './callQuality.js';
 
 type ScreenCaptureOptions = { target: 'screen' | 'window'; withSystemAudio: boolean };
 export type RemoteFrameHandler = (kind: CallMediaKind, frame: unknown, peerUpeerId: string) => void;
@@ -16,6 +17,9 @@ export function useCallMedia(callId: string) {
     const captureGenerationRef = useRef(0);
     const screenRef = useRef<MediaStream | null>(null);
     const sequenceRef = useRef<Record<CallMediaKind, number>>({ audio: 0, video: 0, screen: 0 });
+    const qualityMonitorRef = useRef(new CallQualityMonitor());
+    const qualityRef = useRef<CallQualityLevel>({ bitrate: 700_000, framerate: 24 });
+    const qualityProbeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const onRemoteFrameRef = useRef<RemoteFrameHandler | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [screenSharing, setScreenSharing] = useState(false);
@@ -51,6 +55,8 @@ export function useCallMedia(callId: string) {
             return;
         }
         const streamId = event.senderUpeerId ?? event.peerUpeerId;
+        const feedback = qualityMonitorRef.current.observe(streamId, frame.kind, frame.seq, frame.data.byteLength, frame.ts);
+        if (feedback) window.upeer.sendCallMeta(callId, { ...feedback, target: streamId, rttMs: qualityMonitorRef.current.getRtt(streamId) ?? 0 });
         const diagnosticKey = `${callId}:${streamId}:${frame.kind}`;
         logRemoteMediaDiagnostic(`${diagnosticKey}:frame-received`, 'Remote CALL_MEDIA frame passed renderer parsing and was queued for decode', { callId, peerUpeerId: streamId, kind: frame.kind, mediaBytes: frame.data.byteLength, keyFrame: frame.keyFrame });
         void session.decodeChunk(frame.kind, frame.data, frame.ts, frame.keyFrame ?? true, (decoded) => {
@@ -61,11 +67,49 @@ export function useCallMedia(callId: string) {
         });
     }, [callId]);
 
+    const handleCallMeta = useCallback((event: { callId: string; peerUpeerId: string; meta?: unknown }) => {
+        if (event.callId !== callId || !event.meta || typeof event.meta !== 'object') return;
+        const report = event.meta as { type?: string; target?: string; source?: string; origin?: string; mediaKind?: CallMediaKind; lossRatio?: number; jitterMs?: number; sendBitrate?: number; rttMs?: number; sentAt?: number };
+        if (report.type === 'quality-probe' && typeof report.origin === 'string' && typeof report.sentAt === 'number') {
+            window.upeer.sendCallMeta(callId, { type: 'quality-probe-ack', target: report.origin, sentAt: report.sentAt });
+            return;
+        }
+        if (report.type === 'quality-probe-ack' && typeof report.target === 'string' && typeof report.sentAt === 'number') {
+            const rttMs = qualityMonitorRef.current.resolveProbe(event.peerUpeerId, report.sentAt);
+            if (rttMs !== null) {
+                const next = adaptCallQuality(qualityRef.current, { type: 'quality-feedback', target: report.target, mediaKind: 'video', lossRatio: 0, jitterMs: 0, sendBitrate: qualityRef.current.bitrate, rttMs });
+                if (next.bitrate !== qualityRef.current.bitrate || next.framerate !== qualityRef.current.framerate) {
+                    qualityRef.current = next;
+                    sessionRef.current?.setVideoQuality(next);
+                }
+            }
+            return;
+        }
+        if (report.type !== 'quality-feedback' || typeof report.target !== 'string' || (report.mediaKind !== 'audio' && report.mediaKind !== 'video' && report.mediaKind !== 'screen') || typeof report.lossRatio !== 'number' || typeof report.jitterMs !== 'number' || typeof report.sendBitrate !== 'number') return;
+        const next = adaptCallQuality(qualityRef.current, report as QualityFeedback);
+        if (next.bitrate !== qualityRef.current.bitrate || next.framerate !== qualityRef.current.framerate) {
+            qualityRef.current = next;
+            sessionRef.current?.setVideoQuality(next);
+        }
+    }, [callId]);
+
     useEffect(() => {
         sessionRef.current = new WebCodecsSession();
         const unsubscribe = window.upeer?.onCallMedia?.(handleRemoteMedia);
+        const unsubscribeMeta = window.upeer?.onCallMeta?.(handleCallMeta);
+        const qualityMonitor = qualityMonitorRef.current;
+        qualityProbeTimerRef.current = setInterval(() => {
+            const currentCall = useCallStore.getState().calls[callId];
+            if (currentCall?.phase !== 'connected') return;
+            const target = currentCall.isGroup ? currentCall.relayUpeerId : currentCall.peerUpeerId;
+            if (target) window.upeer.sendCallMeta(callId, qualityMonitor.createProbe(target));
+        }, 5000);
         return () => {
             unsubscribe?.();
+            unsubscribeMeta?.();
+            if (qualityProbeTimerRef.current) clearInterval(qualityProbeTimerRef.current);
+            qualityProbeTimerRef.current = null;
+            qualityMonitor.reset();
             screenRef.current?.getTracks().forEach((track) => track.stop());
             localStreamRef.current?.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
@@ -75,15 +119,21 @@ export function useCallMedia(callId: string) {
             sessionRef.current = null;
             if (session) void session.release();
         };
-    }, [callId, handleRemoteMedia]);
+    }, [callId, handleCallMeta, handleRemoteMedia]);
 
     const startLocalCapture = useCallback(async (video: boolean): Promise<boolean> => {
         if (localStreamRef.current) return true;
         const generation = captureGenerationRef.current;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: video ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 20 } } : false,
+                audio: {
+                    channelCount: { ideal: 1 },
+                    sampleRate: { ideal: 48000 },
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+                video: video ? { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 24, max: 30 } } : false,
             });
             if (generation !== captureGenerationRef.current) {
                 stream.getTracks().forEach((track) => track.stop());

@@ -104,6 +104,8 @@ vi.mock('../../../src/main_process/network/server/state.js', () => ({
         storedServer = server;
     }),
     setKademliaDHT: vi.fn(),
+    setNetworkReady: vi.fn(),
+    clearSendQueue: vi.fn(),
     setDhtMaintenanceTimer: vi.fn((timer: ReturnType<typeof setInterval> | null) => {
         storedTimer = timer;
     }),

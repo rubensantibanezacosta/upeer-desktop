@@ -48,7 +48,7 @@ vi.mock('../../../src/main_process/network/handlers.js', () => ({ queryOwnVaults
 vi.mock('../../../src/main_process/network/server/mediaWorker.js', () => ({
     createMediaVerificationWorker: vi.fn(() => {
         mocks.port = Object.assign(new EventEmitter(), { start: vi.fn(), close: vi.fn(), postMessage: vi.fn() });
-        mocks.worker = { postMessage: vi.fn(), kill: vi.fn() };
+        mocks.worker = Object.assign(new EventEmitter(), { postMessage: vi.fn(), kill: vi.fn() });
         return { worker: mocks.worker, port: mocks.port };
     }),
 }));

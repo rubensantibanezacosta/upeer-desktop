@@ -64,7 +64,7 @@ describe('WebCodecsSession worker bridge', () => {
         await vi.waitFor(() => expect(worker.messages).toHaveLength(1));
 
         expect(track.clone).toHaveBeenCalledOnce();
-        expect(worker.messages[0]?.message).toMatchObject({ type: 'encode-frame', kind: 'video', frame });
+        expect(worker.messages[0]?.message).toMatchObject({ type: 'encode-frame', kind: 'video', frame, captureId: 'video' });
         expect(worker.messages[0]?.transfer).toEqual([frame]);
         await session.release();
         vi.unstubAllGlobals();

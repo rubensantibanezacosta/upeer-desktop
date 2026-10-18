@@ -1,5 +1,6 @@
 import { type CallMediaKind, type MediaFrame } from './mediaChunker.js';
 import type { MediaCodec } from './mediaPipeline.js';
+import { getAudioEncoderConfig } from './audioCodecConfig.js';
 
 export class PassthroughMediaCodec implements MediaCodec {
     async encode(frame: MediaFrame): Promise<Uint8Array> {
@@ -94,8 +95,8 @@ export class WebCodecsMediaCodec implements MediaCodec {
             error: () => undefined,
         });
         const config = kind === 'audio'
-            ? { codec: 'opus', sampleRate: 48000, numberOfChannels: 1 }
-            : { codec: 'vp8', width: 640, height: 480, bitrate: 300_000 };
+            ? getAudioEncoderConfig('audio', 48000, 1)
+            : { codec: 'vp8', width: 1280, height: 720, bitrate: 700_000, framerate: 24 };
         encoder.configure(config);
         this.encoders[kind] = encoder;
         return encoder;
@@ -124,7 +125,7 @@ export class WebCodecsMediaCodec implements MediaCodec {
         if (frame.kind === 'audio') {
             return { timestamp: frame.ts, data: frame.data };
         }
-        return { timestamp: frame.ts, data: frame.data, codedWidth: 640, codedHeight: 480 };
+        return { timestamp: frame.ts, data: frame.data, codedWidth: 1280, codedHeight: 720 };
     }
 
     private chunkToBytes(chunk: { byteLength?: number; copyTo?: (target: Uint8Array) => void }): Uint8Array {

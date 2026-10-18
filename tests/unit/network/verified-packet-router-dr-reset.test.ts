@@ -100,7 +100,7 @@ describe('verifiedPacketRouter DR_RESET edges', () => {
             sendResponse: vi.fn(),
         });
 
-        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id');
+        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'direct');
         expect(contactKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
         expect(chatRetry.retryPendingDirectMessages).toHaveBeenCalledWith('peer-id');
         expect(encryptedRetry.retryPendingEncryptedOperations).toHaveBeenCalledWith('peer-id');
