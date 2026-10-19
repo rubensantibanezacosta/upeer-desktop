@@ -97,9 +97,34 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         if (!effectiveId) return;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
+            let sourcePath = file.path;
+            if (file.path.startsWith('data:image/')) {
+                const dataUrlMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(file.path);
+                if (!dataUrlMatch) {
+                    console.error('La imagen editada tiene un formato de datos no válido', { file: file.name });
+                    continue;
+                }
+                const tempResult = await window.upeer.saveBufferToTemp({
+                    base64: dataUrlMatch[2],
+                    fileName: file.name,
+                });
+                if (!tempResult.success || !tempResult.path) {
+                    console.error('Error al guardar temporalmente la imagen editada', { file: file.name, error: tempResult.error });
+                    continue;
+                }
+                sourcePath = tempResult.path;
+            }
+            const persistResult = await window.upeer.persistInternalAsset({
+                filePath: sourcePath,
+                fileName: file.name,
+            });
+            if (!persistResult.success || !persistResult.path) {
+                console.error('Error al preparar el archivo para la transferencia', { file: file.name, error: persistResult.error });
+                continue;
+            }
             const result = await fileTransfer.startTransfer({
                 upeerId: effectiveId,
-                filePath: file.path,
+                filePath: persistResult.path,
                 thumbnail: thumbnails?.[i],
                 caption: captions?.[i],
                 fileName: file.name

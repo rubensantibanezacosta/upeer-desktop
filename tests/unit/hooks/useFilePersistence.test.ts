@@ -120,13 +120,38 @@ describe('useFilePersistence', () => {
     });
 
     it('handleFileSubmit inicia la transferencia y añade el mensaje', async () => {
+        upeerMock.persistInternalAsset.mockResolvedValue({ success: true, path: '/assets/a.txt' });
         const { result } = makeHook();
         await act(async () => {
             await result.current.handleFileSubmit([{ path: '/a.txt', name: 'a.txt', size: 5, type: 'text/plain', lastModified: 1 }]);
         });
-        expect(startTransfer).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/a.txt' }));
+        expect(upeerMock.persistInternalAsset).toHaveBeenCalledWith({ filePath: '/a.txt', fileName: 'a.txt' });
+        expect(startTransfer).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/assets/a.txt' }));
         expect(mocks.addFileTransferMessage).toHaveBeenCalled();
         expect(mocks.setFilePickerOpen).toHaveBeenCalledWith(false);
+    });
+
+    it('no inicia la transferencia si no puede persistir el archivo', async () => {
+        upeerMock.persistInternalAsset.mockResolvedValue({ success: false, error: 'Ruta no autorizada' });
+        const { result } = makeHook();
+        await act(async () => {
+            await result.current.handleFileSubmit([{ path: '/tmp/edited.png', name: 'Subtract (1).png', size: 5, type: 'image/png', lastModified: 1 }]);
+        });
+        expect(startTransfer).not.toHaveBeenCalled();
+        expect(mocks.addFileTransferMessage).not.toHaveBeenCalled();
+    });
+
+    it('guarda una imagen editada temporalmente y persiste su ruta antes de enviarla', async () => {
+        const editedDataUrl = 'data:image/png;base64,SGVsbG8=';
+        upeerMock.saveBufferToTemp.mockResolvedValue({ success: true, path: '/tmp/upeer-voicemail/Subtract (1).png' });
+        upeerMock.persistInternalAsset.mockResolvedValue({ success: true, path: '/assets/Subtract (1).png' });
+        const { result } = makeHook();
+        await act(async () => {
+            await result.current.handleFileSubmit([{ path: editedDataUrl, name: 'Subtract (1).png', size: 5, type: 'image/png', lastModified: 1 }]);
+        });
+        expect(upeerMock.saveBufferToTemp).toHaveBeenCalledWith({ base64: 'SGVsbG8=', fileName: 'Subtract (1).png' });
+        expect(upeerMock.persistInternalAsset).toHaveBeenCalledWith({ filePath: '/tmp/upeer-voicemail/Subtract (1).png', fileName: 'Subtract (1).png' });
+        expect(startTransfer).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/assets/Subtract (1).png' }));
     });
 
     it('handleSendVoiceNote guarda el audio y lo envía como nota de voz', async () => {

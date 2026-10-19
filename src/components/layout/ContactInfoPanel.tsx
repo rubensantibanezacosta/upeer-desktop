@@ -32,6 +32,10 @@ interface ContactInfoPanelProps {
     onArchive?: () => void;
     onMute?: () => void;
     onFavorite?: () => void;
+    onCallAudio?: () => void;
+    onCallVideo?: () => void;
+    onSearch?: () => void;
+    callsUnavailable?: boolean;
 }
 
 export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
@@ -48,6 +52,10 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     onArchive,
     onMute,
     onFavorite,
+    onCallAudio,
+    onCallVideo,
+    onSearch,
+    callsUnavailable,
 }) => {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [currentView, setCurrentView] = useState<'main' | 'media' | 'cipher'>('main');
@@ -109,6 +117,10 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                         onOpenMedia={onOpenMedia}
                         onViewAllMedia={() => setCurrentView('media')}
                         onOpenCipher={() => setCurrentView('cipher')}
+                        onCallAudio={onCallAudio ?? (() => undefined)}
+                        onCallVideo={onCallVideo ?? (() => undefined)}
+                        onSearch={onSearch ?? (() => undefined)}
+                        callsUnavailable={callsUnavailable ?? false}
                     />
                 </SlidingPanelView>
 

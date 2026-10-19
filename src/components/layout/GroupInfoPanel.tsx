@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItem, ListItemButton, ListItemContent, Modal, ModalDialog, Typography } from '@mui/joy';
+import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItem, ListItemButton, ListItemContent, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
 import CloseIcon from '@mui/icons-material/Close';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
@@ -10,6 +10,9 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import SearchIcon from '@mui/icons-material/Search';
 import { Contact, Group } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
@@ -35,9 +38,13 @@ interface GroupInfoPanelProps {
     onLeaveGroup?: () => void;
     onTransferAdmin?: (memberId: string) => void;
     onRemoveMember?: (memberId: string) => void;
+    onCallAudio?: () => void;
+    onCallVideo?: () => void;
+    onSearch?: () => void;
+    callsUnavailable?: boolean;
 }
 
-export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember }) => {
+export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember, onCallAudio, onCallVideo, onSearch, callsUnavailable = false }) => {
     const [currentView, setCurrentView] = useState<'main' | 'media'>('main');
     const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'leave' } | { type: 'transfer' | 'remove'; memberId: string } | null>(null);
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
@@ -53,18 +60,27 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
     return (
         <Box sx={{ width: { xs: '100%', sm: 380, lg: 480 }, minWidth: 0, maxWidth: 480, flexShrink: 0, borderLeft: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             <Box sx={{ height: 60, px: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-                <IconButton aria-label="Cerrar info del grupo" size="sm" variant="plain" color="neutral" onClick={onClose}><CloseIcon /></IconButton>
-                <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del grupo</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <IconButton aria-label="Cerrar info del grupo" size="sm" variant="plain" color="neutral" onClick={onClose}><CloseIcon /></IconButton>
+                    <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del grupo</Typography>
+                </Box>
             </Box>
             {currentView === 'media' ? (
-                <ContactMediaExplorer items={sharedMedia} onBack={() => setCurrentView('main')} onOpenMedia={onOpenMedia ?? (() => undefined)} />
-            ) : <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <ContactMediaExplorer items={sharedMedia} onBack={() => setCurrentView('main')} onOpenMedia={onOpenMedia ?? (() => undefined)} />
+                </Box>
+            ) : <Box sx={{ flexGrow: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
                 <Box sx={{ pt: 4, pb: 3, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1 }}>
-                    <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, borderRadius: '50%', mb: 1 }}>
+                    <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, borderRadius: 'md', mb: 1 }}>
                         {!group.avatar && <GroupsIcon sx={{ fontSize: 40 }} />}
                     </Avatar>
                     <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
                     <Typography level="body-sm" color="neutral">Grupo · {group.members.length} miembro{group.members.length === 1 ? '' : 's'}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, pt: 1 }}>
+                        <Button aria-label="Llamar al grupo" disabled={callsUnavailable} onClick={onCallAudio} startDecorator={<LocalPhoneIcon />}>Llamar</Button>
+                        <Button aria-label="Videollamar al grupo" disabled={callsUnavailable} onClick={onCallVideo} startDecorator={<VideocamIcon />}>Vídeo</Button>
+                        <Button aria-label="Buscar en el chat" onClick={onSearch} startDecorator={<SearchIcon />}>Buscar</Button>
+                    </Box>
                 </Box>
                 <Divider />
                 <Box sx={{ px: 2, pt: 2, pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -77,15 +93,19 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                             const name = isCurrentUser ? 'Tú' : contact?.name || `${id.slice(0, 12)}…`;
                             return (
                                 <ListItem key={id} sx={{ gap: 1.5, py: 1 }}>
-                                    <Avatar src={contact?.avatar || undefined} size="md">{name.charAt(0).toUpperCase()}</Avatar>
+                                    <Avatar src={contact?.avatar || undefined} size="md" sx={{ borderRadius: 'md' }}>{name.charAt(0).toUpperCase()}</Avatar>
                                     <ListItemContent>
                                         <Typography level="body-sm">{name}</Typography>
                                         {contact?.alias && contact.alias !== contact.name && <Typography level="body-xs" color="neutral">{contact.alias}</Typography>}
                                     </ListItemContent>
                                     {memberIsAdmin && <Chip size="sm" variant="soft" color="success">Admin. del grupo</Chip>}
                                     {isAdmin && !isCurrentUser && !memberIsAdmin && <>
-                                        <IconButton aria-label={`Hacer admin a ${name}`} size="sm" variant="plain" onClick={() => setConfirmAction({ type: 'transfer', memberId: id })}><AdminPanelSettingsIcon /></IconButton>
-                                        <IconButton aria-label={`Expulsar a ${name}`} size="sm" variant="plain" color="danger" onClick={() => setConfirmAction({ type: 'remove', memberId: id })}><PersonRemoveIcon /></IconButton>
+                                        <Tooltip title={`Hacer administrador a ${name}`} variant="soft">
+                                            <IconButton aria-label={`Hacer admin a ${name}`} size="sm" variant="plain" onClick={() => setConfirmAction({ type: 'transfer', memberId: id })}><AdminPanelSettingsIcon /></IconButton>
+                                        </Tooltip>
+                                        <Tooltip title={`Expulsar a ${name}`} variant="soft">
+                                            <IconButton aria-label={`Expulsar a ${name}`} size="sm" variant="plain" color="danger" onClick={() => setConfirmAction({ type: 'remove', memberId: id })}><PersonRemoveIcon /></IconButton>
+                                        </Tooltip>
                                     </>}
                                 </ListItem>
                             );

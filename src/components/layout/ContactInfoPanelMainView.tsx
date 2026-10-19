@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     Box,
+    Button,
     Divider,
     IconButton,
     List,
@@ -13,6 +14,9 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import LockIcon from '@mui/icons-material/Lock';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import SearchIcon from '@mui/icons-material/Search';
 import { Contact } from '../../types/chat.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { ContactInfoHero } from './ContactInfoHero.js';
@@ -30,6 +34,10 @@ interface ContactInfoPanelMainViewProps {
     onOpenMedia: (media: { url: string; name: string; mimeType: string; fileId: string }) => void;
     onViewAllMedia: () => void;
     onOpenCipher: () => void;
+    onCallAudio: () => void;
+    onCallVideo: () => void;
+    onSearch: () => void;
+    callsUnavailable: boolean;
 }
 
 export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> = ({
@@ -44,6 +52,10 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
     onOpenMedia,
     onViewAllMedia,
     onOpenCipher,
+    onCallAudio,
+    onCallVideo,
+    onSearch,
+    callsUnavailable,
 }) => (
     <>
         <Box
@@ -76,6 +88,12 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                 lastSeenText={lastSeenText}
                 trust={trust}
             />
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, pb: 2 }}>
+                <Button aria-label="Llamar" disabled={callsUnavailable || contact.status === 'blocked' || contact.status === 'pending' || contact.status === 'incoming'} onClick={onCallAudio} startDecorator={<LocalPhoneIcon />}>Llamar</Button>
+                <Button aria-label="Videollamar" disabled={callsUnavailable || contact.status === 'blocked' || contact.status === 'pending' || contact.status === 'incoming'} onClick={onCallVideo} startDecorator={<VideocamIcon />}>Vídeo</Button>
+                <Button aria-label="Buscar en el chat" onClick={onSearch} startDecorator={<SearchIcon />}>Buscar</Button>
+            </Box>
 
             <ContactMediaStrip items={sharedMedia} onOpenMedia={onOpenMedia} onViewAll={onViewAllMedia} />
 

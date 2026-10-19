@@ -33,6 +33,32 @@ describe('GroupInfoPanel', () => {
         expect(screen.getByRole('button', { name: 'Añadir' })).toBeDefined();
     });
 
+    it('expone llamadas de voz, vídeo y búsqueda para el grupo', () => {
+        const onCallAudio = vi.fn();
+        const onCallVideo = vi.fn();
+        const onSearch = vi.fn();
+        render(
+            <GroupInfoPanel
+                group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'self', members: ['self', 'peer'], status: 'active' }}
+                contacts={[]}
+                currentUserId="self"
+                onClose={vi.fn()}
+                onInviteMembers={vi.fn()}
+                onCallAudio={onCallAudio}
+                onCallVideo={onCallVideo}
+                onSearch={onSearch}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Llamar al grupo' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Videollamar al grupo' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Buscar en el chat' }));
+
+        expect(onCallAudio).toHaveBeenCalledOnce();
+        expect(onCallVideo).toHaveBeenCalledOnce();
+        expect(onSearch).toHaveBeenCalledOnce();
+    });
+
     it('cierra el panel y no muestra la acción de invitar a miembros si no eres administrador', () => {
         const onClose = vi.fn();
 

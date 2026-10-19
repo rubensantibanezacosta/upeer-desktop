@@ -123,6 +123,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
 }) => {
     const { startCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeCallKind = useCallStore((state) => Object.values(state.calls).find((call) => call.phase !== 'ended')?.kind);
+    const callsUnavailable = useCallStore((state) => state.isStartingCall || Object.keys(state.calls).length > 0);
     const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
     const groupMedia = useSharedMediaItems(
@@ -325,6 +326,10 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onBlockContact={handleBlockContact}
                                         onDeleteContact={() => handleDeleteContact(targetUpeerId)}
                                         onOpenMedia={handleMediaClick}
+                                        onCallAudio={() => void startCall(targetUpeerId, 'audio')}
+                                        onCallVideo={() => void startCall(targetUpeerId, 'video')}
+                                        onSearch={() => setIsChatSearchOpen(true)}
+                                        callsUnavailable={callsUnavailable}
                                     />
                                 )}
                                 {activeGroupId && activeGroup && isGroupInfoOpen && (
@@ -336,6 +341,10 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onClose={() => setIsGroupInfoOpen(false)}
                                         onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
                                         onOpenMedia={handleMediaClick}
+                                        onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup.members, activeGroupId)}
+                                        onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup.members, activeGroupId)}
+                                        onSearch={() => setIsChatSearchOpen(true)}
+                                        callsUnavailable={callsUnavailable}
                                         onFavorite={() => chatStore.handleToggleFavoriteGroup(activeGroupId)}
                                         onClearChat={() => handleClearChat(activeGroupId)}
                                         onLeaveGroup={() => chatStore.handleLeaveGroup(activeGroupId)}
