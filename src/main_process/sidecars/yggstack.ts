@@ -11,6 +11,8 @@ import {
 } from './yggstackShared.js';
 import { addAddressCallback, addStatusCallback, emitStatus, yggstackState } from './yggstackState.js';
 import { bindYggstackOutput, ensureYggstackExecutable, getRestartDelayMs, spawnYggstackProcess } from './yggstackProcessSupport.js';
+import { fetchConnectedPeers } from './yggstackAdmin.js';
+import type { ConnectedPeer } from './yggstackAdmin.js';
 
 export type { YggStatus } from './yggstackShared.js';
 
@@ -24,6 +26,16 @@ export function onYggstackStatus(cb: StatusCallback): void {
 
 export function getYggstackAddress(): string | null {
     return yggstackState.detectedAddress;
+}
+
+export async function getConnectedPeers(): Promise<ConnectedPeer[] | null> {
+    try {
+        yggstackState.activePeers = await fetchConnectedPeers();
+    } catch (err) {
+        warn('Failed to query connected yggstack peers', { err: String(err) }, 'yggstack');
+        return null;
+    }
+    return [...yggstackState.activePeers];
 }
 
 export function getRestartAttempts(): number {

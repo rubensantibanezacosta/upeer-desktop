@@ -12,6 +12,8 @@ import {
     FALLBACK_PEERS,
     HEALTH_CHECK_INTERVAL_MS,
     MAX_ACTIVE_PEERS,
+    MIN_ACTIVE_PEERS,
+    MIN_STOCK_PEERS,
     computeScore,
     logTopPeers,
     makePeerInfo,
@@ -29,6 +31,9 @@ const refreshCacheSnapshot = (cacheDir: string) => {
 
 const applyActivePeers = () => {
     peerManagerState.activePeers = peerManagerState.peerPool.slice(0, MAX_ACTIVE_PEERS);
+    if (peerManagerState.activePeers.length < MIN_ACTIVE_PEERS) {
+        warn(`Only ${peerManagerState.activePeers.length}/${MIN_ACTIVE_PEERS} minimum active peers are reachable`, undefined, 'peers');
+    }
     peerManagerState.peersChangedCb?.(peerManagerState.activePeers.map((peer) => peer.uri));
 };
 
@@ -36,7 +41,7 @@ export const restorePeerCache = (cacheDir: string) => {
     const cached = loadCache(cacheDir);
     const cacheAge = cached ? Date.now() - cached.lastFullRefresh : Infinity;
 
-    if (!cached || cacheAge >= CACHE_TTL_MS || cached.peers.length < 4) {
+    if (!cached || cacheAge >= CACHE_TTL_MS || cached.peers.length < MIN_ACTIVE_PEERS) {
         return false;
     }
 
@@ -44,7 +49,10 @@ export const restorePeerCache = (cacheDir: string) => {
     info(`Peers cache valid (${cached.peers.length} nodes, refresh in ${minLeft} min)`, undefined, 'peers');
     peerManagerState.selfGeo = cached.selfGeo;
     peerManagerState.peerPool = cached.peers;
-    peerManagerState.activePeers = cached.peers.slice(0, MAX_ACTIVE_PEERS);
+    peerManagerState.peerPool = cached.peers
+        .filter((peer) => peer.alive)
+        .sort((a, b) => b.score - a.score);
+    peerManagerState.activePeers = peerManagerState.peerPool.slice(0, MAX_ACTIVE_PEERS);
 
     setTimeout(() => {
         void fullRefresh(cacheDir).catch((err) => {
@@ -67,14 +75,18 @@ export async function fullRefresh(cacheDir: string): Promise<void> {
         }
     }
 
-    const rawPeers = await fetchPeersWithMeta();
-    info(`${rawPeers.length} online peers parsed`, undefined, 'peers');
+    const apiPeers = await fetchPeersWithMeta();
+    info(`${apiPeers.length} online peers parsed`, undefined, 'peers');
 
-    const existingUris = new Set(rawPeers.map((peer) => peer.uri));
-    for (const fallbackPeer of FALLBACK_PEERS) {
-        if (!existingUris.has(fallbackPeer.uri)) {
-            rawPeers.push(makePeerInfo(fallbackPeer.uri, fallbackPeer.country, 90));
-        }
+    const candidatesByUri = new Map([
+        ...FALLBACK_PEERS.map((peer) => [peer.uri, makePeerInfo(peer.uri, peer.country, 90)] as const),
+        ...peerManagerState.peerPool.map((peer) => [peer.uri, peer] as const),
+        ...apiPeers.map((peer) => [peer.uri, peer] as const),
+    ]);
+    const rawPeers = [...candidatesByUri.values()];
+
+    if (rawPeers.length < MIN_STOCK_PEERS) {
+        warn(`Peer candidate stock below target (${rawPeers.length}/${MIN_STOCK_PEERS})`, undefined, 'peers');
     }
 
     if (peerManagerState.selfGeo) {
@@ -143,13 +155,15 @@ export async function healthCheck(cacheDir: string): Promise<void> {
                 continue;
             }
 
+            peerManagerState.activePeers = peerManagerState.activePeers.filter((activePeer) => activePeer.uri !== peer.uri);
+            activeSet.delete(peer.uri);
+            changed = true;
             warn('Peer pool exhausted — triggering background rediscovery', undefined, 'peers');
             setTimeout(() => {
                 void fullRefresh(cacheDir).catch((err) => {
                     warn('Peer rediscovery after pool exhaustion failed', { err: String(err) }, 'peers');
                 });
             }, 2_000);
-            return;
         }
     }
 

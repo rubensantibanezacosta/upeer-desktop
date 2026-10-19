@@ -10,8 +10,6 @@ import {
     PUBLIC_PEERS_URL,
     PROBE_BATCH_SIZE,
     PROBE_TIMEOUT_MS,
-    extractHost,
-    extractPort,
     haversineKm,
     isIPv4,
     isIPv6,
@@ -23,34 +21,38 @@ export async function fetchPeersWithMeta(): Promise<PeerInfo[]> {
     const content = await httpGet(PUBLIC_PEERS_URL, FETCH_TIMEOUT_MS);
     if (!content) return [];
 
-    const peers: PeerInfo[] = [];
-    const headings: Array<{ pos: number; name: string }> = [];
-    const headingRegex = /(?:<h[23][^>]*>([^<]+)<\/h[23]>|^#{1,3}\s+(.+)$)/gim;
-    let headingMatch: RegExpExecArray | null;
-    while ((headingMatch = headingRegex.exec(content)) !== null) {
-        const raw = (headingMatch[1] ?? headingMatch[2] ?? '').trim().replace(/\s+/g, ' ');
-        if (raw && !/peer|v\d|\bapi\b/i.test(raw) && raw.length < 60) {
-            headings.push({ pos: headingMatch.index, name: raw });
-        }
+    let response: { peers?: Array<{ uri?: unknown; country?: unknown; status?: unknown; uptime_pct?: unknown }> };
+    try {
+        response = JSON.parse(content) as typeof response;
+    } catch (error) {
+        warn('Failed to parse public peers API response', { err: String(error) }, 'peers');
+        return [];
+    }
+
+    if (!Array.isArray(response.peers)) {
+        warn('Public peers API response has no peers array', undefined, 'peers');
+        return [];
     }
 
     const seen = new Set<string>();
-    const markdownRegex = /\|\s*((?:tcp|tls):\/\/[^\s|]+)\s*\|\s*online[^|]*\|\s*(\d+)%/gi;
-    let markdownMatch: RegExpExecArray | null;
-    while ((markdownMatch = markdownRegex.exec(content)) !== null) {
-        tryAddPeer(markdownMatch[1].trim(), parseInt(markdownMatch[2], 10), markdownMatch.index, peers, headings, seen);
-    }
+    const peers: PeerInfo[] = [];
+    for (const item of response.peers) {
+        if (typeof item.uri !== 'string' || item.status !== 'up' || seen.has(item.uri)) continue;
+        if (!/^(?:tcp|tls):\/\//i.test(item.uri)) continue;
 
-    if (peers.length === 0) {
-        const htmlRegex = /href=["']((?:tcp|tls):\/\/[^"'<\s]+)["'][^>]*>[\s\S]{1,300}?online[\s\S]{1,150}?(\d+)%/gi;
-        let htmlMatch: RegExpExecArray | null;
-        while ((htmlMatch = htmlRegex.exec(content)) !== null) {
-            tryAddPeer(htmlMatch[1].trim(), parseInt(htmlMatch[2], 10), htmlMatch.index, peers, headings, seen);
-        }
+        const uptimePct = typeof item.uptime_pct === 'number' && Number.isFinite(item.uptime_pct)
+            ? Math.max(0, Math.min(100, item.uptime_pct))
+            : 0;
+        const country = typeof item.country === 'string' && item.country.trim() ? item.country.trim() : 'Unknown';
+        const peer = makePeerInfo(item.uri, country, uptimePct);
+        if (!peer.host || peer.port <= 0) continue;
+
+        seen.add(item.uri);
+        peers.push(peer);
     }
 
     const countries = new Set(peers.map(peer => peer.country)).size;
-    info(`Parsed ${peers.length} peers from ${countries} countries`, undefined, 'peers');
+    info(`Parsed ${peers.length} online peers from API across ${countries} countries`, undefined, 'peers');
     return peers;
 }
 
@@ -169,32 +171,14 @@ export async function probePeerLatency(uri: string): Promise<{ alive: boolean; l
     });
 }
 
-function tryAddPeer(
-    uri: string,
-    uptimePct: number,
-    pos: number,
-    peers: PeerInfo[],
-    headings: Array<{ pos: number; name: string }>,
-    seen: Set<string>
-): void {
-    if (seen.has(uri)) return;
-    const host = extractHost(uri);
-    const port = extractPort(uri);
-    if (!host || port <= 0) return;
-
-    let country = 'Unknown';
-    for (const heading of headings) {
-        if (heading.pos <= pos) country = heading.name;
-        else break;
-    }
-
-    seen.add(uri);
-    peers.push(makePeerInfo(uri, country, uptimePct));
-}
-
 function httpGet(url: string, timeoutMs: number): Promise<string | null> {
     return new Promise(resolve => {
         const req = https.get(url, { timeout: timeoutMs }, (res) => {
+            if (res.statusCode != null && (res.statusCode < 200 || res.statusCode >= 300)) {
+                res.resume();
+                resolve(null);
+                return;
+            }
             let data = '';
             res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
             res.on('end', () => resolve(data));

@@ -27,7 +27,7 @@ export interface PeerCache {
     lastFullRefresh: number;
 }
 
-export const PUBLIC_PEERS_URL = 'https://publicpeers.neilalexander.dev/';
+export const PUBLIC_PEERS_URL = 'https://yggpeers.fsky.io/api/v1/peers?status=up&is_network=false';
 export const GEO_SELF_URL = 'https://ip-api.com/json?fields=lat,lon,countryCode';
 export const GEO_BATCH_URL = 'https://ip-api.com/batch?fields=lat,lon,countryCode,query';
 export const PROBE_TIMEOUT_MS = 3_000;
@@ -36,7 +36,9 @@ export const FETCH_TIMEOUT_MS = 10_000;
 export const CACHE_TTL_MS = 2 * 60 * 60 * 1_000;
 export const HEALTH_CHECK_INTERVAL_MS = 5 * 60 * 1_000;
 export const PROBE_BATCH_SIZE = 30;
-export const MAX_ACTIVE_PEERS = 8;
+export const MIN_ACTIVE_PEERS = 2;
+export const MAX_ACTIVE_PEERS = 3;
+export const MIN_STOCK_PEERS = 10;
 export const MAX_GEO_DISTANCE_KM = 12_000;
 
 export const FALLBACK_PEERS: Array<{ uri: string; country: string }> = [

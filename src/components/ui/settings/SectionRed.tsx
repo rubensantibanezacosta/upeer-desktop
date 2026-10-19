@@ -81,6 +81,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
     const showRetry = isDown || (isReconnecting && maxedOut);
 
     const peers = stats?.peers ?? [];
+    const reservePeers = stats?.reservePeers ?? [];
     const latencies = peers.map(p => p.latencyMs).filter((l): l is number => l !== null);
     const avgLatency = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : null;
     const maxLatency = latencies.length ? Math.max(...latencies) : LATENCY_MAX;
@@ -120,7 +121,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </Box>
             </Box>
 
-            {isUp && peers.length > 0 && (
+            {isUp && stats && (
                 <>
                     <Divider sx={{ mx: 1.5, my: 0.5 }} />
                     <Box sx={{ px: 2, py: 1.5 }}>
@@ -128,11 +129,17 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                 <PublicIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
                                 <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                                    Nodos activos · {peers.length}
+                                    Conectados en Yggdrasil · {stats.connectionStatusAvailable ? peers.length : '—'}
                                 </Typography>
                             </Box>
                             <LiveDot freshSec={freshSec} />
                         </Box>
+
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary', mb: 1 }}>
+                            {stats.connectionStatusAvailable
+                                ? 'Conexiones actuales reportadas por yggstack.'
+                                : 'No se pudo consultar el estado real de conexiones de yggstack.'}
+                        </Typography>
 
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
                             {avgLatency !== null && (
@@ -158,6 +165,28 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             selfLon={stats?.selfLon ?? null}
                         />
 
+                        <Typography level="body-xs" sx={{ fontWeight: 700, mt: 1.5, mb: 0.5 }}>Conectados ahora · {peers.length}</Typography>
+                        {peers.length > 0
+                            ? peers.map((peer) => <PeerRow key={`connected-${peer.uri}`} peer={peer} maxLatency={maxLatency} />)
+                            : <Typography level="body-xs" sx={{ color: 'text.tertiary', py: 0.5 }}>Sin peers públicos conectados.</Typography>}
+
+                        <Typography level="body-xs" sx={{ fontWeight: 700, mt: 1.25, mb: 0.5 }}>
+                            Peers públicos en reserva · {reservePeers.length}
+                        </Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 0.5 }}>
+                            {reservePeers.map((peer) => (
+                                <Box key={`reserve-${peer.uri}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 0.75, py: 0.35, borderRadius: 'sm', backgroundColor: 'background.level1' }}>
+                                    <Typography level="body-xs" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.68rem' }} title={peer.uri}>
+                                        {peer.country} · {peer.host}
+                                    </Typography>
+                                    <Typography level="body-xs" sx={{ color: 'text.tertiary', flexShrink: 0, fontSize: '0.65rem' }}>
+                                        {peer.latencyMs !== null ? `${peer.latencyMs} ms` : '—'}
+                                    </Typography>
+                                </Box>
+                            ))}
+                            {reservePeers.length === 0 && <Typography level="body-xs" sx={{ color: 'text.tertiary', py: 0.25 }}>No hay peers públicos de reserva.</Typography>}
+                        </Box>
+
                         <Box sx={{ display: 'grid', gridTemplateColumns: '160px 1fr 56px', gap: 1.5, mb: 0.5, px: 0.5 }}>
                             <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem' }}>Nodo</Typography>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -167,9 +196,6 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem', textAlign: 'right' }}>Latencia</Typography>
                         </Box>
 
-                        {peers.map((peer, i) => (
-                            <PeerRow key={peer.host || i} peer={peer} maxLatency={maxLatency} />
-                        ))}
                     </Box>
                 </>
             )}

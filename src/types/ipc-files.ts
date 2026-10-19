@@ -79,11 +79,32 @@ export interface SaveTransferredFileResponse {
 }
 
 export interface GetNetworkStatsResponse {
-    yggdrasilAddress: string;
-    connectedPeers: number;
-    bytesSent: number;
-    bytesReceived: number;
-    uptimeSeconds: number;
+    peerCount: number;
+    connectionStatusAvailable: boolean;
+    peers: Array<{
+        uri: string;
+        host: string;
+        country: string;
+        latencyMs: number | null;
+        score: number;
+        alive: boolean;
+        lat: number | null;
+        lon: number | null;
+    }>;
+    reservePeers: Array<{
+        uri: string;
+        host: string;
+        country: string;
+        latencyMs: number | null;
+        score: number;
+        alive: boolean;
+        lat: number | null;
+        lon: number | null;
+    }>;
+    restartAttempts: number;
+    maxRestartAttempts: number;
+    selfLat: number | null;
+    selfLon: number | null;
 }
 
 export interface RestartYggstackResponse {

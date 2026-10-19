@@ -10,6 +10,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 
 export interface PeerStat {
+    uri: string;
     host: string;
     country: string;
     latencyMs: number | null;
@@ -21,7 +22,9 @@ export interface PeerStat {
 
 export interface NetworkStats {
     peerCount: number;
+    connectionStatusAvailable: boolean;
     peers: PeerStat[];
+    reservePeers: PeerStat[];
     restartAttempts: number;
     maxRestartAttempts: number;
     selfLat: number | null;
@@ -91,6 +94,12 @@ export const PeerRow: React.FC<{ peer: PeerStat; maxLatency: number }> = ({ peer
                     sx={{ color: 'text.tertiary', fontSize: '0.65rem', fontFamily: 'monospace', lineHeight: 1.2 }}
                 >
                     {shortHost}
+                </Typography>
+                <Typography
+                    level="body-xs"
+                    sx={{ color: 'text.tertiary', fontSize: '0.58rem', fontFamily: 'monospace', lineHeight: 1.2, wordBreak: 'break-all' }}
+                >
+                    {peer.uri}
                 </Typography>
             </Box>
 

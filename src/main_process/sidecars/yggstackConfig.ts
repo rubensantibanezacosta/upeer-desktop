@@ -5,6 +5,7 @@ import { exec } from 'node:child_process';
 import { info } from '../security/secure-logger.js';
 import { initPeerManager, setOnPeersChanged } from './peer-manager.js';
 import { yggstackState } from './yggstackState.js';
+import { YGGSTACK_ADMIN_HOST, YGGSTACK_ADMIN_PORT } from './yggstackShared.js';
 
 export function resolveYggstackPath(): string {
     const platformFolder = `${process.platform}-${process.arch}`;
@@ -50,8 +51,13 @@ export async function ensureConfig(yggstackPath: string): Promise<string> {
 
     if (fs.existsSync(confPath)) {
         info(`Updating peers in existing config: ${confPath}`, undefined, 'yggstack');
-        const updatedConf = fs.readFileSync(confPath, 'utf8').replace(/(Peers:\s*\[)([\s\S]*?)(\])/, `$1\n${peersHjson}\n  $3`);
-        fs.writeFileSync(confPath, updatedConf, 'utf8');
+        const updatedConf = fs.readFileSync(confPath, 'utf8')
+            .replace(/(Peers:\s*\[)([\s\S]*?)(\])/, `$1\n${peersHjson}\n  $3`)
+            .replace(/AdminListen:\s*.*$/m, `AdminListen: tcp://${YGGSTACK_ADMIN_HOST}:${YGGSTACK_ADMIN_PORT}`);
+        const configuredConf = /AdminListen:/m.test(updatedConf)
+            ? updatedConf
+            : `${updatedConf.trimEnd()}\nAdminListen: tcp://${YGGSTACK_ADMIN_HOST}:${YGGSTACK_ADMIN_PORT}\n`;
+        fs.writeFileSync(confPath, configuredConf, 'utf8');
         return confPath;
     }
 
@@ -68,7 +74,7 @@ export async function ensureConfig(yggstackPath: string): Promise<string> {
 
     const conf = generatedConf
         .replace(/(Peers:\s*\[)([\s\S]*?)(\])/, `$1\n${peersHjson}\n  $3`)
-        .replace(/AdminListen:\s*.*/, 'AdminListen: none');
+        .replace(/AdminListen:\s*.*/, `AdminListen: tcp://${YGGSTACK_ADMIN_HOST}:${YGGSTACK_ADMIN_PORT}`);
 
     fs.writeFileSync(confPath, conf, 'utf8');
     info(`Config saved to: ${confPath}`, undefined, 'yggstack');

@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import https from 'node:https';
 import net from 'node:net';
 import dns from 'node:dns';
+import { PUBLIC_PEERS_URL } from '../../../src/main_process/sidecars/peerManagerShared.js';
 
 type LookupResult = Awaited<ReturnType<typeof dns.promises.lookup>>;
-type MockResponse = EventEmitter & { statusCode?: number };
+type MockResponse = EventEmitter & { statusCode?: number; resume: ReturnType<typeof vi.fn> };
 type MockRequest = EventEmitter & {
     write: ReturnType<typeof vi.fn>;
     end: ReturnType<typeof vi.fn>;
@@ -17,7 +18,7 @@ type RequestOptionsLike = { path?: string };
 type ResponseCallback = (response: MockResponse) => void;
 
 function createResponse(statusCode = 200): MockResponse {
-    return Object.assign(new EventEmitter(), { statusCode });
+    return Object.assign(new EventEmitter(), { statusCode, resume: vi.fn() });
 }
 
 function createRequest(): MockRequest {
@@ -48,6 +49,12 @@ vi.mock('node:dns', () => ({
     promises: { lookup: vi.fn() }
 }));
 
+const apiPeers = [
+    { uri: 'tcp://1.2.3.4:1234', country: 'Spain', status: 'up', uptime_pct: 98 },
+    { uri: 'tcp://1.1.1.1:1111', country: 'France', status: 'up', uptime_pct: 100 },
+    { uri: 'tcp://2.2.2.2:2222', country: 'Germany', status: 'down', uptime_pct: 95 },
+];
+
 import * as peerManager from '../../../src/main_process/sidecars/peer-manager.js';
 
 describe('PeerManager Hardening', () => {
@@ -71,7 +78,7 @@ describe('PeerManager Hardening', () => {
             const callback = resolveCallback(opts, cb);
             setImmediate(() => {
                 if (callback) callback(res);
-                res.emit('data', Buffer.from('tcp://1.2.3.4:1234\n## Spain\n- `tcp://1.1.1.1:1111` (100%)'));
+                res.emit('data', Buffer.from(JSON.stringify({ peers: apiPeers })));
                 res.emit('end');
             });
             return createGetHandle();
@@ -134,30 +141,19 @@ describe('PeerManager Hardening', () => {
             return req;
         }) as unknown as typeof https.get);
         await peerManager.initPeerManager(tempCacheDir);
-        expect(peerManager.getPeerPool()).toBeDefined();
+        expect(peerManager.getPeerPool().length).toBeGreaterThanOrEqual(10);
+        expect(peerManager.getActivePeerUris()).toHaveLength(3);
     });
 
-    it('should cover markdown and HTML parsing of peers', async () => {
-        const mockMD = `
-## Germany
-| tcp://1.1.1.1:1111 | online | 95% |
-| tls://2.2.2.2:2222 | online | 100% |
-        `;
-        const mockHTML = `
-            <h2>France</h2>
-            <a href="tcp://3.3.3.3:3333">tcp://3.3.3.3:3333</a> online 80%
-        `;
-
-        let callCount = 0;
+    it('should parse peers from the Yggpeers API', async () => {
         vi.spyOn(https, 'get').mockImplementation(((url: string | URL, opts: unknown, cb?: ResponseCallback) => {
             const resolvedCallback = resolveCallback(opts, cb);
             const res = createResponse();
             res.statusCode = 200;
             setImmediate(() => {
                 resolvedCallback?.(res);
-                if (url.toString().includes('neilalexander')) {
-                    res.emit('data', Buffer.from(callCount === 0 ? mockMD : mockHTML));
-                    callCount++;
+                if (url.toString() === PUBLIC_PEERS_URL) {
+                    res.emit('data', Buffer.from(JSON.stringify({ peers: apiPeers })));
                 } else {
                     res.emit('data', Buffer.from('{}'));
                 }
@@ -168,11 +164,11 @@ describe('PeerManager Hardening', () => {
 
         await peerManager.initPeerManager(tempCacheDir);
         const pool = peerManager.getPeerPool();
+        expect(peerManager.getActivePeerUris()).toHaveLength(3);
+        expect(pool.length).toBeGreaterThanOrEqual(10);
         expect(pool.some(p => p.uri === 'tcp://1.1.1.1:1111')).toBe(true);
-
-        callCount = 1;
-        await peerManager.initPeerManager(tempCacheDir);
-        expect(peerManager.getPeerPool().some(p => p.uri === 'tcp://3.3.3.3:3333')).toBe(true);
+        expect(pool.some(p => p.uri === 'tcp://2.2.2.2:2222')).toBe(false);
+        expect(pool.find(p => p.uri === 'tcp://1.2.3.4:1234')?.uptimePct).toBe(98);
     });
 
     it('should cover additional edge cases in geolocate and probe', async () => {
@@ -242,7 +238,7 @@ describe('PeerManager Hardening', () => {
             const callback = resolveCallback(opts, cb);
             setImmediate(() => {
                 callback?.(res);
-                res.emit('data', Buffer.from('## Spain\n' + manyPeers.map(p => `- \`${p.uri}\` (100%)`).join('\n')));
+                res.emit('data', Buffer.from(JSON.stringify({ peers: manyPeers.map(peer => ({ ...peer, status: 'up' })) })));
                 res.emit('end');
             });
             return createGetHandle();

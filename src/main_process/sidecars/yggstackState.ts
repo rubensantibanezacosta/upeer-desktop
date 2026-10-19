@@ -1,10 +1,12 @@
 import type { ChildProcess } from 'node:child_process';
 import type { AddressCallback, StatusCallback, YggStatus } from './yggstackShared.js';
+import type { ConnectedPeer } from './yggstackAdmin.js';
 
 export const yggstackState = {
     process: null as ChildProcess | null,
     detectedAddress: null as string | null,
     currentConfPath: null as string | null,
+    activePeers: [] as ConnectedPeer[],
     isQuitting: false,
     restartAttempts: 0,
     addressCallbacks: [] as AddressCallback[],

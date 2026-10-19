@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import {
   getYggstackAddress,
+  getConnectedPeers,
   getRestartAttempts,
   getMaxRestartAttempts,
   forceRestart
@@ -21,12 +22,14 @@ export function registerNetworkHandlers(): void {
   ipcMain.handle('get-ygg-ip', () => getYggstackAddress() || 'No detectado');
 
   // Devuelve estadísticas de red para la sección Conexión de Settings
-  ipcMain.handle('get-network-stats', () => {
-    const activePeerUris = new Set(getActivePeerUris());
+  ipcMain.handle('get-network-stats', async () => {
+    const selectedPeerUris = new Set(getActivePeerUris());
     const pool = getPeerPool();
-    const activePeers = pool
-      .filter(p => activePeerUris.has(p.uri))
+    const connectedPeers = await getConnectedPeers();
+    const connectedSet = new Set(connectedPeers?.map(peer => peer.uri) ?? []);
+    const peerStats = pool
       .map(p => ({
+        uri: p.uri,
         host: p.host,
         country: p.country,
         latencyMs: p.latencyMs,
@@ -35,10 +38,18 @@ export function registerNetworkHandlers(): void {
         lat: p.lat,
         lon: p.lon,
       }));
+    const peersByUri = new Map(peerStats.map(peer => [peer.uri, peer]));
+    const activePeers = connectedPeers?.flatMap(peer => {
+      const publicPeer = peersByUri.get(peer.uri);
+      return publicPeer ? [{ ...publicPeer, alive: true }] : [];
+    }) ?? [];
+    const reservePeers = peerStats.filter(peer => !connectedSet.has(peer.uri) && !selectedPeerUris.has(peer.uri));
     const self = getSelfGeo();
     return {
       peerCount: activePeers.length,
       peers: activePeers,
+      connectionStatusAvailable: connectedPeers !== null,
+      reservePeers,
       restartAttempts: getRestartAttempts(),
       maxRestartAttempts: getMaxRestartAttempts(),
       selfLat: self?.lat ?? null,

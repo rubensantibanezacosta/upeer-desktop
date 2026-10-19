@@ -147,7 +147,19 @@ declare global {
             /** Estadísticas de red: peers activos, latencias, reintentos */
             getNetworkStats: () => Promise<{
                 peerCount: number;
+                connectionStatusAvailable: boolean;
                 peers: Array<{
+                    uri: string;
+                    host: string;
+                    country: string;
+                    latencyMs: number | null;
+                    score: number;
+                    alive: boolean;
+                    lat: number | null;
+                    lon: number | null;
+                }>;
+                reservePeers: Array<{
+                    uri: string;
                     host: string;
                     country: string;
                     latencyMs: number | null;
