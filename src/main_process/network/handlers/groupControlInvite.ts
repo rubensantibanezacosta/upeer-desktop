@@ -10,6 +10,7 @@ import {
   updateGroupInfo,
   updateGroupMemberPublicKeys,
   updateGroupMembers,
+  updateGroupStatus,
 } from "../../storage/groups/operations.js";
 import { saveMessage } from "../../storage/messages/operations.js";
 import { getContactByUpeerId } from "../../storage/contacts/operations.js";
@@ -160,7 +161,21 @@ async function applyGroupInvite(
   }
 
   const existing = getGroupById(groupId);
-  if (existing?.status === "removed") return;
+  const isRejoining = existing?.status === "removed";
+  if (
+    isRejoining &&
+    (existing.adminUpeerId !== actualAdmin ||
+      !existing.members.includes(actualAdmin) ||
+      existing.members.includes(myId) ||
+      epoch <= existing.epoch)
+  ) {
+    warn(
+      "GROUP_INVITE rejected for removed group without valid rejoin state",
+      { sender: upeerId, groupId, epoch, currentEpoch: existing.epoch },
+      "security",
+    );
+    return;
+  }
   const isNewGroup = !existing;
   const scopedMemberKeys = Object.fromEntries(
     Object.entries({
@@ -219,7 +234,7 @@ async function applyGroupInvite(
       return;
     }
 
-    if (epoch < existing.epoch) {
+    if (epoch < existing.epoch || (isRejoining && epoch <= existing.epoch)) {
       security(
         "Stale GROUP_INVITE ignored",
         { sender: upeerId, groupId, epoch, currentEpoch: existing.epoch },
@@ -277,6 +292,7 @@ async function applyGroupInvite(
       senderKey,
       senderKeyCreatedAt: Date.now(),
     });
+    if (isRejoining) updateGroupStatus(groupId, "active");
     if (existing.name !== groupName || avatar !== undefined) {
       updateGroupInfo(groupId, {
         name: groupName,

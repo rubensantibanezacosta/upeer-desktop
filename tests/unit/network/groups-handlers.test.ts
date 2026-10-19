@@ -436,6 +436,71 @@ describe('Group Handlers Final Coverage', () => {
             expect(mockWin.webContents.send).not.toHaveBeenCalledWith('group-invite-received', expect.anything());
         });
 
+        it('rejoins a removed group only from its current admin at a newer epoch', async () => {
+            const epoch = 4;
+            const senderKey = 'e'.repeat(64);
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue({
+                groupName: 'Test Group',
+                members: [senderId, 'my-id', 'other-member'],
+                epoch,
+                senderKey,
+            });
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
+                groupId,
+                name: 'Test Group',
+                adminUpeerId: senderId,
+                members: [senderId, 'other-member'],
+                status: 'removed',
+                epoch: 3,
+                senderKey: 'd'.repeat(64),
+            }));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId: senderId,
+                payload: 'aa',
+                nonce: 'bb',
+            } as GroupInviteData, mockWin);
+
+            expect(groupsOps.updateGroupMembers).toHaveBeenCalledWith(groupId, [senderId, 'my-id', 'other-member']);
+            expect(groupsOps.updateGroupCrypto).toHaveBeenCalledWith(groupId, expect.objectContaining({ epoch, senderKey }));
+            expect(groupsOps.updateGroupStatus).toHaveBeenCalledWith(groupId, 'active');
+        });
+
+        it.each([
+            { title: 'the old epoch', epoch: 3, adminUpeerId: senderId, members: [senderId, 'my-id'] },
+            { title: 'an unknown administrator', epoch: 4, adminUpeerId: 'other-admin', members: ['other-admin', 'my-id'] },
+            { title: 'an administrator no longer in the group', epoch: 4, adminUpeerId: senderId, members: ['my-id'] },
+        ])('does not rejoin a removed group from $title', async ({ epoch, adminUpeerId, members }) => {
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue({
+                groupName: 'Test Group',
+                members,
+                epoch,
+                senderKey: 'e'.repeat(64),
+            });
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
+                groupId,
+                adminUpeerId: senderId,
+                members: [senderId, 'other-member'],
+                status: 'removed',
+                epoch: 3,
+                senderKey: 'd'.repeat(64),
+            }));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId,
+                payload: 'aa',
+                nonce: 'bb',
+            } as GroupInviteData, mockWin);
+
+            expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
+            expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
+            expect(groupsOps.updateGroupStatus).not.toHaveBeenCalled();
+        });
+
         it('rejects a stale invite that would roll back the sender epoch and key', async () => {
             const olderPayload = JSON.stringify({
                 groupName: 'Old name',
