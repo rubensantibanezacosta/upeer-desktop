@@ -31,7 +31,7 @@ type StoredMessageRecord = {
 };
 
 type GroupRecordLike = {
-    status: 'active' | 'invited';
+    status: 'active' | 'invited' | 'removed';
     members: string[];
 };
 
@@ -117,7 +117,7 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
 
     if (isGroup) {
         const group = getGroupById(upeerId) as GroupRecordLike | null;
-        if (!group || group.status !== 'active') return;
+        if (!group || group.status === 'removed' || group.status === 'invited') return;
 
         for (const memberId of group.members) {
             if (memberId === myId) continue;

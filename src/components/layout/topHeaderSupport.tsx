@@ -86,7 +86,7 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
         {isGroup && isAdmin && (
             <input type="file" accept="image/*" ref={avatarFileRef} style={{ display: 'none' }} onChange={onAvatarFileChange} />
         )}
-        <Box sx={{ position: 'relative', cursor: isGroup && isAdmin ? 'pointer' : 'default' }} onClick={onAvatarClick}>
+        <Box sx={{ position: 'relative', cursor: isGroup && isAdmin ? 'pointer' : 'default' }} onClick={(event) => { event.stopPropagation(); onAvatarClick(); }}>
             {isGroup ? (
                 <Avatar
                     size="sm"

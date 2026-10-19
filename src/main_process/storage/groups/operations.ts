@@ -7,7 +7,7 @@ export interface GroupRecord {
     adminUpeerId: string;
     members: string[]; // parsed from JSON
     isFavorite?: boolean;
-    status: 'active' | 'invited';
+    status: 'active' | 'invited' | 'removed';
     epoch: number;
     senderKey?: string | null;
     senderKeyCreatedAt?: number | null;
@@ -86,7 +86,7 @@ export function saveGroup(
     name: string,
     adminUpeerId: string,
     members: string[],
-    status: 'active' | 'invited' = 'active',
+    status: 'active' | 'invited' | 'removed' = 'active',
     avatar?: string,
     cryptoState?: GroupCryptoState,
     memberPublicKeys: Record<string, string> = {},
@@ -230,11 +230,20 @@ export function updateGroupCrypto(groupId: string, cryptoState: GroupCryptoState
         .run();
 }
 
-export function updateGroupStatus(groupId: string, status: 'active' | 'invited'): void {
+export function updateGroupStatus(groupId: string, status: 'active' | 'invited' | 'removed'): void {
     const db = getDb();
     const schema = getSchema();
     db.update(schema.groups)
         .set({ status })
+        .where(eq(schema.groups.groupId, groupId))
+        .run();
+}
+
+export function updateGroupAdmin(groupId: string, adminUpeerId: string): void {
+    const db = getDb();
+    const schema = getSchema();
+    db.update(schema.groups)
+        .set({ adminUpeerId })
         .where(eq(schema.groups.groupId, groupId))
         .run();
 }

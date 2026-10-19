@@ -4,6 +4,10 @@ const onReceiveMock = vi.fn();
 const refreshContactsMock = vi.fn();
 const sendReadReceiptMock = vi.fn();
 const getContactsMock = vi.fn();
+const { playNotificationSoundMock, chatActionState } = vi.hoisted(() => ({
+    playNotificationSoundMock: vi.fn(),
+    chatActionState: { groupPrefs: {} as Record<string, { muted?: boolean }> },
+}));
 
 (globalThis as Record<string, unknown>).window = {
     upeer: {
@@ -36,7 +40,8 @@ const getContactsMock = vi.fn();
 vi.mock('../../../src/store/usePrivacyStore.js', () => ({ usePrivacyStore: { getState: () => ({ readReceipts: true }) } }));
 vi.mock('../../../src/store/useNavigationStore.js', () => ({ useNavigationStore: { getState: () => ({}) } }));
 vi.mock('../../../src/store/useNotificationStore.js', () => ({ useNotificationStore: { getState: () => ({ msgNotif: true, sound: true }) } }));
-vi.mock('../../../src/utils/notificationSound.js', () => ({ playNotificationSound: vi.fn() }));
+vi.mock('../../../src/utils/notificationSound.js', () => ({ playNotificationSound: playNotificationSoundMock }));
+vi.mock('../../../src/store/useChatActionsStore.js', () => ({ useChatActionsStore: { getState: () => chatActionState } }));
 
 import { createChatListenerActions } from '../../../src/store/chatStoreListeners.js';
 import type { ChatMessage } from '../../../src/types/chat.js';
@@ -46,6 +51,8 @@ describe('chatStoreListeners: onReceive con mensaje recuperado del vault', () =>
         onReceiveMock.mockReset();
         refreshContactsMock.mockReset();
         sendReadReceiptMock.mockReset();
+        playNotificationSoundMock.mockReset();
+        chatActionState.groupPrefs = {};
         (globalThis.window as unknown as { __chat_listeners_initialized?: boolean }).__chat_listeners_initialized = false;
     });
 
@@ -121,5 +128,34 @@ describe('chatStoreListeners: onReceive con mensaje recuperado del vault', () =>
         const result = updater({ chatHistory: [] });
         expect(result.chatHistory).toHaveLength(1);
         expect(result.chatHistory[0].message).toBe(fileMessage);
+    });
+
+    it('no reproduce sonido para un grupo silenciado', () => {
+        chatActionState.groupPrefs = { 'group-muted': { muted: true } };
+        Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+        const onGroupMessageMock = (globalThis.window as unknown as { upeer: { onGroupMessage: ReturnType<typeof vi.fn> } }).upeer.onGroupMessage;
+        const set = vi.fn();
+        const get = vi.fn(() => ({ activeGroupId: '', contacts: [], myIdentity: undefined, refreshGroups: vi.fn() }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        const handler = onGroupMessageMock.mock.calls.at(-1)?.[0];
+        handler({ groupId: 'group-muted', message: 'mensaje', isMine: false, timestamp: 1000 });
+
+        expect(playNotificationSoundMock).not.toHaveBeenCalled();
+        Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    });
+
+    it('reproduce sonido para un grupo no silenciado cuando la ventana está oculta', () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+        const onGroupMessageMock = (globalThis.window as unknown as { upeer: { onGroupMessage: ReturnType<typeof vi.fn> } }).upeer.onGroupMessage;
+        const set = vi.fn();
+        const get = vi.fn(() => ({ activeGroupId: '', contacts: [], myIdentity: undefined, refreshGroups: vi.fn() }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        const handler = onGroupMessageMock.mock.calls.at(-1)?.[0];
+        handler({ groupId: 'group-unmuted', message: 'mensaje', isMine: false, timestamp: 1000 });
+
+        expect(playNotificationSoundMock).toHaveBeenCalledOnce();
+        Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     });
 });

@@ -1,5 +1,6 @@
 import { useNavigationStore } from './useNavigationStore.js';
 import { useNotificationStore } from './useNotificationStore.js';
+import { useChatActionsStore } from './useChatActionsStore.js';
 import { usePrivacyStore } from './usePrivacyStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
@@ -166,7 +167,8 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             const { activeGroupId, contacts, myIdentity } = get();
             if (data.groupId !== activeGroupId) {
                 const { msgNotif, sound } = useNotificationStore.getState();
-                if (msgNotif && sound && document.hidden) {
+                const muted = useChatActionsStore.getState().groupPrefs[data.groupId]?.muted ?? false;
+                if (msgNotif && sound && document.hidden && !muted) {
                     playNotificationSound();
                 }
             }

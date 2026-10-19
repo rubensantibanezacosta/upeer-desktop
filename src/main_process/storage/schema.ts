@@ -17,7 +17,7 @@ export const groups = sqliteTable('groups', {
     adminUpeerId: text('admin_upeer_id').notNull(),
     members: text('members').notNull().default('[]'), // JSON array of upeerIds
     isFavorite: integer('is_favorite', { mode: 'boolean' }).notNull().default(false),
-    status: text('status').notNull().default('active'), // 'active' | 'invited'
+    status: text('status').notNull().default('active'), // 'active' | 'invited' | 'removed'
     avatar: text('avatar'), // base64 data URL, local only
     epoch: integer('epoch').notNull().default(1),
     senderKey: text('sender_key'),

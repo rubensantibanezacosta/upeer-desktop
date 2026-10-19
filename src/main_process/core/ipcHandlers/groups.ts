@@ -5,7 +5,9 @@ import {
   sendGroupMessage,
   inviteToGroup,
   updateGroup,
-  leaveGroup
+  leaveGroup,
+  transferGroupAdmin,
+  removeGroupMember
 } from '../../network/messaging/groups.js';
 
 /**
@@ -57,6 +59,16 @@ export function registerGroupHandlers(): void {
 
   ipcMain.handle('leave-group', async (event, { groupId }) => {
     await leaveGroup(groupId);
+    return { success: true };
+  });
+
+  ipcMain.handle('transfer-group-admin', async (event, { groupId, memberUpeerId }) => {
+    await transferGroupAdmin(groupId, memberUpeerId);
+    return { success: true };
+  });
+
+  ipcMain.handle('remove-group-member', async (event, { groupId, memberUpeerId }) => {
+    await removeGroupMember(groupId, memberUpeerId);
     return { success: true };
   });
 }

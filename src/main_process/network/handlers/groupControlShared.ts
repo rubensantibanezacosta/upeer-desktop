@@ -10,6 +10,7 @@ export type GroupPayload = {
     avatar?: string | null;
     epoch?: number;
     senderKey?: string;
+    adminUpeerId?: string;
 };
 
 export interface GroupControlPacket extends GroupPayload {

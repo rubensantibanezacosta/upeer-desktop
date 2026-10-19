@@ -7,8 +7,9 @@ import { getMyPublicKeyHex, getMyUPeerId, verify } from '../../security/identity
 import { GroupControlPacket } from './groupControlShared.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
+import { withGroupOperationLock } from '../groupOperationQueue.js';
 
-export async function handleGroupLeave(
+async function applyGroupLeave(
     upeerId: string,
     data: GroupControlPacket,
     win: BrowserWindow | null
@@ -50,14 +51,18 @@ export async function handleGroupLeave(
 
     if (!group.members.includes(upeerId)) return;
 
+    const shouldRotate = group.adminUpeerId === myId;
     const newMembers = group.members.filter((member) => member !== upeerId);
-    updateGroupMembers(groupId, newMembers);
-
-    try {
-        const { rotateGroupAfterMemberRemoval } = await import('../messaging/groupControl.js');
-        await rotateGroupAfterMemberRemoval(groupId, upeerId);
-    } catch (err) {
-        warn('Failed to rotate group sender key after leave', { groupId, upeerId, err: String(err) }, 'security');
+    if (shouldRotate) {
+        try {
+            const { rotateGroupAfterMemberRemoval } = await import('../messaging/groupControl.js');
+            await rotateGroupAfterMemberRemoval(groupId, upeerId);
+        } catch (err) {
+            warn('Failed to rotate group sender key after leave', { groupId, upeerId, err: String(err) }, 'security');
+            updateGroupMembers(groupId, newMembers);
+        }
+    } else {
+        updateGroupMembers(groupId, newMembers);
     }
 
     const senderName = contact.name || upeerId;
@@ -76,4 +81,13 @@ export async function handleGroupLeave(
         status: 'delivered',
         isSystem: true,
     });
+}
+
+export async function handleGroupLeave(
+    upeerId: string,
+    data: GroupControlPacket,
+    win: BrowserWindow | null,
+): Promise<void> {
+    if (!data.groupId) return;
+    return withGroupOperationLock(data.groupId, () => applyGroupLeave(upeerId, data, win));
 }

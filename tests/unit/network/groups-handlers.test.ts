@@ -40,6 +40,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     updateGroupInfo: vi.fn(),
     updateGroupMemberPublicKeys: vi.fn(),
     updateGroupMembers: vi.fn(),
+    updateGroupStatus: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
@@ -633,13 +634,12 @@ describe('Group Handlers Final Coverage', () => {
             expect(groupsOps.updateGroupInfo).toHaveBeenCalledWith(groupId, { name: 'DR Name' });
         });
 
-        it('should delete local state when a valid update removes me from the group', async () => {
+        it('should keep local history and mark removed when a valid revocation removes me', async () => {
             const ratchet = await import('../../../src/main_process/security/ratchet.js');
             const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
             const inner = JSON.stringify({
                 members: [senderId, 'other-member'],
                 epoch: 2,
-                senderKey: 'e'.repeat(64),
             });
             vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue(JSON.parse(inner));
 
@@ -661,10 +661,41 @@ describe('Group Handlers Final Coverage', () => {
                 ratchetHeader: { dh: 'c'.repeat(64), pn: 0, n: 3 },
             } as GroupUpdateData, mockWin);
 
-            expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(groupId);
-            expect(groupsOps.deleteGroup).toHaveBeenCalledWith(groupId);
+            expect(messagesOps.deleteMessagesByChatId).not.toHaveBeenCalled();
+            expect(groupsOps.deleteGroup).not.toHaveBeenCalled();
+            expect(groupsOps.updateGroupMembers).toHaveBeenCalledWith(groupId, [senderId, 'other-member']);
+            expect(groupsOps.updateGroupStatus).toHaveBeenCalledWith(groupId, 'removed');
+            expect(groupsOps.updateGroupCrypto).toHaveBeenCalledWith(groupId, { epoch: 2 });
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('group-updated', {
+                groupId,
+                members: [senderId, 'other-member'],
+                status: 'removed',
+            });
+        });
+
+        it('rejects a revocation without a newer epoch', async () => {
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue({
+                members: [senderId, 'other-member'],
+                epoch: 1,
+            });
+            vi.mocked(identity.getMyUPeerId).mockReturnValue('my-id');
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
+                groupId,
+                adminUpeerId: senderId,
+                epoch: 2,
+                senderKey: 'd'.repeat(64),
+                members: [senderId, 'my-id', 'other-member'],
+            }));
+
+            await handleGroupUpdate(senderId, {
+                groupId,
+                payload: 'a'.repeat(32),
+                nonce: 'b'.repeat(48),
+                ratchetHeader: { dh: 'c'.repeat(64), pn: 0, n: 4 },
+            } as GroupUpdateData, mockWin);
+
+            expect(groupsOps.updateGroupStatus).not.toHaveBeenCalled();
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
-            expect(mockWin.webContents.send).toHaveBeenCalledWith('group-updated', { groupId, members: [] });
         });
     });
 
@@ -692,10 +723,10 @@ describe('Group Handlers Final Coverage', () => {
             const groupControl = await import('../../../src/main_process/network/messaging/groupControl.js');
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' } as never);
             vi.mocked(identity.verify).mockReturnValue(true);
-            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, members: [senderId, 'other'], epoch: 1, senderKey: 'd'.repeat(64) }));
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, adminUpeerId: 'my-id', members: [senderId, 'other'], epoch: 1, senderKey: 'd'.repeat(64) }));
 
             await handleGroupLeave(senderId, { groupId, signature: 'sig' } as GroupLeaveData, mockWin);
-            expect(groupsOps.updateGroupMembers).toHaveBeenCalled();
+            expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
             expect(groupControl.rotateGroupAfterMemberRemoval).toHaveBeenCalledWith(groupId, senderId);
         });
 

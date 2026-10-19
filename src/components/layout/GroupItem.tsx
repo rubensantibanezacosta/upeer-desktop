@@ -58,7 +58,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <Typography level="body-md" sx={{ fontWeight: 500 }} noWrap>
-                            {highlight ? highlightText(group.name, highlight) : group.name}
+                            {highlight ? highlightText(group.name, highlight) : group.name}{group.status === 'removed' ? ' · Saliste' : ''}
                         </Typography>
                         <Typography level="body-xs" color="neutral" sx={{ ml: 1, minWidth: 'max-content' }}>
                             {timeStr}
@@ -100,7 +100,7 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
                         </Typography>
                     </Box>
 
-                    <GroupItemActions groupId={group.groupId} isFavorite={group.isFavorite} onToggleFavorite={onToggleFavorite} onLeaveRequest={() => setConfirmLeaveOpen(true)} onClearChat={onClearChat ? () => onClearChat(group.groupId) : undefined} />
+                    {group.status !== 'removed' && <GroupItemActions groupId={group.groupId} isFavorite={group.isFavorite} onToggleFavorite={onToggleFavorite} onLeaveRequest={() => setConfirmLeaveOpen(true)} onClearChat={onClearChat ? () => onClearChat(group.groupId) : undefined} />}
                 </Box>
             </ListItemButton>
 

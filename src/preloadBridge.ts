@@ -168,6 +168,8 @@ const groupApi = {
     updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => ipcRenderer.invoke('update-group', { groupId, ...fields }),
     toggleFavoriteGroup: (groupId: string, isFavorite: boolean) => ipcRenderer.invoke('toggle-favorite-group', { groupId, isFavorite }),
     leaveGroup: (groupId: string) => ipcRenderer.invoke('leave-group', { groupId }),
+    transferGroupAdmin: (groupId: string, memberUpeerId: string) => ipcRenderer.invoke('transfer-group-admin', { groupId, memberUpeerId }),
+    removeGroupMember: (groupId: string, memberUpeerId: string) => ipcRenderer.invoke('remove-group-member', { groupId, memberUpeerId }),
 };
 
 const fileApi = {

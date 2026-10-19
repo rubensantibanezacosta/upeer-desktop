@@ -83,6 +83,8 @@ declare global {
             updateGroup: (groupId: string, fields: { name?: string; avatar?: string | null }) => Promise<{ success: boolean }>;
             toggleFavoriteGroup: (groupId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             leaveGroup: (groupId: string) => Promise<{ success: boolean }>;
+            transferGroupAdmin: (groupId: string, memberUpeerId: string) => Promise<{ success: boolean }>;
+            removeGroupMember: (groupId: string, memberUpeerId: string) => Promise<{ success: boolean }>;
             onChatCleared: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
             onGroupMessage: (callback: (data: UpeerIncomingGroupMessage) => void) => UpeerUnsubscribe;
             onGroupInvite: (callback: (data: { groupId: string }) => void) => UpeerUnsubscribe;

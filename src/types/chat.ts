@@ -155,7 +155,7 @@ export interface Group {
     adminUpeerId: string;
     members: string[];
     isFavorite?: boolean;
-    status: 'active' | 'invited';
+    status: 'active' | 'invited' | 'removed';
     avatar?: string | null;
     createdAt?: string;
     // UI extras

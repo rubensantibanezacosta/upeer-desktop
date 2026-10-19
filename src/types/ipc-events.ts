@@ -84,7 +84,9 @@ export interface GroupUpdatedEvent {
     groupId: string;
     name?: string;
     avatar?: string | null;
-    adminUpeerId: string;
+    members?: string[];
+    status?: 'active' | 'invited' | 'removed';
+    adminUpeerId?: string;
 }
 
 export interface ReceiveGroupMessageEvent {

@@ -18,6 +18,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
     getGroupById: vi.fn(),
     saveGroup: vi.fn(),
     updateGroupCrypto: vi.fn(),
+    updateGroupAdmin: vi.fn(),
     updateGroupMembers: vi.fn(),
     updateGroupMemberPublicKeys: vi.fn(),
     updateGroupInfo: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyPublicKeyHex: vi.fn(() => '11'.repeat(32)),
+    getUPeerIdFromPublicKey: vi.fn((publicKey: Buffer) => publicKey.toString('hex') === 'aa'.repeat(32) ? 'peer-online' : 'peer-offline'),
     getMySignedPreKey: vi.fn(() => ({ spkPub: '55'.repeat(32), spkSig: '66'.repeat(64), spkId: 13 })),
     getMyUPeerId: vi.fn(() => 'self-id'),
     sign: vi.fn(() => Buffer.from('sig')),
@@ -323,6 +325,67 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
+    it('vaults offline member revocation without the rotated sender key', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const groupPayload = await import('../../../src/main_process/network/groupPayload.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { removeGroupMember } = await import('../../../src/main_process/network/messaging/groups.js');
+        const payloadSpy = vi.spyOn(groupPayload, 'buildGroupUpdatePayload');
+        const group = {
+            groupId: 'grp-revoke',
+            name: 'Grupo',
+            adminUpeerId: 'self-id',
+            status: 'active',
+            members: ['self-id', 'peer-online', 'peer-offline'],
+            epoch: 6,
+            senderKey: 'cc'.repeat(32),
+            memberPublicKeys: {},
+        } as GroupRecord;
+        vi.mocked(groupsOps.getGroupById).mockImplementation(() => ({
+            ...group,
+            members: ['self-id', 'peer-online', 'peer-offline'],
+            epoch: 6,
+            senderKey: 'cc'.repeat(32),
+        }) as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => ({
+            upeerId,
+            status: upeerId === 'peer-online' ? 'connected' : 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 9,
+            address: upeerId === 'peer-online' ? '200::10' : undefined,
+            knownAddresses: '[]',
+        }) as unknown as ContactRecord);
+
+        await removeGroupMember('grp-revoke', 'peer-offline');
+
+        expect(groupsOps.updateGroupMembers).toHaveBeenCalledWith('grp-revoke', ['self-id', 'peer-online']);
+        expect(groupsOps.updateGroupCrypto).toHaveBeenCalledWith('grp-revoke', expect.objectContaining({
+            epoch: 2,
+            senderKey: 'dd'.repeat(32),
+        }));
+        const remainingDelivery = vi.mocked(VaultManager.replicateToVaults).mock.calls.find(
+            ([recipient]) => recipient === 'peer-online',
+        );
+        const revocationDelivery = vi.mocked(VaultManager.replicateToVaults).mock.calls.find(
+            ([recipient]) => recipient === 'peer-offline',
+        );
+        expect(remainingDelivery).toBeDefined();
+        expect(revocationDelivery).toBeDefined();
+        expect(payloadSpy).toHaveBeenCalledTimes(2);
+        expect(payloadSpy.mock.calls[0][0]).toEqual(expect.objectContaining({
+            members: ['self-id', 'peer-online'],
+            epoch: 2,
+            senderKey: 'dd'.repeat(32),
+        }));
+        expect(payloadSpy.mock.calls[1][0]).toEqual(expect.objectContaining({
+            members: ['self-id', 'peer-online'],
+            epoch: 3,
+        }));
+        expect(payloadSpy.mock.calls[1][0]).not.toHaveProperty('senderKey');
+    });
+
     it('vaults GROUP_LEAVE for own devices and offline members', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
@@ -333,6 +396,7 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
+            status: 'active',
             members: ['self-id', 'peer-online', 'peer-offline'],
         } as GroupRecord);
         vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => {
@@ -452,13 +516,15 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
-            members: ['self-id', 'peer-online'],
+            members: ['self-id'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
         } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
             members: ['self-id', 'peer-online'],

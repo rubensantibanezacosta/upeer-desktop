@@ -42,7 +42,7 @@ type ChatContactRecord = {
 };
 
 type GroupRecordLike = {
-    status: 'active' | 'invited';
+    status: 'active' | 'invited' | 'removed';
     members: string[];
 };
 
@@ -147,7 +147,7 @@ export async function sendUDPMessage(
 export async function sendTypingIndicator(upeerId: string): Promise<void> {
     if (upeerId.startsWith('grp-')) {
         const group = await getGroupById(upeerId) as GroupRecordLike | null;
-        if (!group || group.status !== 'active') return;
+        if (!group || group.status === 'removed' || group.status === 'invited') return;
         const myId = getMyUPeerId();
         const data = { type: 'TYPING', groupId: upeerId };
         for (const memberId of group.members) {

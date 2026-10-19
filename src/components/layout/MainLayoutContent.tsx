@@ -14,7 +14,9 @@ import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreview
 import { useCall } from '../../features/call/useCall.js';
 import { useCallStore } from '../../features/call/useCallStore.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { useSharedMediaItems } from './contactInfoPanelSupport.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
+import { GroupInfoPanel } from './GroupInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
 import { MainLayoutPanels } from './MainLayoutPanels.js';
@@ -65,6 +67,8 @@ interface MainLayoutContentProps {
     setEditingMessage: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
     setIsContactInfoOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isContactInfoOpen: boolean;
+    setIsGroupInfoOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isGroupInfoOpen: boolean;
     setIsInviteGroupMembersOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -113,12 +117,18 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     setEditingMessage,
     setIsContactInfoOpen,
     isContactInfoOpen,
+    setIsGroupInfoOpen,
+    isGroupInfoOpen,
     setIsInviteGroupMembersOpen,
 }) => {
     const { startCall } = useCall(chatStore.myIdentity?.upeerId);
     const activeCallKind = useCallStore((state) => Object.values(state.calls).find((call) => call.phase !== 'ended')?.kind);
     const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
+    const groupMedia = useSharedMediaItems(
+        chatStore.groupChatHistory,
+        fileTransfer.allTransfers.filter((transfer: FileTransfer) => transfer.chatUpeerId === activeGroupId),
+    );
     const unreadChatCount = chatStore.contacts.filter((contact) =>
         contact.status !== 'blocked' && (
             contactPrefs[contact.upeerId]?.unread ||
@@ -186,6 +196,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             groupId={activeGroupId}
                                             onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
+                                            onOpenInfo={() => setIsGroupInfoOpen((value) => !value)}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
                                             onSearch={() => setIsChatSearchOpen(true)}
                                             onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members, activeGroupId)}
@@ -266,7 +277,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 onAttachFile={handleAttachFile}
                                                 allowContactShare={!activeGroupId && !!targetUpeerId}
                                                 onSendVoiceNote={handleSendVoiceNote}
-                                                disabled={(activeGroupId ? false : !targetUpeerId) || (targetUpeerId ? !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '') : false)}
+                                                disabled={(activeGroupId ? activeGroup?.status !== 'active' : !targetUpeerId) || (targetUpeerId ? !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '') : false)}
                                                 replyToMessage={currentReplyToMessage ? {
                                                     ...currentReplyToMessage,
                                                     senderName: currentReplyToMessage.senderName || (currentReplyToMessage.isMine ? 'Tú' : activeContact?.name),
@@ -314,6 +325,28 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onBlockContact={handleBlockContact}
                                         onDeleteContact={() => handleDeleteContact(targetUpeerId)}
                                         onOpenMedia={handleMediaClick}
+                                    />
+                                )}
+                                {activeGroupId && activeGroup && isGroupInfoOpen && (
+                                    <GroupInfoPanel
+                                        group={activeGroup}
+                                        contacts={chatStore.contacts}
+                                        currentUserId={chatStore.myIdentity?.upeerId}
+                                        sharedMedia={groupMedia}
+                                        onClose={() => setIsGroupInfoOpen(false)}
+                                        onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
+                                        onOpenMedia={handleMediaClick}
+                                        onFavorite={() => chatStore.handleToggleFavoriteGroup(activeGroupId)}
+                                        onClearChat={() => handleClearChat(activeGroupId)}
+                                        onLeaveGroup={() => chatStore.handleLeaveGroup(activeGroupId)}
+                                        onTransferAdmin={async (memberId) => {
+                                            await window.upeer.transferGroupAdmin(activeGroupId, memberId);
+                                            await chatStore.refreshGroups();
+                                        }}
+                                        onRemoveMember={async (memberId) => {
+                                            await window.upeer.removeGroupMember(activeGroupId, memberId);
+                                            await chatStore.refreshGroups();
+                                        }}
                                     />
                                 )}
                             </>

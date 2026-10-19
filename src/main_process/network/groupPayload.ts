@@ -16,6 +16,7 @@ type GroupUpdatePayload = {
     memberPublicKeys?: Record<string, string>;
     epoch?: number;
     senderKey?: string;
+    adminUpeerId?: string;
 };
 
 const MAX_SERIALIZED_GROUP_PAYLOAD_CHARS = 90_000;

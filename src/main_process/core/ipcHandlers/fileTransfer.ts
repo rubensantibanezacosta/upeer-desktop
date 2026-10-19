@@ -38,7 +38,7 @@ export function registerFileTransferHandlers(): void {
       const group = getGroupById(upeerId);
 
       if (group) {
-        if (group.status !== 'active') return { success: false, error: 'Group is not active' };
+        if (group.status === 'invited' || group.status === 'removed') return { success: false, error: 'Group is not active' };
 
         // Multi-send to all members with a shared logical message ID
         const myId = (await import('../../security/identity.js')).getMyUPeerId();

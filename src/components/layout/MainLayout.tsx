@@ -84,12 +84,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [forwardingMsg, setForwardingMsg] = useState<ChatMessage | null>(null);
     const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
+    const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
     const [isInviteGroupMembersOpen, setIsInviteGroupMembersOpen] = useState(false);
 
     useEffect(() => {
         if (activeGroupId || !targetUpeerId) {
             setIsContactInfoOpen(false);
         }
+        if (!activeGroupId) setIsGroupInfoOpen(false);
     }, [activeGroupId, targetUpeerId]);
 
     useEffect(() => {
@@ -183,6 +185,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 setEditingMessage={setEditingMessage}
                 setIsContactInfoOpen={setIsContactInfoOpen}
                 isContactInfoOpen={isContactInfoOpen}
+                setIsGroupInfoOpen={setIsGroupInfoOpen}
+                isGroupInfoOpen={isGroupInfoOpen}
                 setIsInviteGroupMembersOpen={setIsInviteGroupMembersOpen}
             />
             <MainLayoutOverlays

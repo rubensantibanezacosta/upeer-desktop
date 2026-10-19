@@ -7,7 +7,7 @@ import {
     Input
 } from '@mui/joy';
 import EditIcon from '@mui/icons-material/Edit';
-import { resizeImageToDataUrl } from '../ui/settings/shared.js';
+import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
 import { formatTopHeaderLastSeen, TopHeaderAvatar, TopHeaderTrustIndicator } from './topHeaderSupport.js';
 
@@ -54,7 +54,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             return;
         }
         try {
-            const dataUrl = await resizeImageToDataUrl(file);
+            const dataUrl = await resizeImageToDataUrl(file, { size: 128, quality: 0.85, maxBytes: 50 * 1024 * 1024 });
             await onUpdateGroup({ avatar: dataUrl });
         } catch (error) {
             console.error('[TopHeader] No se pudo actualizar el avatar del grupo', error);
@@ -94,23 +94,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     gap: 1.5,
                     minWidth: 0,
                     borderRadius: 'lg',
-                    cursor: !isGroup && onOpenInfo ? 'pointer' : 'default',
-                    px: !isGroup && onOpenInfo ? 0.75 : 0,
-                    py: !isGroup && onOpenInfo ? 0.5 : 0,
-                    ml: !isGroup && onOpenInfo ? -0.75 : 0,
+                    cursor: onOpenInfo ? 'pointer' : 'default',
+                    px: onOpenInfo ? 0.75 : 0,
+                    py: onOpenInfo ? 0.5 : 0,
+                    ml: onOpenInfo ? -0.75 : 0,
                     transition: 'background-color 0.15s ease',
-                    '&:hover': !isGroup && onOpenInfo ? { backgroundColor: 'background.level1' } : undefined,
+                    '&:hover': onOpenInfo ? { backgroundColor: 'background.level1' } : undefined,
                 }}
-                onClick={!isGroup ? onOpenInfo : undefined}
-                onKeyDown={!isGroup && onOpenInfo ? (e) => {
+                onClick={onOpenInfo}
+                onKeyDown={onOpenInfo ? (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         onOpenInfo();
                     }
                 } : undefined}
-                role={!isGroup && onOpenInfo ? 'button' : undefined}
-                aria-label={!isGroup && onOpenInfo && contactName ? `Abrir info del contacto ${contactName}` : undefined}
-                tabIndex={!isGroup && onOpenInfo ? 0 : -1}
+                role={onOpenInfo ? 'button' : undefined}
+                aria-label={onOpenInfo && contactName ? `Abrir info del ${isGroup ? 'grupo' : 'contacto'} ${contactName}` : undefined}
+                tabIndex={onOpenInfo ? 0 : -1}
             >
                 <TopHeaderAvatar isGroup={isGroup} isAdmin={isAdmin} avatar={avatar} contactName={contactName} onAvatarClick={handleAvatarClick} avatarFileRef={avatarFileRef} onAvatarFileChange={handleAvatarFileChange} />
                 <Box>
@@ -137,7 +137,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                 </Typography>
                                 {isGroup && isAdmin && contactName && (
                                     <Tooltip title="Editar nombre del grupo" variant="soft" size="sm">
-                                        <IconButton aria-label="Editar nombre del grupo" size="sm" variant="plain" color="neutral" onClick={startEditName}
+                                        <IconButton aria-label="Editar nombre del grupo" size="sm" variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); startEditName(); }}
                                             sx={{ minHeight: 'auto', p: 0.25 }}>
                                             <EditIcon sx={{ fontSize: 13 }} />
                                         </IconButton>

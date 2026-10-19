@@ -42,8 +42,17 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         if (!id) {
             return;
         }
+        const selectedGroup = get().groups.find((group) => group.groupId === id);
         const generation = ++navGeneration;
         const { pendingScrollMsgId } = useNavigationStore.getState();
+        if (selectedGroup?.status === 'removed') {
+            window.upeer.getMessages(id).then((messages: RawChatMessage[]) => {
+                if (navGeneration !== generation) return;
+                const { contacts, myIdentity } = get();
+                set({ groupChatHistory: messages.reverse().map((message) => mapGroupMessage(id, message, contacts, myIdentity)), isWindowedHistory: false });
+            });
+            return;
+        }
         const loadMessages = pendingScrollMsgId
             ? window.upeer.getMessagesAround(id, pendingScrollMsgId)
             : window.upeer.getMessages(id);
@@ -174,7 +183,7 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             members: Array.isArray(group.members) ? group.members : JSON.parse(group.members || '[]'),
         }));
         const { activeGroupId } = get();
-        const shouldClearActiveGroup = Boolean(activeGroupId) && !groups.some((group) => group.groupId === activeGroupId);
+        const shouldClearActiveGroup = Boolean(activeGroupId) && !groups.some((group) => group.groupId === activeGroupId && group.status !== 'removed');
         set({
             groups,
             ...(shouldClearActiveGroup ? { activeGroupId: '', groupChatHistory: [], isWindowedHistory: false } : {}),
