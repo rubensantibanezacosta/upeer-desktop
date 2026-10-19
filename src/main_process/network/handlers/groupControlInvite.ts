@@ -13,7 +13,7 @@ import {
   updateGroupStatus,
 } from "../../storage/groups/operations.js";
 import { saveMessage } from "../../storage/messages/operations.js";
-import { getContactByUpeerId } from "../../storage/contacts/operations.js";
+import { getContactByUpeerId, isContactBlocked } from "../../storage/contacts/operations.js";
 import {
   getMySignedPreKeyBundle,
   getMyUPeerId,
@@ -161,6 +161,7 @@ async function applyGroupInvite(
   }
 
   const existing = getGroupById(groupId);
+  if (isContactBlocked(upeerId) && !existing?.members.includes(upeerId)) return;
   const isRejoining = existing?.status === "removed";
   if (
     isRejoining &&

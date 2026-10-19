@@ -3,6 +3,7 @@ import { ipcMain } from 'electron';
 import { registerContactHandlers } from '../../../../src/main_process/core/ipcHandlers/contacts.js';
 import * as contactsOps from '../../../../src/main_process/storage/contacts/operations.js';
 import * as contactsMessaging from '../../../../src/main_process/network/messaging/contacts.js';
+import { callManager } from '../../../../src/main_process/network/call/callManager.js';
 
 type AddContactPayload = { address: string; name: string };
 type AddContactResult = { success: boolean; upeerId?: string; error?: string; alreadyExists?: boolean };
@@ -63,10 +64,27 @@ vi.mock('../../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'self-peer-id'),
 }));
 
+vi.mock('../../../../src/main_process/network/call/callManager.js', () => ({
+    callManager: { getAll: vi.fn(() => []), end: vi.fn() },
+}));
+
 describe('Contacts IPC Handlers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         registerContactHandlers();
+    });
+
+    it('termina llamadas privadas al bloquear y conserva llamadas grupales', () => {
+        const privateSession = { callId: 'private-call', peerUpeerId: 'peer-123', isGroup: false };
+        const groupSession = { callId: 'group-call', peerUpeerId: 'peer-123', isGroup: true };
+        vi.mocked(callManager.getAll).mockReturnValue([privateSession, groupSession] as never);
+        const blockHandler = vi.mocked(ipcMain.handle).mock.calls.find(([channel]) => channel === 'block-contact')?.[1];
+        if (!blockHandler) throw new Error('Missing block-contact handler');
+
+        blockHandler(null as never, { upeerId: 'peer-123' });
+
+        expect(callManager.end).toHaveBeenCalledWith('private-call', 'local-hangup');
+        expect(callManager.end).not.toHaveBeenCalledWith('group-call', expect.anything());
     });
 
     it('registers the add-contact handler', () => {

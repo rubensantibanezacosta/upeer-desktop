@@ -5,9 +5,11 @@ import { callManager } from '../../../src/main_process/network/call/callManager.
 const { sendMock, scoreMock } = vi.hoisted(() => ({ sendMock: vi.fn(), scoreMock: vi.fn() }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({ getMyUPeerId: () => 'me' }));
-vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
-    getContactByUpeerId: () => ({ address: '1::1', publicKey: undefined }),
+const { contactMock, blockedMock } = vi.hoisted(() => ({
+    contactMock: vi.fn(() => ({ address: '1::1', publicKey: undefined, status: 'connected' })),
+    blockedMock: vi.fn(() => false),
 }));
+vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({ getContactByUpeerId: contactMock, isContactBlocked: blockedMock }));
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({ getVouchScore: scoreMock }));
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({ sendSecureUDPMessage: sendMock }));
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }));
@@ -16,6 +18,8 @@ describe('callSignaling (grupos)', () => {
     beforeEach(() => {
         callManager.resetForTests();
         sendMock.mockClear();
+        blockedMock.mockReset();
+        blockedMock.mockReturnValue(false);
         scoreMock.mockReset();
         scoreMock.mockResolvedValue(50);
     });
@@ -25,6 +29,26 @@ describe('callSignaling (grupos)', () => {
         sendCallMediaUpdate('peer9', session.callId, { muted: true, cameraEnabled: true });
         expect(sendMock).toHaveBeenCalledTimes(1);
         expect(sendMock).toHaveBeenCalledWith('1::1', expect.objectContaining({ type: 'CALL_MEDIA_UPDATE', muted: true }), undefined);
+    });
+
+    it('no inicia una llamada privada si el contacto está bloqueado localmente', async () => {
+        const { sendCallOffer } = await import('../../../src/main_process/network/call/callSignaling.js');
+        blockedMock.mockReturnValueOnce(true);
+
+        await expect(sendCallOffer('peer9', 'video')).rejects.toThrow('Contact unavailable');
+        expect(callManager.getAll()).toHaveLength(0);
+        expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    it('silencia los eventos de llamadas privadas, pero permite los de grupo compartido', async () => {
+        const { isBlockedPrivateCallPacket } = await import('../../../src/main_process/network/call/callPacketHandler.js');
+        blockedMock.mockReturnValue(true);
+        const privateSession = callManager.create('peer9', 'audio', 'incoming', 'private-1');
+        const groupSession = callManager.createGroupIncoming('peer9', 'audio', 'group-1', ['peer9', 'peer2']);
+
+        expect(isBlockedPrivateCallPacket('peer9', { type: 'CALL_OFFER', callId: 'private-1', kind: 'audio' })).toBe(true);
+        expect(isBlockedPrivateCallPacket('peer9', { type: 'CALL_MEDIA', callId: privateSession.callId })).toBe(true);
+        expect(isBlockedPrivateCallPacket('peer9', { type: 'CALL_OFFER', callId: groupSession.callId, groupMembers: ['peer9', 'peer2'] })).toBe(false);
     });
 
     it('sendCallMediaUpdate hace broadcast a todos los miembros del grupo', () => {

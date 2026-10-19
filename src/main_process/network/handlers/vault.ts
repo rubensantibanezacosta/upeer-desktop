@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
 import { saveFileMessage } from '../../storage/messages/operations.js';
 import {
     getMyPublicKeyHex,
@@ -125,6 +125,13 @@ export async function handleVaultDelivery(
 
                 // If it's a signed inner packet (CHAT, FILE_DATA_SMALL, etc.)
                 if (innerPacket && typeof innerPacket.signature === 'string') {
+                    const blockedOrigin = isContactBlocked(entry.senderSid);
+                    if (blockedOrigin && !isVaultGroupPacket(innerPacket.type)
+                        && !(typeof innerPacket.type === 'string' && innerPacket.type.startsWith('CALL_'))) continue;
+                    if (blockedOrigin && typeof innerPacket.type === 'string' && innerPacket.type.startsWith('CALL_')) {
+                        const { isBlockedPrivateCallPacket } = await import('../call/callPacketHandler.js');
+                        if (isBlockedPrivateCallPacket(entry.senderSid, innerPacket)) continue;
+                    }
                     const { signature: innerSig, senderUpeerId: _senderUpeerId, isInternalSync: _isInternalSync, ...innerData } = innerPacket;
                     const isFileTransferPacket = innerPacket.type === 'FILE_DATA_SMALL'
                         || (typeof innerPacket.type === 'string' && innerPacket.type.startsWith('FILE_'));
@@ -363,4 +370,9 @@ export async function handleVaultDelivery(
     pendingVaultFileCustodians.delete(recoverySourceKey);
 
     completeVaultRecoverySource(recoverySourceKey);
+}
+
+function isVaultGroupPacket(type: unknown): boolean {
+    return type === 'GROUP_MSG' || type === 'GROUP_ACK' || type === 'GROUP_INVITE'
+        || type === 'GROUP_UPDATE' || type === 'GROUP_LEAVE';
 }

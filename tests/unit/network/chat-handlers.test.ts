@@ -41,6 +41,7 @@ vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+    isContactBlocked: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({

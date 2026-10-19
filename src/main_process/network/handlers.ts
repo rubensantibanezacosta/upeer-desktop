@@ -11,9 +11,7 @@ import {
 
 import { debug, error, security, warn } from '../security/secure-logger.js';
 import { validateMessage } from '../security/validation.js';
-import {
-    getContactByUpeerId,
-} from '../storage/contacts/operations.js';
+import { getContactByUpeerId } from '../storage/contacts/operations.js';
 import { getGroupById, mergeGroupMemberPublicKeys } from '../storage/groups/operations.js';
 import {
     updateContactLocation,
@@ -184,6 +182,19 @@ export async function handlePacket(
         if (!upeerId) return;
 
         const directContact = await getContactByUpeerId(upeerId) as { publicKey?: string; status?: string; address?: string } | undefined;
+        const isBlockedContact = directContact?.status === 'blocked';
+        const isGroupPacket = pktType === 'GROUP_MSG' || pktType === 'GROUP_ACK' || pktType === 'GROUP_INVITE'
+            || pktType === 'GROUP_UPDATE' || pktType === 'GROUP_LEAVE';
+        const isCallPacket = pktType === 'CALL_OFFER' || pktType === 'CALL_RING' || pktType === 'CALL_ACCEPT'
+            || pktType === 'CALL_REJECT' || pktType === 'CALL_BUSY' || pktType === 'CALL_CANCEL'
+            || pktType === 'CALL_END' || pktType === 'CALL_SDP' || pktType === 'CALL_ICE'
+            || pktType === 'CALL_MEDIA' || pktType === 'CALL_MEDIA_UPDATE' || pktType === 'CALL_META'
+            || pktType === 'CALL_JOIN' || pktType === 'CALL_LEAVE';
+        if (isBlockedContact && !isGroupPacket && !isCallPacket) return;
+        if (isBlockedContact && isCallPacket) {
+            const { isBlockedPrivateCallPacket } = await import('./call/callPacketHandler.js');
+            if (isBlockedPrivateCallPacket(upeerId, data)) return;
+        }
         const groupMessage = pktType === 'GROUP_MSG' && typeof data.groupId === 'string'
             ? getGroupById(data.groupId)
             : null;
@@ -196,7 +207,7 @@ export async function handlePacket(
             ? groupMessage.memberPublicKeys?.[upeerId] ?? candidateGroupPublicKey
             : undefined;
         const publicKey = directContact?.publicKey ?? groupPublicKey;
-        if (!publicKey || directContact?.status === 'blocked') {
+        if (!publicKey) {
             security('Origin unknown, blocked or missing key', { upeerId, ip: rinfo.address, type: pktType }, 'network');
             return;
         }

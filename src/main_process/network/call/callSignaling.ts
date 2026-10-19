@@ -1,4 +1,4 @@
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { sendSecureUDPMessage } from '../server/transport.js';
@@ -28,13 +28,18 @@ function send(peerUpeerId: string, packet: Record<string, unknown>): boolean {
 }
 
 export async function sendCallOffer(peerUpeerId: string, kind: CallMediaKind): Promise<string> {
+    if (isContactBlocked(peerUpeerId) || !resolvePeer(peerUpeerId)) throw new Error('Contact unavailable');
     const session = callManager.create(peerUpeerId, kind, 'outgoing');
-    send(peerUpeerId, {
+    const sent = send(peerUpeerId, {
         type: 'CALL_OFFER',
         callId: session.callId,
         kind,
         timestamp: Date.now(),
     });
+    if (!sent) {
+        callManager.end(session.callId, 'error');
+        throw new Error('Contact unavailable');
+    }
     return session.callId;
 }
 

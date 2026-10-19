@@ -14,6 +14,28 @@ import { validateCallPacket } from './validationCalls.js';
 import { getGroupById } from '../../storage/groups/operations.js';
 import { callFanoutPolicy } from './callFanoutPolicy.js';
 import { sendCallRendererEvent } from './callRendererEvents.js';
+import { isContactBlocked } from '../../storage/contacts/operations.js';
+
+export function isBlockedPrivateCallPacket(upeerId: string, data: Record<string, unknown>): boolean {
+    if (!isContactBlocked(upeerId)) return false;
+    const callId = typeof data.callId === 'string' ? data.callId : '';
+    const session = callManager.get(callId);
+    if (session?.isGroup) return false;
+    const members = Array.isArray(data.groupMembers)
+        ? data.groupMembers.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : [];
+    return !members.some((member) => member !== upeerId);
+}
+
+function isPrivateCallPacket(upeerId: string, data: Record<string, unknown>): boolean {
+    const callId = typeof data.callId === 'string' ? data.callId : '';
+    const session = callManager.get(callId);
+    if (session?.isGroup) return false;
+    const members = Array.isArray(data.groupMembers)
+        ? data.groupMembers.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : [];
+    return !members.some((member) => member !== upeerId);
+}
 
 export function handleCallPacket(
     upeerId: string,
@@ -29,6 +51,9 @@ export function handleCallPacket(
 
     const callId = data.callId as string;
     const kind = (data.kind ?? 'audio') as CallMediaKind;
+
+    if (isBlockedPrivateCallPacket(upeerId, data)) return;
+    if (type === 'CALL_OFFER' && isContactBlocked(upeerId) && isPrivateCallPacket(upeerId, data)) return;
 
     switch (type) {
         case 'CALL_OFFER': {

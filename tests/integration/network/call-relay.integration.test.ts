@@ -20,6 +20,7 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: (upeerId: string) => contactStatuses[upeerId] ?? null,
+    isContactBlocked: () => false,
 }));
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({ getVouchScore: scoreMock }));

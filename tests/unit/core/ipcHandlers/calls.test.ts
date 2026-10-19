@@ -24,7 +24,10 @@ vi.mock('../../../../src/main_process/network/call/callSignaling.js', () => ({
 
 vi.mock('../../../../src/main_process/security/secure-logger.js', () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }));
 vi.mock('../../../../src/main_process/storage/messages/operations.js', () => ({ saveMessage: vi.fn(async () => ({ changes: 1 })) }));
-vi.mock('../../../../src/main_process/storage/contacts/operations.js', () => ({ getContactByUpeerId: vi.fn(() => ({ name: 'Peer' })) }));
+vi.mock('../../../../src/main_process/storage/contacts/operations.js', () => ({
+    getContactByUpeerId: vi.fn(() => ({ name: 'Peer' })),
+    isContactBlocked: vi.fn(() => false),
+}));
 vi.mock('../../../../src/main_process/network/messaging/chatSend.js', () => ({ sendUDPMessage: vi.fn(async () => undefined) }));
 
 type Handler = (event: unknown, payload: Record<string, unknown>) => unknown;
@@ -79,6 +82,16 @@ describe('registerCallHandlers', () => {
         expect(result.success).toBe(true);
         expect(result.callId).toBe('call-123');
         expect(signaling.sendCallOffer).toHaveBeenCalledWith('peer1', 'video');
+    });
+
+    it('start-call no ofrece llamadas ni videollamadas a un contacto bloqueado', async () => {
+        const contacts = await import('../../../../src/main_process/storage/contacts/operations.js');
+        vi.mocked(contacts.isContactBlocked).mockReturnValue(true);
+
+        const result = await getHandler('start-call')(null, { upeerId: 'peer1', kind: 'video' }) as { success: boolean; error: string };
+
+        expect(result).toEqual({ success: false, error: 'Contact unavailable' });
+        expect(signaling.sendCallOffer).not.toHaveBeenCalled();
     });
 
     it('accept-call acepta la llamada y envía el accept', async () => {

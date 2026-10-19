@@ -15,6 +15,7 @@ type VaultContact = Awaited<ReturnType<typeof contactsOps.getContactByUpeerId>>;
 // Mocks
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+    isContactBlocked: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
@@ -93,6 +94,7 @@ describe('Vault Delivery Handler', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
         vi.mocked(identity.verify).mockReturnValue(true);
         vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
         vi.mocked(fileTransferSignature.verifyFileTransferPacketSignature).mockReturnValue(true);
@@ -215,6 +217,21 @@ describe('Vault Delivery Handler', () => {
             mockSendResponse
         );
         expect(vouches.issueVouch).toHaveBeenCalledWith(custodianSid, 'VAULT_RETRIEVED');
+    });
+
+    it('silently ignores private vault entries from a locally blocked sender', async () => {
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+        vi.mocked(contactsOps.isContactBlocked).mockReturnValue(true);
+        const entry = {
+            senderSid: 'origin-id',
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', id: 'm1', content: 'hello', signature: 'inner-sig' })).toString('hex'),
+        };
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const chatModule = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(chatModule.handleChatMessage).not.toHaveBeenCalled();
+        expect(mockSendResponse).not.toHaveBeenCalled();
     });
 
     it('should process own vaulted CHAT entries using local identity and internal sync', async () => {

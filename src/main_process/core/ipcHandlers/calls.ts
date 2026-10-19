@@ -19,7 +19,7 @@ import {
 import { isValidCallId, isValidMediaKind } from '../../network/call/validationCalls.js';
 import { saveMessage } from '../../storage/messages/operations.js';
 import { sendGroupCallEvent } from '../../network/messaging/groups.js';
-import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
 import { sendUDPMessage } from '../../network/messaging/chatSend.js';
 import { shouldSendCallMedia } from './callMediaFanout.js';
 import { handleCallMediaSpeakerState } from './callMediaSpeaker.js';
@@ -100,6 +100,9 @@ export function registerCallHandlers(): void {
         }
         if (!isValidMediaKind(kind)) {
             return { success: false, error: 'Invalid kind' };
+        }
+        if (isContactBlocked(upeerId)) {
+            return { success: false, error: 'Contact unavailable' };
         }
         try {
             const callId = await sendCallOffer(upeerId, kind);

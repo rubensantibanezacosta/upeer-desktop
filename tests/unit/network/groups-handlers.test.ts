@@ -45,6 +45,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(),
+    isContactBlocked: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
@@ -131,6 +132,7 @@ describe('Group Handlers Final Coverage', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
     });
 
     describe('handleGroupMessage', () => {
@@ -330,6 +332,57 @@ describe('Group Handlers Final Coverage', () => {
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
         });
 
+        it('silently ignores a blocked inviter for a new group', async () => {
+            vi.mocked(contactsOps.isContactBlocked).mockReturnValue(true);
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue({
+                groupName: 'Test Group',
+                members: [senderId, 'my-id'],
+                epoch: 1,
+                senderKey: 'c'.repeat(64),
+            });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId: senderId,
+                payload: 'aa',
+                nonce: 'bb',
+            } as GroupInviteData, mockWin);
+
+            expect(groupsOps.saveGroup).not.toHaveBeenCalled();
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('group-invite-received', expect.anything());
+        });
+
+        it('continues shared-group updates from a blocked contact', async () => {
+            vi.mocked(contactsOps.isContactBlocked).mockReturnValue(true);
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue({
+                groupName: 'Updated Group',
+                members: [senderId, 'my-id'],
+                epoch: 2,
+                senderKey: 'd'.repeat(64),
+            });
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
+                groupId,
+                name: 'Test Group',
+                adminUpeerId: senderId,
+                members: [senderId, 'my-id'],
+                epoch: 1,
+                senderKey: 'c'.repeat(64),
+            }));
+            vi.mocked(groupsOps.updateGroupCrypto).mockClear();
+
+            await handleGroupInvite(senderId, {
+                groupId,
+                adminUpeerId: senderId,
+                payload: 'aa',
+                nonce: 'bb',
+            } as GroupInviteData, mockWin);
+
+            expect(groupsOps.updateGroupCrypto).toHaveBeenCalledWith(groupId, expect.objectContaining({ epoch: 2, senderKey: 'd'.repeat(64) }));
+        });
+
         it('should fail if decryption fails', async () => {
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub' } as never);
             vi.mocked(identity.decrypt).mockReturnValue(null);
@@ -340,6 +393,8 @@ describe('Group Handlers Final Coverage', () => {
         });
 
         it('should reject static-recipient legacy group invites', async () => {
+            vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
+            vi.mocked(groupControlShared.decryptGroupControlPayload).mockResolvedValue(null);
             vi.mocked(groupsOps.getGroupById).mockReturnValue(null);
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'b'.repeat(64), name: 'Alice' } as never);
 

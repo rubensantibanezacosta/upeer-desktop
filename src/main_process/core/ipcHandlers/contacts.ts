@@ -18,6 +18,7 @@ import { computeScore, getDirectContactIds } from '../../security/reputation/vou
 import { getMyUPeerId } from '../../security/identity.js';
 import { warn } from '../../security/secure-logger.js';
 import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
+import { callManager } from '../../network/call/callManager.js';
 
 /**
  * Registra los manejadores IPC relacionados con contactos
@@ -149,7 +150,14 @@ export function registerContactHandlers(): void {
     }
   });
 
-  ipcMain.handle('block-contact', (event, { upeerId }) => blockContact(upeerId));
+  ipcMain.handle('block-contact', (event, { upeerId }) => {
+    const result = blockContact(upeerId);
+    for (const session of callManager.getAll()) {
+      if (session.isGroup || session.peerUpeerId !== upeerId) continue;
+      callManager.end(session.callId, 'local-hangup');
+    }
+    return result;
+  });
   ipcMain.handle('unblock-contact', (event, { upeerId }) => unblockContact(upeerId));
   ipcMain.handle('toggle-favorite-contact', (event, { upeerId, isFavorite }) => {
     setContactFavorite(upeerId, !!isFavorite);

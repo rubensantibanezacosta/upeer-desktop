@@ -274,15 +274,37 @@ describe('network/handlers.ts - handlePacket', () => {
         expect(groupHandlers.handleGroupMessage).toHaveBeenCalled();
     });
 
-    it('rejects GROUP_MSG from a blocked non-contact even if its group roster key is valid', async () => {
+    it('accepts GROUP_MSG in a shared group despite a local block', async () => {
         const blockedContact = { ...connectedContact, status: 'blocked' } as NonNullable<KnownContact>;
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(blockedContact);
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'group1',
+            name: 'Group',
+            adminUpeerId: 'admin',
+            members: ['peer1', 'me'],
+            memberPublicKeys: { peer1: 'ab'.repeat(32) },
+            status: 'active',
+            epoch: 1,
+        });
+        vi.mocked(identity.verify).mockReturnValue(true);
         const packet = { type: 'GROUP_MSG', senderUpeerId: 'peer1', signature: 'cd'.repeat(64), groupId: 'group1', content: 'ciphertext', nonce: '11'.repeat(24), epoch: 1 };
 
         await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
 
+        expect(identity.verify).toHaveBeenCalled();
+        expect(groupHandlers.handleGroupMessage).toHaveBeenCalled();
+    });
+
+    it('silently ignores private packets from blocked contacts before verifying or acknowledging them', async () => {
+        const blockedContact = { ...connectedContact, status: 'blocked' } as NonNullable<KnownContact>;
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(blockedContact);
+        const packet = { type: 'CHAT', senderUpeerId: 'peer1', signature: 'cd'.repeat(64), id: 'm1', content: 'ciphertext' };
+
+        await handlePacket(Buffer.from(JSON.stringify(packet)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+
         expect(identity.verify).not.toHaveBeenCalled();
-        expect(groupHandlers.handleGroupMessage).not.toHaveBeenCalled();
+        expect(chatHandlers.handleChatMessage).not.toHaveBeenCalled();
+        expect(mockSendResponse).not.toHaveBeenCalled();
     });
 
     it('does not use group roster keys for private CHAT packets', async () => {
