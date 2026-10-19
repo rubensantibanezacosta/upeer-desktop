@@ -4,6 +4,10 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
+    getGroupById: vi.fn(() => ({ status: 'active' })),
+}));
+
 describe('encryptedOperationRetry', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -77,5 +81,21 @@ describe('encryptedOperationRetry', () => {
         expect(await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-b')).toBe(1);
         expect(removedGroupRetry).not.toHaveBeenCalled();
         expect(retainedGroupRetry).toHaveBeenCalledOnce();
+    });
+
+    it('does not retry pending encrypted group operations after removal', async () => {
+        const retryModule = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const staleRetry = vi.fn().mockResolvedValue(undefined);
+        retryModule.registerEncryptedOperationRetry('peer-a', 'group:group-a:update:1:peer-a', staleRetry);
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({ status: 'removed' } as never);
+
+        const retried = await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-a');
+
+        expect(retried).toBe(0);
+        expect(staleRetry).not.toHaveBeenCalled();
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({ status: 'active' } as never);
+        expect(await retryModule.retryPendingGroupEncryptedOperations('peer-a', 'group-a')).toBe(0);
+        expect(staleRetry).not.toHaveBeenCalled();
     });
 });

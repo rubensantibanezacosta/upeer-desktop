@@ -719,15 +719,47 @@ describe('Group Handlers Final Coverage', () => {
     });
 
     describe('handleGroupLeave', () => {
-        it('should verify signature and leave', async () => {
+        it('marks the local copy removed when its administrator leaves and preserves history', async () => {
             const groupControl = await import('../../../src/main_process/network/messaging/groupControl.js');
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, adminUpeerId: senderId, members: [senderId, 'my-id', 'other'], epoch: 1, senderKey: 'd'.repeat(64) }));
             vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' } as never);
             vi.mocked(identity.verify).mockReturnValue(true);
-            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, adminUpeerId: 'my-id', members: [senderId, 'other'], epoch: 1, senderKey: 'd'.repeat(64) }));
 
-            await handleGroupLeave(senderId, { groupId, signature: 'sig' } as GroupLeaveData, mockWin);
+            await handleGroupLeave(senderId, { groupId, signature: 'aa' } as GroupLeaveData, mockWin);
+            expect(groupsOps.updateGroupMembers).toHaveBeenCalledWith(groupId, ['my-id', 'other']);
+            expect(groupsOps.updateGroupStatus).toHaveBeenCalledWith(groupId, 'removed');
+            expect(messagesOps.deleteMessagesByChatId).not.toHaveBeenCalled();
+            expect(groupsOps.deleteGroup).not.toHaveBeenCalled();
+            expect(groupControl.rotateGroupAfterMemberRemoval).not.toHaveBeenCalled();
+        });
+
+        it('marks the local group removed when its administrator leaves and no other members remain', async () => {
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({
+                groupId,
+                adminUpeerId: senderId,
+                members: [senderId],
+                epoch: 1,
+                senderKey: 'd'.repeat(64),
+            }));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' } as never);
+            vi.mocked(identity.verify).mockReturnValue(true);
+
+            await handleGroupLeave(senderId, { groupId, signature: 'aa' } as GroupLeaveData, mockWin);
+
+            expect(groupsOps.updateGroupMembers).toHaveBeenCalledWith(groupId, []);
+            expect(groupsOps.updateGroupStatus).toHaveBeenCalledWith(groupId, 'removed');
+        });
+
+        it('rejects GROUP_LEAVE packets without a valid signature', async () => {
+            vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, adminUpeerId: 'my-id', members: [senderId, 'my-id'] }));
+            vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({ publicKey: 'pub', name: 'Leaver' } as never);
+            vi.mocked(identity.verify).mockReturnValue(false);
+
+            await handleGroupLeave(senderId, { groupId } as GroupLeaveData, mockWin);
+
             expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
-            expect(groupControl.rotateGroupAfterMemberRemoval).toHaveBeenCalledWith(groupId, senderId);
+            expect(groupsOps.updateGroupStatus).not.toHaveBeenCalled();
+            expect(messagesOps.saveMessage).not.toHaveBeenCalled();
         });
 
         it('should delete local group state for internal self leave sync', async () => {
@@ -735,7 +767,7 @@ describe('Group Handlers Final Coverage', () => {
             vi.mocked(identity.verify).mockReturnValue(true);
             vi.mocked(groupsOps.getGroupById).mockReturnValue(makeGroup({ groupId, members: ['my-id', 'other'], epoch: 1, senderKey: 'd'.repeat(64) }));
 
-            await handleGroupLeave('my-id', { groupId, signature: 'sig', isInternalSync: true } as GroupLeaveData, mockWin);
+            await handleGroupLeave('my-id', { groupId, signature: 'aa', isInternalSync: true } as GroupLeaveData, mockWin);
 
             expect(messagesOps.deleteMessagesByChatId).toHaveBeenCalledWith(groupId);
             expect(groupsOps.deleteGroup).toHaveBeenCalledWith(groupId);

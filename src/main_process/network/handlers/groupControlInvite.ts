@@ -160,6 +160,7 @@ async function applyGroupInvite(
   }
 
   const existing = getGroupById(groupId);
+  if (existing?.status === "removed") return;
   const isNewGroup = !existing;
   const scopedMemberKeys = Object.fromEntries(
     Object.entries({

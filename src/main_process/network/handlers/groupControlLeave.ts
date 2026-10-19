@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
-import { deleteGroup, getGroupById, updateGroupMembers } from '../../storage/groups/operations.js';
+import { deleteGroup, getGroupById, updateGroupMembers, updateGroupStatus } from '../../storage/groups/operations.js';
 import { deleteMessagesByChatId, saveMessage } from '../../storage/messages/operations.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getMyPublicKeyHex, getMyUPeerId, verify } from '../../security/identity.js';
@@ -8,13 +8,14 @@ import { GroupControlPacket } from './groupControlShared.js';
 import { security, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { withGroupOperationLock } from '../groupOperationQueue.js';
+import { clearPendingGroupEncryptedOperations } from '../messaging/encryptedOperationRetry.js';
 
 async function applyGroupLeave(
     upeerId: string,
     data: GroupControlPacket,
     win: BrowserWindow | null
 ): Promise<void> {
-    const { groupId, signature: leaveSig, ...leaveData } = data;
+    const { groupId, signature: leaveSig, isInternalSync: _isInternalSync, ...leaveData } = data;
     if (!groupId) return;
 
     const myId = getMyUPeerId();
@@ -27,16 +28,13 @@ async function applyGroupLeave(
         return;
     }
 
-    if (leaveSig) {
-        const isValid = verify(
-            Buffer.from(canonicalStringify(leaveData)),
-            Buffer.from(leaveSig, 'hex'),
-            Buffer.from(contact.publicKey, 'hex')
-        );
-        if (!isValid) {
-            security('Invalid GROUP_LEAVE signature', { upeerId, groupId }, 'security');
-            return;
-        }
+    if (!leaveSig || !/^(?:[0-9a-f]{2})+$/i.test(leaveSig) || !verify(
+        Buffer.from(canonicalStringify(leaveData)),
+        Buffer.from(leaveSig, 'hex'),
+        Buffer.from(contact.publicKey, 'hex')
+    )) {
+        security('Invalid GROUP_LEAVE signature', { upeerId, groupId }, 'security');
+        return;
     }
 
     const group = getGroupById(groupId);
@@ -49,7 +47,17 @@ async function applyGroupLeave(
         return;
     }
 
+    if (group.status === 'removed') return;
     if (!group.members.includes(upeerId)) return;
+
+    if (group.adminUpeerId === upeerId) {
+        const remainingMembers = group.members.filter((memberId) => memberId !== upeerId);
+        updateGroupMembers(groupId, remainingMembers);
+        updateGroupStatus(groupId, 'removed');
+        clearPendingGroupEncryptedOperations('*', groupId);
+        win?.webContents.send('group-updated', { groupId, members: remainingMembers, status: 'removed' });
+        return;
+    }
 
     const shouldRotate = group.adminUpeerId === myId;
     const newMembers = group.members.filter((member) => member !== upeerId);

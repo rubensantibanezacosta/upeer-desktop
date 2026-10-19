@@ -80,6 +80,7 @@ export async function retryPendingGroupEncryptedOperations(
   try {
     const { withFreshGroupOperationLock } =
       await import("../groupOperationQueue.js");
+    const { getGroupById } = await import("../../storage/groups/operations.js");
     const generationAtStart = groupRetryGeneration.get(groupId) ?? 0;
     const entries = Array.from(pendingEncryptedOperations.entries()).filter(
       ([, entry]) =>
@@ -100,6 +101,10 @@ export async function retryPendingGroupEncryptedOperations(
         let wasRetried = false;
         await withFreshGroupOperationLock(groupId, async () => {
           if ((groupRetryGeneration.get(groupId) ?? 0) !== generationAtStart) {
+            return;
+          }
+          const group = getGroupById(groupId);
+          if (!group || group.status !== "active") {
             return;
           }
           await entry.retry();

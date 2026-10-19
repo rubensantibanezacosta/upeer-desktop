@@ -39,6 +39,7 @@ async function applyGroupUpdate(
 
   const group = getGroupById(groupId);
   if (!group) return;
+  if (group.status === "removed") return;
 
   const claimedAdmin = adminUpeerId || senderUpeerId;
   if (group.adminUpeerId !== claimedAdmin || senderUpeerId !== claimedAdmin) {

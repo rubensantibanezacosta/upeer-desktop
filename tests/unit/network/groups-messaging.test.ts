@@ -118,6 +118,7 @@ describe('network/messaging/groups.ts', () => {
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(undefined);
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-new',
+            adminUpeerId: 'self-id',
             name: 'Grupo nuevo',
             avatar: null,
             members: ['self-id', 'peer-a'],
@@ -155,6 +156,8 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-offline'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
@@ -199,11 +202,15 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
         } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
@@ -256,6 +263,8 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-robust',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-a', 'peer-b'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
@@ -288,6 +297,61 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
+    it('does not let a non-admin change group details or membership', async () => {
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { inviteToGroup, updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-protected',
+            adminUpeerId: 'peer-admin',
+            members: ['self-id', 'peer-admin'],
+            status: 'active',
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+
+        await updateGroup('grp-protected', { name: 'Cambio no autorizado' });
+        await inviteToGroup('grp-protected', 'peer-new');
+
+        expect(groupsOps.updateGroupInfo).not.toHaveBeenCalled();
+        expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
+        expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
+    });
+
+    it('requires transferring admin control before an administrator leaves', async () => {
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { leaveGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-admin-leave',
+            adminUpeerId: 'self-id',
+            members: ['self-id', 'peer-a'],
+            status: 'active',
+            epoch: 1,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+        await expect(leaveGroup('grp-admin-leave')).rejects.toThrow('Transfiere la administración a otro miembro antes de salir');
+
+        expect(groupsOps.updateGroupMembers).not.toHaveBeenCalled();
+        expect(groupsOps.updateGroupCrypto).not.toHaveBeenCalled();
+        expect(messagesOps.deleteMessagesByChatId).not.toHaveBeenCalled();
+        expect(groupsOps.deleteGroup).not.toHaveBeenCalled();
+    });
+
+    it('keeps the active conversation when leaving fails before completion', async () => {
+        const { createChatOperationActions } = await import('../../../src/store/chatStoreOperations.js');
+        const set = vi.fn();
+        const refreshGroups = vi.fn();
+        const get = vi.fn(() => ({ activeGroupId: 'grp-admin-leave', refreshGroups }));
+        const leaveGroup = vi.fn().mockRejectedValue(new Error('delivery failed'));
+        vi.stubGlobal('window', { upeer: { leaveGroup } });
+
+        await expect(createChatOperationActions(set as never, get as never).handleLeaveGroup('grp-admin-leave'))
+            .rejects.toThrow('delivery failed');
+
+        expect(refreshGroups).not.toHaveBeenCalled();
+        expect(set).not.toHaveBeenCalled();
+    });
+
     it('retries pending encrypted group updates after DR_RESET', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
@@ -297,6 +361,8 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
@@ -463,6 +529,7 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
             name: 'Grupo',
             status: 'active',
             members: ['self-id', 'peer-online'],
@@ -517,6 +584,7 @@ describe('network/messaging/groups.ts', () => {
         vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
             adminUpeerId: 'self-id',
+            status: 'active',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
             members: ['self-id'],
@@ -525,6 +593,7 @@ describe('network/messaging/groups.ts', () => {
         } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
             adminUpeerId: 'self-id',
+            status: 'active',
             name: 'Grupo con avatar',
             avatar: 'data:image/jpeg;base64,avatar',
             members: ['self-id', 'peer-online'],
@@ -579,6 +648,7 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
             name: 'Grupo',
             status: 'active',
             members: ['self-id', 'online-peer', 'offline-peer'],
@@ -614,6 +684,7 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-call',
+            adminUpeerId: 'self-id',
             name: 'Grupo',
             status: 'active',
             members: ['self-id', 'online-peer', 'offline-peer'],
@@ -650,11 +721,15 @@ describe('network/messaging/groups.ts', () => {
 
         vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),
         } as GroupRecord).mockReturnValueOnce({
             groupId: 'grp-1',
+            adminUpeerId: 'self-id',
+            status: 'active',
             members: ['self-id', 'peer-online'],
             epoch: 1,
             senderKey: 'cc'.repeat(32),

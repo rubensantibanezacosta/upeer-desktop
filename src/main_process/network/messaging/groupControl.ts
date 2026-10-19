@@ -92,8 +92,12 @@ async function sendGroupInvitePacket(
     });
 
     if (contact.status === 'connected' && options?.registerRetry !== false) {
-        registerEncryptedOperationRetry(targetUpeerId, retryKey, () =>
-            sendGroupInvitePacket(group, targetUpeerId, { skipVault: true, registerRetry: false }));
+        registerEncryptedOperationRetry(targetUpeerId, retryKey, async () => {
+            const currentGroup = getGroupById(group.groupId);
+            if (!currentGroup || currentGroup.status !== 'active' || currentGroup.epoch !== group.epoch
+                || currentGroup.adminUpeerId !== myId || !currentGroup.members.includes(targetUpeerId)) return;
+            await sendGroupInvitePacket(group, targetUpeerId, { skipVault: true, registerRetry: false });
+        });
     }
 
 }
@@ -142,7 +146,8 @@ async function broadcastGroupUpdatePacket(
                 if (contact.status === 'connected' && options?.registerRetry !== false) {
                     registerEncryptedOperationRetry(memberUpeerId, retryKey, async () => {
                         const currentGroup = getGroupById(group.groupId);
-                        if (!currentGroup || currentGroup.epoch !== group.epoch) return;
+                        if (!currentGroup || currentGroup.status !== 'active' || currentGroup.epoch !== group.epoch
+                            || currentGroup.adminUpeerId !== myId || !currentGroup.members.includes(memberUpeerId)) return;
                         await withGroupOperationLock(group.groupId, () =>
                             broadcastGroupUpdatePacket(group, fields, [memberUpeerId], { skipVault: true, registerRetry: false }));
                     });
@@ -285,7 +290,7 @@ async function runGroupOperation<T>(groupId: string, operation: () => Promise<T>
 export async function inviteToGroup(groupId: string, upeerId: string): Promise<void> {
     return runGroupOperation(groupId, async () => {
     const group = getGroupById(groupId);
-    if (!group || group.status === 'removed' || group.members.includes(upeerId)) return;
+    if (!group || group.status !== 'active' || group.adminUpeerId !== getMyUPeerId() || group.members.includes(upeerId)) return;
 
     const newMembers = Array.from(new Set([...group.members, upeerId]));
     const nextSenderState = rotateGroupSenderState(group.epoch);
@@ -317,7 +322,7 @@ export async function updateGroup(
 ): Promise<void> {
     return runGroupOperation(groupId, async () => {
     const group = ensureGroupState(getGroupById(groupId) as GroupRecord);
-    if (!group || group.status === 'removed') return;
+    if (!group || group.status !== 'active' || group.adminUpeerId !== getMyUPeerId()) return;
 
     updateGroupInfo(groupId, fields);
 
@@ -359,6 +364,11 @@ export async function leaveGroup(groupId: string): Promise<void> {
     if (!group) return;
 
     const myId = getMyUPeerId();
+    if (group.adminUpeerId === myId && group.members.some((memberId) => memberId !== myId)) {
+        throw new Error('Transfiere la administración a otro miembro antes de salir');
+    }
+    if (group.status === 'removed') return;
+
     const packet = buildSignedPacket({
         type: 'GROUP_LEAVE',
         groupId,
