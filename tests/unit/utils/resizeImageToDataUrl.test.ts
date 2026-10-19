@@ -67,8 +67,8 @@ describe('resizeImageToDataUrl', () => {
             }
         });
 
-        const file = { size: 100 } as File;
-        const promise = resizeImageToDataUrl(file, { size: 64 });
+        const file = { size: 20 * 1024 * 1024 } as File;
+        const promise = resizeImageToDataUrl(file, { size: 64, maxBytes: 50 * 1024 * 1024 });
 
         // El FileReader dispara onload síncrono que asigna image.onload; lo invocamos para resolver
         createdImages[0]?.onload?.();
