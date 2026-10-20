@@ -70,5 +70,6 @@ describe('deleteAllUserData', () => {
         expect(mocks.resetIdentityForEmptyDevice).toHaveBeenCalledWith('/user-data');
         expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/assets', { recursive: true, force: true });
         expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/p2p-chat.db', { force: true });
+        expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/yggstack.conf', { force: true });
     });
 });

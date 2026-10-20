@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getYggstackAddress } from '../../sidecars/yggstack.js';
+import { getYggstackAddress, spawnYggstack, stopYggstack } from '../../sidecars/yggstack.js';
 import {
   getMyUPeerId,
   getMyPublicKeyHex,
@@ -35,17 +35,18 @@ import { warn } from '../../security/secure-logger.js';
  * Registra los manejadores IPC relacionados con identidad y autenticación
  */
 export function registerIdentityHandlers(): void {
-  const resetNetworkForIdentityChange = () => {
+  const resetNetworkForIdentityChange = async () => {
     closeUDPServer();
     stopPeerManager();
     stopRenewalService();
     RepairWorker.stop();
+    await stopYggstack();
   };
 
   ipcMain.handle('delete-identity', async () => {
     try {
       lockSession();
-      resetNetworkForIdentityChange();
+      await resetNetworkForIdentityChange();
       await deleteAllUserData(app.getPath('userData'));
       await initDB(app.getPath('userData'));
       return { success: true };
@@ -189,7 +190,7 @@ export function registerIdentityHandlers(): void {
     if (isMnemonicMode()) {
       const isSameIdentity = validateMnemonicIdentity(mnemonicToUse);
       if (!isSameIdentity) {
-        resetNetworkForIdentityChange();
+        await resetNetworkForIdentityChange();
         lockSession();
         await deleteAllUserData(app.getPath('userData'));
         await initDB(app.getPath('userData'));
@@ -197,6 +198,7 @@ export function registerIdentityHandlers(): void {
     }
     const success = unlockWithMnemonic(mnemonicToUse);
     if (success) {
+      await spawnYggstack();
       if (alias) setMyAlias(alias);
       if (avatar) setMyAvatar(avatar);
       const mainWindow = getMainWindow();
@@ -211,6 +213,7 @@ export function registerIdentityHandlers(): void {
   ipcMain.handle('unlock-session', async (event, { mnemonic }) => {
     const successResult = await unlockWithMnemonic(mnemonic);
     if (successResult) {
+      await spawnYggstack();
       const mainWindow = getMainWindow();
       if (mainWindow) startUDPServer(mainWindow);
       const { startRenewalService } = await import('../../network/dht/renewal.js');

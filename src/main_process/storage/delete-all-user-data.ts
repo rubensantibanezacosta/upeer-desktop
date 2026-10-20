@@ -17,6 +17,7 @@ const ACCOUNT_FILES = [
     'identity.key.legacy-bak',
     'identity.mnemonic.enc',
     'identity.mnemonic_mode',
+    'yggstack.conf',
     'session.locked',
     'spk.enc',
     'backup_survival_kit.json',
@@ -137,7 +138,6 @@ export async function deleteAllUserData(userDataPath: string): Promise<void> {
     fs.rmSync(path.join(userDataPath, 'p2p-chat.db-journal'), { force: true });
     const identityFlags = [
         'identity.mnemonic_mode',
-        'identity.mnemonic-mode',
         'identity.mode',
     ];
     for (const flag of identityFlags) {
