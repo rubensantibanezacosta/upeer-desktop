@@ -76,9 +76,12 @@ describe('PeerManager Hardening', () => {
             const res = createResponse();
             res.statusCode = 200;
             const callback = resolveCallback(opts, cb);
+            const target = String(url);
             setImmediate(() => {
                 if (callback) callback(res);
-                res.emit('data', Buffer.from(JSON.stringify({ peers: apiPeers })));
+                res.emit('data', Buffer.from(JSON.stringify(target.includes('ipwho.is')
+                    ? { success: true, latitude: 40, longitude: -3, country_code: 'ES' }
+                    : { peers: apiPeers })));
                 res.emit('end');
             });
             return createGetHandle();
@@ -232,13 +235,15 @@ describe('PeerManager Hardening', () => {
             uptimePct: 100
         }));
 
-        vi.spyOn(https, 'get').mockImplementation(((_url: string, opts: unknown, cb?: ResponseCallback) => {
+        vi.spyOn(https, 'get').mockImplementation(((url: string, opts: unknown, cb?: ResponseCallback) => {
             const res = createResponse();
             res.statusCode = 200;
             const callback = resolveCallback(opts, cb);
             setImmediate(() => {
                 callback?.(res);
-                res.emit('data', Buffer.from(JSON.stringify({ peers: manyPeers.map(peer => ({ ...peer, status: 'up' })) })));
+                res.emit('data', Buffer.from(JSON.stringify(String(url).includes('ipwho.is')
+                    ? { success: true, latitude: 10, longitude: 20 }
+                    : { peers: manyPeers.map(peer => ({ ...peer, status: 'up' })) })));
                 res.emit('end');
             });
             return createGetHandle();

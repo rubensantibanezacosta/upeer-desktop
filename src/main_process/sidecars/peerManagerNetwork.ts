@@ -4,18 +4,23 @@ import net from 'node:net';
 import { info, warn } from '../security/secure-logger.js';
 import {
     FETCH_TIMEOUT_MS,
-    GEO_BATCH_URL,
+    GEO_CACHE_TTL_MS,
+    GEO_PEER_URL,
     GEO_SELF_URL,
     GEO_TIMEOUT_MS,
+    MAX_GEO_PEERS,
     PUBLIC_PEERS_URL,
     PROBE_BATCH_SIZE,
     PROBE_TIMEOUT_MS,
+    computeScore,
     haversineKm,
     isIPv4,
     isIPv6,
     makePeerInfo,
 } from './peerManagerShared.js';
 import type { GeoCoords, PeerInfo } from './peerManagerShared.js';
+
+const geoCache = new Map<string, { lat: number; lon: number; expiresAt: number }>();
 
 export async function fetchPeersWithMeta(): Promise<PeerInfo[]> {
     const content = await httpGet(PUBLIC_PEERS_URL, FETCH_TIMEOUT_MS);
@@ -61,9 +66,9 @@ export async function fetchSelfGeo(): Promise<GeoCoords | null> {
     if (!data) return null;
 
     try {
-        const parsed = JSON.parse(data) as { lat?: number; lon?: number; countryCode?: string };
-        if (typeof parsed.lat === 'number' && typeof parsed.lon === 'number') {
-            return { lat: parsed.lat, lon: parsed.lon, countryCode: parsed.countryCode ?? '' };
+        const parsed = JSON.parse(data) as { success?: boolean; latitude?: number; longitude?: number; country_code?: string };
+        if (parsed.success === true && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+            return { lat: parsed.latitude, lon: parsed.longitude, countryCode: parsed.country_code ?? '' };
         }
     } catch (err) {
         warn('Failed to parse self geolocation response', { err: String(err) }, 'peers');
@@ -75,8 +80,9 @@ export async function fetchSelfGeo(): Promise<GeoCoords | null> {
 export async function geolocatePeers(peers: PeerInfo[], selfGeo: GeoCoords | null): Promise<void> {
     if (!selfGeo) return;
 
+    const targets = peers.slice(0, MAX_GEO_PEERS);
     const hostToIp = new Map<string, string>();
-    const hostsToResolve = [...new Set(peers.map(peer => peer.host).filter(host => !isIPv4(host) && !isIPv6(host)))];
+    const hostsToResolve = [...new Set(targets.map(peer => peer.host).filter(host => !isIPv4(host) && !isIPv6(host)))];
 
     await Promise.allSettled(
         hostsToResolve.map(async (host) => {
@@ -91,33 +97,44 @@ export async function geolocatePeers(peers: PeerInfo[], selfGeo: GeoCoords | nul
 
     const peerToIp = new Map<string, string>();
     const uniqueIps: string[] = [];
-    for (const peer of peers) {
+    for (const peer of targets) {
         if (isIPv6(peer.host)) continue;
         const ip = isIPv4(peer.host) ? peer.host : (hostToIp.get(peer.host) ?? peer.host);
         peerToIp.set(peer.uri, ip);
         if (!uniqueIps.includes(ip)) uniqueIps.push(ip);
     }
 
+    const now = Date.now();
     const geoByIp = new Map<string, { lat: number; lon: number }>();
-    for (let index = 0; index < uniqueIps.length; index += 100) {
-        const batch = uniqueIps.slice(index, index + 100);
-        const body = JSON.stringify(batch.map(query => ({ query, fields: 'lat,lon,query' })));
-        const response = await httpPost(GEO_BATCH_URL, body, GEO_TIMEOUT_MS);
-        if (!response) continue;
-        try {
-            const values = JSON.parse(response) as Array<{ query: string; lat?: number; lon?: number }>;
-            for (const value of values) {
-                if (typeof value.lat === 'number' && typeof value.lon === 'number') {
-                    geoByIp.set(value.query, { lat: value.lat, lon: value.lon });
-                }
-            }
-        } catch (err) {
-            warn('Failed to parse batch geolocation response', { err: String(err) }, 'peers');
+    const pendingIps: string[] = [];
+    for (const ip of uniqueIps) {
+        const cached = geoCache.get(ip);
+        if (cached && cached.expiresAt > now) {
+            geoByIp.set(ip, { lat: cached.lat, lon: cached.lon });
+        } else {
+            pendingIps.push(ip);
         }
     }
 
+    const concurrency = 5;
+    for (let index = 0; index < pendingIps.length; index += concurrency) {
+        const batch = pendingIps.slice(index, index + concurrency);
+        await Promise.all(batch.map(async (ip) => {
+            const response = await httpGet(`${GEO_PEER_URL}${encodeURIComponent(ip)}`, GEO_TIMEOUT_MS);
+            if (!response) return;
+            try {
+                const parsed = JSON.parse(response) as { success?: boolean; latitude?: number; longitude?: number };
+                if (parsed.success !== true || typeof parsed.latitude !== 'number' || typeof parsed.longitude !== 'number') return;
+                geoByIp.set(ip, { lat: parsed.latitude, lon: parsed.longitude });
+                geoCache.set(ip, { lat: parsed.latitude, lon: parsed.longitude, expiresAt: Date.now() + GEO_CACHE_TTL_MS });
+            } catch (err) {
+                warn('Failed to parse peer geolocation response', { err: String(err), ip }, 'peers');
+            }
+        }));
+    }
+
     let geolocated = 0;
-    for (const peer of peers) {
+    for (const peer of targets) {
         const ip = peerToIp.get(peer.uri);
         if (!ip) continue;
         const geo = geoByIp.get(ip);
@@ -128,7 +145,7 @@ export async function geolocatePeers(peers: PeerInfo[], selfGeo: GeoCoords | nul
         geolocated++;
     }
 
-    info(`Geolocation: ${geolocated}/${peers.length} peers with distance`, undefined, 'peers');
+    info(`Geolocation: ${geolocated}/${targets.length} peers with distance`, undefined, 'peers');
 }
 
 export async function probePeersLatency(peers: PeerInfo[]): Promise<void> {
@@ -139,6 +156,7 @@ export async function probePeersLatency(peers: PeerInfo[]): Promise<void> {
             peer.alive = result.alive;
             peer.latencyMs = result.alive ? result.latencyMs : null;
             peer.lastChecked = Date.now();
+            peer.score = computeScore(peer, null);
         }));
     }
 
@@ -173,7 +191,7 @@ export async function probePeerLatency(uri: string): Promise<{ alive: boolean; l
 
 function httpGet(url: string, timeoutMs: number): Promise<string | null> {
     return new Promise(resolve => {
-        const req = https.get(url, { timeout: timeoutMs }, (res) => {
+        const req = https.get(url, { timeout: timeoutMs, headers: { 'User-Agent': 'uPeer/1.0', Accept: 'application/json' } }, (res) => {
             if (res.statusCode != null && (res.statusCode < 200 || res.statusCode >= 300)) {
                 res.resume();
                 resolve(null);
@@ -186,31 +204,5 @@ function httpGet(url: string, timeoutMs: number): Promise<string | null> {
         });
         req.on('error', () => resolve(null));
         req.on('timeout', () => { req.destroy(); resolve(null); });
-    });
-}
-
-function httpPost(url: string, body: string, timeoutMs: number): Promise<string | null> {
-    return new Promise(resolve => {
-        const parsedUrl = new URL(url);
-        const req = https.request({
-            hostname: parsedUrl.hostname,
-            port: parsedUrl.port || '443',
-            path: parsedUrl.pathname + parsedUrl.search,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(body),
-            },
-            timeout: timeoutMs,
-        }, (res) => {
-            let data = '';
-            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-            res.on('end', () => resolve(data));
-            res.on('error', () => resolve(null));
-        });
-        req.on('error', () => resolve(null));
-        req.on('timeout', () => { req.destroy(); resolve(null); });
-        req.write(body);
-        req.end();
     });
 }

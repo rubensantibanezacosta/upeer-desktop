@@ -9,14 +9,17 @@ import {
 } from './peerManagerNetwork.js';
 import {
     CACHE_TTL_MS,
+    computeScore,
     FALLBACK_PEERS,
     HEALTH_CHECK_INTERVAL_MS,
     MAX_ACTIVE_PEERS,
+    MAX_GEO_PEERS,
+    MAX_RESERVE_PEERS,
     MIN_ACTIVE_PEERS,
     MIN_STOCK_PEERS,
-    computeScore,
     logTopPeers,
     makePeerInfo,
+    selectBestPeers,
 } from './peerManagerShared.js';
 import type { GeoCoords } from './peerManagerShared.js';
 import { peerManagerState } from './peerManagerState.js';
@@ -80,7 +83,6 @@ export async function fullRefresh(cacheDir: string): Promise<void> {
 
     const candidatesByUri = new Map([
         ...FALLBACK_PEERS.map((peer) => [peer.uri, makePeerInfo(peer.uri, peer.country, 90)] as const),
-        ...peerManagerState.peerPool.map((peer) => [peer.uri, peer] as const),
         ...apiPeers.map((peer) => [peer.uri, peer] as const),
     ]);
     const rawPeers = [...candidatesByUri.values()];
@@ -89,19 +91,25 @@ export async function fullRefresh(cacheDir: string): Promise<void> {
         warn(`Peer candidate stock below target (${rawPeers.length}/${MIN_STOCK_PEERS})`, undefined, 'peers');
     }
 
-    if (peerManagerState.selfGeo) {
-        await geolocatePeers(rawPeers, peerManagerState.selfGeo);
+    await probePeersLatency(rawPeers);
+
+    for (const peer of rawPeers) {
+        peer.score = computeScore(peer, null);
     }
 
-    await probePeersLatency(rawPeers);
+    if (peerManagerState.selfGeo) {
+        const geoPeers = rawPeers
+            .filter((peer) => peer.alive)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, MAX_GEO_PEERS);
+        await geolocatePeers(geoPeers, peerManagerState.selfGeo);
+    }
 
     for (const peer of rawPeers) {
         peer.score = computeScore(peer, peerManagerState.selfGeo);
     }
 
-    peerManagerState.peerPool = rawPeers
-        .filter((peer) => peer.alive)
-        .sort((a, b) => b.score - a.score);
+    peerManagerState.peerPool = selectBestPeers(rawPeers.filter((peer) => peer.alive), MAX_RESERVE_PEERS);
 
     logTopPeers(peerManagerState.peerPool);
     applyActivePeers();

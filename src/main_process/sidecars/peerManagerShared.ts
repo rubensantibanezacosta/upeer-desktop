@@ -28,25 +28,24 @@ export interface PeerCache {
 }
 
 export const PUBLIC_PEERS_URL = 'https://yggpeers.fsky.io/api/v1/peers?status=up&is_network=false';
-export const GEO_SELF_URL = 'https://ip-api.com/json?fields=lat,lon,countryCode';
-export const GEO_BATCH_URL = 'https://ip-api.com/batch?fields=lat,lon,countryCode,query';
+export const GEO_SELF_URL = 'https://ipwho.is/';
+export const GEO_PEER_URL = 'https://ipwho.is/';
+export const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+export const MAX_GEO_PEERS = 30;
 export const PROBE_TIMEOUT_MS = 3_000;
 export const GEO_TIMEOUT_MS = 6_000;
 export const FETCH_TIMEOUT_MS = 10_000;
-export const CACHE_TTL_MS = 2 * 60 * 60 * 1_000;
+export const CACHE_TTL_MS = 30 * 60 * 1_000;
 export const HEALTH_CHECK_INTERVAL_MS = 5 * 60 * 1_000;
 export const PROBE_BATCH_SIZE = 30;
 export const MIN_ACTIVE_PEERS = 2;
 export const MAX_ACTIVE_PEERS = 3;
-export const MIN_STOCK_PEERS = 10;
+export const MAX_RESERVE_PEERS = 200;
 export const MAX_GEO_DISTANCE_KM = 12_000;
-
-export const FALLBACK_PEERS: Array<{ uri: string; country: string }> = [
+export const MIN_STOCK_PEERS = 10;
+export const FALLBACK_PEERS: { uri: string; country: string }[] = [
     { uri: 'tls://ygg.mkg20001.io:443', country: 'Germany' },
-    {
-        uri: 'tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358',
-        country: 'UK'
-    },
+    { uri: 'tls://yggdrasil.neilalexander.dev:64648?key=ecbbcb3298e7d3b4196103333c3e839cfe47a6ca47602b94a6d596683f6bb358', country: 'UK' },
     { uri: 'tls://51.15.204.214:54321', country: 'France' },
     { uri: 'tls://95.217.35.92:1337', country: 'Finland' },
     { uri: 'tls://vpn.ltha.de:443', country: 'Germany' },
@@ -56,7 +55,6 @@ export const FALLBACK_PEERS: Array<{ uri: string; country: string }> = [
     { uri: 'tls://spain.magicum.net:36901', country: 'Spain' },
     { uri: 'tls://redcatho.de:9494', country: 'Germany' },
 ];
-
 export function makePeerInfo(uri: string, country: string, uptimePct: number): PeerInfo {
     return {
         uri,
@@ -74,19 +72,20 @@ export function makePeerInfo(uri: string, country: string, uptimePct: number): P
     };
 }
 
-export function computeScore(peer: PeerInfo, geo: GeoCoords | null): number {
-    let geoScore = 20;
-    let latencyScore = 20;
-
-    if (geo != null && peer.distanceKm != null) {
-        geoScore = Math.max(0, 1 - peer.distanceKm / MAX_GEO_DISTANCE_KM) * 40;
-    }
-    if (peer.latencyMs != null) {
-        latencyScore = Math.max(0, 1 - peer.latencyMs / PROBE_TIMEOUT_MS) * 40;
-    }
-    const uptimeScore = (peer.uptimePct / 100) * 20;
-
+export function scorePeer(uptimePct: number, latencyMs: number, distanceKm: number | null): number {
+    const latencyScore = Math.max(0, 1 - latencyMs / PROBE_TIMEOUT_MS) * 40;
+    const uptimeScore = Math.max(0, Math.min(100, uptimePct)) / 100 * 20;
+    const geoScore = Math.max(0, 1 - (distanceKm ?? MAX_GEO_DISTANCE_KM) / MAX_GEO_DISTANCE_KM) * 40;
     return geoScore + latencyScore + uptimeScore;
+}
+
+export function computeScore(peer: PeerInfo, geo: GeoCoords | null): number {
+    const distanceKm = geo === null || peer.distanceKm === null ? null : peer.distanceKm;
+    return scorePeer(peer.uptimePct, peer.latencyMs ?? PROBE_TIMEOUT_MS, distanceKm);
+}
+
+export function selectBestPeers<T extends { score: number }>(peers: T[], limit: number): T[] {
+    return [...peers].sort((left, right) => right.score - left.score).slice(0, limit);
 }
 
 export function logTopPeers(pool: PeerInfo[]): void {
