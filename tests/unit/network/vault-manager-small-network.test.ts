@@ -21,7 +21,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(async () => undefined),
+    sendSecurePacket: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
@@ -62,7 +62,7 @@ describe('vault manager small-network attachment cases', () => {
         const nodes = await VaultManager.replicateToVaults('peer-2', packet);
 
         expect(nodes).toBe(1);
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
@@ -93,7 +93,7 @@ describe('vault manager small-network attachment cases', () => {
         const nodes = await VaultManager.replicateToVaults('peer-2', packet);
 
         expect(nodes).toBe(1);
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
         const [, recipientSid, senderSid, , data] = vi.mocked(vaultOps.saveVaultEntry).mock.calls[0];
         expect(recipientSid).toBe('peer-2');
@@ -114,8 +114,8 @@ describe('vault manager small-network attachment cases', () => {
 
         await VaultManager.queryOwnVaults();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::peer-1',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );
@@ -142,8 +142,8 @@ describe('vault manager small-network attachment cases', () => {
 
         await VaultManager.queryOwnVaults();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             address.toUpperCase(),
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' }),
         );
@@ -161,7 +161,7 @@ describe('vault manager small-network attachment cases', () => {
 
         await VaultManager.queryOwnVaults();
 
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
     });
 
     it('queries the single known peer even if it is still marked disconnected', async () => {
@@ -177,8 +177,8 @@ describe('vault manager small-network attachment cases', () => {
 
         await VaultManager.queryOwnVaults();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::peer-1',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );

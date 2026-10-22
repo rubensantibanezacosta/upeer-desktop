@@ -28,7 +28,7 @@ vi.mock('../../../../src/main_process/storage/contacts/operations.js', () => ({
     getContactByUpeerId: vi.fn(() => ({ name: 'Peer' })),
     isContactBlocked: vi.fn(() => false),
 }));
-vi.mock('../../../../src/main_process/network/messaging/chatSend.js', () => ({ sendUDPMessage: vi.fn(async () => undefined) }));
+vi.mock('../../../../src/main_process/network/messaging/chatSend.js', () => ({ sendChatMessage: vi.fn(async () => undefined) }));
 
 type Handler = (event: unknown, payload: Record<string, unknown>) => unknown;
 
@@ -146,7 +146,7 @@ describe('registerCallHandlers', () => {
             upeerId: 'peer1', message: 'Llamada de voz perdida', isSystem: true,
         }));
         const chatSend = await import('../../../../src/main_process/network/messaging/chatSend.js');
-        expect(chatSend.sendUDPMessage).toHaveBeenCalledWith('peer1', '__SYS__|Llamada de voz perdida', undefined, expect.any(String));
+        expect(chatSend.sendChatMessage).toHaveBeenCalledWith('peer1', '__SYS__|Llamada de voz perdida', undefined, expect.any(String));
     });
 
     it('registra llamada de grupo saliente perdida como evento del grupo', async () => {
@@ -178,14 +178,14 @@ describe('registerCallHandlers', () => {
             expect.any(String), 'peer1', true, '__SYS__|Videollamada rechazada', undefined, undefined, 'sent', expect.any(String), expect.any(Number),
         ));
         expect(getContactByUpeerId).not.toHaveBeenCalled();
-        expect(chatSend.sendUDPMessage).not.toHaveBeenCalled();
+        expect(chatSend.sendChatMessage).not.toHaveBeenCalled();
     });
 
     it('registra la llamada perdida del emisor y la envía mediante entrega de chat', async () => {
         const session = callManager.create('peer1', 'video', 'outgoing');
         callManager.end(session.callId, 'no-answer');
 
-        await vi.waitFor(() => expect(chatSend.sendUDPMessage).toHaveBeenCalledWith(
+        await vi.waitFor(() => expect(chatSend.sendChatMessage).toHaveBeenCalledWith(
             'peer1', '__SYS__|Videollamada perdida', undefined, expect.any(String),
         ));
         expect(messages.saveMessage).toHaveBeenCalledWith(

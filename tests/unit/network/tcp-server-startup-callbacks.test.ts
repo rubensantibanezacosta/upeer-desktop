@@ -113,7 +113,7 @@ vi.mock('../../../src/main_process/network/server/state.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
     drainSendQueue: vi.fn(),
 }));
 

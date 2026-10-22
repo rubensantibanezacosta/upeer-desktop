@@ -129,7 +129,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                 <PublicIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
                                 <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                                    Conectados en Yggdrasil · {stats.connectionStatusAvailable ? peers.length : '—'}
+                                    Conectados a la red · {stats.connectionStatusAvailable ? peers.length : '—'}
                                 </Typography>
                             </Box>
                             <LiveDot freshSec={freshSec} />
@@ -137,8 +137,8 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
                         <Typography level="body-xs" sx={{ color: 'text.tertiary', mb: 1 }}>
                             {stats.connectionStatusAvailable
-                                ? 'Conexiones actuales reportadas por yggstack.'
-                                : 'No se pudo consultar el estado real de conexiones de yggstack.'}
+                                ? 'Conexiones actuales de tu nodo.'
+                                : 'No se pudo consultar el estado actual de las conexiones.'}
                         </Typography>
 
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>

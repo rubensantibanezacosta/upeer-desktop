@@ -92,7 +92,7 @@ import * as identity from '../../../src/main_process/security/identity.js';
 import * as contactsOps from '../../../src/main_process/storage/contacts/operations.js';
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(async () => undefined),
+    sendSecurePacket: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
@@ -491,7 +491,7 @@ describe('vault reconnect file transfer integration', () => {
                     { upeerId: 'self-id', address: '200::sender', status: 'connected' }
                 ];
             }) as never);
-            vi.mocked(transport.sendSecureUDPMessage).mockImplementation(async (address: string, packet: { type?: string }) => {
+            vi.mocked(transport.sendSecurePacket).mockImplementation(async (address: string, packet: { type?: string }) => {
                 if (!peerState.recipientOnline && address === '200::peer-2' && packet?.type === 'VAULT_STORE') {
                     throw new Error('peer-2-offline');
                 }
@@ -568,7 +568,7 @@ describe('vault reconnect file transfer integration', () => {
             peerState.selfId = 'peer-2';
 
             await VaultManager.queryOwnVaults();
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+            expect(transport.sendSecurePacket).toHaveBeenCalledWith(
                 '200::sender',
                 expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'peer-2' })
             );

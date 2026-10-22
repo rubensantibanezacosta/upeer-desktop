@@ -34,7 +34,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -110,18 +110,18 @@ describe('groups fan-out edge cases', () => {
         const result = await sendGroupMessage('grp-edge', 'hola edge');
 
         expect(result).toEqual(expect.objectContaining({ savedMessage: 'hola edge' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(3);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(3);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-edge', senderUpeerId: 'self-id' }),
             'aa'.repeat(32),
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::11',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-edge', senderUpeerId: 'self-id' }),
             'aa'.repeat(32),
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::other-device',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-edge', senderUpeerId: 'self-id' }),
             '11'.repeat(32),
@@ -164,7 +164,7 @@ describe('groups fan-out edge cases', () => {
 
         await sendGroupMessage('grp-roster-only', 'hola miembro');
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::2',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-roster-only' }),
             publicKey,
@@ -198,6 +198,6 @@ describe('groups fan-out edge cases', () => {
         const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
         await sendGroupMessage('grp-invalid-location', 'no falsificar');
 
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalledWith('200::3', expect.anything(), expect.anything());
+        expect(transport.sendSecurePacket).not.toHaveBeenCalledWith('200::3', expect.anything(), expect.anything());
     });
 });

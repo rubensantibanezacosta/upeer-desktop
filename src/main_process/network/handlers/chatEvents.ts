@@ -10,15 +10,13 @@ import {
     saveReaction,
     deleteReaction,
 } from '../../storage/messages/reactions.js';
-import {
-    getMySignedPreKeyBundle,
-    getMyUPeerId,
-} from '../../security/identity.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { warn, security } from '../../security/secure-logger.js';
 import { clearPendingDirectMessage } from '../messaging/chatRetry.js';
 import { isValidMessageId } from './chatShared.js';
 import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
+import { createDrResetPacket } from './drResetPacket.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 
 type ChatEventMessageRecord = {
@@ -162,11 +160,11 @@ export async function handleChatEdit(
         const newContent = data.ratchetHeader
             ? await decryptDoubleRatchetPayload(upeerId, data, async (reset) => {
                 if (!fromAddress || !sendResponse) return;
-                sendResponse(fromAddress, { ...reset, signedPreKey: getMySignedPreKeyBundle() });
+                sendResponse(fromAddress, createDrResetPacket(reset.ratchetContext));
             })
             : await resolveEditedContent(upeerId, data);
         if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, createDrResetPacket());
         }
         if (typeof newContent !== 'string') return;
 

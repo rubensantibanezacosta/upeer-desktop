@@ -208,7 +208,7 @@ onYggstackAddress(() => {
     drainSendQueue();
 });
 
-export function sendSecureUDPMessage(ip: string, data: Record<string, unknown>, recipientPubKeyHex?: string, isInternalSync = false): void {
+export function sendSecurePacket(ip: string, data: Record<string, unknown>, recipientPubKeyHex?: string, isInternalSync = false): void {
     if (!getTcpServer()) return;
     if (!isYggdrasilAddress(ip)) return;
 

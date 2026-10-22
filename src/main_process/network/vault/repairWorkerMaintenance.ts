@@ -16,7 +16,7 @@ export async function renewExpiringVaultEntries(): Promise<void> {
 
         info('Renewing expiring vault entries', { count: expiringSoon.length }, 'vault');
 
-        const { sendSecureUDPMessage } = await import('../server/transport.js');
+        const { sendSecurePacket } = await import('../server/transport.js');
         const { getContacts } = await import('../../storage/contacts/operations.js');
         const { getMyUPeerId } = await import('../../security/identity.js');
         const allContacts = await getContacts();
@@ -33,7 +33,7 @@ export async function renewExpiringVaultEntries(): Promise<void> {
                 .slice(0, 6);
 
             for (const custodian of custodians) {
-                sendSecureUDPMessage(custodian.address, {
+                sendSecurePacket(custodian.address, {
                     type: 'VAULT_RENEW',
                     payloadHash: entry.payloadHash,
                     newExpiresAt,

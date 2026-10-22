@@ -18,7 +18,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({ getVouchScore: scoreMock }));
 
-vi.mock('../../../src/main_process/network/server/transport.js', () => ({ sendSecureUDPMessage: sendMock }));
+vi.mock('../../../src/main_process/network/server/transport.js', () => ({ sendSecurePacket: sendMock }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),

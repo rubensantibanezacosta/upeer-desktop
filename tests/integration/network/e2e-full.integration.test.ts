@@ -90,7 +90,7 @@ async function createNode(id: string, mnemonic?: string): Promise<E2ENode> {
     const contacts = await import('../../../src/main_process/storage/contacts/operations.js');
     const messages = await import('../../../src/main_process/storage/messages/operations.js');
     const { updateContactSignedPreKey } = await import('../../../src/main_process/storage/contacts/keys.js');
-    const { sendUDPMessage: sendMessage } = await import('../../../src/main_process/network/messaging/chatSend.js');
+    const { sendChatMessage: sendMessage } = await import('../../../src/main_process/network/messaging/chatSend.js');
     const { closeDatabase, getSqlite } = await import('../../../src/main_process/storage/shared.js');
     const vaultOps = await import('../../../src/main_process/storage/vault/operations.js');
     const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
@@ -109,7 +109,7 @@ async function createNode(id: string, mnemonic?: string): Promise<E2ENode> {
     state.setNetworkReady(true);
 
     const sendResponse = (ip: string, data: Record<string, unknown>): void => {
-        transport.sendSecureUDPMessage(ip, data);
+        transport.sendSecurePacket(ip, data);
     };
 
     let frameBuf = Buffer.alloc(0);

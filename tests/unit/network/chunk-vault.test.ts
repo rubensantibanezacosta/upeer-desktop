@@ -9,7 +9,7 @@ vi.mock('../../../src/main_process/storage/vault/asset-operations.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -71,7 +71,7 @@ describe('ChunkVault', () => {
         );
         expect(assetOps.trackDistributedAsset).toHaveBeenNthCalledWith(1, 'file-hash', 'shard:file-hash:0:0', 0, 2, 'my-id', 0);
         expect(assetOps.trackDistributedAsset).toHaveBeenNthCalledWith(2, 'file-hash', 'shard:file-hash:0:1', 1, 2, 'my-id', 0);
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
     });
 
     it('distributes large-file shards across many connected custodians in round-robin order', async () => {
@@ -93,13 +93,13 @@ describe('ChunkVault', () => {
         const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('large-file-hash', shards, 'recipient-id');
 
         expect(stored).toBe(24);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(12);
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(1, '200::1', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:0' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(2, '200::2', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:1' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(3, '200::3', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:2' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(4, '200::4', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:3' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(5, '200::5', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:4' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenNthCalledWith(6, '200::1', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:5' }));
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(12);
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(1, '200::1', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:0' }));
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(2, '200::2', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:1' }));
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(3, '200::3', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:2' }));
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(4, '200::4', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:3' }));
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(5, '200::5', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:4' }));
+        expect(transport.sendSecurePacket).toHaveBeenNthCalledWith(6, '200::1', expect.objectContaining({ payloadHash: 'shard:large-file-hash:0:5' }));
 
         const remoteCustodians = vi.mocked(assetOps.trackDistributedAsset).mock.calls
             .map((call) => call[4])
@@ -122,7 +122,7 @@ describe('ChunkVault', () => {
             { upeerId: 'my-id', address: '200::self', status: 'connected', lastSeen: '2026-04-03T10:06:00.000Z' },
         ] as never);
 
-        vi.mocked(transport.sendSecureUDPMessage).mockImplementation(async (address: string) => {
+        vi.mocked(transport.sendSecurePacket).mockImplementation(async (address: string) => {
             if (address === '200::2') {
                 throw new Error('custodian-offline');
             }
@@ -134,7 +134,7 @@ describe('ChunkVault', () => {
         const shards = Array.from({ length: 6 }, (_, index) => Buffer.from((index + 1).toString(16).padStart(2, '0'), 'hex'));
         const stored = await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('resilient-file-hash', shards, 'recipient-id');
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(6);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(6);
         expect(stored).toBe(10);
         expect(assetOps.trackDistributedAsset).toHaveBeenCalledTimes(10);
 

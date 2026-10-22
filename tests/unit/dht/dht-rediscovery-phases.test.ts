@@ -48,27 +48,27 @@ describe('dhtRediscovery phase edges', () => {
             { upeerId: 'peer-stale', address: '200::stale', lastSeen: Date.now() - 40 * 24 * 60 * 60 * 1000 },
         ] as never);
 
-        const sendSecureUDPMessage = vi.fn();
+        const sendSecurePacket = vi.fn();
         // onPacket debe devolver una cleanup function y registrar el handler
         let registeredHandler: ((ip: string, data: RediscoveryPacket) => void) | null = null;
         const onPacket: OnRediscoveryPacket = vi.fn((handler) => {
             registeredHandler = handler;
             return () => { registeredHandler = null; };
         });
-        const rediscoveryPromise = aggressiveRediscovery('target-id', sendSecureUDPMessage, onPacket);
+        const rediscoveryPromise = aggressiveRediscovery('target-id', sendSecurePacket, onPacket);
 
         await vi.advanceTimersByTimeAsync(5_000);
         const result = await rediscoveryPromise;
 
         expect(result).toBeNull();
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith('200::recent', { type: 'PING' });
-        expect(sendSecureUDPMessage).not.toHaveBeenCalledWith('200::stale', { type: 'PING' });
+        expect(sendSecurePacket).toHaveBeenCalledWith('200::recent', { type: 'PING' });
+        expect(sendSecurePacket).not.toHaveBeenCalledWith('200::stale', { type: 'PING' });
         // Verificar que se registró el handler de paquetes
         expect(registeredHandler).toBeDefined();
 
         await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
         await Promise.resolve();
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect(sendSecurePacket).toHaveBeenCalledTimes(1);
         expect(logger.network).toHaveBeenCalledWith('Entering beacon mode', undefined, { myId: 'target-id', duration: '24h' }, 'rediscovery');
     });
 
@@ -82,17 +82,17 @@ describe('dhtRediscovery phase edges', () => {
             { upeerId: 'peer-b', address: '200::b' },
         ] as never);
 
-        const sendSecureUDPMessage = vi.fn();
-        startEnhancedBeaconMode((24 * 60 * 60 * 1000) + (31 * 60 * 1000), sendSecureUDPMessage);
+        const sendSecurePacket = vi.fn();
+        startEnhancedBeaconMode((24 * 60 * 60 * 1000) + (31 * 60 * 1000), sendSecurePacket);
 
         await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(sendSecurePacket).toHaveBeenCalledTimes(2);
 
         await vi.advanceTimersByTimeAsync((24 * 60 * 60 * 1000) - (5 * 60 * 1000) + 1);
-        vi.mocked(sendSecureUDPMessage).mockClear();
+        vi.mocked(sendSecurePacket).mockClear();
         await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1);
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(sendSecurePacket).toHaveBeenCalledTimes(2);
         await vi.advanceTimersByTimeAsync(60 * 1000 + 1);
         expect(logger.network).toHaveBeenCalledWith('Enhanced beacon mode ended', undefined, {}, 'beacon-enhanced');
     });

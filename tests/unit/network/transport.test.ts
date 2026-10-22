@@ -68,9 +68,9 @@ import * as state from '../../../src/main_process/network/server/state.js';
 import * as socks5 from '../../../src/main_process/network/server/socks5.js';
 import * as circuitBreaker from '../../../src/main_process/network/server/circuitBreaker.js';
 import * as callMediaUdp from '../../../src/main_process/network/server/callMediaUdp.js';
-import { resetTransportConnectionsForTests, sendSecureUDPMessage } from '../../../src/main_process/network/server/transport.js';
+import { resetTransportConnectionsForTests, sendSecurePacket } from '../../../src/main_process/network/server/transport.js';
 
-describe('Transport - sendSecureUDPMessage', () => {
+describe('Transport - sendSecurePacket', () => {
 
     const createMockSocket = () => ({
         destroyed: false,
@@ -96,7 +96,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'PING', content: 'hello' });
+        sendSecurePacket('1.2.3.4', { type: 'PING', content: 'hello' });
 
         await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -108,7 +108,7 @@ describe('Transport - sendSecureUDPMessage', () => {
     it('should queue non-file messages when network is NOT ready', () => {
         vi.mocked(state.setNetworkReady)(false);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'CHAT', content: 'hello' });
+        sendSecurePacket('1.2.3.4', { type: 'CHAT', content: 'hello' });
 
         expect(state.addToSendQueue).toHaveBeenCalled();
         expect(socks5.socks5Connect).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe('Transport - sendSecureUDPMessage', () => {
     it('should NOT queue file-related messages when network is NOT ready (drop policy)', () => {
         vi.mocked(state.setNetworkReady)(false);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'FILE_CHUNK', data: '...' });
+        sendSecurePacket('1.2.3.4', { type: 'FILE_CHUNK', data: '...' });
 
         expect(state.addToSendQueue).not.toHaveBeenCalled();
         expect(socks5.socks5Connect).not.toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'CHAT' }, 'recipient-pubkey');
+        sendSecurePacket('1.2.3.4', { type: 'CHAT' }, 'recipient-pubkey');
 
         await new Promise(resolve => setTimeout(resolve, 20));
 
@@ -140,8 +140,8 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'PING', a: 1 });
-        sendSecureUDPMessage('1.2.3.4', { type: 'PING', a: 2 });
+        sendSecurePacket('1.2.3.4', { type: 'PING', a: 1 });
+        sendSecurePacket('1.2.3.4', { type: 'PING', a: 2 });
 
         await new Promise(resolve => setTimeout(resolve, 20));
 
@@ -152,7 +152,7 @@ describe('Transport - sendSecureUDPMessage', () => {
     it('should block sending if IP is in circuit breaker blocklist', async () => {
         vi.mocked(circuitBreaker.isIPBlocked).mockReturnValue(true);
 
-        sendSecureUDPMessage('1.2.3.4', { type: 'PING' });
+        sendSecurePacket('1.2.3.4', { type: 'PING' });
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -176,8 +176,8 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: media });
-        sendSecureUDPMessage('200::peer', { type: 'CALL_ACCEPT', callId: 'call-1' });
+        sendSecurePacket('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: media });
+        sendSecurePacket('200::peer', { type: 'CALL_ACCEPT', callId: 'call-1' });
 
         expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledTimes(1);
         expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledWith('200::peer', expect.any(Buffer));
@@ -190,7 +190,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([1, 2, 3]) });
+        sendSecurePacket('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([1, 2, 3]) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
         expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledOnce();
@@ -206,7 +206,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([7, 8, 9]) });
+        sendSecurePacket('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array([7, 8, 9]) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
         expect(socks5.socks5Connect).not.toHaveBeenCalled();
@@ -217,7 +217,7 @@ describe('Transport - sendSecureUDPMessage', () => {
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array(1300) });
+        sendSecurePacket('200::peer', { type: 'CALL_MEDIA', callId: 'call-1', data: new Uint8Array(1300) });
         await new Promise(resolve => setTimeout(resolve, 20));
 
         expect(callMediaUdp.sendCallMediaDatagram).toHaveBeenCalledOnce();

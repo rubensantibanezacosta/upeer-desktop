@@ -21,7 +21,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
@@ -95,7 +95,7 @@ describe('VaultManager - Replication Logic', () => {
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({} as KnownRecipient);
         vi.mocked(reputation.getVouchScore).mockResolvedValue(55);
 
-        vi.mocked(transport.sendSecureUDPMessage).mockImplementation((addr: string) => {
+        vi.mocked(transport.sendSecurePacket).mockImplementation((addr: string) => {
             if (addr === '1.1.1.1') return Promise.resolve();
             return Promise.reject(new Error('Network error'));
         });
@@ -110,7 +110,7 @@ describe('VaultManager - Replication Logic', () => {
 
         await VaultManager.replicateToVaults(recipientId, replicatedPacket);
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalled();
+        expect(transport.sendSecurePacket).toHaveBeenCalled();
 
         expect(mockKademlia.storeValue).toHaveBeenCalledWith(
             expect.anything(),
@@ -138,6 +138,6 @@ describe('VaultManager - Replication Logic', () => {
 
         await VaultManager.replicateToVaults(recipientId, { type: 'CHAT', data: 'hi' });
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('3.3.3.3', expect.anything());
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith('3.3.3.3', expect.anything());
     });
 });

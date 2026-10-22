@@ -14,7 +14,7 @@ import {
 import { error, warn } from '../../security/secure-logger.js';
 import { buildMessagePayload } from '../messagePayload.js';
 import { canonicalStringify } from '../utils.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import { getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
@@ -97,7 +97,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const signedData = { ...data, signature: dataSignature.toString('hex'), senderUpeerId: myId };
         if (contact.status === 'connected') {
             for (const address of getFanOutAddresses(contact)) {
-                sendSecureUDPMessage(address, signedData, contact.publicKey);
+                sendSecurePacket(address, signedData, contact.publicKey);
             }
             if (options?.registerRetry !== false) {
                 registerEncryptedOperationRetry(targetId, `chat-update:${msgId}`, () =>
@@ -141,7 +141,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     const selfAddresses = await getSelfAddresses(myId);
     const myPublicKey = getMyPublicKey().toString('hex');
     for (const address of selfAddresses) {
-        sendSecureUDPMessage(address, signedSelfSync, myPublicKey, true);
+        sendSecurePacket(address, signedSelfSync, myPublicKey, true);
     }
     import('../vault/manager.js').then(async ({ VaultManager }) => {
         const mySignedPreKey = getMySignedPreKey();
@@ -198,7 +198,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
         const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
         if (contact && contact.status === 'connected' && contact.publicKey) {
             for (const address of getFanOutAddresses(contact)) {
-                sendSecureUDPMessage(address, signedData, contact.publicKey);
+                sendSecurePacket(address, signedData, contact.publicKey);
             }
         }
         if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
@@ -221,7 +221,7 @@ export async function sendChatDelete(upeerId: string, msgId: string): Promise<vo
 
     const selfAddresses = await getSelfAddresses(myId);
     for (const address of selfAddresses) {
-        sendSecureUDPMessage(address, signedData, myPublicKey, true);
+        sendSecurePacket(address, signedData, myPublicKey, true);
     }
     (async () => {
         const { VaultManager } = await import('../vault/manager.js');
@@ -255,7 +255,7 @@ export async function sendChatClear(upeerId: string, customTimestamp?: number): 
             const selfNodes = kademlia.findClosestContacts(myId, 20)
                 .filter((node) => node.upeerId === myId && node.address !== myYggAddress);
             for (const node of selfNodes) {
-                sendSecureUDPMessage(node.address, data, myPublicKey);
+                sendSecurePacket(node.address, data, myPublicKey);
             }
         }
     } catch (err) {

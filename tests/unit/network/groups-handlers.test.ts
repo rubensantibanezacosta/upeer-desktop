@@ -122,7 +122,7 @@ vi.mock('../../../src/main_process/network/handlers/groupControlShared.js', asyn
 });
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 describe('Group Handlers Final Coverage', () => {
@@ -251,7 +251,7 @@ describe('Group Handlers Final Coverage', () => {
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
             expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-group-message', expect.anything());
             const transport = await import('../../../src/main_process/network/server/transport.js');
-            expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+            expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         });
 
         it('rejects a group message ID already stored in another conversation', async () => {
@@ -306,7 +306,7 @@ describe('Group Handlers Final Coverage', () => {
             }, mockWin, '200::sender');
 
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('200::sender', {
+            expect(transport.sendSecurePacket).toHaveBeenCalledWith('200::sender', {
                 type: 'GROUP_ACK',
                 id: messageId,
                 groupId,
@@ -675,7 +675,10 @@ describe('Group Handlers Final Coverage', () => {
                 ratchetHeader: { dh: 'a'.repeat(64), pn: 0, n: 0 }
             } as GroupInviteData, mockWin, '1.2.3.4', sendResponse);
 
-            expect(sendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
+            expect(sendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+                type: 'DR_RESET',
+                resetId: expect.any(String),
+            }));
             expect(groupsOps.saveGroup).not.toHaveBeenCalled();
         });
     });

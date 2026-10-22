@@ -4,12 +4,13 @@ import { getMainWindow } from '../../core/windowManager.js';
 import { showDesktopNotification } from '../../utils/desktopNotification.js';
 import { focusWindow } from '../../utils/windowFocus.js';
 import { saveMessage, getMessageById } from '../../storage/messages/operations.js';
-import { getMyUPeerId, getMySignedPreKeyBundle } from '../../security/identity.js';
+import { getMyUPeerId } from '../../security/identity.js';
 import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { decompressMessage } from '../../utils/messageCompression.js';
 import { warn, info } from '../../security/secure-logger.js';
 import { isValidMessageId } from './chatShared.js';
 import { decryptDoubleRatchetContent, type DecryptedChatPayload } from './chatMessageDecrypt.js';
+import { createDrResetPacket } from './drResetPacket.js';
 import type { ChatAckPacket, ChatContactRecord, ChatDrResetPacket, ChatIncomingPayload } from './chatMessageTypes.js';
 
 type SaveMessageResult = { changes?: number } | undefined;
@@ -83,7 +84,7 @@ export async function receiveChatMessage(
             return;
         }
     } else if (data.nonce) {
-        sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+        sendResponse(fromAddress, createDrResetPacket());
         warn('Dropping non-DR chat message', { upeerId, msgId }, 'security');
         return;
     }

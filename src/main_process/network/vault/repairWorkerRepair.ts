@@ -118,7 +118,7 @@ export async function reconstructVaultSegment(
 export async function collectMissingVaultShards(fileHash: string, segIdx: number, missingIndices: number[]): Promise<void> {
     info('Collecting missing segments shards', { fileHash, segIdx, missingCount: missingIndices.length }, 'vault');
 
-    const { sendSecureUDPMessage } = await import('../server/transport.js');
+    const { sendSecurePacket } = await import('../server/transport.js');
     const { getContacts } = await import('../../storage/contacts/operations.js');
     const { getMyUPeerId } = await import('../../security/identity.js');
     const contacts = await getContacts();
@@ -139,7 +139,7 @@ export async function collectMissingVaultShards(fileHash: string, segIdx: number
         for (const custodian of custodians) {
             requests.push((async () => {
                 try {
-                    await sendSecureUDPMessage(custodian.address, {
+                    await sendSecurePacket(custodian.address, {
                         type: 'VAULT_QUERY',
                         requesterSid: myId,
                         payloadHash,
@@ -161,7 +161,7 @@ export async function redistributeVaultSegmentShards(fileHash: string, segIdx: n
     const coder = new ErasureCoder(4, 8);
     const shards = coder.encode(segmentData);
 
-    const { sendSecureUDPMessage } = await import('../server/transport.js');
+    const { sendSecurePacket } = await import('../server/transport.js');
     const { getContacts } = await import('../../storage/contacts/operations.js');
     const { getMyUPeerId } = await import('../../security/identity.js');
     const contacts = await getContacts();
@@ -184,7 +184,7 @@ export async function redistributeVaultSegmentShards(fileHash: string, segIdx: n
 
         redistributions.push((async () => {
             try {
-                await sendSecureUDPMessage(custodian.address, {
+                await sendSecurePacket(custodian.address, {
                     type: 'VAULT_STORE',
                     payloadHash,
                     recipientSid: '*',

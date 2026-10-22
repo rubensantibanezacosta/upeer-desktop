@@ -12,8 +12,8 @@ import {
 import { deleteReaction, saveReaction } from '../../storage/messages/reactions.js';
 import { error } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
-import { sendUDPMessage } from './chatSend.js';
+import { sendSecurePacket } from '../server/transport.js';
+import { sendChatMessage } from './chatSend.js';
 import { emitMessageStatusUpdated, getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 
 type ChatContactRecord = {
@@ -68,12 +68,12 @@ export async function sendReadReceipt(upeerId: string, id: string): Promise<void
     const selfAddresses = await getSelfAddresses(myId);
 
     for (const address of getFanOutAddresses(contact)) {
-        sendSecureUDPMessage(address, signedData, contact.publicKey);
+        sendSecurePacket(address, signedData, contact.publicKey);
     }
 
     const myPublicKey = getMyPublicKey().toString('hex');
     for (const address of selfAddresses) {
-        sendSecureUDPMessage(address, signedData, myPublicKey, true);
+        sendSecurePacket(address, signedData, myPublicKey, true);
     }
 
     import('../vault/manager.js').then(({ VaultManager }) => {
@@ -94,7 +94,7 @@ export async function sendContactCard(targetUpeerId: string, contact: ContactCar
             avatar: contact.avatar || undefined,
         },
     });
-    const result = await sendUDPMessage(targetUpeerId, serializedMessage);
+    const result = await sendChatMessage(targetUpeerId, serializedMessage);
     return result?.id;
 }
 
@@ -124,7 +124,7 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
             const contact = await getContactByUpeerId(memberId) as ChatContactRecord | undefined;
             if (contact?.status === 'connected' && contact.publicKey) {
                 for (const address of getFanOutAddresses(contact)) {
-                    sendSecureUDPMessage(address, signedData, contact.publicKey);
+                    sendSecurePacket(address, signedData, contact.publicKey);
                 }
             } else if (contact?.publicKey && ['offline', 'disconnected'].includes(contact.status ?? '')) {
                 try {
@@ -138,7 +138,7 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
 
         const selfAddresses = await getSelfAddresses(myId);
         for (const address of selfAddresses) {
-            sendSecureUDPMessage(address, signedData, myPublicKey, true);
+            sendSecurePacket(address, signedData, myPublicKey, true);
         }
         if (selfAddresses.length < 1) {
             try {
@@ -154,12 +154,12 @@ export async function sendChatReaction(upeerId: string, msgId: string, emoji: st
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
     if (!contact?.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
     for (const address of getFanOutAddresses(contact)) {
-        sendSecureUDPMessage(address, signedData, contact.publicKey);
+        sendSecurePacket(address, signedData, contact.publicKey);
     }
 
     const selfAddresses = await getSelfAddresses(myId);
     for (const address of selfAddresses) {
-        sendSecureUDPMessage(address, signedData, myPublicKey, true);
+        sendSecurePacket(address, signedData, myPublicKey, true);
     }
 
     try {

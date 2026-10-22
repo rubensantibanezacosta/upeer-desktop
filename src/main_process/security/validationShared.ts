@@ -6,9 +6,14 @@ export interface ValidationResult {
 const HEX_ID_RE = /^[0-9a-f]+$/i;
 const POW_PROOF_RE = /^[0-9a-f]+$/i;
 const KEY_40_OR_64_RE = /^[0-9a-f]+$/i;
+const RESET_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isValidHexId(value: unknown): boolean {
     return typeof value === 'string' && value.length >= 32 && value.length <= 128 && HEX_ID_RE.test(value);
+}
+
+export function isValidResetId(value: unknown): value is string {
+    return typeof value === 'string' && RESET_ID_RE.test(value);
 }
 
 export function validatePowProof(value: unknown): ValidationResult {

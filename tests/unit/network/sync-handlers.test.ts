@@ -37,7 +37,7 @@ vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
     getKademliaInstance: vi.fn(),
 }));
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
     getYggstackAddress: vi.fn(),
@@ -158,8 +158,8 @@ describe('Sync Handlers', () => {
 
             await broadcastPulse('MESSAGE_READ', { messageId: 'm1' });
 
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('addr-2', expect.objectContaining({
+            expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+            expect(transport.sendSecurePacket).toHaveBeenCalledWith('addr-2', expect.objectContaining({
                 type: 'SYNC_PULSE',
                 action: 'MESSAGE_READ',
                 deviceId: 'device-1',
@@ -171,7 +171,7 @@ describe('Sync Handlers', () => {
             vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
 
             await broadcastPulse('ACTION', {});
-            expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+            expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         });
 
         it('should deduplicate repeated self nodes and skip blank addresses', async () => {
@@ -188,8 +188,8 @@ describe('Sync Handlers', () => {
 
             await broadcastPulse('MESSAGE_DELETE', { messageId: 'm2' });
 
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-            expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+            expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+            expect(transport.sendSecurePacket).toHaveBeenCalledWith(
                 'addr-2',
                 expect.objectContaining({ action: 'MESSAGE_DELETE', messageId: 'm2' }),
                 undefined,

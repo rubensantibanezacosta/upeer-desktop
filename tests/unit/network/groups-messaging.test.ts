@@ -75,7 +75,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -196,7 +196,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const ratchet = await import('../../../src/main_process/security/ratchet.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -228,7 +228,7 @@ describe('network/messaging/groups.ts', () => {
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
         expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_UPDATE',
@@ -256,7 +256,7 @@ describe('network/messaging/groups.ts', () => {
     it('continues broadcasting GROUP_UPDATE when one member vaulting fails', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const logger = await import('../../../src/main_process/security/secure-logger.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
@@ -290,7 +290,7 @@ describe('network/messaging/groups.ts', () => {
             expect.objectContaining({ memberUpeerId: 'peer-a', err: 'Error: vault-a-failed' }),
             'network'
         );
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::a',
             expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-robust' }),
             'aa'.repeat(32)
@@ -355,7 +355,7 @@ describe('network/messaging/groups.ts', () => {
     it('retries pending encrypted group updates after DR_RESET', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { retryPendingGroupEncryptedOperations } = await import('../../../src/main_process/network/messaging/encryptedOperationRetry.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -379,12 +379,12 @@ describe('network/messaging/groups.ts', () => {
 
         await updateGroup('grp-1', { name: 'Nuevo nombre' });
 
-        vi.mocked(sendSecureUDPMessage).mockClear();
+        vi.mocked(sendSecurePacket).mockClear();
 
         const retried = await retryPendingGroupEncryptedOperations('peer-online', 'grp-1');
 
         expect(retried).toBe(1);
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-1' }),
             'aa'.repeat(32)
@@ -456,7 +456,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { leaveGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -487,7 +487,7 @@ describe('network/messaging/groups.ts', () => {
 
         await leaveGroup('grp-1');
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_LEAVE',
@@ -577,7 +577,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const ratchet = await import('../../../src/main_process/security/ratchet.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { inviteToGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -613,7 +613,7 @@ describe('network/messaging/groups.ts', () => {
         await inviteToGroup('grp-1', 'peer-online');
 
         expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({
                 type: 'GROUP_INVITE',
@@ -643,7 +643,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
@@ -666,7 +666,7 @@ describe('network/messaging/groups.ts', () => {
 
         await sendGroupMessage('grp-1', 'hola grupo sync');
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::other-device',
             expect.objectContaining({ type: 'GROUP_MSG', groupId: 'grp-1' }),
             '11'.repeat(32),
@@ -678,7 +678,7 @@ describe('network/messaging/groups.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const { sendGroupCallEvent } = await import('../../../src/main_process/network/messaging/groups.js');
 
@@ -705,7 +705,7 @@ describe('network/messaging/groups.ts', () => {
         expect(messagesOps.saveMessage).toHaveBeenCalledWith(
             'call-event-id', 'grp-call', true, '__SYS__|Llamada de voz perdida', undefined, expect.any(String), 'sent', 'self-id', 1234,
         );
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::online-peer', expect.objectContaining({ type: 'GROUP_MSG', id: 'call-event-id', groupId: 'grp-call' }), 'aa'.repeat(32), false,
         );
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
@@ -716,7 +716,7 @@ describe('network/messaging/groups.ts', () => {
     it('still sends to primary address when knownAddresses is malformed', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
 
         vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
@@ -747,7 +747,7 @@ describe('network/messaging/groups.ts', () => {
 
         await updateGroup('grp-1', { name: 'Nombre' });
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::10',
             expect.objectContaining({ type: 'GROUP_UPDATE', groupId: 'grp-1' }),
             'aa'.repeat(32)

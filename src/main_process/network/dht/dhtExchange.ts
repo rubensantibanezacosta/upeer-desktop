@@ -75,7 +75,7 @@ function parseJsonValue<T>(value: string | null | undefined, fallback?: T): T | 
     }
 }
 
-export function broadcastDhtUpdate(sendSecureUDPMessage: SendDhtPacket) {
+export function broadcastDhtUpdate(sendSecurePacket: SendDhtPacket) {
     const addresses = getDhtNetworkAddresses();
     if (addresses.length === 0) {
         return;
@@ -108,14 +108,14 @@ export function broadcastDhtUpdate(sendSecureUDPMessage: SendDhtPacket) {
         knownAddresses?.filter(isYggdrasilAddress).forEach(address => addressesToNotify.add(address));
 
         for (const address of addressesToNotify) {
-            sendSecureUDPMessage(address, { type: 'DHT_UPDATE', locationBlock: locBlock });
+            sendSecurePacket(address, { type: 'DHT_UPDATE', locationBlock: locBlock });
         }
     }
 
     network('Multi-channel update propagated', undefined, { intimateContacts: connectedContacts.length }, 'dht');
 }
 
-export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessage: SendDhtPacket) {
+export async function sendDhtExchange(targetUpeerId: string, sendSecurePacket: SendDhtPacket) {
     const targetContact = await getContactByUpeerId(targetUpeerId);
     if (!targetContact || targetContact.status !== 'connected') {
         return;
@@ -151,7 +151,7 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
         );
 
         if (payload.length > 0) {
-            sendSecureUDPMessage(targetContact.address, { type: 'DHT_EXCHANGE', peers: payload });
+            sendSecurePacket(targetContact.address, { type: 'DHT_EXCHANGE', peers: payload });
         }
         return;
     }
@@ -178,11 +178,11 @@ export async function sendDhtExchange(targetUpeerId: string, sendSecureUDPMessag
         .slice(0, 5);
 
     if (payload.length > 0) {
-        sendSecureUDPMessage(targetContact.address, { type: 'DHT_EXCHANGE', peers: payload });
+        sendSecurePacket(targetContact.address, { type: 'DHT_EXCHANGE', peers: payload });
     }
 }
 
-export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: SendDhtPacket) {
+export async function startDhtSearch(upeerId: string, sendSecurePacket: SendDhtPacket) {
     network('Starting active DHT search', undefined, { upeerId }, 'dht-search');
 
     const location = await findNodeLocation(upeerId);
@@ -194,7 +194,7 @@ export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: Send
     const kademlia = getKademliaInstance();
     if (kademlia) {
         network('Starting iterative search', undefined, { upeerId }, 'kademlia');
-        iterativeFindNode(upeerId, sendSecureUDPMessage as unknown as Parameters<typeof iterativeFindNode>[1]).catch(err => {
+        iterativeFindNode(upeerId, sendSecurePacket as unknown as Parameters<typeof iterativeFindNode>[1]).catch(err => {
             warn('Iterative search failed', err, 'kademlia');
         });
         return;
@@ -229,6 +229,6 @@ export async function startDhtSearch(upeerId: string, sendSecureUDPMessage: Send
                 timestamp: Date.now(),
             },
         };
-        sendSecureUDPMessage(target.address, packet);
+        sendSecurePacket(target.address, packet);
     }
 }

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { ErasureCoder } from './redundancy/erasure.js';
 import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
 import { saveVaultEntry } from '../../storage/vault/operations.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { info, error, debug, warn } from '../../security/secure-logger.js';
@@ -208,7 +208,7 @@ export class ChunkVault {
                 };
 
                 try {
-                    await sendSecureUDPMessage(custodian.address, vaultPacket);
+                    await sendSecurePacket(custodian.address, vaultPacket);
                     remoteCopies += 1;
 
                     if (custodian.upeerId) {

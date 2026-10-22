@@ -41,7 +41,7 @@ describe('dhtExchange/broadcast edge cases', () => {
         const handlers = await import('../../../src/main_process/network/dht/handlers.js');
         const { broadcastDhtUpdate } = await import('../../../src/main_process/network/dht/core.js');
 
-        const sendSecureUDPMessage = vi.fn();
+        const sendSecurePacket = vi.fn();
 
         vi.mocked(utils.getDhtNetworkAddresses).mockReturnValue(['200::self', '200::backup']);
         vi.mocked(contactsOps.getContacts).mockReturnValue([
@@ -54,13 +54,13 @@ describe('dhtExchange/broadcast edge cases', () => {
         ] as never);
         vi.mocked(handlers.publishLocationBlock).mockResolvedValue(undefined);
 
-        broadcastDhtUpdate(sendSecureUDPMessage);
+        broadcastDhtUpdate(sendSecurePacket);
 
         expect(identity.incrementMyDhtSeq).toHaveBeenCalled();
         expect(handlers.publishLocationBlock).toHaveBeenCalled();
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith('200::peer', expect.objectContaining({ type: 'DHT_UPDATE' }));
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith('200::peer-2', expect.objectContaining({ type: 'DHT_UPDATE' }));
+        expect(sendSecurePacket).toHaveBeenCalledTimes(2);
+        expect(sendSecurePacket).toHaveBeenCalledWith('200::peer', expect.objectContaining({ type: 'DHT_UPDATE' }));
+        expect(sendSecurePacket).toHaveBeenCalledWith('200::peer-2', expect.objectContaining({ type: 'DHT_UPDATE' }));
     });
 
     it('sendDhtExchange filtra peers inválidos de Kademlia y usa fallback de address al parsear mal knownAddresses', async () => {
@@ -68,7 +68,7 @@ describe('dhtExchange/broadcast edge cases', () => {
         const handlers = await import('../../../src/main_process/network/dht/handlers.js');
         const { sendDhtExchange } = await import('../../../src/main_process/network/dht/core.js');
 
-        const sendSecureUDPMessage = vi.fn();
+        const sendSecurePacket = vi.fn();
 
         vi.mocked(handlers.getKademliaInstance).mockReturnValue({
             findClosestContacts: vi.fn(() => [
@@ -94,10 +94,10 @@ describe('dhtExchange/broadcast edge cases', () => {
             return undefined;
         });
 
-        await sendDhtExchange('target-peer', sendSecureUDPMessage);
+        await sendDhtExchange('target-peer', sendSecurePacket);
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledTimes(1);
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::dest',
             expect.objectContaining({
                 type: 'DHT_EXCHANGE',

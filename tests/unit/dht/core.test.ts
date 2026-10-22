@@ -69,7 +69,7 @@ vi.mock('../../../src/main_process/security/secure-logger', async (importOrigina
 });
 
 describe('DHT Core', () => {
-    const sendSecureUDPMessage = vi.fn();
+    const sendSecurePacket = vi.fn();
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -80,7 +80,7 @@ describe('DHT Core', () => {
     describe('broadcastDhtUpdate', () => {
         it('should not broadcast if no addresses found', () => {
             vi.mocked(utils.getDhtNetworkAddresses).mockReturnValue([]);
-            broadcastDhtUpdate(sendSecureUDPMessage);
+            broadcastDhtUpdate(sendSecurePacket);
             expect(identity.incrementMyDhtSeq).not.toHaveBeenCalled();
         });
 
@@ -99,11 +99,11 @@ describe('DHT Core', () => {
             ]);
             vi.mocked(handlers.publishLocationBlock).mockResolvedValue(undefined);
 
-            broadcastDhtUpdate(sendSecureUDPMessage);
+            broadcastDhtUpdate(sendSecurePacket);
 
             expect(identity.incrementMyDhtSeq).toHaveBeenCalled();
             expect(handlers.publishLocationBlock).toHaveBeenCalled();
-            expect(sendSecureUDPMessage).toHaveBeenCalledWith('200:db8::2', expect.objectContaining({
+            expect(sendSecurePacket).toHaveBeenCalledWith('200:db8::2', expect.objectContaining({
                 type: 'DHT_UPDATE'
             }));
         });
@@ -129,9 +129,9 @@ describe('DHT Core', () => {
                 });
                 return undefined;
             });
-            await sendDhtExchange('target-id', sendSecureUDPMessage);
+            await sendDhtExchange('target-id', sendSecurePacket);
 
-            expect(sendSecureUDPMessage).toHaveBeenCalledWith('target-addr', expect.objectContaining({
+            expect(sendSecurePacket).toHaveBeenCalledWith('target-addr', expect.objectContaining({
                 type: 'DHT_EXCHANGE',
                 peers: expect.arrayContaining([
                     expect.objectContaining({
@@ -158,9 +158,9 @@ describe('DHT Core', () => {
                     renewalToken: JSON.stringify({ token: 'tok1' })
                 })
             ]);
-            await sendDhtExchange('target-id', sendSecureUDPMessage);
+            await sendDhtExchange('target-id', sendSecurePacket);
 
-            expect(sendSecureUDPMessage).toHaveBeenCalledWith('target-addr', expect.objectContaining({
+            expect(sendSecurePacket).toHaveBeenCalledWith('target-addr', expect.objectContaining({
                 type: 'DHT_EXCHANGE',
                 peers: expect.arrayContaining([
                     expect.objectContaining({
@@ -186,18 +186,18 @@ describe('DHT Core', () => {
             }));
             vi.mocked(contactsOps.getContacts).mockReturnValue(contacts);
 
-            await sendDhtExchange('target-id', sendSecureUDPMessage);
-            await sendDhtExchange('target-id', sendSecureUDPMessage);
+            await sendDhtExchange('target-id', sendSecurePacket);
+            await sendDhtExchange('target-id', sendSecurePacket);
 
-            expect(sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+            expect(sendSecurePacket).toHaveBeenCalledTimes(2);
         });
     });
 
     describe('startDhtSearch', () => {
         it('should abort if location found in cache', async () => {
             vi.mocked(handlers.findNodeLocation).mockResolvedValue({ address: 'found-ip', dhtSeq: 1, signature: 'sig' } as LocationBlock);
-            await startDhtSearch('target', sendSecureUDPMessage);
-            expect(sendSecureUDPMessage).not.toHaveBeenCalled();
+            await startDhtSearch('target', sendSecurePacket);
+            expect(sendSecurePacket).not.toHaveBeenCalled();
             expect(handlers.iterativeFindNode).not.toHaveBeenCalled();
         });
 
@@ -206,7 +206,7 @@ describe('DHT Core', () => {
             vi.mocked(handlers.getKademliaInstance).mockReturnValue({ findClosestContacts: vi.fn() } as unknown as KademliaDHT);
             vi.mocked(handlers.iterativeFindNode).mockResolvedValue(null);
 
-            await startDhtSearch('target', sendSecureUDPMessage);
+            await startDhtSearch('target', sendSecurePacket);
             expect(handlers.iterativeFindNode).toHaveBeenCalled();
         });
 
@@ -219,10 +219,10 @@ describe('DHT Core', () => {
                 createContact({ upeerId: 'b', address: 'ip-b', status: 'connected', expiresAt: 100 })
             ]);
 
-            await startDhtSearch('c', sendSecureUDPMessage);
+            await startDhtSearch('c', sendSecurePacket);
 
             // Should prioritize 'a' because it has renewal token
-            expect(sendSecureUDPMessage).toHaveBeenNthCalledWith(1, 'ip-a', expect.objectContaining({
+            expect(sendSecurePacket).toHaveBeenNthCalledWith(1, 'ip-a', expect.objectContaining({
                 type: 'DHT_QUERY',
                 targetId: 'c'
             }));
@@ -236,7 +236,7 @@ describe('DHT Core', () => {
                 dhtSeq: 1,
                 signature: 'sig',
             } as LocationBlock);
-            const result = await aggressiveRediscovery('my-id', sendSecureUDPMessage);
+            const result = await aggressiveRediscovery('my-id', sendSecurePacket);
             expect(result).toBe('found-ip');
         });
 
@@ -248,7 +248,7 @@ describe('DHT Core', () => {
                 createContact({ upeerId: 'peer1', address: 'addr1', lastSeen: String(Date.now() - 1000), status: 'connected' })
             ]);
 
-            const promise = aggressiveRediscovery('my-id', sendSecureUDPMessage);
+            const promise = aggressiveRediscovery('my-id', sendSecurePacket);
 
             await vi.advanceTimersByTimeAsync(5000);
 
@@ -268,10 +268,10 @@ describe('DHT Core', () => {
                 createContact({ upeerId: 'peer1', address: 'addr1', status: 'connected' })
             ]);
 
-            startEnhancedBeaconMode(3600000, sendSecureUDPMessage);
+            startEnhancedBeaconMode(3600000, sendSecurePacket);
 
             await vi.advanceTimersByTimeAsync(300001);
-            expect(sendSecureUDPMessage).toHaveBeenCalled();
+            expect(sendSecurePacket).toHaveBeenCalled();
 
             await vi.advanceTimersByTimeAsync(3600000);
             vi.clearAllMocks();
@@ -287,8 +287,8 @@ describe('DHT Core', () => {
         vi.mocked(contactsOps.getContacts).mockReturnValue([
             createContact({ upeerId: 'INVALID_ID', address: 'addr1', status: 'connected', dhtSignature: 'sig1' })
         ]);
-        await sendDhtExchange('target-id', sendSecureUDPMessage);
-        expect(sendSecureUDPMessage).toHaveBeenCalled();
+        await sendDhtExchange('target-id', sendSecurePacket);
+        expect(sendSecurePacket).toHaveBeenCalled();
     });
 
     it('legacy search distance calculation fallback', async () => {
@@ -297,7 +297,7 @@ describe('DHT Core', () => {
         vi.mocked(contactsOps.getContacts).mockReturnValue([
             createContact({ upeerId: 'INVALID', address: 'addr1', status: 'connected' })
         ]);
-        await startDhtSearch('target', sendSecureUDPMessage);
-        expect(sendSecureUDPMessage).toHaveBeenCalled();
+        await startDhtSearch('target', sendSecurePacket);
+        expect(sendSecurePacket).toHaveBeenCalled();
     });
 });

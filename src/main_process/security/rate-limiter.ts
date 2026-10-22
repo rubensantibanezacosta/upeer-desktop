@@ -47,6 +47,7 @@ export class RateLimiter {
             // Chat messages: reasonable limits for normal usage
             'CHAT': { windowMs: 60000, maxTokens: 100, refillRate: 100 / 60 }, // 100 per minute
             'ACK': { windowMs: 60000, maxTokens: 200, refillRate: 200 / 60 },
+            'DR_RESET': { windowMs: 60000, maxTokens: 20, refillRate: 20 / 60 },
             'READ': { windowMs: 60000, maxTokens: 200, refillRate: 200 / 60 },
             'TYPING': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
 

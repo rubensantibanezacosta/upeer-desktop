@@ -9,10 +9,7 @@ import {
   updateGroupMembers,
   updateGroupStatus,
 } from "../../storage/groups/operations.js";
-import {
-  getMySignedPreKeyBundle,
-  getMyUPeerId,
-} from "../../security/identity.js";
+import { getMyUPeerId } from "../../security/identity.js";
 import { security, warn } from "../../security/secure-logger.js";
 import { isValidGroupEpoch, isValidGroupSenderKey } from "../groupState.js";
 import {
@@ -23,6 +20,7 @@ import {
   updateGroupEphemeralKeyIfValid,
   validMemberPublicKeys,
 } from "./groupControlShared.js";
+import { createDrResetPacket } from "./drResetPacket.js";
 
 async function applyGroupUpdate(
   senderUpeerId: string,
@@ -64,10 +62,7 @@ async function applyGroupUpdate(
       data,
       async (reset) => {
         if (!fromAddress || !sendResponse) return;
-        sendResponse(fromAddress, {
-          ...reset,
-          signedPreKey: getMySignedPreKeyBundle(),
-        });
+        sendResponse(fromAddress, createDrResetPacket(reset.ratchetContext));
       },
     );
     if (!inner) {

@@ -154,6 +154,12 @@ describe('validationMessaging (update/clear/contact/identity/drReset)', () => {
             expect(validateDrReset({ signedPreKey: spk }).valid).toBe(true);
         });
 
+        it('acepta un resetId UUID y rechaza formatos inválidos', () => {
+            expect(validateDrReset({ resetId: '123e4567-e89b-12d3-a456-426614174000' }).valid).toBe(true);
+            expect(validateDrReset({ resetId: 'message-1' }).valid).toBe(false);
+            expect(validateDrReset({ resetId: 42 }).valid).toBe(false);
+        });
+
         it('rechaza signedPreKey inválida', () => {
             expect(validateDrReset({ signedPreKey: { spkId: -1 } }).valid).toBe(false);
         });

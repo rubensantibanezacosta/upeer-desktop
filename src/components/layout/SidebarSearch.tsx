@@ -104,7 +104,8 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                             sx={{
                                 borderRadius: 'xl',
                                 fontWeight: activeFilter === f.value ? 600 : 400,
-                                px: 1.5
+                                px: 1.5,
+                                py: 0.5
                             }}
                         >
                             {f.label}

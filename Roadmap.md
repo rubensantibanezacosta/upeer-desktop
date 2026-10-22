@@ -8,7 +8,7 @@ _Última actualización: 8 Agosto 2026_
 
 ### Núcleo P2P y red
 
-- [x] Motor UDP sobre Yggdrasil IPv6 — comunicación P2P sin servidores
+- [x] Motor de transporte seguro sobre Yggdrasil IPv6 — TCP para mensajería y UDP para media de llamadas, sin servidores
 - [x] Kademlia DHT completa — 160 buckets, K=20, α=3, lookup O(log n)
 - [x] Bootstrap diversificado — DNS TXT, LAN multicast, seed nodes, contactos existentes
 - [x] LAN discovery — anuncios `ff02::1` cada 30 s
@@ -63,7 +63,7 @@ _Última actualización: 8 Agosto 2026_
 ### Transferencia de archivos (Fase 16)
 
 - [x] Fragmentación en chunks de 64 KB con validación SHA-256
-- [x] Protocolos UDP: FILE_START, FILE_CHUNK, FILE_ACK, FILE_CANCEL, FILE_COMPLETE
+- [x] Protocolos de transferencia: FILE_START, FILE_CHUNK, FILE_ACK, FILE_CANCEL, FILE_COMPLETE
 - [x] Progreso en tiempo real — barra basada en ACKs
 - [x] Límite de 100 MB por archivo, validación de tipo MIME
 - [x] Thumbnails para imágenes y vídeos
@@ -181,7 +181,7 @@ Llamadas de voz y videollamadas E2EE **100% P2P**: sin TURN, sin STUN, sin servi
 No usamos `RTCPeerConnection`/ICE/DTLS-SRTP para mover el media: el renderer no puede emitir candidates hacia la IP Ygg (200::) porque el nodo corre sin TUN, y un TURN sería un punto centralizado que contradice el diseño. En su lugar:
 - **Captura** con `getUserMedia` (APIs de captura WebRTC).
 - **Codifica/decodifica** con **WebCodecs** (`VideoEncoder`/`AudioDecoder`; opus para audio, VP8/VP9/AV1 para vídeo).
-- **Transporta** los chunks codificados como paquetes P2P **cifrados E2EE** por el canal existente (TCP sobre Yggdrasil, reutilizando `sendSecureUDPMessage` + framing + ratchet). En Ygg todo nodo es alcanzable desde cualquier otro: la mesh ya resuelve enrutamiento y reachability, no hay NAT que atravesar ni relay que levantar.
+- **Transporta** los chunks codificados como paquetes P2P **cifrados E2EE** por el canal existente (TCP sobre Yggdrasil, reutilizando `sendSecurePacket` + framing + ratchet). En Ygg todo nodo es alcanzable desde cualquier otro: la mesh ya resuelve enrutamiento y reachability, no hay NAT que atravesar ni relay que levantar.
 - Opcional en F10: canal **UDP real** vía `yggstack -remote-udp` + SOCKS5 UDP associate para bajar latencia/jitter bajo pérdida. TCP es el MVP.
 
 ### Flujo de datos de media

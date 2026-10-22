@@ -4,7 +4,7 @@ const {
     mockWhere,
     mockFrom,
     mockSelect,
-    mockSendSecureUDPMessage,
+    mockSendSecurePacket,
     mockGetContacts,
     mockGetMyUPeerId,
     mockGetExpiringSoonEntries,
@@ -16,7 +16,7 @@ const {
     mockWhere: vi.fn(),
     mockFrom: vi.fn(),
     mockSelect: vi.fn(),
-    mockSendSecureUDPMessage: vi.fn(),
+    mockSendSecurePacket: vi.fn(),
     mockGetContacts: vi.fn(),
     mockGetMyUPeerId: vi.fn(() => 'self-peer'),
     mockGetExpiringSoonEntries: vi.fn(),
@@ -79,7 +79,7 @@ vi.mock('../../../src/main_process/network/vault/redundancy/erasure.js', async (
 });
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: mockSendSecureUDPMessage,
+    sendSecurePacket: mockSendSecurePacket,
 }));
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
@@ -162,9 +162,9 @@ describe('RepairWorker', () => {
         await renewExpiringVaultEntries();
 
         expect(mockRenewVaultEntry).toHaveBeenCalledWith('hash-1', now + 60 * 24 * 60 * 60 * 1000);
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(mockSendSecureUDPMessage).toHaveBeenNthCalledWith(1, 'addr-1', expect.objectContaining({ type: 'VAULT_RENEW', payloadHash: 'hash-1' }));
-        expect(mockSendSecureUDPMessage).toHaveBeenNthCalledWith(2, 'addr-2', expect.objectContaining({ type: 'VAULT_RENEW', payloadHash: 'hash-1' }));
+        expect(mockSendSecurePacket).toHaveBeenCalledTimes(2);
+        expect(mockSendSecurePacket).toHaveBeenNthCalledWith(1, 'addr-1', expect.objectContaining({ type: 'VAULT_RENEW', payloadHash: 'hash-1' }));
+        expect(mockSendSecurePacket).toHaveBeenNthCalledWith(2, 'addr-2', expect.objectContaining({ type: 'VAULT_RENEW', payloadHash: 'hash-1' }));
     });
 
     it('repairs degraded assets at or below threshold during maintenance', async () => {
@@ -230,9 +230,9 @@ describe('RepairWorker', () => {
         await vi.runAllTimersAsync();
         await promise;
 
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(4);
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledWith('addr-1', expect.objectContaining({ type: 'VAULT_QUERY', payloadHash: 'shard:file-hash:2:0' }));
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledWith('addr-2', expect.objectContaining({ type: 'VAULT_QUERY', payloadHash: 'shard:file-hash:2:3' }));
+        expect(mockSendSecurePacket).toHaveBeenCalledTimes(4);
+        expect(mockSendSecurePacket).toHaveBeenCalledWith('addr-1', expect.objectContaining({ type: 'VAULT_QUERY', payloadHash: 'shard:file-hash:2:0' }));
+        expect(mockSendSecurePacket).toHaveBeenCalledWith('addr-2', expect.objectContaining({ type: 'VAULT_QUERY', payloadHash: 'shard:file-hash:2:3' }));
     });
 
     it('redistributes reconstructed shards when enough custodians exist', async () => {
@@ -247,8 +247,8 @@ describe('RepairWorker', () => {
         await redistributeVaultSegmentShards('file-hash', 4, Buffer.from('segment-data'));
 
         expect(mockEncode).toHaveBeenCalledOnce();
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(4);
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledWith('addr-1', expect.objectContaining({ type: 'VAULT_STORE', payloadHash: 'shard:file-hash:4:0' }));
+        expect(mockSendSecurePacket).toHaveBeenCalledTimes(4);
+        expect(mockSendSecurePacket).toHaveBeenCalledWith('addr-1', expect.objectContaining({ type: 'VAULT_STORE', payloadHash: 'shard:file-hash:4:0' }));
     });
 
     it('espera a que terminen los envíos antes de resolver la redistribución', async () => {
@@ -265,7 +265,7 @@ describe('RepairWorker', () => {
             releaseSend = resolve;
         });
 
-        mockSendSecureUDPMessage.mockImplementation(() => sendBarrier);
+        mockSendSecurePacket.mockImplementation(() => sendBarrier);
 
         let resolved = false;
         const redistribution = redistributeVaultSegmentShards('file-hash', 4, Buffer.from('segment-data'))
@@ -273,11 +273,11 @@ describe('RepairWorker', () => {
                 resolved = true;
             });
 
-        for (let attempt = 0; attempt < 10 && mockSendSecureUDPMessage.mock.calls.length < 4; attempt++) {
+        for (let attempt = 0; attempt < 10 && mockSendSecurePacket.mock.calls.length < 4; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 0));
         }
 
-        expect(mockSendSecureUDPMessage).toHaveBeenCalledTimes(4);
+        expect(mockSendSecurePacket).toHaveBeenCalledTimes(4);
         expect(resolved).toBe(false);
 
         releaseSend?.();

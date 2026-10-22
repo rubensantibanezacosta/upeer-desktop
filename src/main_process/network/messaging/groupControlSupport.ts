@@ -7,7 +7,7 @@ import {
 } from '../../security/identity.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { warn } from '../../security/secure-logger.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import { VaultManager } from '../vault/manager.js';
@@ -40,7 +40,7 @@ export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, 
     }
 
     for (const addr of addresses) {
-        sendSecureUDPMessage(addr, packet, contact.publicKey);
+        sendSecurePacket(addr, packet, contact.publicKey);
     }
 };
 

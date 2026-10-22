@@ -25,7 +25,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/core.js', () => ({
@@ -74,13 +74,13 @@ describe('heartbeat edge cases', () => {
 
         await Promise.resolve();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::ok',
             expect.objectContaining({ type: 'PING', alias: 'Me', avatar: 'avatar-data' }),
             'cc'.repeat(32)
         );
-        expect(dhtCore.sendDhtExchange).toHaveBeenCalledWith('peer-1', transport.sendSecureUDPMessage);
+        expect(dhtCore.sendDhtExchange).toHaveBeenCalledWith('peer-1', transport.sendSecurePacket);
     });
 
     it('tolera fallo en gossip de reputación y aún comparte estado DHT útil', async () => {
@@ -88,7 +88,7 @@ describe('heartbeat edge cases', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const transport = await import('../../../src/main_process/network/server/transport.js');
         const netUtils = await import('../../../src/main_process/network/utils.js');
-        const sendMock = transport.sendSecureUDPMessage as (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void;
+        const sendMock = transport.sendSecurePacket as (ip: string, data: unknown, pubKey?: string, internal?: boolean) => void;
 
         vi.mocked(netUtils.getDhtNetworkAddresses).mockReturnValue(['200::self']);
         vi.mocked(contactsOps.getContacts).mockReturnValue([
@@ -119,12 +119,12 @@ describe('heartbeat edge cases', () => {
             publicKey: 'ff'.repeat(32),
         }, sendMock)).resolves.toBeUndefined();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::target',
             expect.objectContaining({ type: 'DHT_UPDATE', locationBlock: expect.objectContaining({ dhtSeq: 9 }) }),
             'ff'.repeat(32)
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::target',
             expect.objectContaining({
                 type: 'DHT_EXCHANGE',
@@ -132,7 +132,7 @@ describe('heartbeat edge cases', () => {
             }),
             'ff'.repeat(32)
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::target',
             expect.objectContaining({
                 type: 'DHT_EXCHANGE',

@@ -40,7 +40,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
@@ -91,7 +91,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
             { upeerId: 'friend-4', address: '127.0.0.1:4', status: 'connected', lastSeen: new Date().toISOString() }
         ] as KnownContact[];
         vi.mocked(contactsOps.getContacts).mockResolvedValue(mockContacts);
-        vi.mocked(transport.sendSecureUDPMessage).mockResolvedValue(undefined);
+        vi.mocked(transport.sendSecurePacket).mockResolvedValue(undefined);
 
         const packet = { type: 'CHAT', content: 'test msg' };
         vi.spyOn(vaultManagerPrivate, 'getDynamicReplicationFactor').mockResolvedValue(2);
@@ -99,18 +99,18 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         const nodesCount = await VaultManager.replicateToVaults('recipient-id', packet);
 
         expect(nodesCount).toBe(3);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('should handle retries when sending fails initially', async () => {
-        vi.mocked(transport.sendSecureUDPMessage)
+        vi.mocked(transport.sendSecurePacket)
             .mockRejectedValueOnce(new Error('UDP Timeout'))
             .mockResolvedValueOnce(undefined);
 
         await vaultManagerPrivate.sendWithRetry('127.0.0.1:999', { type: 'TEST' }, 3, 10);
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
     });
 
     it('should only include successful custodians in DHT pointer', async () => {
@@ -120,7 +120,7 @@ describe('VaultManager - getDynamicReplicationFactor', () => {
         ] as KnownContact[];
         vi.mocked(contactsOps.getContacts).mockResolvedValue(mockContacts);
 
-        vi.mocked(transport.sendSecureUDPMessage)
+        vi.mocked(transport.sendSecurePacket)
             .mockResolvedValueOnce(undefined)
             .mockRejectedValue(new Error('Fail'));
 
@@ -156,7 +156,7 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         const result = await VaultManager.replicateToVaults('recipient-offline', packet);
 
         expect(result).toBe(1);
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
 
         const [hash, recipientSid, senderSid, priority, data, expiresAt] = vi.mocked(vaultOps.saveVaultEntry).mock.calls[0];
@@ -196,13 +196,13 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         const result = await VaultManager.replicateToVaults('recipient-stale', { type: 'CHAT', content: 'msg' });
 
         expect(result).toBe(1);
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 
     it('uses self-custodian and third-party custodians when available', async () => {
         vi.mocked(dhtShared.getKademliaInstance).mockReturnValue(null);
-        vi.mocked(transport.sendSecureUDPMessage).mockResolvedValue(undefined);
+        vi.mocked(transport.sendSecurePacket).mockResolvedValue(undefined);
 
         vi.mocked(contactsOps.getContacts).mockResolvedValue([
             { upeerId: 'my-peer-id', address: '200::1', status: 'connected' },
@@ -216,7 +216,7 @@ describe('VaultManager.replicateToVaults — self-custodian fallback (2-peer net
         const result = await VaultManager.replicateToVaults('target-peer', { type: 'CHAT' });
 
         expect(result).toBe(3);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
         expect(vaultOps.saveVaultEntry).toHaveBeenCalledOnce();
     });
 

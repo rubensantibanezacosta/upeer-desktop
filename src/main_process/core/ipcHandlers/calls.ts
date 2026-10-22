@@ -20,7 +20,7 @@ import { isValidCallId, isValidMediaKind } from '../../network/call/validationCa
 import { saveMessage } from '../../storage/messages/operations.js';
 import { sendGroupCallEvent } from '../../network/messaging/groups.js';
 import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
-import { sendUDPMessage } from '../../network/messaging/chatSend.js';
+import { sendChatMessage } from '../../network/messaging/chatSend.js';
 import { shouldSendCallMedia } from './callMediaFanout.js';
 import { handleCallMediaSpeakerState } from './callMediaSpeaker.js';
 import { sendCallRendererEvent } from '../../network/call/callRendererEvents.js';
@@ -78,7 +78,7 @@ export function registerCallHandlers(): void {
                             const shouldNotifyPeer = (change.direction === 'outgoing' && change.endReason !== 'rejected')
                                 || (change.direction === 'incoming' && change.connectedAt !== undefined);
                             const peer = shouldNotifyPeer ? getContactByUpeerId(change.peerUpeerId) : undefined;
-                            if (peer) void sendUDPMessage(change.peerUpeerId, message, undefined, eventId);
+                            if (peer) void sendChatMessage(change.peerUpeerId, message, undefined, eventId);
                         })
                         .catch((cause: unknown) => console.error(`Failed to save call event with ${change.peerUpeerId}`, cause));
                 }

@@ -24,7 +24,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -73,13 +73,13 @@ describe('chatMutations sendChatClear edge cases', () => {
         await sendChatClear('peer-target', 123456);
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('200::tablet', {
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith('200::tablet', {
             type: 'CHAT_CLEAR_ALL',
             chatUpeerId: 'peer-target',
             timestamp: 123456,
         }, '11'.repeat(32));
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('200::laptop', {
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith('200::laptop', {
             type: 'CHAT_CLEAR_ALL',
             chatUpeerId: 'peer-target',
             timestamp: 123456,

@@ -2,6 +2,7 @@ import { error, info, warn } from '../../security/secure-logger.js';
 import type { RatchetState } from '../../security/ratchetShared.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
 import type { ChatAckPacket, ChatDrResetPacket, ChatIncomingPayload } from './chatMessageTypes.js';
+import { createDrResetPacket } from './drResetPacket.js';
 
 export type DecryptedChatPayload = {
     plaintext: string;
@@ -34,8 +35,6 @@ async function decryptDoubleRatchetContentUnlocked(
     fromAddress: string,
     isDuplicate: boolean,
 ): Promise<ChatDecryptResult | null> {
-    const { getMySignedPreKeyBundle } = await import('../../security/identity.js');
-
     try {
         const { getRatchetSession } = await import('../../storage/ratchet/operations.js');
         const { x3dhResponder, ratchetInitBob, ratchetDecrypt } = await import('../../security/ratchet.js');
@@ -56,7 +55,7 @@ async function decryptDoubleRatchetContentUnlocked(
             const spkEntry = getSpkBySpkId(spkId);
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { spkId, upeerId }, 'security');
-                sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+                sendResponse(fromAddress, createDrResetPacket());
                 return null;
             }
             const sharedSecret = x3dhResponder(
@@ -71,7 +70,7 @@ async function decryptDoubleRatchetContentUnlocked(
         }
 
         if (!session) {
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, createDrResetPacket());
             warn('No DR session and no x3dhInit, sent DR_RESET', { upeerId }, 'security');
             return null;
         }
@@ -106,7 +105,7 @@ async function decryptDoubleRatchetContentUnlocked(
                     return { plaintext: retry.toString('utf-8'), session: freshSession, spkIdUsed: spkId };
                 }
             }
-            sendResponse(fromAddress, { type: 'DR_RESET', signedPreKey: getMySignedPreKeyBundle() });
+            sendResponse(fromAddress, createDrResetPacket());
             error('Double Ratchet decrypt returned null after x3dh retry', { upeerId }, 'security');
             return null;
         }

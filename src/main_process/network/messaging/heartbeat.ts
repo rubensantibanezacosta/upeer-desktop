@@ -8,7 +8,7 @@ import {
 import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
 import { getDhtNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
 import { sendContactRequest } from './contacts.js';
@@ -99,17 +99,17 @@ export function checkHeartbeat(contacts: HeartbeatContact[]) {
             const addresses = getFanOutAddresses(contact);
             for (const addr of addresses) {
                 if (isIPBlocked(addr)) continue;
-                sendSecureUDPMessage(addr, {
+                sendSecurePacket(addr, {
                     type: 'PING',
                     alias: getMyAlias() || undefined,
                     avatar: getMyAvatar() || undefined,
                     signedPreKey: getMySignedPreKeyBundle(),
                 }, contact.publicKey);
             }
-            sendDhtExchange(contact.upeerId, sendSecureUDPMessage);
+            sendDhtExchange(contact.upeerId, sendSecurePacket);
 
             // Enhanced distributed heartbeat with contact cache exchange
-            distributedHeartbeat(contact, sendSecureUDPMessage).catch(err => {
+            distributedHeartbeat(contact, sendSecurePacket).catch(err => {
                 warn('Distributed heartbeat failed', err, 'heartbeat');
             });
         }
@@ -120,20 +120,20 @@ export function checkHeartbeat(contacts: HeartbeatContact[]) {
 // Distributed Heartbeat Protocol for Extreme Resilience
 // ========================
 
-export async function distributedHeartbeat(contact: HeartbeatContact, sendSecureUDPMessage: HeartbeatSendFn) {
+export async function distributedHeartbeat(contact: HeartbeatContact, sendSecurePacket: HeartbeatSendFn) {
     // 1. Exchange location blocks
-    await exchangeLocationBlocks(contact, sendSecureUDPMessage);
+    await exchangeLocationBlocks(contact, sendSecurePacket);
 
     // 2. Exchange lists of alive contacts
     const aliveContacts = getContactsSeenLast24h();
-    await sendContactList(contact, aliveContacts, sendSecureUDPMessage);
+    await sendContactList(contact, aliveContacts, sendSecurePacket);
 
     // 3. Synchronize DHT (send blocks that need renewal)
     const blocksToShare = getLocationBlocksForRenewal();
-    await shareBlocks(contact, blocksToShare, sendSecureUDPMessage);
+    await shareBlocks(contact, blocksToShare, sendSecurePacket);
 
     // 4. Gossip de reputación (G-Set CRDT anti-entropía)
-    await exchangeReputationGossip(contact, sendSecureUDPMessage);
+    await exchangeReputationGossip(contact, sendSecurePacket);
 
     network('Distributed heartbeat completed', undefined, { contact: contact.upeerId }, 'heartbeat');
 }
@@ -155,7 +155,7 @@ async function exchangeReputationGossip(
     }
 }
 
-async function exchangeLocationBlocks(contact: HeartbeatContact, sendSecureUDPMessage: HeartbeatSendFn) {
+async function exchangeLocationBlocks(contact: HeartbeatContact, sendSecurePacket: HeartbeatSendFn) {
     const currentAddresses = getDhtNetworkAddresses();
     if (currentAddresses.length === 0) return;
 
@@ -166,7 +166,7 @@ async function exchangeLocationBlocks(contact: HeartbeatContact, sendSecureUDPMe
 
     const addresses = getFanOutAddresses(contact);
     for (const addr of addresses) {
-        sendSecureUDPMessage(addr, {
+        sendSecurePacket(addr, {
             type: 'DHT_UPDATE',
             locationBlock: locBlock
         }, contact.publicKey);
@@ -187,7 +187,7 @@ function getContactsSeenLast24h(): HeartbeatPeer[] {
         }));
 }
 
-async function sendContactList(contact: HeartbeatContact, aliveContacts: HeartbeatPeer[], sendSecureUDPMessage: HeartbeatSendFn) {
+async function sendContactList(contact: HeartbeatContact, aliveContacts: HeartbeatPeer[], sendSecurePacket: HeartbeatSendFn) {
     if (aliveContacts.length === 0) return;
 
     const packet = {
@@ -204,7 +204,7 @@ async function sendContactList(contact: HeartbeatContact, aliveContacts: Heartbe
 
     const addresses = getFanOutAddresses(contact);
     for (const addr of addresses) {
-        sendSecureUDPMessage(addr, packet, contact.publicKey);
+        sendSecurePacket(addr, packet, contact.publicKey);
     }
 }
 
@@ -238,7 +238,7 @@ function getLocationBlocksForRenewal(): RenewableBlock[] {
         }));
 }
 
-async function shareBlocks(contact: HeartbeatContact, blocksToShare: RenewableBlock[], sendSecureUDPMessage: HeartbeatSendFn) {
+async function shareBlocks(contact: HeartbeatContact, blocksToShare: RenewableBlock[], sendSecurePacket: HeartbeatSendFn) {
     if (blocksToShare.length === 0) return;
 
     // Share blocks that need renewal
@@ -249,11 +249,11 @@ async function shareBlocks(contact: HeartbeatContact, blocksToShare: RenewableBl
 
     const addresses = getFanOutAddresses(contact);
     for (const addr of addresses) {
-        sendSecureUDPMessage(addr, packet, contact.publicKey);
+        sendSecurePacket(addr, packet, contact.publicKey);
     }
 }
 
 export function broadcastDhtUpdate() {
     if (isSessionLocked()) return;
-    coreBroadcastDhtUpdate(sendSecureUDPMessage);
+    coreBroadcastDhtUpdate(sendSecurePacket);
 }

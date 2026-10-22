@@ -5,13 +5,13 @@ import {
     ListItem,
     ListItemButton,
     ListItemDecorator,
-    Avatar,
-    Badge
+    Avatar
 } from '@mui/joy';
 import { Contact } from '../../types/chat.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { ContactItemActions } from './ContactItemActions.js';
-import { formatContactTime, getTrustIndicator, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
+import { formatContactTime, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
+import { TrustAvatarBadge } from './TrustAvatarBadge.js';
 import { useIsOnline } from '../../hooks/useIsOnline.js';
 
 interface ContactItemProps {
@@ -48,28 +48,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                 }}
             >
                 <ListItemDecorator sx={{ mr: 2 }}>
-                    <Badge
-                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                        badgeContent={getTrustIndicator(c)}
-                        sx={{
-                            '--Badge-paddingX': '0px',
-                            '--Badge-paddingY': '0px',
-                            '--Badge-ring': '2px',
-                            '& .MuiBadge-badge': {
-                                width: 20,
-                                height: 20,
-                                borderRadius: 'sm',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: 'background.surface',
-                                border: '1px solid',
-                                borderColor: 'divider',
-
-                                transform: 'translate(8%, 8%)'
-                            }
-                        }}
-                    >
+                    <TrustAvatarBadge vouchScore={c.vouchScore}>
                         <Avatar
                             size="lg"
                             color={c.status === 'incoming' ? 'primary' : 'neutral'}
@@ -79,7 +58,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                         >
                             {c.name[0]}
                         </Avatar>
-                    </Badge>
+                    </TrustAvatarBadge>
                 </ListItemDecorator>
                 <Box sx={{
                     flexGrow: 1,

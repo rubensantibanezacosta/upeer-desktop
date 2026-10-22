@@ -131,7 +131,7 @@ export function registerIdentityHandlers(): void {
     const { getKademliaInstance } = await import('../../network/dht/handlers.js');
     const kademlia = getKademliaInstance();
     if (kademlia) {
-      // 2. Fan-out UDP a dispositivos propios online
+      // 2. Fan-out por transporte seguro a dispositivos propios online
       const myYggAddress = (await import('../../sidecars/yggstack.js')).getYggstackAddress();
       kademlia.storeLocationBlock(myId, { ...payload, publicKey: myPk, signature, address: myYggAddress || '', dhtSeq: Date.now() });
       const selfNodes = kademlia.findClosestContacts(myId, 20)
@@ -139,8 +139,8 @@ export function registerIdentityHandlers(): void {
 
       const syncPacket = { type: 'IDENTITY_UPDATE', ...payload, signature };
       for (const node of selfNodes) {
-        const { sendSecureUDPMessage } = await import('../../network/server/transport.js');
-        sendSecureUDPMessage(node.address, syncPacket, myPk);
+        const { sendSecurePacket } = await import('../../network/server/transport.js');
+        sendSecurePacket(node.address, syncPacket, myPk);
       }
     }
 
@@ -174,8 +174,8 @@ export function registerIdentityHandlers(): void {
 
       const syncPacket = { type: 'IDENTITY_UPDATE', ...payload, signature };
       for (const node of selfNodes) {
-        const { sendSecureUDPMessage } = await import('../../network/server/transport.js');
-        sendSecureUDPMessage(node.address, syncPacket, myPk);
+        const { sendSecurePacket } = await import('../../network/server/transport.js');
+        sendSecurePacket(node.address, syncPacket, myPk);
       }
     }
 

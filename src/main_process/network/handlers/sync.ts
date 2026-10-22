@@ -86,7 +86,7 @@ export async function broadcastPulse(action: string, payload: BroadcastPulsePayl
     const myId = getMyUPeerId();
     const myDeviceId = getMyDeviceId();
     const { getKademliaInstance } = await import('../dht/shared.js');
-    const { sendSecureUDPMessage } = await import('../server/transport.js');
+    const { sendSecurePacket } = await import('../server/transport.js');
     const { getYggstackAddress } = await import('../../sidecars/yggstack.js');
 
     const kademlia = getKademliaInstance() as KademliaContactLookup | null;
@@ -117,6 +117,6 @@ export async function broadcastPulse(action: string, payload: BroadcastPulsePayl
         });
 
     for (const node of selfNodes) {
-        sendSecureUDPMessage(node.address, pulseData, undefined, true);
+        sendSecurePacket(node.address, pulseData, undefined, true);
     }
 }

@@ -33,7 +33,7 @@ vi.mock('../../../src/main_process/storage/contacts/status.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/core/windowManager.js', () => ({
@@ -54,13 +54,13 @@ describe('network/messaging/contacts.ts', () => {
     it('sendContactRequest envía un HANDSHAKE_REQ con PoW, claves y alias', async () => {
         const identity = await import('../../../src/main_process/security/identity.js');
         const pow = await import('../../../src/main_process/security/pow.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { sendContactRequest } = await import('../../../src/main_process/network/messaging/contacts.js');
 
         await sendContactRequest('200::target');
 
         expect(pow.AdaptivePow.generateLightProof).toHaveBeenCalledWith('self-id');
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::target',
             expect.objectContaining({
                 type: 'HANDSHAKE_REQ',
@@ -90,7 +90,7 @@ describe('network/messaging/contacts.ts', () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const keys = await import('../../../src/main_process/storage/contacts/keys.js');
         const status = await import('../../../src/main_process/storage/contacts/status.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const wm = await import('../../../src/main_process/core/windowManager.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
 
@@ -108,7 +108,7 @@ describe('network/messaging/contacts.ts', () => {
         expect(keys.updateContactPublicKey).toHaveBeenCalledWith('peer-1', 'aa'.repeat(32));
         expect(status.updateContactStatus).toHaveBeenCalledWith('peer-1', 'connected');
         expect(sendMock).toHaveBeenCalledWith('contact-handshake-finished', { upeerId: 'peer-1' });
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::peer',
             expect.objectContaining({ type: 'HANDSHAKE_ACCEPT' })
         );
@@ -117,7 +117,7 @@ describe('network/messaging/contacts.ts', () => {
 
     it('acceptContactRequest responde a la dirección de la solicitud aunque difiera de la guardada', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
             upeerId: 'peer-1',
             address: '200::old-address',
@@ -126,7 +126,7 @@ describe('network/messaging/contacts.ts', () => {
         const { acceptContactRequest } = await import('../../../src/main_process/network/messaging/contacts.js');
         await acceptContactRequest('peer-1', 'aa'.repeat(32), '200::request-source');
 
-        expect(sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(sendSecurePacket).toHaveBeenCalledWith(
             '200::request-source',
             expect.objectContaining({ type: 'HANDSHAKE_ACCEPT' }),
         );

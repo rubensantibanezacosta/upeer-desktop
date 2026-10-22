@@ -3,7 +3,7 @@ import { AdaptivePow } from '../../security/pow.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactPublicKey } from '../../storage/contacts/keys.js';
 import { updateContactStatus } from '../../storage/contacts/status.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { getMainWindow } from '../../core/windowManager.js';
 import { VaultManager } from '../vault/manager.js';
 
@@ -21,7 +21,7 @@ export async function sendContactRequest(targetIp: string) {
         powProof,
         addresses: (await import('../utils.js')).getNetworkAddresses()
     };
-    sendSecureUDPMessage(targetIp, data);
+    sendSecurePacket(targetIp, data);
 }
 
 export async function acceptContactRequest(upeerId: string, publicKey: string, replyAddress?: string) {
@@ -43,7 +43,7 @@ export async function acceptContactRequest(upeerId: string, publicKey: string, r
         avatar: getMyAvatar() || undefined,
         addresses: (await import('../utils.js')).getNetworkAddresses()
     };
-    sendSecureUDPMessage(targetAddress, data);
+    sendSecurePacket(targetAddress, data);
     getMainWindow()?.webContents.send('contact-handshake-finished', { upeerId });
 
     void VaultManager.queryOwnVaults().catch(() => undefined);

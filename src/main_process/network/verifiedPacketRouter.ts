@@ -11,11 +11,14 @@ import { handleVaultDelivery } from './handlers/vault.js';
 import type { GroupAckPayload, GroupMessagePayload, VaultQueryData, VaultStoreData } from './types.js';
 import type { GroupControlPacket } from './handlers/groupControlShared.js';
 import type { RatchetHeader } from '../security/ratchetShared.js';
+import { isValidResetId } from '../security/validationShared.js';
+import { drResetReplayCache } from './drResetReplayCache.js';
 
 const vaultQueryThrottle = new Map<string, number>();
 
 type VerifiedContact = {
     publicKey?: string;
+    signedPreKey?: string | null;
     signedPreKeyId?: number | null;
     name?: string;
     alias?: string;
@@ -596,9 +599,35 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
                 warn('Rejected DR_RESET with an invalid signed prekey signature', { upeerId }, 'security');
                 break;
             }
-            const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
+            const resetId = isValidResetId(data.resetId) ? data.resetId : undefined;
+            if (data.resetId !== undefined && !resetId) {
+                warn('Rejected DR_RESET with an invalid resetId', { upeerId }, 'security');
+                break;
+            }
+            if (resetId && !drResetReplayCache.consume(upeerId, resetId)) {
+                warn('Ignored replayed DR_RESET', { upeerId, resetId }, 'security');
+                break;
+            }
             const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
             if (ratchetContext !== 'direct' && !/^group:[^:]+$/.test(ratchetContext)) break;
+            const currentSpkId = typeof contact.signedPreKeyId === 'number' ? contact.signedPreKeyId : 0;
+            if (currentSpkId > 0 && newSpkId < currentSpkId) {
+                warn('Ignored stale DR_RESET', { upeerId, currentSpkId, receivedSpkId: newSpkId }, 'security');
+                break;
+            }
+            if (
+                currentSpkId > 0
+                && newSpkId === currentSpkId
+                && contact.signedPreKey
+                && contact.signedPreKey.toLowerCase() !== spkPub.toLowerCase()
+            ) {
+                warn('Rejected DR_RESET with a different signed prekey for the same spkId', {
+                    upeerId,
+                    spkId: newSpkId,
+                }, 'security');
+                break;
+            }
+            const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
             const groupId = ratchetContext.startsWith('group:') ? ratchetContext.slice('group:'.length) : undefined;
             const { ratchetSessionQueueKey, withRatchetSessionLock } = await import('../security/ratchetSessionQueue.js');
             await withRatchetSessionLock(ratchetSessionQueueKey(upeerId, ratchetContext), async () => {

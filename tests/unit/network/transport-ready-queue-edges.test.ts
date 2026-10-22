@@ -92,10 +92,10 @@ describe('transport ready queue edge cases', () => {
     });
 
     it('satura la cola offline en MAX_QUEUE_SIZE y descarta el exceso', async () => {
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
 
         for (let index = 0; index < 65; index += 1) {
-            sendSecureUDPMessage('200::peer', { type: 'CHAT', index });
+            sendSecurePacket('200::peer', { type: 'CHAT', index });
         }
 
         expect(queue).toHaveLength(60);
@@ -106,12 +106,12 @@ describe('transport ready queue edge cases', () => {
     it('drena la cola cuando Ygg vuelve a estar lista y limpia todo si cae durante reconexión', async () => {
         const socks5 = await import('../../../src/main_process/network/server/socks5.js');
         const state = await import('../../../src/main_process/network/server/state.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
 
         const mockSocket = createMockSocket();
         vi.mocked(socks5.socks5Connect).mockResolvedValue(mockSocket as never);
 
-        sendSecureUDPMessage('200::peer', { type: 'CHAT', content: 'queued' });
+        sendSecurePacket('200::peer', { type: 'CHAT', content: 'queued' });
         expect(queue).toHaveLength(1);
 
         onAddressCallback?.();
@@ -122,7 +122,7 @@ describe('transport ready queue edge cases', () => {
         expect(socks5.socks5Connect).toHaveBeenCalledWith('200::peer', 50005);
         expect(mockSocket.write).toHaveBeenCalledTimes(1);
 
-        sendSecureUDPMessage('200::peer', { type: 'CHAT', content: 'second' });
+        sendSecurePacket('200::peer', { type: 'CHAT', content: 'second' });
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(mockSocket.write).toHaveBeenCalledTimes(2);
 

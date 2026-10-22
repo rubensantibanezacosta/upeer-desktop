@@ -1,15 +1,10 @@
 import React from 'react';
-import { Box, Tooltip, Typography } from '@mui/joy';
+import { Box, Typography } from '@mui/joy';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import SecurityIcon from '@mui/icons-material/Security';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import GppMaybeIcon from '@mui/icons-material/GppMaybe';
-import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import MicIcon from '@mui/icons-material/Mic';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
@@ -24,45 +19,6 @@ const parseJsonMessage = (message: string) => {
     } catch {
         return undefined;
     }
-};
-
-export const getTrustIndicator = (contact: Contact, showTooltip = true) => {
-    const score: number | undefined = contact.vouchScore;
-    if (score === undefined) {
-        return null;
-    }
-
-    let icon = null;
-    let label = 'Reputación estándar';
-
-    if (score < 40) {
-        icon = <GppMaybeIcon sx={{ fontSize: 12, color: 'danger.600' }} />;
-        label = `Baja reputación (${score}/100) - Ten cuidado`;
-    } else if (score >= 80) {
-        icon = <VerifiedUserIcon sx={{ fontSize: 12, color: 'success.600' }} />;
-        label = `Alta reputación (${score}/100) - Muy confiable`;
-    } else if (score >= 65) {
-        icon = <CheckCircleIcon sx={{ fontSize: 12, color: 'primary.600' }} />;
-        label = `Buena reputación (${score}/100) - Confiable`;
-    } else if (score === 50) {
-        icon = <NewReleasesIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
-        label = 'Sin historial de red aún';
-    } else {
-        icon = <SecurityIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
-        label = `Reputación estándar (${score}/100)`;
-    }
-
-    if (!showTooltip) {
-        return icon;
-    }
-
-    return (
-        <Tooltip title={label} variant="solid" size="sm" placement="top">
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {icon}
-            </Box>
-        </Tooltip>
-    );
 };
 
 export const formatContactTime = (iso?: string | number | null) => formatMessageTime(iso);

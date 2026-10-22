@@ -42,9 +42,9 @@ uPeer P2P ha completado la **Fase 15** con las siguientes capacidades validadas:
 **Motivos para Implementar**:
 
 - **Base tecnológica**: Requisito previo para cualquier transferencia de archivos.
-- **Confiabilidad UDP**: Permite recuperación de paquetes perdidos con ACK selectivo.
+- **Confiabilidad del transporte**: Permite recuperación de paquetes perdidos con ACK selectivo.
 - **Eficiencia**: Streaming progresivo (empezar a mostrar datos antes de completar).
-- **Alineación con arquitectura**: Extiende el protocolo UDP seguro existente.
+- **Alineación con arquitectura**: Extiende el protocolo de transporte seguro existente.
 
 **Estado Actual**: ❌ No implementado
 **Dependencias**: Ninguna (puede construirse sobre capa de mensajería actual)
@@ -457,7 +457,7 @@ uPeer P2P ha completado la **Fase 15** con las siguientes capacidades validadas:
    - Integración con protocolo de fragmentos
    - Preview durante transferencia
 
-5. **Compresión mensajes**: Middleware en `sendSecureUDPMessage()`
+5. **Compresión mensajes**: Middleware en `sendSecurePacket()`
    - Detectar mensajes >500 bytes
    - Aplicar Brotli compresión antes de cifrar
    - Header indicando compresión

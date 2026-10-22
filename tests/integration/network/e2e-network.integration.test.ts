@@ -152,7 +152,7 @@ describe('e2e red real por sockets localhost', () => {
 
         nodeA.transport.resetTransportConnectionsForTests();
 
-        nodeA.transport.sendSecureUDPMessage('200::b', { type: 'CHAT', content: 'hola e2e', senderUpeerId: '200::a' });
+        nodeA.transport.sendSecurePacket('200::b', { type: 'CHAT', content: 'hola e2e', senderUpeerId: '200::a' });
 
         await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -173,7 +173,7 @@ describe('e2e red real por sockets localhost', () => {
 
         const bPub = registry.publicKeys.get('200::b') as string;
         nodeA.transport.resetTransportConnectionsForTests();
-        nodeA.transport.sendSecureUDPMessage('200::b', { type: 'CHAT', content: 'mensaje sellado' }, bPub);
+        nodeA.transport.sendSecurePacket('200::b', { type: 'CHAT', content: 'mensaje sellado' }, bPub);
 
         await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -199,7 +199,7 @@ describe('e2e red real por sockets localhost', () => {
 
         nodeA.transport.resetTransportConnectionsForTests();
         for (let i = 0; i < 5; i += 1) {
-            nodeA.transport.sendSecureUDPMessage('200::b', { type: 'CHAT', content: `msg-${i}` });
+            nodeA.transport.sendSecurePacket('200::b', { type: 'CHAT', content: `msg-${i}` });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 400));

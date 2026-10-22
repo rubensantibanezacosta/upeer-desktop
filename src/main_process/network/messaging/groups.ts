@@ -16,7 +16,7 @@ import { warn, error } from "../../security/secure-logger.js";
 import { buildMessagePayload } from "../messagePayload.js";
 import { encryptGroupMessage } from "../groupState.js";
 import { canonicalStringify } from "../utils.js";
-import { sendSecureUDPMessage } from "../server/transport.js";
+import { sendSecurePacket } from "../server/transport.js";
 import { MAX_MESSAGE_SIZE_BYTES } from "../server/constants.js";
 import { VaultManager } from "../vault/manager.js";
 import { runWithConcurrencyMap } from "../concurrency.js";
@@ -228,7 +228,7 @@ async function applySendGroupMessage(
         if (!selfContact) return;
         const selfAddresses = [...selfContact.addresses];
         for (const address of selfAddresses) {
-          sendSecureUDPMessage(
+          sendSecurePacket(
             address,
             packet,
             getMyPublicKey().toString("hex"),
@@ -249,7 +249,7 @@ async function applySendGroupMessage(
             ) ?? []) {
             if (selfAddresses.includes(node.address)) continue;
             selfAddresses.push(node.address);
-            sendSecureUDPMessage(
+            sendSecurePacket(
               node.address,
               packet,
               getMyPublicKey().toString("hex"),
@@ -273,7 +273,7 @@ async function applySendGroupMessage(
       )
         return;
       for (const address of resolved.addresses) {
-        sendSecureUDPMessage(address, packet, resolved.contact.publicKey);
+        sendSecurePacket(address, packet, resolved.contact.publicKey);
       }
     },
   );
@@ -437,7 +437,7 @@ async function applySendGroupCallEvent(
       if (status === "connected") {
         const address = rawContact?.address;
         if (typeof address === "string" && address)
-          sendSecureUDPMessage(
+          sendSecurePacket(
             address,
             signedPacket,
             isSelf ? getMyPublicKey().toString("hex") : contact.publicKey,

@@ -312,7 +312,7 @@ export async function handlePacket(
 
         await routeVerifiedPacket({
             upeerId,
-            contact: contact as { publicKey?: string; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
+            contact: contact as { publicKey?: string; signedPreKey?: string | null; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
             data: data as NetworkPacket,
             signature,
             rinfo,

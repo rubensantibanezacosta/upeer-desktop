@@ -39,7 +39,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -92,7 +92,7 @@ describe('group fan-out integration', () => {
         const result = await sendGroupMessage('grp-int', 'mensaje de integración');
 
         expect(result).toEqual(expect.objectContaining({ savedMessage: 'mensaje de integración' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(onlineCount);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(onlineCount);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(2);
         for (const member of members) {
             expect(contactOps.getContactByUpeerId).toHaveBeenCalledWith(member);
@@ -130,7 +130,7 @@ describe('group fan-out integration', () => {
 
         await sendGroupMessage('grp-off', 'mensaje offline');
 
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(26);
     });
 });

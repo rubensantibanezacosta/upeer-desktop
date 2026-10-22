@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { getMessages, searchMessages, getMessagesAround, getFileHistory, getOlderMessages } from '../../storage/messages/operations.js';
 import {
-  sendUDPMessage,
+  sendChatMessage,
   sendTypingIndicator,
   sendReadReceipt,
   sendContactCard,
@@ -22,7 +22,7 @@ export function registerMessageHandlers(): void {
   ipcMain.handle('get-file-history', (_event, { limit }) => getFileHistory(typeof limit === 'number' ? Math.min(Math.max(limit, 1), 500) : 200));
 
   ipcMain.handle('send-p2p-message', async (_event, { upeerId, message, replyTo, linkPreview, messageId }) =>
-    await sendUDPMessage(upeerId, { content: message, linkPreview }, replyTo, messageId)
+    await sendChatMessage(upeerId, { content: message, linkPreview }, replyTo, messageId)
   );
 
   ipcMain.handle('send-typing-indicator', (_event, { upeerId }) => sendTypingIndicator(upeerId));

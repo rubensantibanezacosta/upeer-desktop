@@ -7,7 +7,7 @@
  * que Bob conecte por primera vez y enviemos su HANDSHAKE con su clave pública.
  *
  * Flujo:
- *   sendUDPMessage() → no pubkey → savePendingOutboxMessage()
+ *   sendChatMessage() → no pubkey → savePendingOutboxMessage()
  *   HANDSHAKE handler → got pubkey → flushPendingOutbox(upeerId)
  *     → re-encrypt con pubkey → VaultManager.replicateToVaults()
  */

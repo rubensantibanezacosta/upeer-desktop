@@ -1,5 +1,6 @@
 import {
     isValidHexId,
+    isValidResetId,
     validatePowProof,
     validateSignedPreKey,
     type ValidationResult,
@@ -94,6 +95,7 @@ type IdentityUpdatePayload = {
 };
 
 type SyncResetPayload = {
+    resetId?: unknown;
     signedPreKey?: SignedPreKeyPayload | unknown;
     ratchetContext?: unknown;
 };
@@ -410,6 +412,9 @@ export function validateIdentityUpdate(data: IdentityUpdatePayload): ValidationR
 }
 
 export function validateDrReset(data: SyncResetPayload): ValidationResult {
+    if (data.resetId !== undefined && !isValidResetId(data.resetId)) {
+        return { valid: false, error: 'Invalid resetId' };
+    }
     if (data.ratchetContext !== undefined && (typeof data.ratchetContext !== 'string' || data.ratchetContext.length > 256)) {
         return { valid: false, error: 'Invalid ratchetContext' };
     }

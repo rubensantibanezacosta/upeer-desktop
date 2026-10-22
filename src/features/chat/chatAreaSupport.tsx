@@ -112,35 +112,21 @@ interface ChatDateSeparatorProps {
 
 export const ChatDateSeparator: React.FC<ChatDateSeparatorProps> = ({ date }) => (
     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
-        <Box sx={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-            <Typography
-                level="body-xs"
-                sx={{
-                    px: 2,
-                    py: 0.5,
-                    borderRadius: 'lg',
-                    backgroundColor: 'background.level1',
-                    color: 'text.secondary',
-                    fontWeight: 600,
-                    fontSize: '11px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    zIndex: 1,
-                }}
-            >
-                {formatChatDateLabel(date)}
-            </Typography>
-            <Box
-                sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: 0,
-                    right: 0,
-                    height: '1px',
-                    backgroundColor: 'divider',
-                    zIndex: 0,
-                }}
-            />
-        </Box>
+        <Typography
+            level="body-xs"
+            sx={{
+                px: 2,
+                py: 0.5,
+                borderRadius: 'lg',
+                backgroundColor: 'background.level1',
+                color: 'text.secondary',
+                fontWeight: 600,
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+            }}
+        >
+            {formatChatDateLabel(date)}
+        </Typography>
     </Box>
 );

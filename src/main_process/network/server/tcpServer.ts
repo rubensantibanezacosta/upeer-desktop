@@ -25,7 +25,7 @@ import {
     setNetworkReady,
     clearSendQueue,
 } from './state.js';
-import { sendSecureUDPMessage } from './transport.js';
+import { sendSecurePacket } from './transport.js';
 import { drainSendQueue } from './transport.js';
 import { closeCallMediaUdpServer, startCallMediaUdpServer } from './callMediaUdp.js';
 
@@ -82,8 +82,8 @@ export function startUDPServer(win: BrowserWindow) {
                         msg,
                         rinfo,
                         getMainWindow(),
-                        sendSecureUDPMessage,
-                        (rid) => startDhtSearch(rid, sendSecureUDPMessage)
+                        sendSecurePacket,
+                        (rid) => startDhtSearch(rid, sendSecurePacket)
                     );
                 } catch (err) {
                     error('TCP: handlePacket fallo', { peer: peerHint, error: err instanceof Error ? err.message : String(err) }, 'network');
@@ -101,7 +101,7 @@ export function startUDPServer(win: BrowserWindow) {
     });
 
     // Initialize file transfer manager
-    fileTransferManager.initialize(sendSecureUDPMessage, win);
+    fileTransferManager.initialize(sendSecurePacket, win);
 
     // Initialize Kademlia DHT
     const userDataPath = app.getPath('userData');
@@ -114,7 +114,7 @@ export function startUDPServer(win: BrowserWindow) {
             publicKey: c.publicKey || '',
             lastSeen: Date.now(),
         }));
-    const kademliaDHT = new KademliaDHT(getMyUPeerId(), sendSecureUDPMessage, kademliaContacts, userDataPath);
+    const kademliaDHT = new KademliaDHT(getMyUPeerId(), sendSecurePacket, kademliaContacts, userDataPath);
     setKademliaDHT(kademliaDHT);
     setKademliaInstance(kademliaDHT);
 

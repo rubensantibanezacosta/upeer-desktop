@@ -10,7 +10,7 @@ import {
 } from '../../storage/messages/operations.js';
 import { error, warn } from '../../security/secure-logger.js';
 import { buildMessagePayload } from '../messagePayload.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { compressMessage } from '../../utils/messageCompression.js';
@@ -74,7 +74,7 @@ async function buildPayload(content: string, providedLinkPreview: LinkPreviewPay
 }
 
 
-export async function sendUDPMessage(
+export async function sendChatMessage(
     upeerId: string,
     message: string | ChatOutboundMessage,
     replyTo?: string,
@@ -121,7 +121,7 @@ export async function sendUDPMessage(
             error('Immediate vault replication failed for offline contact', err, 'vault');
         }
         if (!vaulted) await markMessageAsFailed(msgId);
-        startDhtSearch(upeerId, sendSecureUDPMessage);
+        startDhtSearch(upeerId, sendSecurePacket);
         return { id: msgId, savedMessage: payload, timestamp };
     }
 
@@ -155,7 +155,7 @@ export async function sendTypingIndicator(upeerId: string): Promise<void> {
             const contact = await getContactByUpeerId(memberId) as ChatContactRecord | undefined;
             if (contact?.status === 'connected' && contact.publicKey) {
                 for (const address of getFanOutAddresses(contact)) {
-                    sendSecureUDPMessage(address, data, contact.publicKey);
+                    sendSecurePacket(address, data, contact.publicKey);
                 }
             }
         }
@@ -165,6 +165,6 @@ export async function sendTypingIndicator(upeerId: string): Promise<void> {
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
     if (!contact || contact.status !== 'connected' || !contact.publicKey) return;
     for (const address of getFanOutAddresses(contact)) {
-        sendSecureUDPMessage(address, { type: 'TYPING' }, contact.publicKey);
+        sendSecurePacket(address, { type: 'TYPING' }, contact.publicKey);
     }
 }

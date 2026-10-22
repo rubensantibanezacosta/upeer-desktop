@@ -168,7 +168,10 @@ describe('Chat Handlers', () => {
 
             expect(identity.decrypt).not.toHaveBeenCalled();
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
-            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({ type: 'DR_RESET' }));
+            expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+                type: 'DR_RESET',
+                resetId: expect.any(String),
+            }));
         });
 
         it('should drop legacy vaulted chat packets', async () => {

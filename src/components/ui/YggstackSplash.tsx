@@ -14,7 +14,7 @@ const PHASES = [
     { label: 'Iniciando nodo P2P…', delay: 0 },
     { label: 'Seleccionando peers cercanos…', delay: 4_000 },
     { label: 'Estableciendo canales…', delay: 12_000 },
-    { label: 'Sincronizando red Yggdrasil…', delay: 22_000 },
+    { label: 'Sincronizando red segura…', delay: 22_000 },
 ];
 
 interface Props {
@@ -185,10 +185,10 @@ function ReconnectBanner({ networkStatus }: { networkStatus: YggNetworkStatus })
 
     const chipProps: { color: 'danger' | 'warning' | 'success'; label: string; icon: React.ReactNode } =
         networkStatus === 'down'
-            ? { color: 'danger', label: 'Red Yggdrasil no disponible', icon: <WifiOffIcon sx={{ fontSize: 16 }} /> }
+            ? { color: 'danger', label: 'Red segura no disponible', icon: <WifiOffIcon sx={{ fontSize: 16 }} /> }
             : networkStatus === 'reconnecting'
-                ? { color: 'warning', label: 'Reconectando a Yggdrasil…', icon: <SyncIcon sx={{ fontSize: 16, animation: 'spin 1s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} /> }
-                : { color: 'success', label: '¡Red Yggdrasil reconectada!', icon: <WifiIcon sx={{ fontSize: 16 }} /> };
+                ? { color: 'warning', label: 'Reconectando a la red segura…', icon: <SyncIcon sx={{ fontSize: 16, animation: 'spin 1s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} /> }
+                : { color: 'success', label: '¡Red segura reconectada!', icon: <WifiIcon sx={{ fontSize: 16 }} /> };
 
     return (
         <Box

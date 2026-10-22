@@ -63,7 +63,7 @@ export function registerContactHandlers(): void {
     }
 
     if (!isYggdrasilAddress(targetIp)) {
-      return { success: false, error: 'Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo nodos 200::/8 y prefijos 300::/8.' };
+      return { success: false, error: 'Dirección de red inválida. Debe ser una dirección IPv6 válida de la red.' };
     }
 
     const myUpeerId = getMyUPeerId();

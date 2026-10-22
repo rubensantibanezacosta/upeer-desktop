@@ -15,7 +15,7 @@ vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
@@ -50,12 +50,12 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
 
         await VaultManager.queryOwnVaults();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::custodian',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::friend',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );
@@ -81,9 +81,9 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
         await VaultManager.queryOwnVaults();
 
         expect(logger.warn).toHaveBeenCalledWith('Failed to find self-vault pointers in DHT', expect.any(Error), 'vault');
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(2);
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('200::a', expect.objectContaining({ type: 'VAULT_QUERY' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith('200::b', expect.objectContaining({ type: 'VAULT_QUERY' }));
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith('200::a', expect.objectContaining({ type: 'VAULT_QUERY' }));
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith('200::b', expect.objectContaining({ type: 'VAULT_QUERY' }));
     });
 
     it('si falla el transporte, registra warning y continúa con el resto de consultas', async () => {
@@ -103,7 +103,7 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
             findLocationBlock: vi.fn().mockResolvedValue({ address: '200::fail-custodian' }),
         } as never);
 
-        vi.mocked(transport.sendSecureUDPMessage).mockImplementation(async (address: string) => {
+        vi.mocked(transport.sendSecurePacket).mockImplementation(async (address: string) => {
             if (address === '200::fail-custodian' || address === '200::fail-friend') {
                 throw new Error(`send failed ${address}`);
             }
@@ -111,7 +111,7 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
 
         await expect(VaultManager.queryOwnVaults()).resolves.toBeUndefined();
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(3);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(3);
         expect(logger.warn).toHaveBeenCalledWith(
             'Failed to send VAULT_QUERY to custodian custodian-fails',
             expect.any(Error),
@@ -122,7 +122,7 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
             expect.any(Error),
             'vault'
         );
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledWith(
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::ok',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
         );

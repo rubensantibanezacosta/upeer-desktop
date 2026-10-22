@@ -17,7 +17,7 @@ La Fase 16 (Transferencia de Archivos) ha sido **completamente implementada** co
    - Timeouts configurables (5 min) y reintentos (3x)
    - Estados: pending, active, completed, failed, cancelled
 
-2. **Handlers UDP** - Protocolos de mensajes
+2. **Handlers de transferencia** - Protocolos de mensajes
    - `FILE_START` - Inicializa transferencia
    - `FILE_CHUNK` - Envía fragmentos
    - `FILE_ACK` - Confirma recepción
@@ -77,7 +77,7 @@ pnpm run test-file-transfer
 | Componente              | Estado        | Detalles                              |
 | ----------------------- | ------------- | ------------------------------------- |
 | TransferManager backend | ✅ Completado | Todos los métodos implementados       |
-| Handlers UDP            | ✅ Completado | 5 protocolos funcionales              |
+| Handlers de transferencia | ✅ Completado | 5 protocolos funcionales            |
 | useFileTransfer hook    | ✅ Completado | Gestión de estado completa            |
 | FilePickerModal         | ✅ Completado | Selector con vista previa             |
 | TransferProgressBar     | ✅ Completado | Progreso visual en tiempo real        |

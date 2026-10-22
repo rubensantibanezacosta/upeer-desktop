@@ -82,7 +82,7 @@ function ensurePacketHandler(onPacket: OnRediscoveryPacket): void {
     }
 }
 
-async function pingContact(ip: string, sendSecureUDPMessage: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<boolean> {
+async function pingContact(ip: string, sendSecurePacket: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<boolean> {
     ensurePacketHandler(onPacket);
     return new Promise(resolve => {
         const existing = pendingPongs.get(ip);
@@ -92,11 +92,11 @@ async function pingContact(ip: string, sendSecureUDPMessage: SendRediscoveryPack
             resolve(false);
         }, 5000);
         pendingPongs.set(ip, { resolve, timer });
-        sendSecureUDPMessage(ip, { type: 'PING' });
+        sendSecurePacket(ip, { type: 'PING' });
     });
 }
 
-async function askAboutContact(contact: ContactSnapshot, targetId: string, sendSecureUDPMessage: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<{ newIp?: string }> {
+async function askAboutContact(contact: ContactSnapshot, targetId: string, sendSecurePacket: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<{ newIp?: string }> {
     ensurePacketHandler(onPacket);
     return new Promise(resolve => {
         const existing = pendingQueryResponses.get(contact.lastKnownIp);
@@ -106,34 +106,34 @@ async function askAboutContact(contact: ContactSnapshot, targetId: string, sendS
             resolve({});
         }, 3000);
         pendingQueryResponses.set(contact.lastKnownIp, { resolve, timer });
-        sendSecureUDPMessage(contact.lastKnownIp, { type: 'DHT_QUERY', targetId });
+        sendSecurePacket(contact.lastKnownIp, { type: 'DHT_QUERY', targetId });
     });
 }
 
-async function scanLanForUpeer(hours: number, _sendSecureUDPMessage: SendRediscoveryPacket, _onPacket: OnRediscoveryPacket): Promise<LanPeer[]> {
+async function scanLanForUpeer(hours: number, _sendSecurePacket: SendRediscoveryPacket, _onPacket: OnRediscoveryPacket): Promise<LanPeer[]> {
     network('Starting LAN scan', undefined, { duration: `${hours}h` }, 'lan-discovery');
     return [];
 }
 
-async function queryPeerForContact(peer: LanPeer, targetId: string, sendSecureUDPMessage: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<string | null> {
+async function queryPeerForContact(peer: LanPeer, targetId: string, sendSecurePacket: SendRediscoveryPacket, onPacket: OnRediscoveryPacket): Promise<string | null> {
     const result = await askAboutContact(
         { upeerId: peer.upeerId, lastKnownIp: peer.address, lastSeen: Date.now() },
         targetId,
-        sendSecureUDPMessage,
+        sendSecurePacket,
         onPacket
     );
     return result.newIp ?? null;
 }
 
-async function sendBeaconBroadcast(_sendSecureUDPMessage: SendRediscoveryPacket) {
+async function sendBeaconBroadcast(_sendSecurePacket: SendRediscoveryPacket) {
     const myId = getMyUPeerId();
     network('Sending beacon broadcast', undefined, { myId }, 'beacon');
 }
 
-function startBeaconMode(durationMs: number, sendSecureUDPMessage: SendRediscoveryPacket) {
+function startBeaconMode(durationMs: number, sendSecurePacket: SendRediscoveryPacket) {
     network('Starting beacon mode', undefined, { duration: `${durationMs}ms` }, 'beacon');
     const beaconInterval = setInterval(() => {
-        sendBeaconBroadcast(sendSecureUDPMessage).catch(err => {
+        sendBeaconBroadcast(sendSecurePacket).catch(err => {
             error('Beacon broadcast failed', err, 'beacon');
         });
     }, 5 * 60 * 1000);
@@ -151,7 +151,7 @@ function stopPromiscuousListening() {
     network('Stopping promiscuous listening', undefined, {}, 'beacon');
 }
 
-async function sendEnhancedBeacon(sendSecureUDPMessage: SendRediscoveryPacket) {
+async function sendEnhancedBeacon(sendSecurePacket: SendRediscoveryPacket) {
     const myId = getMyUPeerId();
     const { getMyPublicKeyHex } = await import('../../security/identity.js');
     const myPublicKey = getMyPublicKeyHex();
@@ -165,12 +165,12 @@ async function sendEnhancedBeacon(sendSecureUDPMessage: SendRediscoveryPacket) {
     network('Sending enhanced beacon', undefined, { myId }, 'beacon-enhanced');
     for (const contact of getContacts() as RediscoveryContact[]) {
         if (contact.address) {
-            sendSecureUDPMessage(contact.address, beaconData);
+            sendSecurePacket(contact.address, beaconData);
         }
     }
 }
 
-export async function aggressiveRediscovery(myId: string, sendSecureUDPMessage: SendRediscoveryPacket, onPacket?: OnRediscoveryPacket): Promise<string | null> {
+export async function aggressiveRediscovery(myId: string, sendSecurePacket: SendRediscoveryPacket, onPacket?: OnRediscoveryPacket): Promise<string | null> {
     network('Starting aggressive rediscovery', undefined, { myId }, 'rediscovery');
 
     const dhtLocation = await findNodeLocation(myId);
@@ -193,8 +193,8 @@ export async function aggressiveRediscovery(myId: string, sendSecureUDPMessage: 
     handlerRegistered = false;
 
     for (const contact of getRecentContacts(30)) {
-        if (await pingContact(contact.lastKnownIp, sendSecureUDPMessage, onPacket)) {
-            const response = await askAboutContact(contact, myId, sendSecureUDPMessage, onPacket);
+        if (await pingContact(contact.lastKnownIp, sendSecurePacket, onPacket)) {
+            const response = await askAboutContact(contact, myId, sendSecurePacket, onPacket);
             if (response && response.newIp) {
                 network('Found via contact query', undefined, { myId, via: contact.upeerId, location: response.newIp }, 'rediscovery');
                 return response.newIp;
@@ -202,25 +202,25 @@ export async function aggressiveRediscovery(myId: string, sendSecureUDPMessage: 
         }
     }
 
-    for (const peer of await scanLanForUpeer(24, sendSecureUDPMessage, onPacket)) {
-        const knownLocation = await queryPeerForContact(peer, myId, sendSecureUDPMessage, onPacket);
+    for (const peer of await scanLanForUpeer(24, sendSecurePacket, onPacket)) {
+        const knownLocation = await queryPeerForContact(peer, myId, sendSecurePacket, onPacket);
         if (knownLocation) {
             network('Found via LAN peer', undefined, { myId, via: peer.upeerId, location: knownLocation }, 'rediscovery');
             return knownLocation;
         }
     }
 
-    startBeaconMode(24 * 60 * 60 * 1000, sendSecureUDPMessage);
+    startBeaconMode(24 * 60 * 60 * 1000, sendSecurePacket);
     network('Entering beacon mode', undefined, { myId, duration: '24h' }, 'rediscovery');
     return null;
 }
 
-export function startEnhancedBeaconMode(durationMs: number, sendSecureUDPMessage: SendRediscoveryPacket) {
+export function startEnhancedBeaconMode(durationMs: number, sendSecurePacket: SendRediscoveryPacket) {
     network('Starting enhanced beacon mode', undefined, { duration: `${durationMs}ms` }, 'beacon-enhanced');
     const endTime = Date.now() + durationMs;
     const firstPhaseMs = Math.min(durationMs, 24 * 60 * 60 * 1000);
     const beaconInterval = setInterval(() => {
-        sendEnhancedBeacon(sendSecureUDPMessage).catch(err => {
+        sendEnhancedBeacon(sendSecurePacket).catch(err => {
             error('Enhanced beacon failed', err, 'beacon-enhanced');
         });
     }, 5 * 60 * 1000);
@@ -228,7 +228,7 @@ export function startEnhancedBeaconMode(durationMs: number, sendSecureUDPMessage
     setTimeout(() => {
         clearInterval(beaconInterval);
         const reducedInterval = setInterval(() => {
-            sendEnhancedBeacon(sendSecureUDPMessage).catch(err => {
+            sendEnhancedBeacon(sendSecurePacket).catch(err => {
                 error('Enhanced beacon failed', err, 'beacon-enhanced');
             });
         }, 30 * 60 * 1000);

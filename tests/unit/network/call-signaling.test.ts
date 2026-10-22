@@ -11,7 +11,7 @@ const { contactMock, blockedMock } = vi.hoisted(() => ({
 }));
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({ getContactByUpeerId: contactMock, isContactBlocked: blockedMock }));
 vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({ getVouchScore: scoreMock }));
-vi.mock('../../../src/main_process/network/server/transport.js', () => ({ sendSecureUDPMessage: sendMock }));
+vi.mock('../../../src/main_process/network/server/transport.js', () => ({ sendSecurePacket: sendMock }));
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }));
 
 describe('callSignaling (grupos)', () => {

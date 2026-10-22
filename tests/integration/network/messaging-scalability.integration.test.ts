@@ -40,7 +40,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -87,9 +87,9 @@ describe('escalabilidad de mensajería (grupos, chats, multimedia, vault)', () =
                 senderKey: 'cc'.repeat(32),
             } as never);
 
-            vi.mocked(transport.sendSecureUDPMessage).mockClear();
+            vi.mocked(transport.sendSecurePacket).mockClear();
             await sendGroupMessage(`g-${N}`, 'hola');
-            const sent = vi.mocked(transport.sendSecureUDPMessage).mock.calls.length;
+            const sent = vi.mocked(transport.sendSecurePacket).mock.calls.length;
             expect(sent).toBe(N - 1);
             console.log(`  grupo N=${N}: ${sent} envíos de fan-out`);
         }

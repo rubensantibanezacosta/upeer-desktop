@@ -55,6 +55,16 @@ describe('IdentityRateLimiter', () => {
         expect(limiter.checkIdentityOnly('p', 'UNK')).toBe(true);
     });
 
+    it('should apply the default DR_RESET rule', async () => {
+        const defaultLimiter = new IdentityRateLimiter();
+        await warmDirectContacts(defaultLimiter);
+
+        let allowed = 0;
+        while (defaultLimiter.checkIdentityOnly('peer-dr-reset', 'DR_RESET')) allowed++;
+
+        expect(allowed).toBe(20);
+    });
+
     it('should adjust limits correctly', async () => {
         vi.mocked(reputation.computeScore).mockReturnValue(95);
         const l = new IdentityRateLimiter({ 'T': { windowMs: 1000, maxTokens: 10, refillRate: 1 } });

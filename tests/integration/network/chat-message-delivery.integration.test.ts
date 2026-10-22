@@ -68,7 +68,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/core.js', () => ({
@@ -110,7 +110,7 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
     getYggstackAddress: vi.fn(() => '200::self'),
 }));
 
-describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
+describe('no-pérdida de mensajes directos (sendChatMessage)', () => {
     const contactOps = async () => await import('../../../src/main_process/storage/contacts/operations.js');
     const messagesOps = async () => await import('../../../src/main_process/storage/messages/operations.js');
     const statusOps = async () => await import('../../../src/main_process/storage/messages/status.js');
@@ -118,8 +118,8 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
     const transport = async () => await import('../../../src/main_process/network/server/transport.js');
     const vault = async () => await import('../../../src/main_process/network/vault/manager.js');
 
-    type SendUDPFn = typeof import('../../../src/main_process/network/messaging/chatSend.js').sendUDPMessage;
-    let sendUDPMessage: SendUDPFn;
+    type SendChatMessageFn = typeof import('../../../src/main_process/network/messaging/chatSend.js').sendChatMessage;
+    let sendChatMessage: SendChatMessageFn;
 
     const connectedContact = {
         upeerId: 'alice',
@@ -145,7 +145,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.useRealTimers();
         const { resetPendingDirectMessages } = await import('../../../src/main_process/network/messaging/chatRetry.js');
         resetPendingDirectMessages();
-        sendUDPMessage = (await import('../../../src/main_process/network/messaging/chatSend.js')).sendUDPMessage;
+        sendChatMessage = (await import('../../../src/main_process/network/messaging/chatSend.js')).sendChatMessage;
         vi.mocked((await messagesOps()).saveMessage).mockResolvedValue({ changes: 1 } as never);
         vi.mocked((await statusOps()).getMessageStatus).mockReturnValue('sent' as never);
     });
@@ -155,11 +155,11 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await messagesOps()).updateMessageStatus).mockResolvedValue(true);
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
 
-        const result = await sendUDPMessage('alice', 'hola');
+        const result = await sendChatMessage('alice', 'hola');
 
         expect(result).toBeDefined();
         expect((await messagesOps()).saveMessage).toHaveBeenCalled();
-        expect((await transport()).sendSecureUDPMessage).toHaveBeenCalled();
+        expect((await transport()).sendSecurePacket).toHaveBeenCalled();
     });
 
     it('vaultea un mensaje connected sin ack al expirar el timeout (no se pierde)', async () => {
@@ -169,7 +169,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
         vi.mocked((await statusOps()).getMessageStatus).mockReturnValue('sent' as never);
 
-        await sendUDPMessage('alice', 'mensaje sin ack');
+        await sendChatMessage('alice', 'mensaje sin ack');
 
         await vi.advanceTimersByTimeAsync(3000);
 
@@ -182,7 +182,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await messagesOps()).updateMessageStatus).mockResolvedValue(true);
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
 
-        const result = await sendUDPMessage('bob', 'hola offline');
+        const result = await sendChatMessage('bob', 'hola offline');
 
         expect(result).toBeDefined();
         expect((await messagesOps()).saveMessage).toHaveBeenCalled();
@@ -199,7 +199,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await messagesOps()).updateMessageStatus).mockResolvedValue(true);
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(0);
 
-        const result = await sendUDPMessage('bob', 'contenido que no se pierde');
+        const result = await sendChatMessage('bob', 'contenido que no se pierde');
 
         expect(result).toBeDefined();
         expect((await messagesOps()).saveMessage).toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
             publicKey: null,
         } as never);
 
-        const result = await sendUDPMessage('carol', 'hola carol');
+        const result = await sendChatMessage('carol', 'hola carol');
 
         expect(result).toBeDefined();
         expect((await messagesOps()).saveMessage).toHaveBeenCalled();
@@ -235,7 +235,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
             publicKey: null,
         } as never);
 
-        const result = await sendUDPMessage('carol', '__SYS__|Llamada de voz perdida', undefined, 'call-event-id');
+        const result = await sendChatMessage('carol', '__SYS__|Llamada de voz perdida', undefined, 'call-event-id');
 
         expect(result).toMatchObject({ id: 'call-event-id' });
         expect((await messagesOps()).saveMessage).toHaveBeenCalledWith(
@@ -248,17 +248,17 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
 
     it('rechaza un mensaje demasiado grande sin guardar nada (sin pérdida parcial)', async () => {
         const huge = 'x'.repeat(1_000_001);
-        const result = await sendUDPMessage('alice', huge);
+        const result = await sendChatMessage('alice', huge);
 
         expect(result).toBeUndefined();
         expect((await messagesOps()).saveMessage).not.toHaveBeenCalled();
-        expect((await transport()).sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect((await transport()).sendSecurePacket).not.toHaveBeenCalled();
     });
 
     it('devuelve undefined si el contacto no existe (sin escritura parcial)', async () => {
         vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(undefined as never);
 
-        const result = await sendUDPMessage('ghost', 'hola fantasma');
+        const result = await sendChatMessage('ghost', 'hola fantasma');
 
         expect(result).toBeUndefined();
         expect((await messagesOps()).saveMessage).not.toHaveBeenCalled();
@@ -270,7 +270,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
         vi.mocked((await statusOps()).getMessageStatus).mockReturnValue('delivered' as never);
 
-        await sendUDPMessage('alice', 'mensaje entregado');
+        await sendChatMessage('alice', 'mensaje entregado');
 
         const { getPendingDirectCount } = await import('../../../src/main_process/network/messaging/chatRetry.js');
         expect(getPendingDirectCount('alice')).toBe(1);
@@ -282,18 +282,18 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
         vi.mocked((await statusOps()).getMessageStatus).mockReturnValue('delivered' as never);
 
-        await sendUDPMessage('alice', 'mensaje pendiente');
+        await sendChatMessage('alice', 'mensaje pendiente');
         const { retryPendingDirectMessages, getPendingDirectCount } =
             await import('../../../src/main_process/network/messaging/chatRetry.js');
 
         expect(getPendingDirectCount('alice')).toBe(1);
-        expect((await transport()).sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect((await transport()).sendSecurePacket).toHaveBeenCalledTimes(1);
 
         const retried = await retryPendingDirectMessages('alice');
 
         expect(retried).toBe(1);
         expect(getPendingDirectCount('alice')).toBe(0);
-        expect((await transport()).sendSecureUDPMessage).toHaveBeenCalledTimes(2);
+        expect((await transport()).sendSecurePacket).toHaveBeenCalledTimes(2);
     });
 
     it('retiene el mensaje pendiente si el peer sigue offline al reintentar (no lo descarta)', async () => {
@@ -302,7 +302,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
         vi.mocked((await vault()).VaultManager.replicateToVaults).mockResolvedValue(1);
         vi.mocked((await statusOps()).getMessageStatus).mockReturnValue('delivered' as never);
 
-        await sendUDPMessage('alice', 'mensaje aun offline');
+        await sendChatMessage('alice', 'mensaje aun offline');
 
         vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue({
             ...offlineContact,
@@ -316,7 +316,7 @@ describe('no-pérdida de mensajes directos (sendUDPMessage)', () => {
 
         expect(retried).toBe(0);
         expect(getPendingDirectCount('alice')).toBe(1);
-        expect((await transport()).sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect((await transport()).sendSecurePacket).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -1,7 +1,7 @@
 import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { callManager } from './callManager.js';
 import type { CallMediaKind } from './callTypes.js';
 
@@ -23,7 +23,7 @@ function send(peerUpeerId: string, packet: Record<string, unknown>): boolean {
     if (!peer) {
         return false;
     }
-    sendSecureUDPMessage(peer.address, packet, peer.publicKey);
+    sendSecurePacket(peer.address, packet, peer.publicKey);
     return true;
 }
 

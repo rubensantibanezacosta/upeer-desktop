@@ -49,7 +49,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
 
         const normalizedIp = ip.trim();
         if (!isYggdrasilAddress(normalizedIp)) {
-            setError('Dirección Yggdrasil inválida. Debe estar en 200::/7, incluyendo 200::/8 y 300::/8.');
+            setError('Dirección de red inválida. Debe ser una dirección IPv6 válida de la red.');
             return;
         }
 

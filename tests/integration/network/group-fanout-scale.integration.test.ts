@@ -41,7 +41,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 describe('group fan-out por escala de peers', () => {
@@ -60,7 +60,7 @@ describe('group fan-out por escala de peers', () => {
         vi.clearAllMocks();
     });
 
-    it.each(SCALES)('entrega por UDP a todos los %d peers online y solo vaultea self', async (onlineCount) => {
+    it.each(SCALES)('entrega por transporte seguro a todos los %d peers online y solo vaultea self', async (onlineCount) => {
         const transport = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
@@ -77,7 +77,7 @@ describe('group fan-out por escala de peers', () => {
 
         await sendGroupMessage('grp-scale', 'mensaje online');
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(onlineCount);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(onlineCount);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(1);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith('self-id', expect.any(Object), undefined, expect.any(String));
     });
@@ -114,7 +114,7 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
 
         await sendGroupMessage('grp-scale', 'mensaje offline');
 
-        expect(transport.sendSecureUDPMessage).not.toHaveBeenCalled();
+        expect(transport.sendSecurePacket).not.toHaveBeenCalled();
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(offlineCount + 1);
         for (const member of members) {
             expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(member, expect.any(Object), undefined, expect.any(String));
@@ -145,7 +145,7 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
 
         await sendGroupMessage('grp-scale', 'mensaje mixto');
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(online);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(online);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(offline + 1);
         for (let i = 0; i < offline; i += 1) {
             expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(`mix-off-${i}`, expect.any(Object), undefined, expect.any(String));

@@ -57,7 +57,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -140,13 +140,13 @@ describe('no-pérdida de eventos de mutación (edición, borrado, reacción, rea
         );
     });
 
-    it('edita y entrega a un contacto connected por UDP y también vaultea', async () => {
+    it('edita y entrega a un contacto connected por transporte seguro y también vaultea', async () => {
         vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(connectedContact as never);
 
         const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chatMutations.js');
         await sendChatUpdate('bob', 'msg-1', 'texto editado online');
 
-        expect((await transport()).sendSecureUDPMessage).toHaveBeenCalled();
+        expect((await transport()).sendSecurePacket).toHaveBeenCalled();
         expect((await vault()).VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'bob',
             expect.objectContaining({ type: 'CHAT_UPDATE', msgId: 'msg-1' }),

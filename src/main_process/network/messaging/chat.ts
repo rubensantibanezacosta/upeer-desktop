@@ -1,4 +1,4 @@
-export { sendUDPMessage, sendTypingIndicator } from './chatSend.js';
+export { sendChatMessage, sendTypingIndicator } from './chatSend.js';
 export {
     sendChatReaction,
     sendContactCard,

@@ -117,8 +117,8 @@ async function applyGroupMessage(
       return;
     }
     if (!isInternalSync && senderAddress) {
-      const { sendSecureUDPMessage } = await import("../server/transport.js");
-      sendSecureUDPMessage(senderAddress, { type: "GROUP_ACK", id, groupId });
+      const { sendSecurePacket } = await import("../server/transport.js");
+      sendSecurePacket(senderAddress, { type: "GROUP_ACK", id, groupId });
     }
     return;
   }
@@ -155,8 +155,8 @@ async function applyGroupMessage(
   // Notify sender that we received the message
   const ackAddress = senderAddress || contact?.address;
   if (!isInternalSync && ackAddress) {
-    const { sendSecureUDPMessage } = await import("../server/transport.js");
-    sendSecureUDPMessage(ackAddress, { type: "GROUP_ACK", id: msgId, groupId });
+    const { sendSecurePacket } = await import("../server/transport.js");
+    sendSecurePacket(ackAddress, { type: "GROUP_ACK", id: msgId, groupId });
   }
 
   if (isNewGroupMsg) {

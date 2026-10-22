@@ -34,7 +34,7 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/server/transport.js', () => ({
-    sendSecureUDPMessage: vi.fn(),
+    sendSecurePacket: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/dht/handlers.js', () => ({
@@ -92,11 +92,11 @@ describe('group fan-out concurrency', () => {
         const result = await sendGroupMessage('grp-big', 'hola a todos');
 
         expect(result).toEqual(expect.objectContaining({ savedMessage: 'hola a todos' }));
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(memberCount);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(memberCount);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(1);
     });
 
-    it('vaultea a los miembros offline mientras envía por UDP a los online', async () => {
+    it('vaultea a los miembros offline mientras envía por transporte seguro a los online', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
@@ -122,7 +122,7 @@ describe('group fan-out concurrency', () => {
 
         await sendGroupMessage('grp-mix', 'mix');
 
-        expect(transport.sendSecureUDPMessage).toHaveBeenCalledTimes(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledTimes(1);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledTimes(2);
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'peer-offline',

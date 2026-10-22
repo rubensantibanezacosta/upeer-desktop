@@ -9,7 +9,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
-import { formatTopHeaderLastSeen, TopHeaderAvatar, TopHeaderTrustIndicator } from './topHeaderSupport.js';
+import { formatTopHeaderLastSeen, TopHeaderAvatar } from './topHeaderSupport.js';
 
 interface TopHeaderProps {
     contactName?: string;
@@ -112,7 +112,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 aria-label={onOpenInfo && contactName ? `Abrir info del ${isGroup ? 'grupo' : 'contacto'} ${contactName}` : undefined}
                 tabIndex={onOpenInfo ? 0 : -1}
             >
-                <TopHeaderAvatar isGroup={isGroup} isAdmin={isAdmin} avatar={avatar} contactName={contactName} onAvatarClick={handleAvatarClick} avatarFileRef={avatarFileRef} onAvatarFileChange={handleAvatarFileChange} />
+                <TopHeaderAvatar isGroup={isGroup} isAdmin={isAdmin} avatar={avatar} contactName={contactName} vouchScore={vouchScore} onAvatarClick={handleAvatarClick} avatarFileRef={avatarFileRef} onAvatarFileChange={handleAvatarFileChange} />
                 <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {isGroup && isAdmin && editingName ? (
@@ -145,7 +145,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                 )}
                             </>
                         )}
-                        {!isGroup && <TopHeaderTrustIndicator vouchScore={vouchScore} />}
                     </Box>
                     {contactName && (
                         <Typography

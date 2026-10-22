@@ -20,7 +20,7 @@ upeer es un sistema de chat peer-to-peer descentralizado que combina múltiples 
 | **Kademlia DHT**     | Tablas hash distribuidas  | Descubrimiento de contact tokens efímeros |
 | **Identity Manager** | Ed25519 + BLAKE2b         | Gestión de identidades criptográficas     |
 | **Message Handler**  | X25519 + Salsa20-Poly1305 | Cifrado E2EE con PFS                      |
-| **Protocol Handler** | UDP sobre Yggdrasil       | Gestión de mensajes DHT y chat            |
+| **Protocol Handler** | TCP sobre Yggdrasil       | Gestión de mensajes DHT y chat            |
 
 ### 1.3 Flujo de Comunicación
 
@@ -29,7 +29,7 @@ upeer es un sistema de chat peer-to-peer descentralizado que combina múltiples 
 2. Conexión Yggdrasil → Obtener dirección IPv6 overlay temporal (200::/7)
 3. Bootstrap DHT → Contactar peers conocidos → Llenar k-buckets con contact tokens efímeros
 4. Handshake → Intercambio de claves efímeras → Establecer sesión PFS
-5. Mensajería → Cifrar con clave de sesión → Enviar sobre UDP
+5. Mensajería → Cifrar con clave de sesión → Enviar sobre TCP/Yggdrasil
 6. Actualización DHT → Publicar contact token firmado con TTL corto → Replicar en K nodos más cercanos
 7. Descubrimiento reactivo → Query DHT → Encontrar pares activos mediante tokens, no direcciones fijas
 ```

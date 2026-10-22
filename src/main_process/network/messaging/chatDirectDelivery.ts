@@ -12,7 +12,7 @@ import {
 } from '../../storage/messages/operations.js';
 import { error, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import {
@@ -90,7 +90,7 @@ export async function sendConnectedChatMessage({
     }
 
     for (const address of peerAddresses) {
-        sendSecureUDPMessage(address, peerPacket, contactPublicKey, false);
+        sendSecurePacket(address, peerPacket, contactPublicKey, false);
     }
 
     if (!isToSelf) {
@@ -120,7 +120,7 @@ export async function sendConnectedChatMessage({
             replyTo,
         };
         for (const address of selfAddresses) {
-            sendSecureUDPMessage(address, selfPacket, myPublicKey, true);
+            sendSecurePacket(address, selfPacket, myPublicKey, true);
         }
     }
 
@@ -177,7 +177,7 @@ export async function sendConnectedChatMessage({
                         clearPendingDirectMessage(msgId);
                         await markMessageAsFailed(msgId);
                     }
-                    startDhtSearch(upeerId, sendSecureUDPMessage);
+                    startDhtSearch(upeerId, sendSecurePacket);
                 }
             } catch (err) {
                 error('Vault fallback setTimeout failed', err, 'vault');

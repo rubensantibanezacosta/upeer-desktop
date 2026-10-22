@@ -40,5 +40,7 @@ export type ChatAckPacket = {
 
 export type ChatDrResetPacket = {
     type: 'DR_RESET';
+    resetId: string;
     signedPreKey: ChatSignedPreKeyBundle;
+    ratchetContext?: 'direct' | `group:${string}`;
 };

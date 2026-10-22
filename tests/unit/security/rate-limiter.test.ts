@@ -27,6 +27,17 @@ describe('RateLimiter - Unit Tests', () => {
         expect(rateLimiter.check('1.2.3.4', 'TEST_TYPE')).toBe(false);
     });
 
+    it('should apply the default DR_RESET limit of 20 per minute', () => {
+        const defaultLimiter = new RateLimiter();
+
+        for (let i = 0; i < 20; i++) {
+            expect(defaultLimiter.check('5.5.5.5', 'DR_RESET')).toBe(true);
+        }
+
+        expect(defaultLimiter.check('5.5.5.5', 'DR_RESET')).toBe(false);
+        expect(defaultLimiter.check('6.6.6.6', 'DR_RESET')).toBe(true);
+    });
+
     it('should refill tokens over time', async () => {
         // Consumir todos los tokens
         for (let i = 0; i < 2; i++) {

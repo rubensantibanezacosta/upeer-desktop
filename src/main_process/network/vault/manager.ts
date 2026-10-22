@@ -1,5 +1,5 @@
 import { getContacts } from '../../storage/contacts/operations.js';
-import { sendSecureUDPMessage } from '../server/transport.js';
+import { sendSecurePacket } from '../server/transport.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { info, warn, debug } from '../../security/secure-logger.js';
 import crypto from 'node:crypto';
@@ -44,7 +44,7 @@ export class VaultManager {
     private static async sendVaultQuery(address: string, packet: VaultReplicatedPacket, source: string, context: VaultRecoveryContext = 'background'): Promise<void> {
         beginVaultRecoverySource(address, source, context);
         try {
-            await sendSecureUDPMessage(address, packet);
+            await sendSecurePacket(address, packet);
         } catch (err) {
             completeVaultRecoverySource(address);
             warn(`Failed to send VAULT_QUERY to ${source}`, err, 'vault');
@@ -91,7 +91,7 @@ export class VaultManager {
         let attempt = 0;
         while (attempt < maxRetries) {
             try {
-                await sendSecureUDPMessage(address, packet);
+                await sendSecurePacket(address, packet);
                 return;
             } catch (err) {
                 attempt++;

@@ -87,10 +87,10 @@ describe('transporte por escala de peers', () => {
     });
 
     it.each(SCALES)('aplica backpressure global (límite 60) a la cola offline con %d peers', async (peerCount) => {
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
 
         for (let i = 0; i < peerCount; i += 1) {
-            sendSecureUDPMessage(`200::peer-${i}`, { type: 'CHAT', index: i });
+            sendSecurePacket(`200::peer-${i}`, { type: 'CHAT', index: i });
         }
 
         const expectedLength = Math.min(60, peerCount);
@@ -102,12 +102,12 @@ describe('transporte por escala de peers', () => {
     it.each(SCALES)('abre una conexión por cada peer y encola sin saturación con %d peers online', async (peerCount) => {
         const socks5 = await import('../../../src/main_process/network/server/socks5.js');
         const state = await import('../../../src/main_process/network/server/state.js');
-        const { sendSecureUDPMessage } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
 
         state.setNetworkReady(true);
         for (let i = 0; i < peerCount; i += 1) {
             vi.mocked(socks5.socks5Connect).mockResolvedValueOnce(createMockSocket() as never);
-            sendSecureUDPMessage(`200::peer-${i}`, { type: 'CHAT', index: i });
+            sendSecurePacket(`200::peer-${i}`, { type: 'CHAT', index: i });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 30));
