@@ -25,6 +25,7 @@ export interface GroupControlPacket extends GroupPayload {
     useRecipientEphemeral?: boolean;
     signature?: string;
     isInternalSync?: boolean;
+    senderDeviceId?: string;
 }
 
 export function sameMembers(left: string[], right: string[]): boolean {
@@ -73,6 +74,7 @@ export async function decryptGroupControlPayload(
             nonce: data.nonce,
             ratchetHeader: data.ratchetHeader,
             x3dhInit: data.x3dhInit,
+            senderDeviceId: data.senderDeviceId,
         }, reset, `group:${data.groupId}`);
         return doubleRatchetContent
             ? JSON.parse(doubleRatchetContent) as GroupPayload

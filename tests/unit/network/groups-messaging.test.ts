@@ -48,6 +48,14 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
     saveRatchetSession: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/security/deviceMessaging.js', () => ({
+    getDeviceMessagingIdentity: vi.fn(() => ({
+        identity: { deviceId: 'ee'.repeat(32), publicKey: 'cc'.repeat(32), secretKey: Buffer.alloc(32) },
+        signedPreKey: { spkPub: 'dd'.repeat(32), spkSig: 'ff'.repeat(64), spkId: 9 },
+    })),
+    signWithDevice: vi.fn(() => Buffer.from('device-sig')),
+}));
+
 vi.mock('electron', () => ({
     BrowserWindow: { getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]) },
 }));
@@ -250,6 +258,76 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String)
+        );
+    });
+
+    it('delivers GROUP_UPDATE with the device identity when the member advertises it', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const ratchet = await import('../../../src/main_process/security/ratchet.js');
+        const { getDeviceMessagingIdentity, signWithDevice } = await import('../../../src/main_process/security/deviceMessaging.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { updateGroup } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValueOnce({
+            groupId: 'grp-device',
+            adminUpeerId: 'self-id',
+            status: 'active',
+            members: ['self-id', 'peer-device'],
+            epoch: 2,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord).mockReturnValueOnce({
+            groupId: 'grp-device',
+            adminUpeerId: 'self-id',
+            status: 'active',
+            members: ['self-id', 'peer-device'],
+            epoch: 2,
+            senderKey: 'cc'.repeat(32),
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-device',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 10,
+            deviceId: 'ee'.repeat(32),
+            devicePublicKey: 'cc'.repeat(32),
+            deviceSignedPreKey: 'dd'.repeat(32),
+            deviceSignedPreKeyId: 9,
+            address: '200::11',
+            knownAddresses: '[]',
+        } as ContactRecord);
+
+        await updateGroup('grp-device', { name: 'Grupo por dispositivo' });
+
+        expect(getDeviceMessagingIdentity).toHaveBeenCalled();
+        expect(signWithDevice).toHaveBeenCalled();
+        expect(ratchet.ratchetEncrypt).toHaveBeenCalled();
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200::11',
+            expect.objectContaining({
+                type: 'GROUP_UPDATE',
+                groupId: 'grp-device',
+                senderDeviceId: 'ee'.repeat(32),
+                x3dhInit: expect.objectContaining({
+                    spkId: 9,
+                    ikPub: 'cc'.repeat(32),
+                }),
+            }),
+            'cc'.repeat(32),
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-device',
+            expect.objectContaining({
+                type: 'GROUP_UPDATE',
+                groupId: 'grp-device',
+                senderDeviceId: 'ee'.repeat(32),
+                senderUpeerId: 'self-id',
+                signature: Buffer.from('device-sig').toString('hex'),
+            }),
+            undefined,
+            expect.any(String),
         );
     });
 

@@ -11,7 +11,7 @@ export function createDrResetPacket(
     ratchetContext: ChatDrResetPacket['ratchetContext'] = 'direct',
     options: DrResetPacketOptions = {},
 ): ChatDrResetPacket {
-    const device = options.useDeviceIdentity && ratchetContext === 'direct'
+    const device = options.useDeviceIdentity
         ? getDeviceMessagingIdentity()
         : null;
     return {

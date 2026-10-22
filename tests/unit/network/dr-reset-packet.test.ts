@@ -32,11 +32,11 @@ describe('createDrResetPacket', () => {
         expect(packet.signedPreKey).toEqual({ spkPub: 'dd'.repeat(32), spkSig: 'ee'.repeat(64), spkId: 2 });
     });
 
-    it('no usa la identidad de dispositivo en contextos de grupo', async () => {
+    it('usa la identidad de dispositivo también en contextos de grupo', async () => {
         const { createDrResetPacket } = await import('../../../src/main_process/network/handlers/drResetPacket.js');
         const packet = createDrResetPacket('group:abc', { useDeviceIdentity: true });
 
-        expect(packet.senderDeviceId).toBeUndefined();
-        expect(packet.signedPreKey.spkId).toBe(1);
+        expect(packet.senderDeviceId).toBe('cc'.repeat(32));
+        expect(packet.signedPreKey).toEqual({ spkPub: 'dd'.repeat(32), spkSig: 'ee'.repeat(64), spkId: 2 });
     });
 });

@@ -75,10 +75,10 @@ describe('group fan-out integration', () => {
         for (let i = 0; i < onlineCount; i += 1) {
             const id = `peer-${i}`;
             members.push(id);
-            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${id}` };
+            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${i.toString(16)}` };
         }
         members.push('offline-peer');
-        contactStatuses['offline-peer'] = { status: 'disconnected', publicKey: 'bb'.repeat(32), address: '200::offline' };
+        contactStatuses['offline-peer'] = { status: 'disconnected', publicKey: 'bb'.repeat(32), address: '200::ffff' };
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-int',

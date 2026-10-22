@@ -10,6 +10,11 @@ type StoredContact = Omit<Contact, 'knownAddresses'> & {
     ephemeralPublicKey?: string | null;
     ephemeralPublicKeyUpdatedAt?: string | null;
     deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceCertificate?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeySignature?: string | null;
+    deviceSignedPreKeyId?: number | null;
     deviceMeta?: string | null;
     renewalToken?: string | null;
     signedPreKey?: string | null;

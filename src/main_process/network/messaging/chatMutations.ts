@@ -94,7 +94,7 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
             warn('Chat update skipped because the contact device is not admitted', { targetId, err: String(err) }, 'security');
             return;
         }
-        const encrypted = await encryptChatPayload(targetId, payload, contact, 'direct', { allowDeviceIdentity: !isGroupContext });
+        const encrypted = await encryptChatPayload(targetId, payload, contact, 'direct', { allowDeviceIdentity: true });
         const usesDevice = Boolean(encrypted.deviceId && contact.devicePublicKey);
         const data = {
             type: 'CHAT_UPDATE',

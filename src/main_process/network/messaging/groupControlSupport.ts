@@ -6,6 +6,7 @@ import {
     sign,
 } from '../../security/identity.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { signWithDevice } from '../../security/deviceMessaging.js';
 import { warn } from '../../security/secure-logger.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
@@ -21,6 +22,10 @@ export interface GroupDeliveryContact {
     knownAddresses?: string;
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 }
 
 export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, packet: Record<string, unknown>): Promise<void> => {
@@ -40,8 +45,9 @@ export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, 
         warn('No se pudieron parsear las direcciones conocidas del contacto', { upeerId: contact.upeerId, error: String(error) }, 'network');
     }
 
+    const recipientPublicKey = contact.devicePublicKey ?? contact.publicKey;
     for (const addr of addresses) {
-        sendSecurePacket(addr, packet, contact.publicKey);
+        sendSecurePacket(addr, packet, recipientPublicKey);
     }
 };
 
@@ -50,11 +56,24 @@ export const vaultPacket = async (targetUpeerId: string, packet: Record<string, 
     await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride);
 };
 
-export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId: string): Record<string, unknown> => ({
-    ...packet,
-    senderUpeerId,
-    signature: sign(Buffer.from(canonicalStringify(packet))).toString('hex')
-});
+export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId: string): Record<string, unknown> => {
+    const senderDeviceId = typeof packet.senderDeviceId === 'string' ? packet.senderDeviceId : '';
+    const deviceSignature = senderDeviceId ? signWithDevice(Buffer.from(canonicalStringify(packet))) : null;
+    if (deviceSignature) {
+        return {
+            ...packet,
+            senderUpeerId,
+            signature: deviceSignature.toString('hex'),
+        };
+    }
+    const legacyPacket = senderDeviceId ? { ...packet } : packet;
+    if (senderDeviceId) delete legacyPacket.senderDeviceId;
+    return {
+        ...legacyPacket,
+        senderUpeerId,
+        signature: sign(Buffer.from(canonicalStringify(legacyPacket))).toString('hex'),
+    };
+};
 
 export const resolveGroupContact = async (targetUpeerId: string): Promise<GroupDeliveryContact | null> => {
     const myId = getMyUPeerId();
@@ -78,6 +97,10 @@ export const resolveGroupContact = async (targetUpeerId: string): Promise<GroupD
         knownAddresses: contact.knownAddresses ?? undefined,
         signedPreKey: contact.signedPreKey ?? undefined,
         signedPreKeyId: contact.signedPreKeyId ?? undefined,
+        deviceId: contact.deviceId ?? undefined,
+        devicePublicKey: contact.devicePublicKey ?? undefined,
+        deviceSignedPreKey: contact.deviceSignedPreKey ?? undefined,
+        deviceSignedPreKeyId: contact.deviceSignedPreKeyId ?? undefined,
     };
 };
 
@@ -92,7 +115,13 @@ export const buildEncryptedGroupPacket = async (
     if (targetUpeerId !== getMyUPeerId()) {
         await requireContactAdmission(targetUpeerId, contact.publicKey);
     }
-    const encrypted = await encryptChatPayload(targetUpeerId, sensitivePayload, contact, `group:${groupId}`);
+    const encrypted = await encryptChatPayload(
+        targetUpeerId,
+        sensitivePayload,
+        contact,
+        `group:${groupId}`,
+        { allowDeviceIdentity: true },
+    );
 
     return {
         type,
@@ -104,6 +133,7 @@ export const buildEncryptedGroupPacket = async (
         ...(encrypted.x3dhInit ? { x3dhInit: encrypted.x3dhInit } : {}),
         ...(encrypted.ephemeralPublicKey ? { ephemeralPublicKey: encrypted.ephemeralPublicKey } : {}),
         ...(encrypted.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encrypted.useRecipientEphemeral } : {}),
+        ...(encrypted.deviceId ? { senderDeviceId: encrypted.deviceId } : {}),
     };
 };
 
