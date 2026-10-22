@@ -2,6 +2,7 @@ import { sign } from '../../security/identity.js';
 import { updateMessageStatus } from '../../storage/messages/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
+import { requireContactAdmission } from '../contactAdmission.js';
 import { encryptChatPayload } from './chatEncryption.js';
 
 type ContactAddressRecord = {
@@ -67,6 +68,7 @@ export async function vaultChatForOfflineDelivery(
     senderUpeerId: string,
     timestamp: number,
 ): Promise<number> {
+    if (recipientUpeerId !== senderUpeerId) await requireContactAdmission(recipientUpeerId, recipientContact.publicKey);
     const encryptedPayload = await encryptChatPayload(recipientUpeerId, content, recipientContact);
 
     const vaultData = {

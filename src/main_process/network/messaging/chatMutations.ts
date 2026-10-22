@@ -16,6 +16,7 @@ import { buildMessagePayload } from '../messagePayload.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
+import { requireContactAdmission } from '../contactAdmission.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import { getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
@@ -80,6 +81,12 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     ) => {
         const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
         if (!contact || !contact.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
+        try {
+            if (targetId !== myId) await requireContactAdmission(targetId, contact.publicKey);
+        } catch (err) {
+            warn('Chat update skipped because the contact device is not admitted', { targetId, err: String(err) }, 'security');
+            return;
+        }
         const encrypted = await encryptChatPayload(targetId, payload, contact);
         const data = {
             type: 'CHAT_UPDATE',

@@ -14,6 +14,7 @@ import { error, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { startDhtSearch } from '../dht/core.js';
+import { requireContactAdmission } from '../contactAdmission.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import {
     emitMessageStatusUpdated,
@@ -65,6 +66,7 @@ export async function sendConnectedChatMessage({
     syncOwnDevices = true,
     persistContent,
 }: ConnectedSendOptions): Promise<void> {
+    if (upeerId !== selfId) await requireContactAdmission(upeerId, contact.publicKey);
     const encryptedData = await encryptChatPayload(upeerId, payload, contact);
     const contactPublicKey = contact.publicKey ?? undefined;
     const peerPacket = {

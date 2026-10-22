@@ -9,6 +9,7 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
+import { requireContactAdmission } from '../contactAdmission.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import { VaultManager } from '../vault/manager.js';
 
@@ -88,6 +89,9 @@ export const buildEncryptedGroupPacket = async (
     targetUpeerId: string,
     contact: GroupDeliveryContact,
 ) => {
+    if (targetUpeerId !== getMyUPeerId()) {
+        await requireContactAdmission(targetUpeerId, contact.publicKey);
+    }
     const encrypted = await encryptChatPayload(targetUpeerId, sensitivePayload, contact, `group:${groupId}`);
 
     return {

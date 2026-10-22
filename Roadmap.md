@@ -12,12 +12,13 @@ _Última actualización: 22 Octubre 2026_
 - [x] Publicar el registro de cuenta con `epoch`, certificado activo y revocaciones.
 - [ ] Dejar de usar la identidad/SPK compartida para mensajería y usar claves por dispositivo.
 - [x] Aceptar solo bloques de ubicación con certificado válido y aplicar `DHT_UPDATE` con `dhtSeq` estrictamente mayor.
+- [x] Comprobar la admisión del contacto antes de cifrar mensajes directos, vault offline, outbox pendiente, actualizaciones y paquetes de grupo.
 - [x] Vectores JS↔Go↔Kotlin del contrato de cuenta y dispositivo, en ambos sentidos, incluida la clave DHT del registro, manipulación, revocación y epoch obsoleto.
 - [ ] Migrar instalaciones existentes sin copiar la mnemonic ni la raíz a otros dispositivos.
 - [ ] Acordar la ventana de compatibilidad de bloques legacy antes de activar `fail-closed` en Android.
 - [ ] Probar roaming Desktop↔móvil en ambos sentidos y actualizar este roadmap al cerrar B7.
 
-Estado Android (22/10/2026): store y lookup DHT iterativos completados (K=20, α=3, ACK, reintento acotado, fusión por `deviceId` y caché verificada de 5 min), `DHT_UPDATE` enviado y aplicado con certificado, registro, secuencia persistida y rate limit. Desktop ya emite bloques con `deviceCertificate`, publica su registro de cuenta y acepta bloques de Android. Los vectores `tests/fixtures/dht-account-go.json` y `upper/transport-bridge/testdata/account_device_vectors.json` fijan el contrato en ambos sentidos; el segundo también se consume en JVM con `AccountDeviceVectorTest`. El siguiente bloqueo compartido es la prueba de roaming real y la migración de la mensajería a claves por dispositivo.
+Estado Android (22/10/2026): store y lookup DHT iterativos completados (K=20, α=3, ACK, reintento acotado, fusión por `deviceId` y caché verificada de 5 min), `DHT_UPDATE` enviado y aplicado con certificado, registro, secuencia persistida y rate limit. Desktop ya emite bloques con `deviceCertificate`, publica su registro de cuenta y acepta bloques de Android. Los vectores `tests/fixtures/dht-account-go.json` y `upper/transport-bridge/testdata/account_device_vectors.json` fijan el contrato en ambos sentidos; el segundo también se consume en JVM con `AccountDeviceVectorTest`. Desktop ya comprueba la admisión del contacto antes de cifrar (`contactAdmission.ts`) en envío directo, vault offline, outbox pendiente, actualizaciones y grupos, con caché de 60 s ligada al epoch del registro y auditoría para registro/ubicación ausentes. El siguiente bloqueo compartido es la prueba de roaming real y la migración de la mensajería a claves por dispositivo.
 
 El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](../ROADMAP.md).
 

@@ -16,6 +16,7 @@ import { getDb } from './shared.js';
 import { pendingOutbox } from './schema.js';
 import { getContactByUpeerId } from './contacts/operations.js';
 import { debug, warn } from '../security/secure-logger.js';
+import { ContactAdmissionError, requireContactAdmission } from '../network/contactAdmission.js';
 import { encryptChatPayload } from '../network/messaging/chatEncryption.js';
 
 export async function savePendingOutboxMessage(
@@ -77,6 +78,7 @@ export async function flushPendingOutbox(
                 continue;
             }
 
+            await requireContactAdmission(recipientSid, contactPubKey);
             const encryptedPayload = await encryptChatPayload(recipientSid, entry.plaintext, {
                 publicKey: contactPubKey,
                 signedPreKey: contact?.signedPreKey,
@@ -115,9 +117,11 @@ export async function flushPendingOutbox(
         } catch (err) {
             // Si el error es por criptografía (falta clave), eliminar el mensaje
             // para evitar reintentos infinitos. Otros errores (red, vault) se reintentan.
-            const isCryptoError = err !== null && err !== undefined && typeof err === 'object' && 'name' in err && (
-                err.name === 'DoubleRatchetUnavailableError' ||
-                (typeof err.constructor?.name === 'string' && err.constructor.name === 'DoubleRatchetUnavailableError')
+            const isCryptoError = err instanceof ContactAdmissionError || (
+                err !== null && err !== undefined && typeof err === 'object' && 'name' in err && (
+                    err.name === 'DoubleRatchetUnavailableError' ||
+                    (typeof err.constructor?.name === 'string' && err.constructor.name === 'DoubleRatchetUnavailableError')
+                )
             );
             if (isCryptoError) {
                 warn('Pending outbox: crypto unavailable for message, deleting stuck entry', { id: entry.id, recipientSid, error: err }, 'vault');
