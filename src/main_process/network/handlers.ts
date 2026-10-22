@@ -8,6 +8,7 @@ import {
     getUPeerIdFromPublicKey,
     verify
 } from '../security/identity.js';
+import { decryptSealedWithDevice } from '../security/deviceMessaging.js';
 
 import { debug, error, security, warn } from '../security/secure-logger.js';
 import { validateMessage } from '../security/validation.js';
@@ -78,7 +79,7 @@ export async function handlePacket(
             if (!rateLimiter.checkIp(rinfo.address, 'SEALED')) {
                 return;
             }
-            const inner = unsealPacket(fullPacket as { ciphertext: string }, (ct) => decryptSealed(ct));
+            const inner = unsealPacket(fullPacket as { ciphertext: string }, (ct) => decryptSealed(ct) ?? decryptSealedWithDevice(ct));
             if (!inner) {
                 security('SEALED: failed to decrypt', { ip: rinfo.address }, 'network');
                 return;
@@ -181,7 +182,27 @@ export async function handlePacket(
         const upeerId = senderUpeerId;
         if (!upeerId) return;
 
-        const directContact = await getContactByUpeerId(upeerId) as { publicKey?: string; status?: string; address?: string } | undefined;
+        const directContact = await getContactByUpeerId(upeerId) as {
+            publicKey?: string;
+            status?: string;
+            address?: string;
+            deviceId?: string | null;
+            devicePublicKey?: string | null;
+        } | undefined;
+        const senderDeviceId = typeof data.senderDeviceId === 'string' ? data.senderDeviceId.toLowerCase() : undefined;
+        if (senderDeviceId && directContact?.deviceId !== senderDeviceId) {
+            security('Packet announced an unknown sender device', {
+                upeerId,
+                senderDeviceId,
+                knownDeviceId: directContact?.deviceId ?? null,
+            }, 'security');
+            return;
+        }
+        const senderDevicePublicKey = senderDeviceId
+            && directContact?.devicePublicKey
+            && /^[0-9a-f]{64}$/i.test(directContact.devicePublicKey)
+            ? directContact.devicePublicKey.toLowerCase()
+            : undefined;
         const isBlockedContact = directContact?.status === 'blocked';
         const isGroupPacket = pktType === 'GROUP_MSG' || pktType === 'GROUP_ACK' || pktType === 'GROUP_INVITE'
             || pktType === 'GROUP_UPDATE' || pktType === 'GROUP_LEAVE';
@@ -262,6 +283,23 @@ export async function handlePacket(
                     Buffer.from(canonicalStringify(legacyPayload)),
                     Buffer.from(signature, 'hex'),
                     Buffer.from(publicKey, 'hex')
+                );
+            }
+        }
+
+        if (!verified && senderDevicePublicKey) {
+            const deviceKey = Buffer.from(senderDevicePublicKey, 'hex');
+            verified = verify(
+                Buffer.from(canonicalStringify(payloadForVerification)),
+                Buffer.from(signature, 'hex'),
+                deviceKey
+            );
+            if (!verified && senderYggAddress !== undefined) {
+                const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
+                verified = verify(
+                    Buffer.from(canonicalStringify(legacyPayload)),
+                    Buffer.from(signature, 'hex'),
+                    deviceKey
                 );
             }
         }

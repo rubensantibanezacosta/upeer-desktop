@@ -3,6 +3,7 @@ import {
     computeKeyFingerprint,
     updateContactPublicKey,
     updateContactEphemeralPublicKey,
+    updateContactDeviceIdentity,
     updateContactSignedPreKey
 } from '../../../src/main_process/storage/contacts/keys.js';
 import * as shared from '../../../src/main_process/storage/shared.js';
@@ -14,6 +15,7 @@ type MockDb = {
     get: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     set: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
     run: ReturnType<typeof vi.fn>;
 };
 type MockSchema = {
@@ -26,6 +28,10 @@ type MockSchema = {
         signedPreKeySignature: string;
         signedPreKeyId: string;
         status: string;
+        deviceId: string;
+    };
+    ratchetSessions: {
+        upeerId: string;
     };
 };
 
@@ -48,6 +54,7 @@ describe('Contacts Storage Keys', () => {
             get: vi.fn(),
             update: vi.fn().mockReturnThis(),
             set: vi.fn().mockReturnThis(),
+            delete: vi.fn().mockReturnThis(),
             run: vi.fn()
         };
         mockSchema = {
@@ -59,7 +66,11 @@ describe('Contacts Storage Keys', () => {
                 signedPreKey: 'signedPreKey',
                 signedPreKeySignature: 'signedPreKeySignature',
                 signedPreKeyId: 'signedPreKeyId',
-                status: 'status'
+                status: 'status',
+                deviceId: 'deviceId'
+            },
+            ratchetSessions: {
+                upeerId: 'upeerId'
             }
         };
         vi.mocked(shared.getDb).mockReturnValue(mockDb as unknown as ReturnType<typeof shared.getDb>);
@@ -130,6 +141,37 @@ describe('Contacts Storage Keys', () => {
                 signedPreKeyId: 123
             });
             expect(mockDb.run).toHaveBeenCalled();
+        });
+    });
+
+    describe('updateContactDeviceIdentity', () => {
+        const identity = {
+            devicePublicKey: 'a'.repeat(64),
+            deviceId: 'b'.repeat(64),
+            deviceCertificate: '{"version":1}',
+            deviceSignedPreKey: 'c'.repeat(64),
+            deviceSignedPreKeySignature: 'd'.repeat(128),
+            deviceSignedPreKeyId: 456
+        };
+
+        it('invalida las sesiones cuando cambia el dispositivo', () => {
+            mockDb.get.mockReturnValue({ deviceId: 'e'.repeat(64) });
+
+            const result = updateContactDeviceIdentity('peer1', identity);
+
+            expect(result.changed).toBe(true);
+            expect(result.previousDeviceId).toBe('e'.repeat(64));
+            expect(mockDb.delete).toHaveBeenCalledWith(mockSchema.ratchetSessions);
+            expect(mockDb.run).toHaveBeenCalled();
+        });
+
+        it('conserva las sesiones cuando el dispositivo no cambia', () => {
+            mockDb.get.mockReturnValue({ deviceId: identity.deviceId });
+
+            const result = updateContactDeviceIdentity('peer1', identity);
+
+            expect(result.changed).toBe(false);
+            expect(mockDb.delete).not.toHaveBeenCalled();
         });
     });
 });

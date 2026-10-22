@@ -57,6 +57,13 @@
       "when": 1792262092125,
       "tag": "0008_group_member_public_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792920000000,
+      "tag": "0009_device_messaging_identity",
+      "breakpoints": true
     }
   ]
 }

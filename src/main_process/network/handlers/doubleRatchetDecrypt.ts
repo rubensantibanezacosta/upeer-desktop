@@ -3,6 +3,7 @@ import { ratchetDecrypt, ratchetInitBob, x3dhResponder } from '../../security/ra
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
 import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
+import { resolveInboundDeviceSpk } from '../../security/deviceMessaging.js';
 import { serializeState } from '../../security/ratchet.js';
 import { warn } from '../../security/secure-logger.js';
 
@@ -56,14 +57,15 @@ async function decryptDoubleRatchetPayloadUnlocked(
 
         if (!session && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const spkEntry = getSpkBySpkId(spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
                 await onReset?.(createResetPacket(contextId));
                 return null;
             }
 
             const sharedSecret = x3dhResponder(
-                getMyIdentitySkBuffer(),
+                deviceSpkEntry?.secretKey ?? getMyIdentitySkBuffer(),
                 spkEntry.spkSk,
                 Buffer.from(ikPub, 'hex'),
                 Buffer.from(ekPub, 'hex')
@@ -91,10 +93,11 @@ async function decryptDoubleRatchetPayloadUnlocked(
         );
         if (canRecoverFromFreshX3dh && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const spkEntry = getSpkBySpkId(spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (spkEntry) {
                 const sharedSecret = x3dhResponder(
-                    getMyIdentitySkBuffer(),
+                    deviceSpkEntry?.secretKey ?? getMyIdentitySkBuffer(),
                     spkEntry.spkSk,
                     Buffer.from(ikPub, 'hex'),
                     Buffer.from(ekPub, 'hex')

@@ -3,6 +3,7 @@ import {
     getMyUPeerId,
     sign
 } from '../../security/identity.js';
+import { signWithDevice } from '../../security/deviceMessaging.js';
 import { error, warn } from '../../security/secure-logger.js';
 import { getYggstackAddress, onYggstackAddress, onYggstackStatus } from '../../sidecars/yggstack.js';
 import { SEALED_TYPES, sealPacket } from '../sealed.js';
@@ -232,7 +233,12 @@ export function sendSecurePacket(ip: string, data: Record<string, unknown>, reci
         isInternalSync
     };
     const signaturePayload = binaryMedia ? callMediaSignatureValue(payloadToSign) : canonicalStringify(payloadToSign);
-    const signature = sign(Buffer.from(signaturePayload));
+    const senderDeviceId = typeof data.senderDeviceId === 'string' && /^[0-9a-f]{64}$/i.test(data.senderDeviceId) ? data.senderDeviceId : '';
+    const signature = senderDeviceId ? signWithDevice(Buffer.from(signaturePayload)) : sign(Buffer.from(signaturePayload));
+    if (!signature) {
+        warn('Packet signing key is unavailable', { type: data.type, senderDeviceId }, 'network');
+        return;
+    }
     const signedInner = {
         ...data,
         ...(binaryMedia ? { mediaHash: hashCallMedia(binaryMedia) } : {}),

@@ -1,6 +1,7 @@
 import { error, info, warn } from '../../security/secure-logger.js';
 import type { RatchetState } from '../../security/ratchetShared.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
+import { resolveInboundDeviceSpk } from '../../security/deviceMessaging.js';
 import type { ChatAckPacket, ChatDrResetPacket, ChatIncomingPayload } from './chatMessageTypes.js';
 import { createDrResetPacket } from './drResetPacket.js';
 
@@ -52,14 +53,15 @@ async function decryptDoubleRatchetContentUnlocked(
         const canUseFreshX3dh = !session || retryStartsNewRatchet;
         if (canUseFreshX3dh && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const spkEntry = getSpkBySpkId(spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { spkId, upeerId }, 'security');
                 sendResponse(fromAddress, createDrResetPacket());
                 return null;
             }
             const sharedSecret = x3dhResponder(
-                getMyIdentitySkBuffer(),
+                deviceSpkEntry?.secretKey ?? getMyIdentitySkBuffer(),
                 spkEntry.spkSk,
                 Buffer.from(ikPub, 'hex'),
                 Buffer.from(ekPub, 'hex'),
@@ -89,10 +91,11 @@ async function decryptDoubleRatchetContentUnlocked(
 
         if (sessionResult && data.x3dhInit && !isDuplicate) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const spkEntry = getSpkBySpkId(spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (spkEntry) {
                 const sharedSecret = x3dhResponder(
-                    getMyIdentitySkBuffer(),
+                    deviceSpkEntry?.secretKey ?? getMyIdentitySkBuffer(),
                     spkEntry.spkSk,
                     Buffer.from(ikPub, 'hex'),
                     Buffer.from(ekPub, 'hex'),

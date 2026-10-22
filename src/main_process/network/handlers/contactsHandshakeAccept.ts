@@ -20,6 +20,7 @@ import {
     getSafeEphemeralPublicKey,
     hasValidHandshakeIdentity,
     maybeSendAvatarUpdate,
+    maybeUpdateContactDeviceIdentity,
     maybeUpdateSignedPreKey,
     rateLimiter,
     verifyHandshakeAcceptSignature,
@@ -107,6 +108,7 @@ export async function handleHandshakeAccept(
         const currentAddress = rinfo.address;
         const incomingAddresses = Array.isArray(data.addresses) ? data.addresses : [currentAddress];
         addOrUpdateContact(senderUpeerId, currentAddress, existing.name, publicKey, 'connected', safeEphKey, undefined, undefined, undefined, incomingAddresses);
+        maybeUpdateContactDeviceIdentity(senderUpeerId, data, 'HANDSHAKE_ACCEPT');
         if (safeEphKey) {
             updateContactEphemeralPublicKey(senderUpeerId, safeEphKey);
         }
@@ -126,6 +128,7 @@ export async function handleHandshakeAccept(
                 updateContactEphemeralPublicKey(senderUpeerId, safeEphKey);
             }
             maybeUpdateSignedPreKey(senderUpeerId, publicKey, data.signedPreKey, 'HANDSHAKE_ACCEPT');
+            maybeUpdateContactDeviceIdentity(senderUpeerId, data, 'HANDSHAKE_ACCEPT');
             if (typeof data.alias === 'string' && data.alias) {
                 updateContactName(senderUpeerId, data.alias.slice(0, 100));
             }

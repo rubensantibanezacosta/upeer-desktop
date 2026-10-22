@@ -10,6 +10,7 @@ import {
     saveMessage,
     updateMessageStatus,
 } from '../../storage/messages/operations.js';
+import { signWithDevice } from '../../security/deviceMessaging.js';
 import { error, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { sendSecurePacket } from '../server/transport.js';
@@ -33,6 +34,10 @@ type ChatContactRecord = {
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
+    devicePublicKey?: string | null;
+    deviceId?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 };
 
 type ConnectedSendOptions = {
@@ -66,17 +71,33 @@ export async function sendConnectedChatMessage({
     syncOwnDevices = true,
     persistContent,
 }: ConnectedSendOptions): Promise<void> {
-    if (upeerId !== selfId) await requireContactAdmission(upeerId, contact.publicKey);
-    const encryptedData = await encryptChatPayload(upeerId, payload, contact);
+    if (upeerId !== selfId) {
+        await requireContactAdmission(upeerId, contact.publicKey, {
+            expectedDevice: {
+                deviceId: contact.deviceId,
+                devicePublicKey: contact.devicePublicKey,
+            },
+        });
+    }
+    const encryptedData = await encryptChatPayload(upeerId, payload, contact, 'direct', { allowDeviceIdentity: true });
     const contactPublicKey = contact.publicKey ?? undefined;
+    const recipientPublicKey = encryptedData.deviceId
+        ? contact.devicePublicKey ?? undefined
+        : contactPublicKey;
     const peerPacket = {
         type: 'CHAT',
         id: msgId,
         timestamp,
         ...encryptedData,
+        ...(encryptedData.deviceId ? { senderDeviceId: encryptedData.deviceId } : {}),
         replyTo,
     };
-    const signature = sign(Buffer.from(canonicalStringify(peerPacket)));
+    const signature = encryptedData.deviceId
+        ? signWithDevice(Buffer.from(canonicalStringify(peerPacket)))
+        : sign(Buffer.from(canonicalStringify(peerPacket)));
+    if (!signature) {
+        throw new Error('Device messaging key is unavailable');
+    }
     const signatureHex = signature.toString('hex');
     const isToSelf = upeerId === selfId;
 
@@ -92,7 +113,7 @@ export async function sendConnectedChatMessage({
     }
 
     for (const address of peerAddresses) {
-        sendSecurePacket(address, peerPacket, contactPublicKey, false);
+        sendSecurePacket(address, peerPacket, recipientPublicKey, false);
     }
 
     if (!isToSelf) {

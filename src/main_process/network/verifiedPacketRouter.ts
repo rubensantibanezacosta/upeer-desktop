@@ -470,6 +470,10 @@ async function handlePingProfileUpdate(upeerId: string, contact: VerifiedContact
             }
         }
     }
+    if (contact.publicKey) {
+        const { maybeUpdateContactDeviceIdentity } = await import('./handlers/contactsShared.js');
+        maybeUpdateContactDeviceIdentity(upeerId, data as Record<string, unknown>, 'PING');
+    }
 }
 
 export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<void> {

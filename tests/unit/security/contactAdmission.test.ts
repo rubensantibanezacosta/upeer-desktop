@@ -180,6 +180,38 @@ describe('contact admission before encryption', () => {
         })).rejects.toThrow('contact location is invalid');
     });
 
+    it('rechaza un dispositivo que no coincide con el anunciado para mensajería', async () => {
+        const certificate = location.deviceCertificate as Record<string, unknown>;
+        const options = {
+            now,
+            findRegistry: async () => registry,
+            findLocation: async () => location,
+            verifyLocation: async () => true,
+            warn: vi.fn(),
+            debug: vi.fn(),
+        };
+
+        await expect(requireContactAdmission(account, publicKey, {
+            ...options,
+            expectedDevice: {
+                deviceId: String(certificate.deviceId),
+                devicePublicKey: String(certificate.devicePublicKey),
+            },
+        })).resolves.toBeUndefined();
+
+        resetContactAdmissionCache();
+        await expect(requireContactAdmission(account, publicKey, {
+            ...options,
+            expectedDevice: { deviceId: 'aa'.repeat(32) },
+        })).rejects.toThrow('contact device does not match the advertised messaging device');
+
+        resetContactAdmissionCache();
+        await expect(requireContactAdmission(account, publicKey, {
+            ...options,
+            expectedDevice: { devicePublicKey: 'bb'.repeat(32) },
+        })).rejects.toThrow('contact device key does not match the advertised messaging key');
+    });
+
     it('omite identificadores que no son cuentas uPeer', async () => {
         let registryCalls = 0;
 

@@ -1,4 +1,5 @@
 import { getMyPublicKeyHex, getMyUPeerId, getMyAlias, getMyAvatar, getMyEphemeralPublicKeyHex, getMySignedPreKeyBundle } from '../../security/identity.js';
+import { buildMyDeviceHandshakeFields } from '../../security/deviceMessaging.js';
 import { AdaptivePow } from '../../security/pow.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactPublicKey } from '../../storage/contacts/keys.js';
@@ -16,6 +17,7 @@ export async function sendContactRequest(targetIp: string) {
         publicKey: getMyPublicKeyHex(),
         ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
         signedPreKey: getMySignedPreKeyBundle(), // ← X3DH / Double Ratchet
+        ...(buildMyDeviceHandshakeFields() ?? {}),
         alias: getMyAlias() || undefined,
         avatar: getMyAvatar() || undefined,
         powProof,
@@ -39,6 +41,7 @@ export async function acceptContactRequest(upeerId: string, publicKey: string, r
         publicKey: getMyPublicKeyHex(),
         ephemeralPublicKey: getMyEphemeralPublicKeyHex(),
         signedPreKey: getMySignedPreKeyBundle(), // ← X3DH / Double Ratchet
+        ...(buildMyDeviceHandshakeFields() ?? {}),
         alias: getMyAlias() || undefined,
         avatar: getMyAvatar() || undefined,
         addresses: (await import('../utils.js')).getNetworkAddresses()

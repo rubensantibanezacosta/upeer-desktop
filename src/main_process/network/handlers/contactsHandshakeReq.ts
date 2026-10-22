@@ -14,6 +14,7 @@ import {
     getSafeEphemeralPublicKey,
     hasValidHandshakeIdentity,
     maybeSendAvatarUpdate,
+    maybeUpdateContactDeviceIdentity,
     maybeUpdateSignedPreKey,
     rateLimiter,
     verifyHandshakeRequestSignature,
@@ -158,6 +159,7 @@ export async function handleHandshakeReq(
         runTransaction(() => {
             addOrUpdateContact(senderUpeerId, rinfo.address, alias, publicKey, newStatus, safeEphKey, undefined, undefined, undefined, data.addresses);
             maybeUpdateSignedPreKey(senderUpeerId, publicKey, data.signedPreKey, 'HANDSHAKE_REQ');
+            maybeUpdateContactDeviceIdentity(senderUpeerId, data, 'HANDSHAKE_REQ');
             maybeSendAvatarUpdate(senderUpeerId, data.avatar, updateContactAvatar);
         });
     } catch (err) {

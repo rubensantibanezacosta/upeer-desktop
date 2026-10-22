@@ -66,3 +66,43 @@ export function updateContactSignedPreKey(
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
 }
+
+export type ContactDeviceIdentity = {
+    devicePublicKey: string;
+    deviceId: string;
+    deviceCertificate: string;
+    deviceSignedPreKey: string;
+    deviceSignedPreKeySignature: string;
+    deviceSignedPreKeyId: number;
+};
+
+export function updateContactDeviceIdentity(
+    upeerId: string,
+    identity: ContactDeviceIdentity,
+): { changed: boolean; previousDeviceId: string | null } {
+    const db = getDb();
+    const schema = getSchema();
+    const existing = db.select({ deviceId: schema.contacts.deviceId })
+        .from(schema.contacts)
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .get() as { deviceId: string | null } | undefined;
+    const previousDeviceId = existing?.deviceId ?? null;
+    const changed = previousDeviceId !== identity.deviceId;
+    db.update(schema.contacts)
+        .set({
+            devicePublicKey: identity.devicePublicKey,
+            deviceId: identity.deviceId,
+            deviceCertificate: identity.deviceCertificate,
+            deviceSignedPreKey: identity.deviceSignedPreKey,
+            deviceSignedPreKeySignature: identity.deviceSignedPreKeySignature,
+            deviceSignedPreKeyId: identity.deviceSignedPreKeyId,
+        })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+    if (changed) {
+        db.delete(schema.ratchetSessions)
+            .where(eq(schema.ratchetSessions.upeerId, upeerId))
+            .run();
+    }
+    return { changed, previousDeviceId };
+}

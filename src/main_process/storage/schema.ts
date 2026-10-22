@@ -65,6 +65,12 @@ export const contacts = sqliteTable('contacts', {
     signedPreKey: text('signed_pre_key'),              // hex X25519 public key
     signedPreKeySignature: text('signed_pre_key_sig'), // hex Ed25519 signature de SPK por IK
     signedPreKeyId: integer('signed_pre_key_id'),      // ID correlativo del SPK
+    devicePublicKey: text('device_public_key'),
+    deviceId: text('device_id'),
+    deviceCertificate: text('device_certificate'),
+    deviceSignedPreKey: text('device_signed_pre_key'),
+    deviceSignedPreKeySignature: text('device_signed_pre_key_sig'),
+    deviceSignedPreKeyId: integer('device_signed_pre_key_id'),
     dhtSeq: integer('dht_seq').notNull().default(0),
     dhtSignature: text('dht_signature'),
     dhtExpiresAt: integer('dht_expires_at'),

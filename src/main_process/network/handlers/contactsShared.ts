@@ -1,7 +1,8 @@
 import { verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
-import { security, warn } from '../../security/secure-logger.js';
-import { updateContactSignedPreKey } from '../../storage/contacts/keys.js';
+import { debug, security, warn } from '../../security/secure-logger.js';
+import { updateContactDeviceIdentity, updateContactSignedPreKey } from '../../storage/contacts/keys.js';
+import { hasDeviceHandshakeFields, parseDeviceHandshakeFields, toContactDeviceBinding } from '../../security/deviceMessaging.js';
 import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
 
 export const rateLimiter = new IdentityRateLimiter();
@@ -110,6 +111,22 @@ export function maybeUpdateSignedPreKey(upeerId: string, publicKey: string, sign
     } catch (err) {
         warn('Error in SPK verification', err, 'security');
     }
+}
+
+export function maybeUpdateContactDeviceIdentity(upeerId: string, data: Record<string, unknown>, label: string): void {
+    const fields = parseDeviceHandshakeFields(data, upeerId);
+    if (!fields) {
+        if (hasDeviceHandshakeFields(data)) {
+            security(`${label}: identidad de dispositivo inválida`, { upeerId }, 'security');
+        }
+        return;
+    }
+    const result = updateContactDeviceIdentity(upeerId, toContactDeviceBinding(fields));
+    debug(`${label}: vínculo de dispositivo actualizado`, {
+        upeerId,
+        deviceId: fields.deviceId,
+        changed: result.changed,
+    }, 'security');
 }
 
 export function maybeSendAvatarUpdate(upeerId: string, avatar: unknown, updateContactAvatar: (upeerId: string, avatar: string) => void): void {
