@@ -570,6 +570,29 @@ describe('Chat Handlers', () => {
         });
     });
 
+        it('should ignore stale Double Ratchet chat updates', async () => {
+            const data: ChatEditData = {
+                msgId: '12345678-1234-1234-1234-123456789012',
+                content: 'aa',
+                nonce: 'bb',
+                ratchetHeader: { dh: 'c'.repeat(64), pn: 0, n: 1 },
+                version: 2,
+            };
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({
+                id: data.msgId,
+                chatUpeerId: senderId,
+                isMine: 0,
+                version: 2,
+            } as never);
+
+            await handleChatEdit(senderId, data, mockWin, 'edit-stale', '1.2.3.4', mockSendResponse);
+
+            expect(doubleRatchetDecrypt.decryptDoubleRatchetPayload).not.toHaveBeenCalled();
+            expect(messagesOps.updateMessageContent).not.toHaveBeenCalled();
+            expect(mockSendResponse).not.toHaveBeenCalled();
+        });
+
+
     describe('handleChatDelete', () => {
         it('should delete locally if message is from the peer', async () => {
             const data: ChatDeleteData = { msgId: '12345678-1234-1234-1234-123456789012', timestamp: 1234 };

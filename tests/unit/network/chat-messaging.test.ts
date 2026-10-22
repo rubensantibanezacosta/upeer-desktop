@@ -55,6 +55,15 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyPublicKey: vi.fn(() => Buffer.from('11'.repeat(32), 'hex')),
 }));
 
+vi.mock('../../../src/main_process/security/deviceMessaging.js', () => ({
+    getDeviceMessagingIdentity: vi.fn(() => ({
+        identity: { deviceId: 'ee'.repeat(32), publicKey: 'cc'.repeat(32), secretKey: Buffer.alloc(32) },
+        signedPreKey: { spkPub: 'dd'.repeat(32), spkSig: 'ff'.repeat(64), spkId: 9 },
+    })),
+    signWithDevice: vi.fn(() => Buffer.from('device-sig')),
+    resolveInboundDeviceSpk: vi.fn(() => null),
+}));
+
 vi.mock('../../../src/main_process/security/ratchet.js', () => ({
     x3dhInitiator: vi.fn(() => ({
         ekPub: Buffer.from('33'.repeat(32), 'hex'),
@@ -1049,6 +1058,48 @@ describe('network/messaging/chat.ts', () => {
                 chatUpeerId: 'grp-1',
                 senderUpeerId: 'self-id'
             })
+        );
+    });
+
+    it('signs direct chat updates with the device identity when the contact advertises it', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { getRatchetSession } = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
+        const { signWithDevice } = await import('../../../src/main_process/security/deviceMessaging.js');
+        const { sendChatUpdate } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-device',
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            deviceId: 'ee'.repeat(32),
+            devicePublicKey: 'cc'.repeat(32),
+            deviceSignedPreKey: 'dd'.repeat(32),
+            deviceSignedPreKeyId: 9,
+            address: '200::9',
+            knownAddresses: '[]',
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.getMessageById).mockResolvedValue({ version: 1 } as NonNullable<MessageRecord>);
+        vi.mocked(getRatchetSession).mockReturnValue({ state: {}, spkIdUsed: 9 } as never);
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await sendChatUpdate('peer-device', '12345678-1234-1234-1234-123456789012', 'texto por dispositivo');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(signWithDevice).toHaveBeenCalled();
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200::9',
+            expect.objectContaining({
+                type: 'CHAT_UPDATE',
+                msgId: '12345678-1234-1234-1234-123456789012',
+                version: 2,
+                senderDeviceId: 'ee'.repeat(32),
+                signature: Buffer.from('device-sig').toString('hex'),
+            }),
+            'cc'.repeat(32)
         );
     });
 });

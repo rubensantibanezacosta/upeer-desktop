@@ -17,6 +17,7 @@ import { canonicalStringify } from '../utils.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { requireContactAdmission } from '../contactAdmission.js';
+import { signWithDevice } from '../../security/deviceMessaging.js';
 import { encryptChatPayload } from './chatEncryption.js';
 import { getFanOutAddresses, getSelfAddresses } from './chatSupport.js';
 import { registerEncryptedOperationRetry } from './encryptedOperationRetry.js';
@@ -29,6 +30,12 @@ type ChatContactRecord = {
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected' | 'blocked';
     address?: string | null;
     knownAddresses?: string | string[] | null;
+    signedPreKey?: string | null;
+    signedPreKeyId?: number | null;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 };
 
 type StoredMessageRecord = {
@@ -62,7 +69,6 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
     const urlFirstRegex = /(https?:\/\/[^\s<>"']+)/i;
     const urlMatch = urlFirstRegex.exec(newContent);
     let payload = newContent;
-
     if (linkPreview) {
         payload = await buildMessagePayload(newContent, linkPreview as never);
     } else if (urlMatch) {
@@ -70,7 +76,6 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const preview = await fetchOgPreview(urlMatch[1]);
         if (preview) payload = await buildMessagePayload(newContent, preview);
     }
-
     const signature = sign(Buffer.from(payload));
     updateMessageContent(msgId, payload, signature.toString('hex'), newVersion);
 
@@ -82,12 +87,15 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
         const contact = await getContactByUpeerId(targetId) as ChatContactRecord | undefined;
         if (!contact || !contact.publicKey || !['connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return;
         try {
-            if (targetId !== myId) await requireContactAdmission(targetId, contact.publicKey);
+            if (targetId !== myId) await requireContactAdmission(targetId, contact.publicKey, {
+                expectedDevice: { deviceId: contact.deviceId, devicePublicKey: contact.devicePublicKey },
+            });
         } catch (err) {
             warn('Chat update skipped because the contact device is not admitted', { targetId, err: String(err) }, 'security');
             return;
         }
-        const encrypted = await encryptChatPayload(targetId, payload, contact);
+        const encrypted = await encryptChatPayload(targetId, payload, contact, 'direct', { allowDeviceIdentity: !isGroupContext });
+        const usesDevice = Boolean(encrypted.deviceId && contact.devicePublicKey);
         const data = {
             type: 'CHAT_UPDATE',
             msgId,
@@ -98,13 +106,19 @@ export async function sendChatUpdate(upeerId: string, msgId: string, newContent:
             ...(encrypted.x3dhInit ? { x3dhInit: encrypted.x3dhInit } : {}),
             ...(encrypted.ephemeralPublicKey ? { ephemeralPublicKey: encrypted.ephemeralPublicKey } : {}),
             ...(encrypted.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encrypted.useRecipientEphemeral } : {}),
+            ...(encrypted.deviceId ? { senderDeviceId: encrypted.deviceId } : {}),
             ...(isGroupContext ? { chatUpeerId: upeerId } : {}),
         };
-        const dataSignature = sign(Buffer.from(canonicalStringify(data)));
+        const dataSignature = (usesDevice ? signWithDevice : sign)(Buffer.from(canonicalStringify(data)));
+        if (!dataSignature) {
+            warn('Chat update skipped because the device signing key is unavailable', { targetId, msgId }, 'security');
+            return;
+        }
         const signedData = { ...data, signature: dataSignature.toString('hex'), senderUpeerId: myId };
         if (contact.status === 'connected') {
+            const recipientKey = usesDevice ? contact.devicePublicKey ?? undefined : contact.publicKey ?? undefined;
             for (const address of getFanOutAddresses(contact)) {
-                sendSecurePacket(address, signedData, contact.publicKey);
+                sendSecurePacket(address, signedData, recipientKey);
             }
             if (options?.registerRetry !== false) {
                 registerEncryptedOperationRetry(targetId, `chat-update:${msgId}`, () =>

@@ -24,6 +24,7 @@ type ChatEventMessageRecord = {
     chatUpeerId: string;
     isMine: boolean | number;
     message?: string;
+    version?: number | null;
 };
 
 type EditableChatPayload = {
@@ -156,6 +157,10 @@ export async function handleChatEdit(
     const isInternalSync = Boolean(data.isInternalSync && upeerId === myId);
     const msg = (await getMessageById(messageId)) as ChatEventMessageRecord | undefined;
     if (!msg || msg.chatUpeerId !== chatUpeerId || (msg.isMine && !isInternalSync)) return;
+    if (data.version !== undefined && data.version <= (msg.version ?? 0)) {
+        warn('Stale CHAT_UPDATE ignored', { upeerId, messageId, version: data.version }, 'security');
+        return;
+    }
 
     await withRatchetSessionLock(ratchetSessionQueueKey(upeerId), async () => {
         const newContent = data.ratchetHeader
