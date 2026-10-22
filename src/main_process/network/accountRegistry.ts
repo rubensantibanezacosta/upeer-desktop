@@ -12,10 +12,11 @@ import {
 
 const REGISTRY_KEY_PREFIX = 'upeer-account-registry:';
 const REGISTRY_MAX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REGISTRY_CACHE_TTL_MS = 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_DEVICES = 10;
 const MAX_REVOKED = 32;
-const cache = new Map<string, AccountRegistry>();
+const cache = new Map<string, { registry: AccountRegistry; fetchedAt: number }>();
 let lastPublishedSignature = '';
 
 export interface AccountRegistryDevice {
@@ -100,7 +101,9 @@ export async function findAccountRegistry(
 ): Promise<AccountRegistry | null> {
     const account = accountUpeerId.trim().toLowerCase();
     const cached = cache.get(account);
-    if (cached && cached.expiresAt > now) return cached;
+    if (cached && now < Math.min(cached.registry.expiresAt, cached.fetchedAt + REGISTRY_CACHE_TTL_MS)) {
+        return cached.registry;
+    }
     const kademlia = getKademliaInstance();
     if (!kademlia) return null;
     try {
@@ -108,12 +111,16 @@ export async function findAccountRegistry(
         if (!stored || stored.publisher !== account) return null;
         const registry = verifyAccountRegistry(stored.value, account, now);
         if (!registry) return null;
-        cache.set(account, registry);
+        cache.set(account, { registry, fetchedAt: now });
         return registry;
     } catch (err) {
         debug('Account registry could not be found', { account, error: err instanceof Error ? err.message : String(err) }, 'dht');
         return null;
     }
+}
+
+export function resetAccountRegistryCache(): void {
+    cache.clear();
 }
 
 export function verifyAccountRegistry(
