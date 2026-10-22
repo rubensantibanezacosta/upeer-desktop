@@ -9,6 +9,7 @@ import {
     getDeviceIdentity,
     verifyDeviceCertificate,
 } from '../security/deviceIdentity.js';
+import { loadAccountRegistryStateResult } from '../security/accountRegistryState.js';
 
 const REGISTRY_KEY_PREFIX = 'upeer-account-registry:';
 const REGISTRY_MAX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,12 +52,17 @@ export function getMyAccountRegistry(now = Date.now()): AccountRegistry | null {
     const identity = getDeviceIdentity(now);
     if (!identity || !identityState.secretKey) return null;
     const certificate = identity.certificate;
+    const persisted = loadAccountRegistryStateResult(now);
+    if (persisted.status === 'invalid') return null;
+    const sameAccount = persisted.status === 'ready' && persisted.state.accountUpeerId === certificate.accountUpeerId
+        ? persisted.state
+        : null;
     const registry: AccountRegistry = {
         version: 1,
         accountUpeerId: certificate.accountUpeerId,
         accountPublicKey: certificate.accountPublicKey,
-        epoch: certificate.epoch,
-        issuedAt: certificate.issuedAt,
+        epoch: Math.max(certificate.epoch, sameAccount?.epoch ?? 0),
+        issuedAt: Math.max(certificate.issuedAt, sameAccount?.issuedAt ?? 0),
         expiresAt: certificate.expiresAt,
         devices: [{
             deviceId: certificate.deviceId,
@@ -67,7 +73,7 @@ export function getMyAccountRegistry(now = Date.now()): AccountRegistry | null {
             expiresAt: certificate.expiresAt,
             epoch: certificate.epoch,
         }],
-        revoked: [],
+        revoked: sameAccount ? [...sameAccount.revoked] : [],
         signature: '',
     };
     registry.signature = signRegistry(registry);
@@ -252,7 +258,7 @@ function parseDevice(value: unknown, registryEpoch: number): AccountRegistryDevi
     if (typeof record.devicePublicKey !== 'string' || !isHex(record.devicePublicKey, 32)) return null;
     if (deriveDeviceId(record.devicePublicKey) !== record.deviceId.toLowerCase()) return null;
     if (typeof record.authorizedAt !== 'number' || typeof record.expiresAt !== 'number') return null;
-    if (typeof record.epoch !== 'number' || record.epoch !== registryEpoch) return null;
+    if (typeof record.epoch !== 'number' || record.epoch < 0 || record.epoch > registryEpoch) return null;
     if (record.platform !== undefined && typeof record.platform !== 'string') return null;
     if (record.capabilities !== undefined) {
         if (!Array.isArray(record.capabilities) || record.capabilities.some(item => typeof item !== 'string')) {

@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getDevicesByUPeerId, setDeviceTrust, deleteDevice } from '../../storage/devices-operations.js';
+import { publishMyAccountRegistry } from '../../network/accountRegistry.js';
+import { revokeMyAccountDevice } from '../../network/accountRegistryRevocation.js';
 
 /**
  * Registra los manejadores IPC para la gestión de múltiples dispositivos
@@ -31,7 +33,9 @@ export function registerDeviceHandlers(): void {
     ipcMain.handle('delete-device', async (_event, { deviceId }: { deviceId: string }) => {
         const myId = getMyUPeerId();
         if (!myId) throw new Error('Identity not loaded');
+        const registry = revokeMyAccountDevice(deviceId, 'device removed by the account owner');
         await deleteDevice(myId, deviceId);
-        return { success: true };
+        const published = await publishMyAccountRegistry();
+        return { success: true, epoch: registry.epoch, published };
     });
 }
