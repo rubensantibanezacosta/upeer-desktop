@@ -16,6 +16,10 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     setMyAlias: vi.fn(),
     setMyAvatar: vi.fn(),
 }));
+vi.mock('../../../src/main_process/storage/contacts/operations.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../src/main_process/storage/contacts/operations.js')>();
+    return { ...actual, isContactBlocked: vi.fn(() => false) };
+});
 vi.mock('../../../src/main_process/network/call/callManager.js', () => ({
     callManager: {
         getActive: vi.fn(() => null),

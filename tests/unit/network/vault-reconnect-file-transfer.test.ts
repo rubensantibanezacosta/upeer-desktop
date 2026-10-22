@@ -37,6 +37,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
         status: 'connected'
     })),
     getContacts: vi.fn(async () => []),
+    isContactBlocked: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
