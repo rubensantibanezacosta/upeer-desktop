@@ -84,7 +84,7 @@ export async function receiveChatMessage(
             return;
         }
     } else if (data.nonce) {
-        sendResponse(fromAddress, createDrResetPacket());
+        sendResponse(fromAddress, createDrResetPacket('direct', { useDeviceIdentity: Boolean(data.senderDeviceId) }));
         warn('Dropping non-DR chat message', { upeerId, msgId }, 'security');
         return;
     }

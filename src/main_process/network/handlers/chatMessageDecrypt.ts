@@ -5,6 +5,10 @@ import { resolveInboundDeviceSpk } from '../../security/deviceMessaging.js';
 import type { ChatAckPacket, ChatDrResetPacket, ChatIncomingPayload } from './chatMessageTypes.js';
 import { createDrResetPacket } from './drResetPacket.js';
 
+function createReset(data: ChatIncomingPayload): ChatDrResetPacket {
+    return createDrResetPacket('direct', { useDeviceIdentity: Boolean(data.senderDeviceId) });
+}
+
 export type DecryptedChatPayload = {
     plaintext: string;
     session: RatchetState;
@@ -57,7 +61,7 @@ async function decryptDoubleRatchetContentUnlocked(
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { spkId, upeerId }, 'security');
-                sendResponse(fromAddress, createDrResetPacket());
+                sendResponse(fromAddress, createReset(data));
                 return null;
             }
             const sharedSecret = x3dhResponder(
@@ -72,7 +76,7 @@ async function decryptDoubleRatchetContentUnlocked(
         }
 
         if (!session) {
-            sendResponse(fromAddress, createDrResetPacket());
+            sendResponse(fromAddress, createReset(data));
             warn('No DR session and no x3dhInit, sent DR_RESET', { upeerId }, 'security');
             return null;
         }
@@ -108,7 +112,7 @@ async function decryptDoubleRatchetContentUnlocked(
                     return { plaintext: retry.toString('utf-8'), session: freshSession, spkIdUsed: spkId };
                 }
             }
-            sendResponse(fromAddress, createDrResetPacket());
+            sendResponse(fromAddress, createReset(data));
             error('Double Ratchet decrypt returned null after x3dh retry', { upeerId }, 'security');
             return null;
         }

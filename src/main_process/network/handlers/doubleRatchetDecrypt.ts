@@ -6,25 +6,26 @@ import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/r
 import { resolveInboundDeviceSpk } from '../../security/deviceMessaging.js';
 import { serializeState } from '../../security/ratchet.js';
 import { warn } from '../../security/secure-logger.js';
+import { createDrResetPacket } from './drResetPacket.js';
+import type { ChatDrResetPacket } from './chatMessageTypes.js';
 
 type DoubleRatchetPayload = {
     content?: string;
     nonce?: string;
     ratchetHeader?: RatchetHeader;
     x3dhInit?: X3DHInitPacket;
+    senderDeviceId?: string;
 };
 
 export type RatchetContext = 'direct' | `group:${string}`;
 
-const createResetPacket = (contextId: RatchetContext) => ({
-    type: 'DR_RESET',
-    ratchetContext: contextId,
-} as const);
+const createResetPacket = (contextId: RatchetContext, senderDeviceId?: string): ChatDrResetPacket =>
+    createDrResetPacket(contextId, { useDeviceIdentity: Boolean(senderDeviceId) && contextId === 'direct' });
 
 export async function decryptDoubleRatchetPayload(
     upeerId: string,
     data: DoubleRatchetPayload,
-    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
+    onReset?: (reset: ChatDrResetPacket) => void | Promise<void>,
     contextId: RatchetContext = 'direct',
 ): Promise<string | null> {
     return withRatchetSessionLock(ratchetSessionQueueKey(upeerId, contextId), () => decryptDoubleRatchetPayloadUnlocked(
@@ -38,7 +39,7 @@ export async function decryptDoubleRatchetPayload(
 async function decryptDoubleRatchetPayloadUnlocked(
     upeerId: string,
     data: DoubleRatchetPayload,
-    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
+    onReset?: (reset: ChatDrResetPacket) => void | Promise<void>,
     contextId: RatchetContext = 'direct',
 ): Promise<string | null> {
     if (
@@ -60,7 +61,7 @@ async function decryptDoubleRatchetPayloadUnlocked(
             const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
-                await onReset?.(createResetPacket(contextId));
+                await onReset?.(createResetPacket(contextId, data.senderDeviceId));
                 return null;
             }
 
@@ -76,7 +77,7 @@ async function decryptDoubleRatchetPayloadUnlocked(
         }
 
         if (!session) {
-            await onReset?.(createResetPacket(contextId));
+            await onReset?.(createResetPacket(contextId, data.senderDeviceId));
             return null;
         }
 

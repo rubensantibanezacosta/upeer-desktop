@@ -61,6 +61,7 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
     updateContactSignedPreKey: vi.fn(),
+    updateContactDeviceSignedPreKey: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({

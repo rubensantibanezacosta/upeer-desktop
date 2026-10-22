@@ -23,6 +23,7 @@ export type ChatIncomingPayload = {
     isInternalSync?: boolean;
     timestamp?: number;
     useRecipientEphemeral?: boolean;
+    senderDeviceId?: string;
 };
 
 export type ChatContactRecord = {
@@ -30,6 +31,10 @@ export type ChatContactRecord = {
     publicKey?: string;
     name?: string;
     alias?: string;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 };
 
 export type ChatAckPacket = {
@@ -43,4 +48,5 @@ export type ChatDrResetPacket = {
     resetId: string;
     signedPreKey: ChatSignedPreKeyBundle;
     ratchetContext?: 'direct' | `group:${string}`;
+    senderDeviceId?: string;
 };

@@ -188,6 +188,9 @@ export async function handlePacket(
             address?: string;
             deviceId?: string | null;
             devicePublicKey?: string | null;
+            deviceSignedPreKey?: string | null;
+            deviceSignedPreKeySignature?: string | null;
+            deviceSignedPreKeyId?: number | null;
         } | undefined;
         const senderDeviceId = typeof data.senderDeviceId === 'string' ? data.senderDeviceId.toLowerCase() : undefined;
         if (senderDeviceId && directContact?.deviceId !== senderDeviceId) {
@@ -350,7 +353,18 @@ export async function handlePacket(
 
         await routeVerifiedPacket({
             upeerId,
-            contact: contact as { publicKey?: string; signedPreKey?: string | null; signedPreKeyId?: number | null; name?: string; alias?: string; address?: string },
+            contact: contact as {
+                publicKey?: string;
+                signedPreKey?: string | null;
+                signedPreKeyId?: number | null;
+                deviceId?: string | null;
+                devicePublicKey?: string | null;
+                deviceSignedPreKey?: string | null;
+                deviceSignedPreKeyId?: number | null;
+                name?: string;
+                alias?: string;
+                address?: string;
+            },
             data: data as NetworkPacket,
             signature,
             rinfo,

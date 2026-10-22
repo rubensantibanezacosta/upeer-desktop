@@ -554,7 +554,12 @@ describe('Chat Handlers', () => {
             vi.mocked(ratchetOps.getRatchetSession).mockReturnValue(null);
             vi.mocked(doubleRatchetDecrypt.decryptDoubleRatchetPayload).mockResolvedValue(null);
             vi.mocked(doubleRatchetDecrypt.decryptDoubleRatchetPayload).mockImplementationOnce(async (_upeerId, _payload, onReset) => {
-                await onReset?.({ type: 'DR_RESET', ratchetContext: 'direct' });
+                await onReset?.({
+                    type: 'DR_RESET',
+                    resetId: '123e4567-e89b-12d3-a456-426614174010',
+                    signedPreKey: { spkPub: 'aa'.repeat(32), spkSig: 'bb'.repeat(64), spkId: 1 },
+                    ratchetContext: 'direct',
+                });
                 return null;
             });
 

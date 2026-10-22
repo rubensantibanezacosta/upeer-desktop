@@ -20,7 +20,6 @@ import {
   updateGroupEphemeralKeyIfValid,
   validMemberPublicKeys,
 } from "./groupControlShared.js";
-import { createDrResetPacket } from "./drResetPacket.js";
 
 async function applyGroupUpdate(
   senderUpeerId: string,
@@ -62,7 +61,7 @@ async function applyGroupUpdate(
       data,
       async (reset) => {
         if (!fromAddress || !sendResponse) return;
-        sendResponse(fromAddress, createDrResetPacket(reset.ratchetContext));
+        sendResponse(fromAddress, reset);
       },
     );
     if (!inner) {

@@ -4,7 +4,8 @@ import {
     updateContactPublicKey,
     updateContactEphemeralPublicKey,
     updateContactDeviceIdentity,
-    updateContactSignedPreKey
+    updateContactSignedPreKey,
+    updateContactDeviceSignedPreKey
 } from '../../../src/main_process/storage/contacts/keys.js';
 import * as shared from '../../../src/main_process/storage/shared.js';
 
@@ -139,6 +140,18 @@ describe('Contacts Storage Keys', () => {
                 signedPreKey: 'spkPub',
                 signedPreKeySignature: 'spkSig',
                 signedPreKeyId: 123
+            });
+            expect(mockDb.run).toHaveBeenCalled();
+        });
+    });
+
+    describe('updateContactDeviceSignedPreKey', () => {
+        it('actualiza solo la SPK del dispositivo', () => {
+            updateContactDeviceSignedPreKey('peer1', 'devicePub', 'deviceSig', 456);
+            expect(mockDb.set).toHaveBeenCalledWith({
+                deviceSignedPreKey: 'devicePub',
+                deviceSignedPreKeySignature: 'deviceSig',
+                deviceSignedPreKeyId: 456
             });
             expect(mockDb.run).toHaveBeenCalled();
         });

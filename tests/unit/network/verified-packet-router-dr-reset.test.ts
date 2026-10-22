@@ -57,6 +57,7 @@ vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
 
 vi.mock('../../../src/main_process/storage/contacts/keys.js', () => ({
     updateContactSignedPreKey: vi.fn(),
+    updateContactDeviceSignedPreKey: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/messaging/chatRetry.js', () => ({
@@ -223,5 +224,76 @@ describe('verifiedPacketRouter DR_RESET edges', () => {
         });
 
         expect(ratchetOps.deleteRatchetSession).not.toHaveBeenCalled();
+    });
+
+    it('acepta un reset firmado por dispositivo y actualiza su SPK', async () => {
+        const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
+        const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const contactKeys = await import('../../../src/main_process/storage/contacts/keys.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+
+        vi.mocked(identity.verify).mockReturnValue(true);
+        await routeVerifiedPacket({
+            upeerId: 'peer-id',
+            contact: {
+                publicKey: 'aa'.repeat(32),
+                deviceId: 'ee'.repeat(32),
+                devicePublicKey: 'ff'.repeat(32),
+                deviceSignedPreKey: 'bb'.repeat(32),
+                deviceSignedPreKeyId: 9,
+            },
+            data: {
+                type: 'DR_RESET',
+                resetId: '123e4567-e89b-12d3-a456-426614174005',
+                senderDeviceId: 'ee'.repeat(32),
+                signedPreKey: { spkPub: 'dd'.repeat(32), spkSig: 'cc'.repeat(64), spkId: 10 },
+            },
+            signature: 'sig',
+            rinfo: { address: '200::9', port: 1234 },
+            win: null,
+            sendResponse: vi.fn(),
+        });
+
+        expect(ratchetOps.deleteRatchetSession).toHaveBeenCalledWith('peer-id', 'direct');
+        expect(contactKeys.updateContactDeviceSignedPreKey).toHaveBeenCalledWith(
+            'peer-id',
+            'dd'.repeat(32),
+            'cc'.repeat(64),
+            10,
+        );
+        expect(contactKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un reset de dispositivo no anunciado sin tocar la sesión', async () => {
+        const { routeVerifiedPacket } = await import('../../../src/main_process/network/verifiedPacketRouter.js');
+        const ratchetOps = await import('../../../src/main_process/storage/ratchet/operations.js');
+        const contactKeys = await import('../../../src/main_process/storage/contacts/keys.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+
+        vi.mocked(identity.verify).mockReturnValue(true);
+        await routeVerifiedPacket({
+            upeerId: 'peer-id',
+            contact: {
+                publicKey: 'aa'.repeat(32),
+                deviceId: 'ee'.repeat(32),
+                devicePublicKey: 'ff'.repeat(32),
+                deviceSignedPreKey: 'bb'.repeat(32),
+                deviceSignedPreKeyId: 9,
+            },
+            data: {
+                type: 'DR_RESET',
+                resetId: '123e4567-e89b-12d3-a456-426614174006',
+                senderDeviceId: '12'.repeat(32),
+                signedPreKey: { spkPub: 'dd'.repeat(32), spkSig: 'cc'.repeat(64), spkId: 10 },
+            },
+            signature: 'sig',
+            rinfo: { address: '200::9', port: 1234 },
+            win: null,
+            sendResponse: vi.fn(),
+        });
+
+        expect(ratchetOps.deleteRatchetSession).not.toHaveBeenCalled();
+        expect(contactKeys.updateContactDeviceSignedPreKey).not.toHaveBeenCalled();
+        expect(contactKeys.updateContactSignedPreKey).not.toHaveBeenCalled();
     });
 });

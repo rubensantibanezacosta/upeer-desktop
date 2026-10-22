@@ -1,7 +1,8 @@
 import { getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { updateContactEphemeralPublicKey } from '../../storage/contacts/keys.js';
 import type { RatchetHeader, X3DHInitPacket } from '../../security/ratchetShared.js';
-import { decryptDoubleRatchetPayload, type RatchetContext } from './doubleRatchetDecrypt.js';
+import { decryptDoubleRatchetPayload } from './doubleRatchetDecrypt.js';
+import type { ChatDrResetPacket } from './chatMessageTypes.js';
 
 export type GroupPayload = {
     groupName?: string;
@@ -58,11 +59,11 @@ export function updateGroupEphemeralKeyIfValid(upeerId: string, ephemeralPublicK
 export async function decryptGroupControlPayload(
     upeerId: string,
     data: GroupControlPacket,
-    onReset?: (reset: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => void | Promise<void>,
+    onReset?: (reset: ChatDrResetPacket) => void | Promise<void>,
 ): Promise<GroupPayload | null> {
     if (data.ratchetHeader) {
         const reset = onReset
-            ? async (packet: { type: 'DR_RESET'; ratchetContext: RatchetContext }) => onReset({
+            ? async (packet: ChatDrResetPacket) => onReset({
                 ...packet,
                 ratchetContext: `group:${data.groupId}`,
             })

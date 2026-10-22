@@ -27,7 +27,6 @@ import {
   updateGroupEphemeralKeyIfValid,
   validMemberPublicKeys,
 } from "./groupControlShared.js";
-import { createDrResetPacket } from "./drResetPacket.js";
 
 interface GroupInvitePacket extends GroupPayload {
   groupId: string;
@@ -66,7 +65,7 @@ async function applyGroupInvite(
       data,
       async (reset) => {
         if (!fromAddress || !sendResponse) return;
-        sendResponse(fromAddress, createDrResetPacket(reset.ratchetContext));
+        sendResponse(fromAddress, reset);
       },
     );
     if (!inner) {

@@ -39,6 +39,7 @@ type EditableChatPayload = {
     chatUpeerId?: string;
     isInternalSync?: boolean;
     version?: number;
+    senderDeviceId?: string;
 };
 
 type ChatAckPayload = {
@@ -160,11 +161,11 @@ export async function handleChatEdit(
         const newContent = data.ratchetHeader
             ? await decryptDoubleRatchetPayload(upeerId, data, async (reset) => {
                 if (!fromAddress || !sendResponse) return;
-                sendResponse(fromAddress, createDrResetPacket(reset.ratchetContext));
+                sendResponse(fromAddress, reset);
             })
             : await resolveEditedContent(upeerId, data);
         if (!data.ratchetHeader && data.nonce && fromAddress && sendResponse) {
-            sendResponse(fromAddress, createDrResetPacket());
+            sendResponse(fromAddress, createDrResetPacket('direct', { useDeviceIdentity: Boolean(data.senderDeviceId) }));
         }
         if (typeof newContent !== 'string') return;
 

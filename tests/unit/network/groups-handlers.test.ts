@@ -658,7 +658,12 @@ describe('Group Handlers Final Coverage', () => {
 
         it('should send DR_RESET when group invite ratchet decrypt fails', async () => {
             vi.mocked(groupControlShared.decryptGroupControlPayload).mockImplementation(async (upeerId, packet, onReset) => {
-                await onReset?.({ type: 'DR_RESET', ratchetContext: `group:${packet.groupId}` });
+                await onReset?.({
+                    type: 'DR_RESET',
+                    resetId: '123e4567-e89b-12d3-a456-426614174011',
+                    signedPreKey: { spkPub: 'aa'.repeat(32), spkSig: 'bb'.repeat(64), spkId: 1 },
+                    ratchetContext: `group:${packet.groupId}`,
+                });
                 return null;
             });
             const ratchet = await import('../../../src/main_process/security/ratchet.js');

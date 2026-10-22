@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { verify, getMyUPeerId, setMyAlias, setMyAvatar } from '../security/identity.js';
-import { info, warn } from '../security/secure-logger.js';
+import { warn } from '../security/secure-logger.js';
 import { fileTransferManager } from './file-transfer/transfer-manager.js';
 import { handleChatAck, handleChatClear, handleChatContact, handleChatDelete, handleChatEdit, handleChatMessage, handleChatReaction } from './handlers/chat.js';
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
@@ -11,8 +11,7 @@ import { handleVaultDelivery } from './handlers/vault.js';
 import type { GroupAckPayload, GroupMessagePayload, VaultQueryData, VaultStoreData } from './types.js';
 import type { GroupControlPacket } from './handlers/groupControlShared.js';
 import type { RatchetHeader } from '../security/ratchetShared.js';
-import { isValidResetId } from '../security/validationShared.js';
-import { drResetReplayCache } from './drResetReplayCache.js';
+import { handleDrResetPacket } from './handlers/drResetRoute.js';
 
 const vaultQueryThrottle = new Map<string, number>();
 
@@ -20,6 +19,10 @@ type VerifiedContact = {
     publicKey?: string;
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
     name?: string;
     alias?: string;
     address?: string;
@@ -59,6 +62,10 @@ type ChatContactRecord = {
     publicKey?: string;
     name?: string;
     alias?: string;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 };
 
 type ChatX3dhInit = {
@@ -78,6 +85,7 @@ type ChatIncomingPayload = {
     isInternalSync?: boolean;
     timestamp?: number;
     useRecipientEphemeral?: boolean;
+    senderDeviceId?: string;
 };
 
 type ChatAckPayload = {
@@ -108,6 +116,7 @@ type EditableChatPayload = {
     chatUpeerId?: string;
     isInternalSync?: boolean;
     version?: number;
+    senderDeviceId?: string;
 };
 
 type ChatDeletePayload = {
@@ -217,6 +226,10 @@ function toChatContactRecord(upeerId: string, contact: VerifiedContact): ChatCon
         publicKey: contact.publicKey,
         name: contact.name,
         alias: contact.alias,
+        deviceId: contact.deviceId,
+        devicePublicKey: contact.devicePublicKey,
+        deviceSignedPreKey: contact.deviceSignedPreKey,
+        deviceSignedPreKeyId: contact.deviceSignedPreKeyId,
     };
 }
 
@@ -246,6 +259,7 @@ function toChatIncomingPayload(data: VerifiedPacketData): ChatIncomingPayload {
         isInternalSync: data.isInternalSync === true,
         timestamp: typeof data.timestamp === 'number' ? data.timestamp : undefined,
         useRecipientEphemeral: typeof data.useRecipientEphemeral === 'boolean' ? data.useRecipientEphemeral : undefined,
+        senderDeviceId: typeof data.senderDeviceId === 'string' ? data.senderDeviceId.toLowerCase() : undefined,
     };
 }
 
@@ -284,6 +298,7 @@ function toEditableChatPayload(data: VerifiedPacketData): EditableChatPayload {
         chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
         isInternalSync: data.isInternalSync === true,
         version: typeof data.version === 'number' ? data.version : undefined,
+        senderDeviceId: typeof data.senderDeviceId === 'string' ? data.senderDeviceId.toLowerCase() : undefined,
     };
 }
 
@@ -588,72 +603,7 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             handleReputationDeliver(upeerId, toReputationDeliverPayload(data));
             break;
         case 'DR_RESET': {
-            if (!contact.publicKey) break;
-            if (!isSignedPreKeyPayload(data.signedPreKey)) {
-                warn('Rejected DR_RESET without a valid signed prekey payload', { upeerId }, 'security');
-                break;
-            }
-            const { spkPub, spkSig, spkId: newSpkId } = data.signedPreKey;
-            const spkValid = verify(
-                Buffer.from(spkPub, 'hex'),
-                Buffer.from(spkSig, 'hex'),
-                Buffer.from(contact.publicKey, 'hex')
-            );
-            if (!spkValid) {
-                warn('Rejected DR_RESET with an invalid signed prekey signature', { upeerId }, 'security');
-                break;
-            }
-            const resetId = isValidResetId(data.resetId) ? data.resetId : undefined;
-            if (data.resetId !== undefined && !resetId) {
-                warn('Rejected DR_RESET with an invalid resetId', { upeerId }, 'security');
-                break;
-            }
-            if (resetId && !drResetReplayCache.consume(upeerId, resetId)) {
-                warn('Ignored replayed DR_RESET', { upeerId, resetId }, 'security');
-                break;
-            }
-            const ratchetContext = typeof data.ratchetContext === 'string' ? data.ratchetContext : 'direct';
-            if (ratchetContext !== 'direct' && !/^group:[^:]+$/.test(ratchetContext)) break;
-            const currentSpkId = typeof contact.signedPreKeyId === 'number' ? contact.signedPreKeyId : 0;
-            if (currentSpkId > 0 && newSpkId < currentSpkId) {
-                warn('Ignored stale DR_RESET', { upeerId, currentSpkId, receivedSpkId: newSpkId }, 'security');
-                break;
-            }
-            if (
-                currentSpkId > 0
-                && newSpkId === currentSpkId
-                && contact.signedPreKey
-                && contact.signedPreKey.toLowerCase() !== spkPub.toLowerCase()
-            ) {
-                warn('Rejected DR_RESET with a different signed prekey for the same spkId', {
-                    upeerId,
-                    spkId: newSpkId,
-                }, 'security');
-                break;
-            }
-            const { deleteRatchetSession } = await import('../storage/ratchet/operations.js');
-            const groupId = ratchetContext.startsWith('group:') ? ratchetContext.slice('group:'.length) : undefined;
-            const { ratchetSessionQueueKey, withRatchetSessionLock } = await import('../security/ratchetSessionQueue.js');
-            await withRatchetSessionLock(ratchetSessionQueueKey(upeerId, ratchetContext), async () => {
-                deleteRatchetSession(upeerId, ratchetContext);
-                const { updateContactSignedPreKey } = await import('../storage/contacts/keys.js');
-                if (!contact.signedPreKeyId || newSpkId > contact.signedPreKeyId) {
-                    updateContactSignedPreKey(upeerId, spkPub, spkSig, newSpkId);
-                }
-                const { retryPendingDirectMessages } = await import('./messaging/chatRetry.js');
-                const { retryPendingEncryptedOperations, retryPendingGroupEncryptedOperations } = await import('./messaging/encryptedOperationRetry.js');
-                const retried = ratchetContext === 'direct' ? await retryPendingDirectMessages(upeerId) : 0;
-                const retriedEncrypted = ratchetContext === 'direct'
-                    ? await retryPendingEncryptedOperations(upeerId)
-                    : groupId ? await retryPendingGroupEncryptedOperations(upeerId, groupId) : 0;
-                info('DR session reset by peer', { upeerId, ratchetContext }, 'security');
-                if (retried > 0) {
-                    info('Retried pending direct messages after DR_RESET', { upeerId, retried }, 'security');
-                }
-                if (retriedEncrypted > 0) {
-                    info('Retried pending encrypted operations after DR_RESET', { upeerId, ratchetContext, retriedEncrypted }, 'security');
-                }
-            });
+            await handleDrResetPacket(upeerId, contact, data);
             break;
         }
         case 'CALL_OFFER':
