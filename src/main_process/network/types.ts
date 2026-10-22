@@ -54,6 +54,7 @@ export interface LocationBlock {
     alias?: string;           // Sender’s display name (unsigned, informational)
     deviceId?: string;        // Stable unique ID for the specific device
     deviceMeta?: DeviceMetadata; // Hardware/OS information (informed/consented)
+    deviceCertificate?: Record<string, unknown>;
     dhtSeq: number;
     signature: string;
     expiresAt?: number;

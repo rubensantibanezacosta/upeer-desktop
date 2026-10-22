@@ -1,0 +1,86 @@
+{
+  "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+  "accountSecretKeySeed": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+  "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+  "certificate": {
+    "version": 1,
+    "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+    "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+    "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+    "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+    "platform": "android",
+    "capabilities": [
+      "chat",
+      "dht"
+    ],
+    "issuedAt": 1800000000000,
+    "expiresAt": 1831536000000,
+    "epoch": 4,
+    "signature": "c767783093fef78ec911e39d018f6dc334d9e44d1baf61e9edde0a08d476e74e35ef08d3947dc63c3bbab040064f05152d756c598a1fd5a8e46458f24b9d3103"
+  },
+  "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+  "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+  "deviceSecretKeySeed": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b",
+  "generatedAt": "2026-10-22",
+  "generatedBy": "upper-transport-bridge",
+  "locationBlock": {
+    "address": "200:9f8e:7d6c:5b4a:3928:1706:f5e4:d3c2",
+    "addresses": [
+      "200:9f8e:7d6c:5b4a:3928:1706:f5e4:d3c2",
+      "200::1",
+      "200::2"
+    ],
+    "dhtSeq": 77,
+    "expiresAt": 1802592000000,
+    "signature": "16c5ff01b5918bdd6e980ed9b4f7520137e4b6b5542d0b2e64a1beb98ff198dbbb40bb90654ce62493364284a6837541f5250842ec24cb7c34a0e71b8b910c06",
+    "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+    "deviceMeta": {
+      "clientName": "uPeer Mobile",
+      "clientVersion": "0.1.0",
+      "deviceClass": "mobile",
+      "platform": "android"
+    },
+    "deviceCertificate": {
+      "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+      "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+      "capabilities": [
+        "chat",
+        "dht"
+      ],
+      "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+      "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+      "epoch": 4,
+      "expiresAt": 1831536000000,
+      "issuedAt": 1800000000000,
+      "platform": "android",
+      "signature": "c767783093fef78ec911e39d018f6dc334d9e44d1baf61e9edde0a08d476e74e35ef08d3947dc63c3bbab040064f05152d756c598a1fd5a8e46458f24b9d3103",
+      "version": 1
+    }
+  },
+  "now": 1800000000000,
+  "registry": {
+    "version": 1,
+    "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+    "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+    "epoch": 4,
+    "issuedAt": 1800000000000,
+    "expiresAt": 1800604800000,
+    "devices": [
+      {
+        "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+        "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+        "platform": "android",
+        "capabilities": [
+          "chat",
+          "dht"
+        ],
+        "authorizedAt": 1800000000000,
+        "expiresAt": 1831536000000,
+        "epoch": 4
+      }
+    ],
+    "revoked": [],
+    "signature": "0a617283fd8ba888540dfc79040b294567f7e52062eff6577819f42f9380179f39835779eb03b170be48f30565a44638cea77de6db30191756b51f35a6ef720c"
+  },
+  "registryKey": "7484f3c26bf85aa02865472fe4571252dee00925139fa36bf5f46b4353b30f77"
+}

@@ -1,4 +1,7 @@
-import { getMyUPeerId, sign, verify, getMyAlias, getMyDeviceId } from '../security/identity.js';
+import sodium from 'sodium-native';
+import { getMyUPeerId, sign, verify, getMyAlias, getMyDeviceId, getMyDhtSeq } from '../security/identity.js';
+import { getDeviceIdentity, verifyDeviceCertificate, verifyDeviceLocationBlock } from '../security/deviceIdentity.js';
+import { findAccountRegistry, verifyDeviceAdmission } from './accountRegistry.js';
 import { warn, debug } from '../security/secure-logger.js';
 import { validateAddress, prioritizeYggdrasil } from './addressing.js';
 import { canonicalStringify, safeBufferFromHex } from './cryptoUtils.js';
@@ -19,7 +22,9 @@ type SignedLocationPayload = {
     deviceMeta?: DeviceMetadata;
 };
 
-type VerifiableLocationBlock = Pick<LocationBlock, 'address' | 'addresses' | 'dhtSeq' | 'signature' | 'expiresAt' | 'renewalToken' | 'deviceId' | 'deviceMeta'>;
+type VerifiableLocationBlock = Pick<LocationBlock, 'address' | 'addresses' | 'dhtSeq' | 'signature' | 'expiresAt' | 'renewalToken' | 'deviceId' | 'deviceMeta'> & {
+    deviceCertificate?: unknown;
+};
 
 export function generateSignedLocationBlock(addressOrAddresses: string | string[], dhtSeq: number, ttlMs?: number, renewalToken?: RenewalToken, deviceMeta?: DeviceMetadata) {
     const ttl = ttlMs ?? LOCATION_BLOCK_TTL_MS;
@@ -28,13 +33,39 @@ export function generateSignedLocationBlock(addressOrAddresses: string | string[
 
     const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
     addresses.forEach(addr => validateAddress(addr));
-    const sortedAddresses = [...new Set(addresses)].sort(prioritizeYggdrasil);
     const finalRenewalToken = renewalToken || generateRenewalToken(getMyUPeerId(), 3);
-    const deviceId = getMyDeviceId();
+    const device = getDeviceIdentity();
+    const sortedAddresses = [...new Set(addresses)].sort(device ? undefined : prioritizeYggdrasil);
 
+    if (device) {
+        const blockSeq = Math.max(dhtSeq, getMyDhtSeq());
+        const data: SignedLocationPayload = {
+            upeerId: getMyUPeerId(),
+            addresses: sortedAddresses,
+            dhtSeq: blockSeq,
+            expiresAt,
+            deviceId: device.deviceId,
+        };
+        if (deviceMeta) data.deviceMeta = deviceMeta;
+        const signature = Buffer.alloc(sodium.crypto_sign_BYTES);
+        sodium.crypto_sign_detached(signature, Buffer.from(canonicalStringify(data)), device.secretKey);
+        return {
+            address: sortedAddresses[0],
+            addresses: sortedAddresses,
+            dhtSeq: blockSeq,
+            expiresAt,
+            signature: signature.toString('hex'),
+            renewalToken: finalRenewalToken,
+            alias: getMyAlias() || undefined,
+            deviceId: device.deviceId,
+            deviceMeta,
+            deviceCertificate: device.certificate,
+        };
+    }
+
+    const deviceId = getMyDeviceId();
     const data: SignedLocationPayload = { upeerId: getMyUPeerId(), addresses: sortedAddresses, dhtSeq, expiresAt, deviceId };
     if (deviceMeta) data.deviceMeta = deviceMeta;
-
     const sig = sign(Buffer.from(canonicalStringify(data))).toString('hex');
 
     return {
@@ -62,6 +93,12 @@ export function verifyLocationBlock(
 
     if (block.expiresAt < Date.now()) {
         return false;
+    }
+
+    if (block.deviceCertificate) {
+        const valid = verifyDeviceLocationBlock(upeerId, block as unknown as Record<string, unknown>, publicKeyHex);
+        if (!valid) return false;
+        return !block.renewalToken || verifyRenewalToken(block.renewalToken, publicKeyHex);
     }
 
     try {
@@ -107,6 +144,14 @@ export async function verifyLocationBlockWithDHT(
     publicKeyHex: string
 ): Promise<boolean> {
     if (block.expiresAt === undefined) return false;
+
+    if (block.deviceCertificate) {
+        const certificate = verifyDeviceCertificate(block.deviceCertificate, upeerId);
+        if (!certificate) return false;
+        const registry = await findAccountRegistry(upeerId);
+        if (!registry || !verifyDeviceAdmission(certificate, registry)) return false;
+        return verifyLocationBlock(upeerId, block, publicKeyHex);
+    }
 
     if (block.expiresAt < Date.now()) {
         const canRenew = block.renewalToken && verifyRenewalToken(block.renewalToken, publicKeyHex);

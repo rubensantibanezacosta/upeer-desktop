@@ -1,6 +1,25 @@
 # Roadmap uPeer
 
-_Última actualización: 8 Agosto 2026_
+_Última actualización: 22 Octubre 2026_
+
+> Coordinación móvil↔escritorio y trabajo abierto de B6/B7: [`../ROADMAP.md`](../ROADMAP.md) (raíz del workspace, fuera de este repositorio).
+
+---
+
+## 🔗 Coordinación con móvil (B6/B7)
+
+- [x] Emitir certificado de dispositivo firmado por la raíz y adjuntar `deviceCertificate` al `LocationBlock`.
+- [x] Publicar el registro de cuenta con `epoch`, certificado activo y revocaciones.
+- [ ] Dejar de usar la identidad/SPK compartida para mensajería y usar claves por dispositivo.
+- [x] Aceptar solo bloques de ubicación con certificado válido y aplicar `DHT_UPDATE` con `dhtSeq` estrictamente mayor.
+- [x] Vectores JS↔Go del contrato de cuenta y dispositivo, en ambos sentidos, incluida la clave DHT del registro, manipulación y revocación.
+- [ ] Migrar instalaciones existentes sin copiar la mnemonic ni la raíz a otros dispositivos.
+- [ ] Acordar la ventana de compatibilidad de bloques legacy antes de activar `fail-closed` en Android.
+- [ ] Probar roaming Desktop↔móvil en ambos sentidos y actualizar este roadmap al cerrar B7.
+
+Estado Android (22/10/2026): store y lookup DHT iterativos completados (K=20, α=3, ACK, reintento acotado, fusión por `deviceId` y caché verificada de 5 min), `DHT_UPDATE` enviado y aplicado con certificado, registro, secuencia persistida y rate limit. Desktop ya emite bloques con `deviceCertificate`, publica su registro de cuenta y acepta bloques de Android. Los vectores `tests/fixtures/dht-account-go.json` y `upper/transport-bridge/testdata/account_device_vectors.json` fijan el contrato en ambos sentidos. El siguiente bloqueo compartido es la prueba de roaming real y la migración de la mensajería a claves por dispositivo.
+
+El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](../ROADMAP.md).
 
 ---
 
@@ -13,7 +32,7 @@ _Última actualización: 8 Agosto 2026_
 - [x] Bootstrap diversificado — DNS TXT, LAN multicast, seed nodes, contactos existentes
 - [x] LAN discovery — anuncios `ff02::1` cada 30 s
 - [x] Detección de cambio de IP y rediscovery automático (<60 s)
-- [x] Sovereign roaming — protocolo DHT_UPDATE firmado a contactos íntimos
+- [~] Sovereign roaming — `DHT_UPDATE` firmado a contactos íntimos con `LocationBlock` propio firmado por clave de dispositivo y `deviceCertificate`; registro de cuenta publicado y verificado. Falta la prueba de roaming real y la migración de la mensajería a claves por dispositivo.
 - [x] Timeouts e inteligencia de ruta — fallback DHT tras 5 s sin ACK
 - [x] **Protocolo Kademlia Full-Duplex** — implementación completa de `DHT_STORE_ACK` y `DHT_PONG` para estabilidad de red
 
@@ -38,6 +57,8 @@ _Última actualización: 8 Agosto 2026_
 - [x] Identidad mnemónica — clave Ed25519 derivada de 12 palabras BIP39
 - [x] upeer ID — identificador derivado del hash de clave pública
 - [x] Sesiones bloqueables — `lock-session` / `unlock-session` con PIN
+- [~] Multidispositivo autónomo — parcial: hay `deviceId` estable, tabla `devices`, self-sync, vault, certificado de dispositivo firmado, registro con `epoch` y bloques de ubicación con certificado; la mensajería sigue usando la identidad/SPK compartida y `devices.isTrusted` solo se usa en UI, así que `delete-device` aún no revoca claves.
+- [ ] Emparejamiento sin copiar mnemonic/SPK y revocación efectiva — pendiente; el núcleo Go de B6 ya define certificado, registro con epoch, admisión y revocación, pero Desktop debe migrar de identidad compartida a cuenta + dispositivo y sincronizar el registro antes de declarar paridad. Requiere B6 y B10 del roadmap móvil.
 
 ### Mensajería
 
@@ -139,7 +160,7 @@ _Última actualización: 8 Agosto 2026_
 - [x] **Rendimiento del recovery de archivos grandes desde el vault** — el recovery de vídeos/multimedia grandes se atascaba o iba muy lento. Causas y fixes: (1) `handleVaultDelivery` disparaba `tryRecoverVaultTransferByFileHash` **por cada shard** → escaneos O(N²) en DB; ahora se acumulan los `fileHash` del batch y el recovery se dispara **una sola vez por archivo** al final del batch. (2) El **ACK borraba los shards del custodio antes de completar la paginación**, haciendo el `offset` inestable y dejando el archivo a medias; ahora el ACK se retrasa hasta la última página (`hasMore: false`). (3) `VAULT_DELIVERY_PAGE_SIZE`/`MAX_DELIVERY_ENTRIES` subidos de 50 a 120 y `validateVaultDelivery` a 120, reduciendo los round-trips. (4) En el recovery, las queries DB de las entradas del vault se resuelven **en paralelo** (`Promise.all`) en lugar de secuenciales. Añadido test e2e multiproceso de **archivo grande (~2MB) reconstruido por segmentos sin atascarse** (192 shards, 2 páginas). 19 tests multiproceso en verde.
 - [x] Notificaciones de rotación de claves — aviso a contactos cuando cambia la clave estática (Alertas TOFU + `key-change-alert`, ya implementadas)
 - [x] Renewal tokens basados en confianza — nodos con alta reputación pueden renovar más (`trustBasedMaxRenewals` escala el límite por vouch score y `generateTrustBasedRenewalToken` lo aplica; tests unit). La conexión forzada en el hot path de publicación de location blocks se dejó como opcional para no alterar el flujo por defecto (maxRenewals=3)
-- [x] Sincronización diferencial de historial — actualizaciones incrementales (self-sync entre dispositivos + `SYNC_PULSE` para lecturas/ediciones/borrados; probada multiproceso en el escenario multi-dispositivo)
+- [~] Sincronización diferencial de historial — self-sync directo + vault entre procesos, probado con la misma mnemonic y SPK en ambos dispositivos. En online funciona el self-sync directo si el otro dispositivo está en `selfAddresses` o es descubierto; en offline solo queda el vault con el mismo `recipientSid`, sin sobre por dispositivo ni historial inicial negociado. No cumple el modelo de dispositivos autónomos: faltan claves por dispositivo, certificado/registro firmado, emparejamiento sin copiar la raíz y revocación efectiva. Requiere B6 y B10 del roadmap móvil.
 - [ ] Soporte móvil / empaquetado multiplataforma — macOS, Windows instaladores firmados _(pendiente; requiere infraestructura de build/firmado fuera del entorno headless)_
 
 ### Escalabilidad (prioridad: fanout de grupos)

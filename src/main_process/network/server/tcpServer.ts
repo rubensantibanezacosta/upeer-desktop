@@ -9,6 +9,7 @@ import { handlePacket } from '../handlers.js';
 import { startDhtSearch } from '../dht/core.js';
 import { KademliaDHT } from '../dht/kademlia/main.js';
 import { setKademliaInstance, performDhtMaintenance } from '../dht/handlers.js';
+import { publishMyAccountRegistry } from '../accountRegistry.js';
 import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 import { getNetworkAddress } from '../utils.js';
 
@@ -117,6 +118,9 @@ export function startUDPServer(win: BrowserWindow) {
     const kademliaDHT = new KademliaDHT(getMyUPeerId(), sendSecurePacket, kademliaContacts, userDataPath);
     setKademliaDHT(kademliaDHT);
     setKademliaInstance(kademliaDHT);
+    publishMyAccountRegistry().catch(err => {
+        error('DHT account registry publish error', err, 'dht');
+    });
 
     // Start DHT maintenance interval (every hour)
     const dhtMaintenanceTimer = setInterval(() => {
@@ -125,6 +129,9 @@ export function startUDPServer(win: BrowserWindow) {
         }
         performDhtMaintenance().catch(err => {
             error('DHT maintenance error', err, 'dht');
+        });
+        publishMyAccountRegistry().catch(err => {
+            error('DHT account registry republish error', err, 'dht');
         });
 
         import('../../storage/vault/operations.js').then(({ cleanupExpiredVaultEntries }) => {
