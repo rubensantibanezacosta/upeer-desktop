@@ -70,7 +70,7 @@ describe('group fan-out por escala de peers', () => {
         for (let i = 0; i < onlineCount; i += 1) {
             const id = `peer-on-${i}`;
             members.push(id);
-            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::on-${i}` };
+            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${(0x100 + i).toString(16)}` };
         }
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue(buildGroup(members, 5) as never);
@@ -133,12 +133,12 @@ vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
         for (let i = 0; i < online; i += 1) {
             const id = `mix-on-${i}`;
             members.push(id);
-            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::mix-on-${i}` };
+            contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${(0x300 + i).toString(16)}` };
         }
         for (let i = 0; i < offline; i += 1) {
             const id = `mix-off-${i}`;
             members.push(id);
-            contactStatuses[id] = { status: 'disconnected', publicKey: 'bb'.repeat(32), address: `200::mix-off-${i}` };
+            contactStatuses[id] = { status: 'disconnected', publicKey: 'bb'.repeat(32), address: `200::${(0x400 + i).toString(16)}` };
         }
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue(buildGroup(members, 9) as never);

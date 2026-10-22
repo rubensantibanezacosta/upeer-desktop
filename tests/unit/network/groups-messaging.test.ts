@@ -752,13 +752,108 @@ describe('network/messaging/groups.ts', () => {
         );
     });
 
+    it('firma y sella GROUP_MSG por dispositivo y mantiene el fallback legacy', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
+        const { getKademliaInstance } = await import('../../../src/main_process/network/dht/handlers.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { signWithDevice } = await import('../../../src/main_process/security/deviceMessaging.js');
+        const { sendGroupMessage } = await import('../../../src/main_process/network/messaging/groups.js');
+
+        vi.mocked(groupsOps.getGroupById).mockReturnValue({
+            groupId: 'grp-device-msg',
+            adminUpeerId: 'self-id',
+            name: 'Grupo',
+            status: 'active',
+            members: ['self-id', 'peer-device-online', 'peer-device-offline', 'peer-legacy'],
+            epoch: 3,
+            senderKey: 'cc'.repeat(32),
+            memberPublicKeys: {},
+        } as GroupRecord);
+        vi.mocked(contactsOps.getContactByUpeerId).mockImplementation((upeerId: string) => {
+            if (upeerId === 'peer-device-online' || upeerId === 'peer-device-offline') {
+                return {
+                    upeerId,
+                    publicKey: 'aa'.repeat(32),
+                    status: upeerId === 'peer-device-online' ? 'connected' : 'disconnected',
+                    address: upeerId === 'peer-device-online' ? '200::d1' : undefined,
+                    knownAddresses: '[]',
+                    deviceId: 'ee'.repeat(32),
+                    devicePublicKey: 'cc'.repeat(32),
+                } as ContactRecord;
+            }
+            if (upeerId === 'peer-legacy') {
+                return {
+                    upeerId,
+                    publicKey: 'aa'.repeat(32),
+                    status: 'connected',
+                    address: '200::1e',
+                    knownAddresses: '[]',
+                } as ContactRecord;
+            }
+            return undefined;
+        });
+        vi.mocked(getKademliaInstance).mockReturnValue(null);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+
+        await sendGroupMessage('grp-device-msg', 'hola por dispositivo');
+
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200::d1',
+            expect.objectContaining({
+                type: 'GROUP_MSG',
+                groupId: 'grp-device-msg',
+                senderDeviceId: 'ee'.repeat(32),
+            }),
+            'cc'.repeat(32),
+        );
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200::1e',
+            expect.not.objectContaining({ senderDeviceId: expect.anything() }),
+            'aa'.repeat(32),
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-device-offline',
+            expect.objectContaining({
+                type: 'GROUP_MSG',
+                groupId: 'grp-device-msg',
+                senderDeviceId: 'ee'.repeat(32),
+                senderUpeerId: 'self-id',
+                signature: Buffer.from('device-sig').toString('hex'),
+            }),
+            undefined,
+            expect.any(String),
+        );
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'self-id',
+            expect.objectContaining({
+                type: 'GROUP_MSG',
+                groupId: 'grp-device-msg',
+                senderUpeerId: 'self-id',
+                signature: Buffer.from('sig').toString('hex'),
+            }),
+            undefined,
+            expect.any(String),
+        );
+        const deviceSignedPayload = JSON.parse(
+            vi.mocked(signWithDevice).mock.calls[0][0].toString(),
+        ) as Record<string, unknown>;
+        expect(deviceSignedPayload).toMatchObject({
+            type: 'GROUP_MSG',
+            groupId: 'grp-device-msg',
+            senderUpeerId: 'self-id',
+            senderDeviceId: 'ee'.repeat(32),
+        });
+    });
+
     it('envía un evento de llamada de grupo a miembros conectados y lo vaultea para miembros offline', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const groupsOps = await import('../../../src/main_process/storage/groups/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
         const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
-        const { sendGroupCallEvent } = await import('../../../src/main_process/network/messaging/groups.js');
+        const { sendGroupCallEvent } = await import('../../../src/main_process/network/messaging/groupCallEvent.js');
 
         vi.mocked(groupsOps.getGroupById).mockReturnValue({
             groupId: 'grp-call',

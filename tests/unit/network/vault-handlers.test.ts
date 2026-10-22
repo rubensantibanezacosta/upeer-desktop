@@ -414,6 +414,72 @@ describe('Vault Delivery Handler', () => {
         expect(vouches.issueVouch).not.toHaveBeenCalledWith(custodianSid, 'INTEGRITY_FAIL');
     });
 
+    it('verifies a device-signed GROUP_MSG using the announced sender device key', async () => {
+        const devicePublicKey = 'cd'.repeat(32);
+        const innerPacket = {
+            type: 'GROUP_MSG',
+            id: '550e8400-e29b-41d4-a716-446655440010',
+            groupId: 'group-1',
+            content: 'ciphertext',
+            nonce: '11'.repeat(24),
+            epoch: 1,
+            senderUpeerId: 'origin-id',
+            senderDeviceId: 'ef'.repeat(32),
+            signature: 'inner-sig',
+        };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'origin-id',
+            publicKey: 'origin-pubkey',
+            deviceId: 'ef'.repeat(32),
+            devicePublicKey,
+        } as NonNullable<VaultContact>);
+        vi.mocked(identity.verify).mockImplementation((_payload, _signature, publicKey) =>
+            publicKey.toString('hex') === devicePublicKey);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const groupsModule = await import('../../../src/main_process/network/handlers/groups.js');
+        expect(identity.verify).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            expect.any(Buffer),
+            Buffer.from(devicePublicKey, 'hex'),
+        );
+        expect(groupsModule.handleGroupMessage).toHaveBeenCalled();
+    });
+
+    it('rejects a device-signed vault packet when the device binding does not match', async () => {
+        const innerPacket = {
+            type: 'GROUP_MSG',
+            id: '550e8400-e29b-41d4-a716-446655440011',
+            groupId: 'group-1',
+            content: 'ciphertext',
+            nonce: '11'.repeat(24),
+            epoch: 1,
+            senderUpeerId: 'origin-id',
+            senderDeviceId: 'ef'.repeat(32),
+            signature: 'inner-sig',
+        };
+        const entry = { senderSid: 'origin-id', data: Buffer.from(JSON.stringify(innerPacket)).toString('hex') };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'origin-id',
+            publicKey: 'origin-pubkey',
+            deviceId: 'aa'.repeat(32),
+            devicePublicKey: 'cd'.repeat(32),
+        } as NonNullable<VaultContact>);
+        vi.mocked(identity.verify).mockReturnValue(false);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const groupsModule = await import('../../../src/main_process/network/handlers/groups.js');
+        expect(identity.verify).not.toHaveBeenCalledWith(
+            expect.any(Buffer),
+            expect.any(Buffer),
+            Buffer.from('cd'.repeat(32), 'hex'),
+        );
+        expect(groupsModule.handleGroupMessage).not.toHaveBeenCalled();
+    });
+
     it('should process GROUP_MSG, GROUP_INVITE, GROUP_UPDATE and GROUP_LEAVE entries', async () => {
         const msgPacket = { type: 'GROUP_MSG', groupId: 'g1', text: 'hi', signature: 'sig' };
         const invitePacket = { type: 'GROUP_INVITE', groupId: 'g1', signature: 'sig' };

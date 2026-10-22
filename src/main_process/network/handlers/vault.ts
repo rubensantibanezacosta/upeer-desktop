@@ -35,6 +35,8 @@ type VaultDeliveryPayload = {
 type VaultOriginContact = {
     upeerId: string;
     publicKey: string;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
 };
 
 type VaultInnerPacket = {
@@ -59,6 +61,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isVaultEntry(value: unknown): value is VaultEntry {
     return isRecord(value) && typeof value.senderSid === 'string' && typeof value.data === 'string';
+}
+
+function getVaultVerificationKeys(contact: VaultOriginContact, packet: VaultInnerPacket): string[] {
+    const keys = [contact.publicKey];
+    const senderDeviceId = typeof packet.senderDeviceId === 'string'
+        ? packet.senderDeviceId.toLowerCase()
+        : undefined;
+    const devicePublicKey = contact.devicePublicKey?.toLowerCase();
+    if (
+        senderDeviceId
+        && contact.deviceId?.toLowerCase() === senderDeviceId
+        && devicePublicKey
+        && /^[0-9a-f]{64}$/.test(devicePublicKey)
+    ) {
+        keys.push(devicePublicKey);
+    }
+    return Array.from(new Set(keys));
 }
 
 export async function handleVaultDelivery(
@@ -157,13 +176,14 @@ export async function handleVaultDelivery(
                                 ? [{ ...verifiedData, senderUpeerId: innerPacket.senderUpeerId }]
                                 : []),
                         ];
+                    const verificationKeys = getVaultVerificationKeys(originalContact, innerPacket);
                     const isInnerValid = isFileTransferPacket
                         ? verifyFileTransferPacketSignature(innerPacket, originalContact.publicKey)
-                        : verificationPayloads.some((payload) => verify(
+                        : verificationKeys.some((publicKey) => verificationPayloads.some((payload) => verify(
                             Buffer.from(canonicalStringify(payload)),
                             Buffer.from(innerSig, 'hex'),
-                            Buffer.from(originalContact.publicKey, 'hex')
-                        ));
+                            Buffer.from(publicKey, 'hex')
+                        )));
 
                     if (!isInnerValid) {
                         security('Vault delivery integrity failure!', { originalSender: entry.senderSid, custodian: senderSid }, 'vault');

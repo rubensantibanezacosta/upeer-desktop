@@ -16,10 +16,10 @@ import { VaultManager } from '../vault/manager.js';
 
 export interface GroupDeliveryContact {
     upeerId: string;
-    publicKey: string;
+    publicKey?: string;
     status: string;
-    address?: string;
-    knownAddresses?: string;
+    address?: string | null;
+    knownAddresses?: string | string[] | null;
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
     deviceId?: string | null;
@@ -28,6 +28,29 @@ export interface GroupDeliveryContact {
     deviceSignedPreKeyId?: number | null;
 }
 
+export const hasDeviceDeliveryBinding = (contact: GroupDeliveryContact): boolean => {
+    const { deviceId, devicePublicKey } = contact;
+    return typeof deviceId === 'string'
+        && /^[0-9a-f]{64}$/i.test(deviceId)
+        && typeof devicePublicKey === 'string'
+        && /^[0-9a-f]{64}$/i.test(devicePublicKey);
+};
+
+export const buildDeviceAwareGroupPacket = (
+    packet: Record<string, unknown>,
+    contact: GroupDeliveryContact,
+): Record<string, unknown> => (
+    hasDeviceDeliveryBinding(contact)
+        ? { ...packet, senderDeviceId: contact.deviceId }
+        : packet
+);
+
+export const getGroupRecipientPublicKey = (contact: GroupDeliveryContact): string | undefined => (
+    hasDeviceDeliveryBinding(contact)
+        ? contact.devicePublicKey as string
+        : contact.publicKey
+);
+
 export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, packet: Record<string, unknown>): Promise<void> => {
     const addresses: string[] = [];
     if (contact.address) {
@@ -35,9 +58,12 @@ export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, 
     }
 
     try {
-        const known = JSON.parse(contact.knownAddresses ?? '[]');
+        const knownValue = typeof contact.knownAddresses === 'string'
+            ? JSON.parse(contact.knownAddresses)
+            : contact.knownAddresses;
+        const known = Array.isArray(knownValue) ? knownValue : [];
         for (const addr of known) {
-            if (!addresses.includes(addr)) {
+            if (typeof addr === 'string' && !addresses.includes(addr)) {
                 addresses.push(addr);
             }
         }
@@ -73,6 +99,15 @@ export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId
         senderUpeerId,
         signature: sign(Buffer.from(canonicalStringify(legacyPacket))).toString('hex'),
     };
+};
+
+export const buildGroupMessageVaultPacket = (
+    packet: Record<string, unknown>,
+    contact: GroupDeliveryContact | null,
+    senderUpeerId: string,
+): Record<string, unknown> => {
+    const deliveryPacket = contact ? buildDeviceAwareGroupPacket(packet, contact) : packet;
+    return buildSignedPacket({ ...deliveryPacket, senderUpeerId }, senderUpeerId);
 };
 
 export const resolveGroupContact = async (targetUpeerId: string): Promise<GroupDeliveryContact | null> => {

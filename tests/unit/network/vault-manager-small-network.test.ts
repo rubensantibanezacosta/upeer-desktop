@@ -32,6 +32,10 @@ vi.mock('../../../src/main_process/network/dht/shared.js', () => ({
     getKademliaInstance: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({
+    getYggstackAddress: vi.fn(() => '200::self'),
+}));
+
 describe('vault manager small-network attachment cases', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -181,6 +185,73 @@ describe('vault manager small-network attachment cases', () => {
         expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::peer-1',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
+        );
+    });
+
+    it('replica el vault en otros dispositivos de la misma cuenta', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        const storeValue = vi.fn(async () => undefined);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn((targetId: string) => targetId === 'self-id'
+                ? [{ upeerId: 'self-id', address: '200::tablet' }]
+                : []),
+            storeValue,
+        } as never);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([] as never);
+
+        const nodes = await VaultManager.replicateToVaults('peer-2', { type: 'GROUP_MSG' });
+
+        expect(nodes).toBe(1);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::tablet',
+            expect.objectContaining({ type: 'VAULT_STORE', recipientSid: 'peer-2' }),
+        );
+        expect(storeValue).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            expect.objectContaining({
+                custodians: ['self-id'],
+                custodianEndpoints: [{ upeerId: 'self-id', address: '200::tablet' }],
+            }),
+            'self-id',
+        );
+    });
+
+    it('consulta endpoints del puntero y los demás dispositivos propios', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn((targetId: string) => targetId === 'self-id'
+                ? [{ upeerId: 'self-id', address: '200::tablet' }]
+                : []),
+            findValue: vi.fn(async () => ({
+                value: {
+                    custodians: ['self-id', 'legacy-custodian'],
+                    custodianEndpoints: [{ upeerId: 'self-id', address: '200::desktop' }],
+                    updatedAt: Date.now(),
+                },
+            })),
+            findLocationBlock: vi.fn(async () => ({ address: '200::legacy' })),
+        } as never);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([] as never);
+
+        await VaultManager.queryOwnVaults();
+
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::desktop',
+            expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' }),
+        );
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::tablet',
+            expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' }),
+        );
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::legacy',
+            expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' }),
         );
     });
 });

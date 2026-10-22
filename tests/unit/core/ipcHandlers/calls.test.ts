@@ -150,8 +150,8 @@ describe('registerCallHandlers', () => {
     });
 
     it('registra llamada de grupo saliente perdida como evento del grupo', async () => {
-        const groups = await import('../../../../src/main_process/network/messaging/groups.js');
-        const sendGroupCallEvent = vi.spyOn(groups, 'sendGroupCallEvent').mockResolvedValue();
+        const groupCallEvent = await import('../../../../src/main_process/network/messaging/groupCallEvent.js');
+        const sendGroupCallEvent = vi.spyOn(groupCallEvent, 'sendGroupCallEvent').mockResolvedValue();
         const session = callManager.createGroup(['peer1'], 'video', 'grp-call');
         callManager.end(session.callId, 'no-answer');
 

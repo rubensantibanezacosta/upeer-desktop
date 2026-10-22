@@ -18,7 +18,7 @@ import {
 } from '../../network/call/callSignaling.js';
 import { isValidCallId, isValidMediaKind } from '../../network/call/validationCalls.js';
 import { saveMessage } from '../../storage/messages/operations.js';
-import { sendGroupCallEvent } from '../../network/messaging/groups.js';
+import { sendGroupCallEvent } from '../../network/messaging/groupCallEvent.js';
 import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
 import { sendChatMessage } from '../../network/messaging/chatSend.js';
 import { shouldSendCallMedia } from './callMediaFanout.js';

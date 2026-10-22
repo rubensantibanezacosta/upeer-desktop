@@ -7,6 +7,7 @@ import { getKademliaInstance } from '../dht/shared.js';
 import { createVaultPointerKey } from '../dht/kademlia/store.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { beginVaultRecoverySource, type VaultRecoveryContext, completeVaultRecoverySource } from './recoveryTracker.js';
+import { getSelfDeviceAddresses } from './selfDevices.js';
 
 type VaultReplicatedPacket = {
     type?: string;
@@ -20,15 +21,21 @@ type VaultCandidate = {
     lastSeen?: string | number | Date;
 };
 
+type VaultCustodianEndpoint = {
+    upeerId: string;
+    address: string;
+};
+
 type VaultPointerValue = {
     custodians: string[];
+    custodianEndpoints?: VaultCustodianEndpoint[];
     updatedAt: number;
 };
 
 type KademliaLike = {
     findClosestContacts(targetId: string, count: number): Array<{ upeerId: string; address: string }>;
     storeValue(key: Buffer, value: VaultPointerValue, publisher: string): Promise<void>;
-    findValue(key: Buffer): Promise<{ value?: { custodians?: string[] } } | null>;
+    findValue(key: Buffer): Promise<{ value?: { custodians?: string[]; custodianEndpoints?: VaultCustodianEndpoint[] } } | null>;
     findLocationBlock(targetId: string): Promise<{ address?: string } | null>;
 };
 
@@ -145,6 +152,15 @@ export class VaultManager {
                 }));
         }
 
+        const candidateAddresses = new Set(candidates.map(candidate => candidate.address.toLowerCase()));
+        const selfDeviceAddresses = await getSelfDeviceAddresses(myId, kademlia);
+        for (const address of selfDeviceAddresses) {
+            const normalizedAddress = address.toLowerCase();
+            if (candidateAddresses.has(normalizedAddress)) continue;
+            candidateAddresses.add(normalizedAddress);
+            candidates.push({ upeerId: myId, address, status: 'connected' });
+        }
+
         const vaultPacket = {
             type: 'VAULT_STORE',
             payloadHash,
@@ -157,20 +173,34 @@ export class VaultManager {
         const sendPromises = candidates.map(async (friend) => {
             try {
                 await this.sendWithRetry(friend.address, vaultPacket);
-                if (friend.upeerId) return friend.upeerId;
+                return friend;
             } catch (err) {
                 return null;
             }
-            return null;
         });
 
         const results = await Promise.all(sendPromises);
-        const successfulIds = results.filter((id): id is string => !!id);
+        const successfulCandidates = results.filter((candidate): candidate is VaultCandidate => !!candidate);
+        const successfulIds = successfulCandidates
+            .map(candidate => candidate.upeerId)
+            .filter((id): id is string => !!id);
         const custodianIds = Array.from(new Set([myId, ...successfulIds]));
+        const endpointAddresses = new Set<string>();
+        const custodianEndpoints: VaultCustodianEndpoint[] = [];
+        for (const candidate of successfulCandidates) {
+            const normalizedAddress = candidate.address.toLowerCase();
+            if (endpointAddresses.has(normalizedAddress)) continue;
+            endpointAddresses.add(normalizedAddress);
+            custodianEndpoints.push({ upeerId: candidate.upeerId ?? myId, address: candidate.address });
+        }
 
         if (kademlia && typeof kademlia.storeValue === 'function' && custodianIds.length > 0) {
             const ptrKey = createVaultPointerKey(recipientSid);
-            const ptrValue = { custodians: custodianIds, updatedAt: Date.now() };
+            const ptrValue: VaultPointerValue = {
+                custodians: custodianIds,
+                custodianEndpoints,
+                updatedAt: Date.now(),
+            };
             kademlia.storeValue(ptrKey, ptrValue, myId).catch(err => {
                 warn('Failed to publish vault pointer to DHT', err, 'vault');
             });
@@ -180,6 +210,7 @@ export class VaultManager {
             recipient: recipientSid,
             localCustody: true,
             nodes: successfulIds.length,
+            deviceEndpoints: custodianEndpoints.length,
             totalCustodians: custodianIds.length,
             hash: payloadHash.slice(0, 8),
             dht: !!kademlia
@@ -222,24 +253,38 @@ export class VaultManager {
 
             try {
                 const ptrResult = await kademlia.findValue(ptrKey);
-                if (ptrResult && ptrResult.value && Array.isArray(ptrResult.value.custodians)) {
-                    const selfCustodians = ptrResult.value.custodians;
+                const pointer = ptrResult?.value;
+                const custodianEndpoints = Array.isArray(pointer?.custodianEndpoints)
+                    ? pointer.custodianEndpoints.filter((endpoint): endpoint is VaultCustodianEndpoint => (
+                        typeof endpoint?.upeerId === 'string'
+                        && typeof endpoint?.address === 'string'
+                        && endpoint.address.length > 0
+                    ))
+                    : [];
+                for (const endpoint of custodianEndpoints) {
+                    await queryAddress(endpoint.address, `custodian device ${endpoint.upeerId}`);
+                }
 
-                    for (const custodianId of selfCustodians) {
-                        if (custodianId === myId) continue;
-                        try {
-                            const addr = await kademlia.findLocationBlock(custodianId);
-                            if (addr && addr.address) {
-                                await queryAddress(addr.address, `custodian ${custodianId}`);
-                            }
-                        } catch (err) {
-                            debug('Could not find self-custodian location', { custodianId }, 'vault');
+                const selfCustodians = Array.isArray(pointer?.custodians) ? pointer.custodians : [];
+                for (const custodianId of selfCustodians) {
+                    if (custodianId === myId) continue;
+                    try {
+                        const addr = await kademlia.findLocationBlock(custodianId);
+                        if (addr && addr.address) {
+                            await queryAddress(addr.address, `custodian ${custodianId}`);
                         }
+                    } catch (err) {
+                        debug('Could not find self-custodian location', { custodianId }, 'vault');
                     }
                 }
             } catch (err) {
                 warn('Failed to find self-vault pointers in DHT', err, 'vault');
             }
+        }
+
+        const selfDeviceAddresses = await getSelfDeviceAddresses(myId, kademlia);
+        for (const address of selfDeviceAddresses) {
+            await queryAddress(address, 'self device');
         }
 
         for (const friend of onlineFriends) {
