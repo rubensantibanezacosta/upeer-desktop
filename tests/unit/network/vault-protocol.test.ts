@@ -57,6 +57,27 @@ describe('Vault Protocol Handlers', () => {
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({ type: 'VAULT_ACK' }));
         });
 
+        it('stores the recipient device scope', async () => {
+            const deviceId = 'ab'.repeat(32);
+            const data: VaultStoreData = {
+                payloadHash: 'hash-device',
+                recipientSid: 'recp1',
+                recipientDeviceId: deviceId,
+                senderSid,
+                data: '00112233',
+                priority: 1,
+                expiresAt: Date.now() + 1000
+            };
+            vi.mocked(vaultDb.getSenderUsage).mockResolvedValue(0);
+            vi.mocked(vouches.computeScore).mockReturnValue(70);
+
+            await vaultHandlers.handleVaultStore(senderSid, data, '1.1.1.1', mockSendResponse);
+
+            expect(vaultDb.saveVaultEntry).toHaveBeenCalledWith(
+                'hash-device', 'recp1', senderSid, 1, '00112233', expect.any(Number), deviceId
+            );
+        });
+
         it('should refuse if score is too low', async () => {
             vi.mocked(vouches.computeScore).mockReturnValue(20);
             await vaultHandlers.handleVaultStore(senderSid, {} as VaultStoreData);
@@ -94,13 +115,46 @@ describe('Vault Protocol Handlers', () => {
                 afterId: 120,
             } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
-            expect(vaultDb.getVaultEntriesPageForRecipient).toHaveBeenCalledWith(senderSid, 120, 121);
+            expect(vaultDb.getVaultEntriesPageForRecipient).toHaveBeenCalledWith(senderSid, 120, 121, null);
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 hasMore: true,
                 nextAfterId: 240,
                 entries: expect.arrayContaining([{ id: 240, payloadHash: 'h240' }]),
             }));
             expect(mockSendResponse.mock.calls[0][1].entries).toHaveLength(120);
+        });
+
+        it('scopes the mailbox to the requesting device', async () => {
+            const deviceId = 'ab'.repeat(32);
+            vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue([] as never);
+
+            await vaultHandlers.handleVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                requesterDeviceId: deviceId,
+                timestamp: Date.now(),
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(vaultDb.getVaultEntriesPageForRecipient).toHaveBeenCalledWith(
+                senderSid, undefined, 121, deviceId
+            );
+        });
+
+        it('does not deliver a device-specific entry to another device', async () => {
+            const entry = {
+                payloadHash: 'h1',
+                recipientSid: senderSid,
+                recipientDeviceId: 'ab'.repeat(32),
+            };
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry as never);
+
+            await vaultHandlers.handleVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                requesterDeviceId: 'cd'.repeat(32),
+                timestamp: Date.now(),
+                payloadHash: 'h1',
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(mockSendResponse).not.toHaveBeenCalled();
         });
 
         it('should refuse unauthorized query (senderSid != requesterSid)', async () => {
@@ -129,6 +183,36 @@ describe('Vault Protocol Handlers', () => {
             await vaultHandlers.handleVaultAck(senderSid, { payloadHashes: ['h1'] });
 
             expect(vaultDb.deleteVaultEntry).toHaveBeenCalledWith('h1');
+        });
+
+        it('only deletes device-specific entries for the acknowledging device', async () => {
+            const deviceId = 'ab'.repeat(32);
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue({
+                payloadHash: 'h-device',
+                recipientSid: senderSid,
+                recipientDeviceId: deviceId,
+            } as never);
+            vi.mocked(vaultDb.deleteVaultEntry).mockResolvedValue(true);
+
+            await vaultHandlers.handleVaultAck(senderSid, { payloadHashes: ['h-device'], deviceId });
+
+            expect(vaultDb.deleteVaultEntry).toHaveBeenCalledWith('h-device');
+        });
+
+        it('rejects an ACK from another device', async () => {
+            vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue({
+                payloadHash: 'h-device',
+                recipientSid: senderSid,
+                recipientDeviceId: 'ab'.repeat(32),
+            } as never);
+
+            await vaultHandlers.handleVaultAck(senderSid, {
+                payloadHashes: ['h-device'],
+                deviceId: 'cd'.repeat(32),
+            });
+
+            expect(vaultDb.deleteVaultEntry).not.toHaveBeenCalled();
+            expect(vouches.issueVouch).toHaveBeenCalledWith(senderSid, 'MALICIOUS');
         });
 
         it('should not reward reputation for unknown ack hashes', async () => {

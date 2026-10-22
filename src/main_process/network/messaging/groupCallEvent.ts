@@ -106,15 +106,29 @@ async function applySendGroupCallEvent(
           isSelf ? null : contact,
           senderId,
         );
-        await VaultManager.replicateToVaults(
-          memberId,
-          signedPacket,
-          undefined,
-          crypto
-            .createHash("sha256")
-            .update(`group:${msgId}:${memberId}`)
-            .digest("hex"),
-        );
+        const recipientDeviceId = "deviceId" in contact && typeof contact.deviceId === "string"
+          ? contact.deviceId
+          : undefined;
+        const payloadHashOverride = crypto
+          .createHash("sha256")
+          .update(`group:${msgId}:${memberId}`)
+          .digest("hex");
+        if (isSelf || !recipientDeviceId) {
+          await VaultManager.replicateToVaults(
+            memberId,
+            signedPacket,
+            undefined,
+            payloadHashOverride,
+          );
+        } else {
+          await VaultManager.replicateToVaults(
+            memberId,
+            signedPacket,
+            undefined,
+            payloadHashOverride,
+            recipientDeviceId,
+          );
+        }
       }
     },
   );

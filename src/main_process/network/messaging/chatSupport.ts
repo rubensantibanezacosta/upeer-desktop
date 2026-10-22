@@ -1,4 +1,5 @@
 import { sign } from '../../security/identity.js';
+import { signWithDevice } from '../../security/deviceMessaging.js';
 import { updateMessageStatus } from '../../storage/messages/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
@@ -61,7 +62,15 @@ export function getFanOutAddresses(contact: ContactAddressRecord): string[] {
 
 export async function vaultChatForOfflineDelivery(
     recipientUpeerId: string,
-    recipientContact: { publicKey?: string | null; signedPreKey?: string | null; signedPreKeyId?: number | null },
+    recipientContact: {
+        publicKey?: string | null;
+        signedPreKey?: string | null;
+        signedPreKeyId?: number | null;
+        deviceId?: string | null;
+        devicePublicKey?: string | null;
+        deviceSignedPreKey?: string | null;
+        deviceSignedPreKeyId?: number | null;
+    },
     msgId: string,
     content: string,
     replyTo: string | undefined,
@@ -69,7 +78,13 @@ export async function vaultChatForOfflineDelivery(
     timestamp: number,
 ): Promise<number> {
     if (recipientUpeerId !== senderUpeerId) await requireContactAdmission(recipientUpeerId, recipientContact.publicKey);
-    const encryptedPayload = await encryptChatPayload(recipientUpeerId, content, recipientContact);
+    const encryptedPayload = await encryptChatPayload(
+        recipientUpeerId,
+        content,
+        recipientContact,
+        'direct',
+        { allowDeviceIdentity: true },
+    );
 
     const vaultData = {
         type: 'CHAT',
@@ -82,9 +97,13 @@ export async function vaultChatForOfflineDelivery(
         ...(encryptedPayload.x3dhInit ? { x3dhInit: encryptedPayload.x3dhInit } : {}),
         ...(encryptedPayload.ephemeralPublicKey ? { ephemeralPublicKey: encryptedPayload.ephemeralPublicKey } : {}),
         ...(encryptedPayload.useRecipientEphemeral !== undefined ? { useRecipientEphemeral: encryptedPayload.useRecipientEphemeral } : {}),
+        ...(encryptedPayload.deviceId ? { senderDeviceId: encryptedPayload.deviceId } : {}),
     };
 
-    const vaultSignature = sign(Buffer.from(canonicalStringify(vaultData)));
+    const deviceSignature = encryptedPayload.deviceId
+        ? signWithDevice(Buffer.from(canonicalStringify(vaultData)))
+        : null;
+    const vaultSignature = deviceSignature ?? sign(Buffer.from(canonicalStringify(vaultData)));
     const innerPacket = {
         ...vaultData,
         senderUpeerId,
@@ -92,14 +111,27 @@ export async function vaultChatForOfflineDelivery(
     };
 
     const { VaultManager } = await import('../vault/manager.js');
+    if (encryptedPayload.deviceId && recipientContact.deviceId) {
+        return VaultManager.replicateToVaults(
+            recipientUpeerId,
+            innerPacket,
+            undefined,
+            undefined,
+            recipientContact.deviceId,
+        );
+    }
     return VaultManager.replicateToVaults(recipientUpeerId, innerPacket);
 }
 
 export async function vaultExistingChatPacket(
     recipientUpeerId: string,
     packet: Record<string, unknown>,
+    recipientDeviceId?: string | null,
 ): Promise<number> {
     const { VaultManager } = await import('../vault/manager.js');
+    if (recipientDeviceId) {
+        return VaultManager.replicateToVaults(recipientUpeerId, packet, undefined, undefined, recipientDeviceId);
+    }
     return VaultManager.replicateToVaults(recipientUpeerId, packet);
 }
 

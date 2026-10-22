@@ -1,6 +1,15 @@
-import { eq, lt, sql, gt, and } from 'drizzle-orm';
+import { eq, lt, sql, gt, and, isNull, or } from 'drizzle-orm';
 import { getDb } from '../shared.js';
 import { vaultStorage } from '../schema.js';
+
+function getRecipientDeviceCondition(recipientDeviceId?: string | null) {
+    if (recipientDeviceId === undefined) return undefined;
+    if (recipientDeviceId === null) return isNull(vaultStorage.recipientDeviceId);
+    return or(
+        isNull(vaultStorage.recipientDeviceId),
+        eq(vaultStorage.recipientDeviceId, recipientDeviceId),
+    );
+}
 
 /**
  * Gets statistics about the vault storage usage.
@@ -45,19 +54,21 @@ export async function saveVaultEntry(
     senderSid: string,
     priority: number,
     data: string,
-    expiresAt: number
+    expiresAt: number,
+    recipientDeviceId?: string | null,
 ) {
     const db = getDb();
     return db.insert(vaultStorage).values({
         payloadHash,
         recipientSid,
+        recipientDeviceId: recipientDeviceId ?? null,
         senderSid,
         priority,
         data,
         expiresAt
     }).onConflictDoUpdate({
         target: vaultStorage.payloadHash,
-        set: { data, expiresAt }
+        set: { data, expiresAt, recipientDeviceId: recipientDeviceId ?? null }
     });
 }
 
@@ -69,23 +80,31 @@ export async function saveVaultEntry(
  * producía una colisión de payloadHash. La limpieza periódica (cleanupExpiredVaultEntries)
  * se ejecuta cada 4h, creando una ventana de entrega de datos caducados.
  */
-export async function getVaultEntriesForRecipient(recipientSid: string) {
+export async function getVaultEntriesForRecipient(recipientSid: string, recipientDeviceId?: string | null) {
     const db = getDb();
     const now = Date.now();
-    return db.select().from(vaultStorage).where(
-        and(
-            eq(vaultStorage.recipientSid, recipientSid),
-            gt(vaultStorage.expiresAt, now)
-        )
-    ).orderBy(vaultStorage.id);
-}
-
-export async function getVaultEntriesPageForRecipient(recipientSid: string, afterId: number | undefined, limit: number) {
-    const db = getDb();
-    const now = Date.now();
+    const deviceCondition = getRecipientDeviceCondition(recipientDeviceId);
     const conditions = [
         eq(vaultStorage.recipientSid, recipientSid),
         gt(vaultStorage.expiresAt, now),
+        ...(deviceCondition ? [deviceCondition] : []),
+    ];
+    return db.select().from(vaultStorage).where(and(...conditions)).orderBy(vaultStorage.id);
+}
+
+export async function getVaultEntriesPageForRecipient(
+    recipientSid: string,
+    afterId: number | undefined,
+    limit: number,
+    recipientDeviceId?: string | null,
+) {
+    const db = getDb();
+    const now = Date.now();
+    const deviceCondition = getRecipientDeviceCondition(recipientDeviceId);
+    const conditions = [
+        eq(vaultStorage.recipientSid, recipientSid),
+        gt(vaultStorage.expiresAt, now),
+        ...(deviceCondition ? [deviceCondition] : []),
     ];
     if (typeof afterId === 'number') {
         conditions.push(gt(vaultStorage.id, afterId));

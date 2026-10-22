@@ -190,7 +190,7 @@ export async function sendConnectedChatMessage({
                         ...peerPacket,
                         senderUpeerId: selfId,
                         signature: signatureHex,
-                    });
+                    }, freshContact.deviceId);
                     if (nodes > 0) {
                         if (await updateMessageStatus(msgId, 'vaulted')) {
                             clearPendingDirectMessage(msgId);

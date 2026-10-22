@@ -31,6 +31,12 @@ describe('validationVaultGroups', () => {
             expect(validateVaultStore({ ...base, data: '' }).valid).toBe(false);
             expect(validateVaultStore({ ...base, data: 'x'.repeat(150001) }).valid).toBe(false);
         });
+
+        it('acepta un recipientDeviceId hexadecimal de 32 bytes', () => {
+            expect(validateVaultStore({ ...base, recipientDeviceId: id64 }).valid).toBe(true);
+            expect(validateVaultStore({ ...base, recipientDeviceId: 'short' }).valid).toBe(false);
+            expect(validateVaultStore({ ...base, recipientDeviceId: 'z'.repeat(64) }).valid).toBe(false);
+        });
     });
 
     describe('validateVaultQuery', () => {
@@ -41,6 +47,11 @@ describe('validationVaultGroups', () => {
         it('rechaza requesterSid inválido', () => {
             expect(validateVaultQuery({}).valid).toBe(false);
             expect(validateVaultQuery({ requesterSid: 'x'.repeat(65) }).valid).toBe(false);
+        });
+
+        it('valida el ámbito de dispositivo del buzón', () => {
+            expect(validateVaultQuery({ requesterSid: 'peer-1', requesterDeviceId: id64 }).valid).toBe(true);
+            expect(validateVaultQuery({ requesterSid: 'peer-1', requesterDeviceId: 'short' }).valid).toBe(false);
         });
     });
 
@@ -53,6 +64,11 @@ describe('validationVaultGroups', () => {
             expect(validateVaultAck({}).valid).toBe(false);
             expect(validateVaultAck({ payloadHashes: Array(201).fill('a'.repeat(64)) }).valid).toBe(false);
             expect(validateVaultAck({ payloadHashes: [''] }).valid).toBe(false);
+        });
+
+        it('valida el deviceId del ACK', () => {
+            expect(validateVaultAck({ payloadHashes: ['a'.repeat(64)], deviceId: id64 }).valid).toBe(true);
+            expect(validateVaultAck({ payloadHashes: ['a'.repeat(64)], deviceId: 'short' }).valid).toBe(false);
         });
     });
 

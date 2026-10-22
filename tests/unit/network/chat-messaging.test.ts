@@ -258,6 +258,44 @@ describe('network/messaging/chat.ts', () => {
         );
     });
 
+    it('vaults device-bound offline messages in the recipient device mailbox', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendChatMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+        const recipientDeviceId = 'ab'.repeat(32);
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer-offline-device',
+            status: 'disconnected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            deviceId: recipientDeviceId,
+            devicePublicKey: 'cc'.repeat(32),
+            deviceSignedPreKey: 'dd'.repeat(32),
+            deviceSignedPreKeyId: 9,
+            address: '200::23',
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
+
+        await sendChatMessage('peer-offline-device', 'hola dispositivo');
+
+        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'peer-offline-device',
+            expect.objectContaining({
+                type: 'CHAT',
+                senderDeviceId: 'ee'.repeat(32),
+                signature: Buffer.from('device-sig').toString('hex'),
+            }),
+            undefined,
+            undefined,
+            recipientDeviceId,
+        );
+    });
+
     it('uses the serialized preview payload for offline vault delivery', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');

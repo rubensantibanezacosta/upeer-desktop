@@ -53,6 +53,7 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn().mockReturnValue('my-id'),
     getMyPublicKeyHex: vi.fn().mockReturnValue('a'.repeat(64)),
+    getMyDeviceId: vi.fn().mockReturnValue(''),
     verify: vi.fn().mockReturnValue(true),
 }));
 
@@ -96,6 +97,7 @@ describe('Vault Delivery Handler', () => {
         vi.clearAllMocks();
         vi.mocked(contactsOps.isContactBlocked).mockReturnValue(false);
         vi.mocked(identity.verify).mockReturnValue(true);
+        vi.mocked(identity.getMyDeviceId).mockReturnValue('');
         vi.mocked(validation.validateMessage).mockReturnValue({ valid: true });
         vi.mocked(fileTransferSignature.verifyFileTransferPacketSignature).mockReturnValue(true);
     });
@@ -103,6 +105,42 @@ describe('Vault Delivery Handler', () => {
     it('should discard non-array entries (DoS protection)', async () => {
         await handleVaultDelivery(custodianSid, { entries: null }, mockWin, mockSendResponse, '1.2.3.4');
         expect(contactsOps.getContactByUpeerId).not.toHaveBeenCalled();
+    });
+
+    it('ignores vault entries addressed to another device', async () => {
+        const entry = {
+            senderSid: 'origin-id',
+            recipientDeviceId: 'bb'.repeat(32),
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'),
+            payloadHash: 'other-device',
+        };
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        expect(contactsOps.getContactByUpeerId).not.toHaveBeenCalled();
+        expect(mockSendResponse).not.toHaveBeenCalled();
+    });
+
+    it('processes and ACKs vault entries addressed to this device', async () => {
+        const deviceId = 'aa'.repeat(32);
+        vi.mocked(identity.getMyDeviceId).mockReturnValue(deviceId);
+        const entry = {
+            senderSid: 'origin-id',
+            recipientDeviceId: deviceId,
+            data: Buffer.from(JSON.stringify({ type: 'CHAT', signature: 'sig' })).toString('hex'),
+            payloadHash: 'own-device',
+        };
+        vi.mocked(contactsOps.getContactByUpeerId).mockResolvedValue(originContact);
+
+        await handleVaultDelivery(custodianSid, { entries: [entry] }, mockWin, mockSendResponse, '1.2.3.4');
+
+        const { handleChatMessage } = await import('../../../src/main_process/network/handlers/chat.js');
+        expect(handleChatMessage).toHaveBeenCalled();
+        expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', expect.objectContaining({
+            type: 'VAULT_ACK',
+            deviceId,
+            payloadHashes: ['own-device'],
+        }));
     });
 
     it('should limit entries to MAX_DELIVERY_ENTRIES (120)', async () => {

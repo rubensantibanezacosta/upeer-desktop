@@ -147,6 +147,7 @@ type ChatReactionPayload = {
 
 type VaultAckPayload = {
     payloadHashes: string[];
+    deviceId?: string;
 };
 
 type VaultRenewPayload = {
@@ -339,6 +340,7 @@ function toVaultAckPayload(data: VerifiedPacketData): VaultAckPayload {
         payloadHashes: Array.isArray(data.payloadHashes)
             ? data.payloadHashes.filter((value): value is string => typeof value === 'string')
             : [],
+        ...(typeof data.deviceId === 'string' ? { deviceId: data.deviceId } : {}),
     };
 }
 
@@ -346,6 +348,7 @@ function toVaultStorePayload(data: VerifiedPacketData, senderSid: string): Vault
     return {
         payloadHash: typeof data.payloadHash === 'string' ? data.payloadHash : '',
         recipientSid: typeof data.recipientSid === 'string' ? data.recipientSid : '',
+        recipientDeviceId: typeof data.recipientDeviceId === 'string' ? data.recipientDeviceId : undefined,
         senderSid: typeof data.senderSid === 'string' ? data.senderSid : senderSid,
         priority: typeof data.priority === 'number' ? data.priority : 0,
         data: typeof data.data === 'string' ? data.data : '',
@@ -357,6 +360,7 @@ function toVaultStorePayload(data: VerifiedPacketData, senderSid: string): Vault
 function toVaultQueryPayload(data: VerifiedPacketData, requesterSid: string): VaultQueryData {
     return {
         requesterSid: typeof data.requesterSid === 'string' ? data.requesterSid : requesterSid,
+        requesterDeviceId: typeof data.requesterDeviceId === 'string' ? data.requesterDeviceId : undefined,
         timestamp: typeof data.timestamp === 'number' ? data.timestamp : 0,
         merkleRoot: typeof data.merkleRoot === 'string' ? data.merkleRoot : undefined,
         batchSize: typeof data.batchSize === 'number' ? data.batchSize : undefined,

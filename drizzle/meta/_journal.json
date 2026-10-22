@@ -64,6 +64,13 @@
       "when": 1792920000000,
       "tag": "0009_device_messaging_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792920001000,
+      "tag": "0010_vault_recipient_device",
+      "breakpoints": true
     }
   ]
 }

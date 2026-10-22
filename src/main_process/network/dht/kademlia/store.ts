@@ -131,11 +131,12 @@ export function createLocationBlockKey(upeerId: string): Buffer {
 }
 
 // Helper function to create Vault Pointer key (Hashed-Targeting V2)
-export function createVaultPointerKey(recipientSid: string): Buffer {
+export function createVaultPointerKey(recipientSid: string, recipientDeviceId?: string): Buffer {
     // Salted key for vault pointers to prevent social graph analysis
     // Uses daily salt + versioned prefix
     const dateSalt = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const hash = crypto.createHash('sha256');
-    hash.update(`vault-ptr-v2:${recipientSid}:${dateSalt}`);
+    const deviceScope = recipientDeviceId ? `:device:${recipientDeviceId}` : '';
+    hash.update(`vault-ptr-v2:${recipientSid}${deviceScope}:${dateSalt}`);
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }

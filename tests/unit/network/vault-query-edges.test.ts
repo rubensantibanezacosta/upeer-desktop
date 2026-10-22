@@ -6,6 +6,7 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'self-id'),
+    getMyDeviceId: vi.fn(() => ''),
 }));
 
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
@@ -58,6 +59,34 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
         expect(transport.sendSecurePacket).toHaveBeenCalledWith(
             '200::friend',
             expect.objectContaining({ type: 'VAULT_QUERY', requesterSid: 'self-id' })
+        );
+    });
+
+    it('consulta el buzón propio del dispositivo y publica el ámbito en VAULT_QUERY', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+
+        const deviceId = 'ab'.repeat(32);
+        vi.mocked(identity.getMyDeviceId).mockReturnValue(deviceId);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
+            { upeerId: 'friend-online', address: '200::friend', status: 'connected' },
+        ] as never);
+        const findValue = vi.fn(async () => ({ value: { custodians: [] } }));
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({ findValue } as never);
+
+        await VaultManager.queryOwnVaults();
+
+        expect(findValue).toHaveBeenCalledTimes(2);
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::friend',
+            expect.objectContaining({
+                type: 'VAULT_QUERY',
+                requesterSid: 'self-id',
+                requesterDeviceId: deviceId,
+            }),
         );
     });
 

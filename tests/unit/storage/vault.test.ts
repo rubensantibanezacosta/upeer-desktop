@@ -107,6 +107,25 @@ describe('Storage - Vault Operations', () => {
         }));
     });
 
+    it('persists the recipient device scope for per-device mailboxes', async () => {
+        const mockInsertChain = {
+            values: vi.fn().mockReturnThis(),
+            onConflictDoUpdate: vi.fn().mockReturnThis()
+        };
+        mockDb.insert.mockReturnValue(mockInsertChain);
+        const deviceId = 'ab'.repeat(32);
+
+        await saveVaultEntry('hash-device', 'recipient1', 'sender1', 1, 'deadbeef', 123456789, deviceId);
+
+        expect(mockInsertChain.values).toHaveBeenCalledWith(expect.objectContaining({
+            payloadHash: 'hash-device',
+            recipientDeviceId: deviceId,
+        }));
+        expect(mockInsertChain.onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            set: expect.objectContaining({ recipientDeviceId: deviceId }),
+        }));
+    });
+
     it('should retrieve non-expired entries for recipient', async () => {
         const mockEntries = [{ payloadHash: 'h1', data: 'd1' }];
         const orderBy = vi.fn().mockReturnValue(mockEntries);

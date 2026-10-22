@@ -328,6 +328,7 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String),
+            'ee'.repeat(32),
         );
     });
 
@@ -824,6 +825,7 @@ describe('network/messaging/groups.ts', () => {
             }),
             undefined,
             expect.any(String),
+            'ee'.repeat(32),
         );
         expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
             'self-id',

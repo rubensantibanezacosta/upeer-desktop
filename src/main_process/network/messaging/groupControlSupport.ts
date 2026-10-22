@@ -77,9 +77,18 @@ export const sendPacketToKnownAddresses = async (contact: GroupDeliveryContact, 
     }
 };
 
-export const vaultPacket = async (targetUpeerId: string, packet: Record<string, unknown>, seed: string): Promise<void> => {
+export const vaultPacket = async (
+    targetUpeerId: string,
+    packet: Record<string, unknown>,
+    seed: string,
+    recipientDeviceId?: string,
+): Promise<void> => {
     const payloadHashOverride = crypto.createHash('sha256').update(seed).digest('hex');
-    await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride);
+    if (recipientDeviceId) {
+        await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride, recipientDeviceId);
+    } else {
+        await VaultManager.replicateToVaults(targetUpeerId, packet, undefined, payloadHashOverride);
+    }
 };
 
 export const buildSignedPacket = (packet: Record<string, unknown>, senderUpeerId: string): Record<string, unknown> => {
@@ -198,7 +207,11 @@ export const deliverGroupPacket = async ({
     }
 
     if (!skipVault) {
-        await vaultPacket(targetUpeerId, signedPacket, vaultSeed);
+        if (contact.deviceId) {
+            await vaultPacket(targetUpeerId, signedPacket, vaultSeed, contact.deviceId);
+        } else {
+            await vaultPacket(targetUpeerId, signedPacket, vaultSeed);
+        }
     }
 
     if (!skipDirectSend && contact.status !== 'connected') {

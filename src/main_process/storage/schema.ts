@@ -101,6 +101,7 @@ export const vaultStorage = sqliteTable('vault_storage', {
     id: integer('id').primaryKey({ autoIncrement: true }),
     payloadHash: text('payload_hash').unique().notNull(),
     recipientSid: text('recipient_sid').notNull(), // Social ID del destinatario
+    recipientDeviceId: text('recipient_device_id'),
     senderSid: text('sender_sid').notNull(),    // Social ID del emisor original
     priority: integer('priority').notNull().default(1), // 1: msg, 2: meta, 3: chunk
     data: text('data').notNull(),               // BLOB/Encrypted data (as hex)

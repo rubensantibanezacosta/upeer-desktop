@@ -1,0 +1,1 @@
+ALTER TABLE `vault_storage` ADD `recipient_device_id` text;

@@ -3,6 +3,7 @@ import { saveVaultEntry, getVaultEntriesPageForRecipient, deleteVaultEntry, getS
 import { security, network, warn, debug } from '../../../security/secure-logger.js';
 import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
+import { normalizeVaultDeviceId } from '../deviceMailbox.js';
 
 /** Número máximo de entradas por respuesta VAULT_DELIVERY (anti-OOM) */
 const VAULT_DELIVERY_PAGE_SIZE = 120;
@@ -79,20 +80,37 @@ export async function handleVaultStore(senderSid: string, data: VaultStoreData, 
         // El remitente no puede imponer TTLs arbitrariamente largos.
         const safeExpiresAt = Math.min(data.expiresAt, Date.now() + VAULT_TTL_MS);
 
+        const recipientDeviceId = normalizeVaultDeviceId(data.recipientDeviceId);
         // BUG CE fix: usar senderSid autenticado (parámetro exterior) en lugar de
         // data.senderSid (campo interior, controlado por el emisor). Sin esto, un
         // atacante puede poner data.senderSid=victimId, haciendo que los registros
         // almacenados no se cuenten contra su cuota (getSenderUsage busca por el
         // campo almacenado, que sería victimId, no el atacante).
-        await saveVaultEntry(
-            data.payloadHash,
-            data.recipientSid,
-            senderSid,    // ← senderSid autenticado por firma exterior, no data.senderSid
-            data.priority,
-            data.data,
-            safeExpiresAt
-        );
-        debug('Vault entry saved', { hash: data.payloadHash, recipient: data.recipientSid }, 'vault');
+        if (recipientDeviceId) {
+            await saveVaultEntry(
+                data.payloadHash,
+                data.recipientSid,
+                senderSid,
+                data.priority,
+                data.data,
+                safeExpiresAt,
+                recipientDeviceId,
+            );
+        } else {
+            await saveVaultEntry(
+                data.payloadHash,
+                data.recipientSid,
+                senderSid,    // ← senderSid autenticado por firma exterior, no data.senderSid
+                data.priority,
+                data.data,
+                safeExpiresAt
+            );
+        }
+        debug('Vault entry saved', {
+            hash: data.payloadHash,
+            recipient: data.recipientSid,
+            device: recipientDeviceId,
+        }, 'vault');
 
         // Send confirmation back to the sender
         if (fromAddress && sendResponse) {
@@ -126,11 +144,15 @@ export async function handleVaultQuery(
         return;
     }
 
+    const requesterDeviceId = normalizeVaultDeviceId(data.requesterDeviceId);
+
     try {
         // If a specific payloadHash is requested, return only that entry (if accessible)
         if (data.payloadHash) {
             const entry = await getVaultEntryByHash(data.payloadHash);
-            if (entry && (entry.recipientSid === data.requesterSid || entry.recipientSid === '*')) {
+            const targetsRequester = entry && (entry.recipientSid === data.requesterSid || entry.recipientSid === '*');
+            const targetsDevice = entry && (!entry.recipientDeviceId || entry.recipientDeviceId === requesterDeviceId);
+            if (targetsRequester && targetsDevice) {
                 // Return single entry as VAULT_DELIVERY
                 sendResponse(fromAddress, {
                     type: 'VAULT_DELIVERY',
@@ -144,7 +166,12 @@ export async function handleVaultQuery(
             }
         }
 
-        const page = await getVaultEntriesPageForRecipient(data.requesterSid, data.afterId, VAULT_DELIVERY_PAGE_SIZE + 1);
+        const page = await getVaultEntriesPageForRecipient(
+            data.requesterSid,
+            data.afterId,
+            VAULT_DELIVERY_PAGE_SIZE + 1,
+            requesterDeviceId,
+        );
 
         const hasMore = page.length > VAULT_DELIVERY_PAGE_SIZE;
         const entries = page.slice(0, VAULT_DELIVERY_PAGE_SIZE);
@@ -171,8 +198,9 @@ export async function handleVaultQuery(
  * Handles VAULT_ACK from a user confirming they've received the messages.
  * This triggers deletion from our local custody.
  */
-export async function handleVaultAck(senderSid: string, data: { payloadHashes: string[] }) {
+export async function handleVaultAck(senderSid: string, data: { payloadHashes: string[]; deviceId?: string }) {
     if (!Array.isArray(data.payloadHashes)) return;
+    const deviceId = normalizeVaultDeviceId(data.deviceId);
 
     for (const hash of data.payloadHashes) {
         // BUG CF fix: verificar que el remitente del ACK es el destinatario legítimo
@@ -187,6 +215,16 @@ export async function handleVaultAck(senderSid: string, data: { payloadHashes: s
         if (entry.recipientSid !== senderSid) {
             security('VAULT_ACK de no-destinatario — ignorado', { hash, sender: senderSid, recipient: entry.recipientSid }, 'vault');
             issueVouch(senderSid, VouchType.MALICIOUS).catch((err) => warn('Failed to issue malicious vouch from vault ACK', { senderSid, err: String(err) }, 'vault'));
+            continue;
+        }
+        if (entry.recipientDeviceId && entry.recipientDeviceId !== deviceId) {
+            security('VAULT_ACK de dispositivo no destinatario — ignorado', {
+                hash,
+                sender: senderSid,
+                device: deviceId,
+                recipientDevice: entry.recipientDeviceId,
+            }, 'vault');
+            issueVouch(senderSid, VouchType.MALICIOUS).catch((err) => warn('Failed to issue malicious vouch from vault device ACK', { senderSid, err: String(err) }, 'vault'));
             continue;
         }
         const deleted = await deleteVaultEntry(hash);

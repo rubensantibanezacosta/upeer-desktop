@@ -219,6 +219,60 @@ describe('vault manager small-network attachment cases', () => {
         );
     });
 
+    it('replica en el buzón del dispositivo anunciado y publica su puntero', async () => {
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const vaultOps = await import('../../../src/main_process/storage/vault/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        const storeValue = vi.fn(async () => undefined);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({
+            findClosestContacts: vi.fn((targetId: string) => targetId === 'self-id'
+                ? [{ upeerId: 'self-id', address: '200::tablet' }]
+                : []),
+            storeValue,
+        } as never);
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([] as never);
+        const deviceId = 'ab'.repeat(32);
+        const payloadHash = 'f'.repeat(64);
+
+        const nodes = await VaultManager.replicateToVaults(
+            'peer-2',
+            { type: 'GROUP_MSG' },
+            undefined,
+            payloadHash,
+            deviceId,
+        );
+
+        expect(nodes).toBe(1);
+        expect(vaultOps.saveVaultEntry).toHaveBeenCalledWith(
+            payloadHash,
+            'peer-2',
+            'self-id',
+            2,
+            expect.any(String),
+            expect.any(Number),
+            deviceId,
+        );
+        expect(transport.sendSecurePacket).toHaveBeenCalledWith(
+            '200::tablet',
+            expect.objectContaining({
+                type: 'VAULT_STORE',
+                recipientSid: 'peer-2',
+                recipientDeviceId: deviceId,
+            }),
+        );
+        expect(storeValue).toHaveBeenCalledTimes(2);
+        expect(storeValue).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            expect.objectContaining({
+                recipientDeviceId: deviceId,
+                custodianEndpoints: [{ upeerId: 'self-id', address: '200::tablet' }],
+            }),
+            'self-id',
+        );
+    });
+
     it('consulta endpoints del puntero y los demás dispositivos propios', async () => {
         const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
         const transport = await import('../../../src/main_process/network/server/transport.js');

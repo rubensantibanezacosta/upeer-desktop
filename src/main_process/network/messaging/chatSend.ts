@@ -39,6 +39,10 @@ type ChatContactRecord = {
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'disconnected';
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+    deviceSignedPreKey?: string | null;
+    deviceSignedPreKeyId?: number | null;
 };
 
 type GroupRecordLike = {

@@ -239,12 +239,23 @@ async function applySendGroupMessage(
         isSelf ? null : contact,
         myId,
       );
-      const nodes = await VaultManager.replicateToVaults(
-        memberUpeerId,
-        signedPacket,
-        undefined,
-        payloadHashOverride,
-      );
+      const recipientDeviceId = "deviceId" in contact && typeof contact.deviceId === "string"
+        ? contact.deviceId
+        : undefined;
+      const nodes = isSelf || !recipientDeviceId
+        ? await VaultManager.replicateToVaults(
+          memberUpeerId,
+          signedPacket,
+          undefined,
+          payloadHashOverride,
+        )
+        : await VaultManager.replicateToVaults(
+          memberUpeerId,
+          signedPacket,
+          undefined,
+          payloadHashOverride,
+          recipientDeviceId,
+        );
 
       if (!isSelf && nodes > 0) {
         if (await updateMessageStatus(msgId, "vaulted")) {

@@ -6,15 +6,18 @@ import {
 type VaultStorePayload = {
     payloadHash?: unknown;
     recipientSid?: unknown;
+    recipientDeviceId?: unknown;
     data?: unknown;
 };
 
 type VaultQueryPayload = {
     requesterSid?: unknown;
+    requesterDeviceId?: unknown;
 };
 
 type VaultAckPayload = {
     payloadHashes?: unknown;
+    deviceId?: unknown;
 };
 
 type VaultDeliveryEntry = {
@@ -70,6 +73,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
 }
 
+function isOptionalDeviceId(value: unknown): boolean {
+    return value === undefined
+        || (typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value));
+}
+
 type GroupLeavePayload = {
     groupId?: unknown;
     signature?: unknown;
@@ -103,6 +111,9 @@ export function validateVaultStore(data: VaultStorePayload): ValidationResult {
     if (!data.recipientSid || typeof data.recipientSid !== 'string' || data.recipientSid.length > 64) {
         return { valid: false, error: 'Invalid recipientSid' };
     }
+    if (!isOptionalDeviceId(data.recipientDeviceId)) {
+        return { valid: false, error: 'Invalid recipientDeviceId' };
+    }
     if (!data.data || typeof data.data !== 'string') {
         return { valid: false, error: 'Invalid data' };
     }
@@ -116,12 +127,18 @@ export function validateVaultQuery(data: VaultQueryPayload): ValidationResult {
     if (!data.requesterSid || typeof data.requesterSid !== 'string' || data.requesterSid.length > 64) {
         return { valid: false, error: 'Invalid requesterSid' };
     }
+    if (!isOptionalDeviceId(data.requesterDeviceId)) {
+        return { valid: false, error: 'Invalid requesterDeviceId' };
+    }
     return { valid: true };
 }
 
 export function validateVaultAck(data: VaultAckPayload): ValidationResult {
     if (!Array.isArray(data.payloadHashes)) {
         return { valid: false, error: 'Invalid payloadHashes' };
+    }
+    if (!isOptionalDeviceId(data.deviceId)) {
+        return { valid: false, error: 'Invalid deviceId' };
     }
     if (data.payloadHashes.length > 200) {
         return { valid: false, error: 'Too many payloadHashes' };

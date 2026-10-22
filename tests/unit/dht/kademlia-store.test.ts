@@ -122,6 +122,13 @@ describe('Kademlia ValueStore', () => {
             expect(k.length).toBe(20);
         });
 
+        it('should scope Vault Pointer keys by recipient device', () => {
+            const accountKey = createVaultPointerKey('recipient1');
+            const deviceKey = createVaultPointerKey('recipient1', 'ab'.repeat(32));
+            expect(deviceKey.length).toBe(20);
+            expect(deviceKey.toString('hex')).not.toBe(accountKey.toString('hex'));
+        });
+
         it('should create unique Vault Pointer keys each day', () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-01'));

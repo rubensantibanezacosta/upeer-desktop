@@ -125,6 +125,7 @@ export interface DhtStoreAck {
 export interface VaultStoreData {
     payloadHash: string;
     recipientSid: string;
+    recipientDeviceId?: string;
     senderSid: string;
     priority: number;
     data: string; // hex
@@ -134,6 +135,7 @@ export interface VaultStoreData {
 
 export interface VaultQueryData {
     requesterSid: string;
+    requesterDeviceId?: string;
     timestamp: number;
     merkleRoot?: string;
     batchSize?: number;

@@ -12,73 +12,23 @@ import { issueVouch, VouchType } from '../../security/reputation/vouches.js';
 import { debug, security, warn, error } from '../../security/secure-logger.js';
 import { fileTransferManager } from '../file-transfer/transfer-manager.js';
 import { verifyFileTransferPacketSignature } from '../file-transfer/signature.js';
-import { saveVaultEntry } from '../../storage/vault/operations.js';
-import { trackDistributedAsset } from '../../storage/vault/asset-operations.js';
-import { SHARD_TTL_MS } from '../vault/manager.js';
 import { completeVaultRecoverySource, touchVaultRecoverySource } from '../vault/recoveryTracker.js';
-
-type VaultSendResponse = (ip: string, data: Record<string, unknown>) => void;
-
-type VaultEntry = {
-    senderSid: string;
-    payloadHash?: string;
-    data: string;
-};
-
-type VaultDeliveryPayload = {
-    entries?: unknown;
-    hasMore?: unknown;
-    nextOffset?: unknown;
-    nextAfterId?: unknown;
-};
-
-type VaultOriginContact = {
-    upeerId: string;
-    publicKey: string;
-    deviceId?: string | null;
-    devicePublicKey?: string | null;
-};
-
-type VaultInnerPacket = {
-    type?: string;
-    signature?: string;
-    senderUpeerId?: string;
-    isInternalSync?: boolean;
-    fileHash?: string;
-    fileName?: string;
-    fileSize?: number;
-    mimeType?: string;
-    payloadHash?: string;
-    [key: string]: unknown;
-};
+import { getMyMailboxDeviceId } from '../vault/deviceMailbox.js';
+import {
+    getVaultVerificationKeys,
+    isRecord,
+    isVaultEntry,
+    isVaultGroupPacket,
+    type VaultDeliveryPayload,
+    type VaultInnerPacket,
+    type VaultOriginContact,
+    type VaultSendResponse,
+} from './vaultDeliverySupport.js';
+import { finalizeVaultDelivery, sendVaultDeliveryAck } from './vaultDeliveryCompletion.js';
+import { recoverVaultShardEntry } from './vaultShardRecovery.js';
 
 const pendingVaultFileCustodians = new Map<string, Map<string, Set<string>>>();
 const vouchedVaultFiles = new Set<string>();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
-}
-
-function isVaultEntry(value: unknown): value is VaultEntry {
-    return isRecord(value) && typeof value.senderSid === 'string' && typeof value.data === 'string';
-}
-
-function getVaultVerificationKeys(contact: VaultOriginContact, packet: VaultInnerPacket): string[] {
-    const keys = [contact.publicKey];
-    const senderDeviceId = typeof packet.senderDeviceId === 'string'
-        ? packet.senderDeviceId.toLowerCase()
-        : undefined;
-    const devicePublicKey = contact.devicePublicKey?.toLowerCase();
-    if (
-        senderDeviceId
-        && contact.deviceId?.toLowerCase() === senderDeviceId
-        && devicePublicKey
-        && /^[0-9a-f]{64}$/.test(devicePublicKey)
-    ) {
-        keys.push(devicePublicKey);
-    }
-    return Array.from(new Set(keys));
-}
 
 export async function handleVaultDelivery(
     senderSid: string,
@@ -103,6 +53,7 @@ export async function handleVaultDelivery(
     }
     const MAX_DELIVERY_ENTRIES = 120; // alineado con VAULT_DELIVERY_PAGE_SIZE del custodio
     const entries = data.entries.slice(0, MAX_DELIVERY_ENTRIES).filter(isVaultEntry);
+    const myDeviceId = await getMyMailboxDeviceId();
 
     touchVaultRecoverySource(recoverySourceKey, senderSid);
 
@@ -125,6 +76,14 @@ export async function handleVaultDelivery(
     try {
         for (const entry of entries) {
             try {
+                if (entry.recipientDeviceId && entry.recipientDeviceId !== myDeviceId) {
+                    debug('Skipping vault entry for another device', {
+                        senderSid,
+                        recipientDeviceId: entry.recipientDeviceId,
+                        hash: entry.payloadHash,
+                    }, 'vault');
+                    continue;
+                }
                 const isOwnVaultEntry = entry.senderSid === getMyUPeerId();
                 const originalContact = (await getContactByUpeerId(entry.senderSid) as VaultOriginContact | null) || (isOwnVaultEntry
                     ? { upeerId: entry.senderSid, publicKey: getMyPublicKeyHex() }
@@ -279,33 +238,12 @@ export async function handleVaultDelivery(
                         await handleChatReaction(entry.senderSid, innerPacket, win);
                     }
                 } else {
-                    // Raw Data / Shards
-                    if (typeof entry.payloadHash === 'string' && entry.payloadHash.startsWith('shard:')) {
-                        debug('Received file shard from vault', { cid: entry.payloadHash }, 'vault');
-                        // For shards, we store them as assets. 
-                        // Format can be legacy (shard:hash:idx) or segmented (shard:hash:seg:idx)
-                        const parts = entry.payloadHash.split(':');
-                        const fileHash = parts[1];
-                        const segmentIndex = parts.length === 4 ? parseInt(parts[2], 10) : 0;
-                        const shardIndex = parseInt(parts.length === 4 ? parts[3] : parts[2], 10);
-
-                        if (fileHash && !isNaN(shardIndex) && !isNaN(segmentIndex)) {
-                            const myId = getMyUPeerId();
-                            await saveVaultEntry(
-                                entry.payloadHash,
-                                myId,
-                                entry.senderSid,
-                                3,
-                                entry.data,
-                                Date.now() + SHARD_TTL_MS
-                            );
-                            await trackDistributedAsset(fileHash, entry.payloadHash, shardIndex, 12, myId, segmentIndex);
-                            const custodians = sourceVaultFiles.get(fileHash) ?? new Set<string>();
-                            custodians.add(senderSid);
-                            sourceVaultFiles.set(fileHash, custodians);
-                            recoveredFileHashes.add(fileHash);
-                        }
-                    }
+                    await recoverVaultShardEntry({
+                        entry,
+                        senderSid,
+                        sourceVaultFiles,
+                        recoveredFileHashes,
+                    });
                 }
                 // Llegamos aquí sin 'continue' ni excepción → entrada procesada correctamente.
                 if (typeof entry.payloadHash !== 'string' || !entry.payloadHash.startsWith('shard:')) {
@@ -328,39 +266,13 @@ export async function handleVaultDelivery(
         error('Vault delivery processing failed', err, 'vault');
     }
 
-    // Disparar el recovery de archivos vaulteados una vez por archivo tras procesar
-    // todo el batch de shards, en lugar de hacerlo por cada shard individual.
-    if (recoveredFileHashes.size > 0) {
-        for (const fileHash of recoveredFileHashes) {
-            try {
-                await fileTransferManager.tryRecoverVaultTransferByFileHash(fileHash);
-            } catch (err) {
-                warn('Vault transfer recovery failed', { fileHash, err: String(err) }, 'vault');
-            }
-        }
-    }
-
-    if (processedEntries > 0) {
-        issueVouch(senderSid, VouchType.VAULT_RETRIEVED).catch((err) => {
-            warn('Failed to issue vault retrieved vouch', { senderSid, err: String(err) }, 'reputation');
-        });
-    }
-
-    if (processedAckHashes.size > 0) {
-        sendResponse(fromAddress, {
-            type: 'VAULT_ACK',
-            payloadHashes: Array.from(processedAckHashes),
-        });
-    }
-
-    // BUG O fix: si el custodio indicó que hay más entradas, solicitamos la siguiente página.
-    // Sin esto, usuarios con >50 mensajes en vault solo reciben los primeros 50 y el resto
-    // queda atrapado en el custodio para siempre.
+    sendVaultDeliveryAck(fromAddress, myDeviceId, processedAckHashes, sendResponse);
     if (data.hasMore === true && typeof data.nextAfterId === 'number') {
         const myId = getMyUPeerId();
         sendResponse(fromAddress, {
             type: 'VAULT_QUERY',
             requesterSid: myId,
+            ...(myDeviceId ? { requesterDeviceId: myDeviceId } : {}),
             afterId: data.nextAfterId,
         });
         touchVaultRecoverySource(recoverySourceKey, senderSid);
@@ -368,31 +280,15 @@ export async function handleVaultDelivery(
         return;
     }
 
-    for (const [fileHash, custodians] of sourceVaultFiles) {
-        const completedTransfer = fileTransferManager.getAllTransfers().some((transfer) =>
-            transfer.direction === 'receiving'
-            && transfer.fileHash === fileHash
-            && transfer.state === 'completed'
-        );
-        if (completedTransfer) {
-            for (const custodianId of custodians) {
-                const vouchKey = `${custodianId}:${fileHash}`;
-                if (!vouchedVaultFiles.has(vouchKey)) {
-                    vouchedVaultFiles.add(vouchKey);
-                    issueVouch(custodianId, VouchType.VAULT_CHUNK).catch((err) => {
-                        vouchedVaultFiles.delete(vouchKey);
-                        warn('Failed to issue completed vault file vouch', { custodianId, fileHash, err: String(err) }, 'reputation');
-                    });
-                }
-            }
-        }
-    }
-    pendingVaultFileCustodians.delete(recoverySourceKey);
+    await finalizeVaultDelivery({
+        senderSid,
+        recoverySourceKey,
+        sourceVaultFiles,
+        pendingVaultFileCustodians,
+        vouchedVaultFiles,
+        recoveredFileHashes,
+        processedEntries,
+    });
 
     completeVaultRecoverySource(recoverySourceKey);
-}
-
-function isVaultGroupPacket(type: unknown): boolean {
-    return type === 'GROUP_MSG' || type === 'GROUP_ACK' || type === 'GROUP_INVITE'
-        || type === 'GROUP_UPDATE' || type === 'GROUP_LEAVE';
 }
