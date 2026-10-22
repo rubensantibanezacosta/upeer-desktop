@@ -61,6 +61,8 @@ export function clearUserData(): void {
     sqlite.exec('DELETE FROM ratchet_sessions');
     sqlite.exec('DELETE FROM pending_outbox');
     sqlite.exec('DELETE FROM reputation_vouches');
+    sqlite.exec('DELETE FROM sync_events');
+    sqlite.exec('DELETE FROM sync_peers');
 }
 
 /**

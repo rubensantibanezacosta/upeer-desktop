@@ -194,3 +194,35 @@ export const devices = sqliteTable('devices', {
     deviceIdx: index('devices_id_idx').on(table.deviceId),
     uniqueConstraint: uniqueIndex('devices_unique_idx').on(table.upeerId, table.deviceId),
 }));
+
+export const syncPeers = sqliteTable('sync_peers', {
+    deviceId: text('device_id').primaryKey(),
+    upeerId: text('upeer_id').notNull(),
+    devicePublicKey: text('device_public_key').notNull(),
+    deviceCertificate: text('device_certificate').notNull(),
+    deviceSignedPreKey: text('device_signed_pre_key').notNull(),
+    deviceSignedPreKeySignature: text('device_signed_pre_key_sig').notNull(),
+    deviceSignedPreKeyId: integer('device_signed_pre_key_id').notNull(),
+    address: text('address'),
+    lastSeen: integer('last_seen').notNull(),
+    lastSequence: integer('last_sequence').notNull().default(0),
+    ackSequence: integer('ack_sequence').notNull().default(0),
+    historyCursor: text('history_cursor'),
+    historyCompleted: integer('history_completed', { mode: 'boolean' }).notNull().default(false),
+}, (table) => ({
+    upeerIdx: index('sync_peers_upeer_idx').on(table.upeerId),
+}));
+
+export const syncEvents = sqliteTable('sync_events', {
+    eventId: text('event_id').primaryKey(),
+    originDeviceId: text('origin_device_id').notNull(),
+    kind: text('kind').notNull(),
+    occurredAt: integer('occurred_at').notNull(),
+    sequence: integer('sequence').notNull().default(0),
+    payload: text('payload').notNull(),
+    direction: text('direction').notNull(),
+    appliedAt: integer('applied_at').notNull(),
+}, (table) => ({
+    originIdx: index('sync_events_origin_idx').on(table.originDeviceId),
+    occurredIdx: index('sync_events_occurred_idx').on(table.occurredAt),
+}));

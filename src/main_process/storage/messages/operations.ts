@@ -4,6 +4,7 @@ import path from 'node:path';
 import { like, gte, lte, lt } from 'drizzle-orm';
 import { getDb, getSchema, eq, desc, and, runTransaction, sql } from '../shared.js';
 import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
+import { emitSyncEvent } from '../sync/eventSink.js';
 
 export { updateMessageStatus, getMessageStatus };
 
@@ -112,7 +113,23 @@ export async function saveMessage(id: string, chatUpeerId: string, isMine: boole
 
     if (result.changes === 0) {
         await updateMessageStatus(id, status);
+        return result;
     }
+
+    emitSyncEvent('MESSAGE_UPSERT', {
+        id,
+        chatUpeerId,
+        senderUpeerId: senderUpeerId ?? null,
+        isMine,
+        message,
+        replyTo: replyTo ?? null,
+        signature: signature ?? null,
+        status,
+        version: 1,
+        isDeleted: false,
+        isEdited: false,
+        timestamp: messageTimestamp,
+    });
 
     return result;
 }
@@ -148,23 +165,41 @@ export function updateMessageContent(id: string, newMessage: string, signature?:
     };
     if (version !== undefined) updates.version = version;
 
-    return db.update(schema.messages)
+    const result = db.update(schema.messages)
         .set(updates)
         .where(eq(schema.messages.id, id))
         .run();
+    if ((result?.changes ?? 0) > 0) {
+        emitSyncEvent('MESSAGE_EDIT', {
+            id,
+            message: newMessage,
+            signature: signature ?? null,
+            version: version ?? 1,
+        });
+    }
+    return result;
 }
 
-export function deleteMessageLocally(id: string, _timestamp?: number) {
+export function deleteMessageLocally(id: string, timestamp?: number) {
     const db = getDb();
     const schema = getSchema();
+    const existing = getMessageById(id) as { chatUpeerId?: string } | undefined;
 
-    return db.update(schema.messages)
+    const result = db.update(schema.messages)
         .set({
             message: "Mensaje eliminado",
             isDeleted: true
         })
         .where(eq(schema.messages.id, id))
         .run();
+    if ((result?.changes ?? 0) > 0) {
+        emitSyncEvent('MESSAGE_DELETE', {
+            id,
+            chatUpeerId: existing?.chatUpeerId ?? null,
+            timestamp: timestamp ?? Date.now(),
+        });
+    }
+    return result;
 }
 
 export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: number) {
@@ -195,6 +230,13 @@ export function deleteMessagesByChatId(chatUpeerId: string, clearTimestamp?: num
             .where(eq(schema.messages.chatUpeerId, chatUpeerId))
             .run().changes;
     });
+
+    if (deletedMessages > 0 || deletedReactions > 0) {
+        emitSyncEvent('CHAT_CLEAR', {
+            chatUpeerId,
+            clearTimestamp: timestamp,
+        });
+    }
 
     return { deletedMessages, deletedReactions, timestamp };
 }

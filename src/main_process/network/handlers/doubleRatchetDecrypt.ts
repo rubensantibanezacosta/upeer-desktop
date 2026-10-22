@@ -17,10 +17,10 @@ type DoubleRatchetPayload = {
     senderDeviceId?: string;
 };
 
-export type RatchetContext = 'direct' | `group:${string}`;
+export type RatchetContext = 'direct' | `group:${string}` | `sync:${string}`;
 
 const createResetPacket = (contextId: RatchetContext, senderDeviceId?: string): ChatDrResetPacket =>
-    createDrResetPacket(contextId, { useDeviceIdentity: Boolean(senderDeviceId) });
+    createDrResetPacket(contextId as ChatDrResetPacket['ratchetContext'], { useDeviceIdentity: Boolean(senderDeviceId) });
 
 export async function decryptDoubleRatchetPayload(
     upeerId: string,

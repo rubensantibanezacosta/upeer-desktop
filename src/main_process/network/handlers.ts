@@ -6,7 +6,6 @@ import { IdentityRateLimiter } from '../security/identity-rate-limiter.js';
 import {
     decryptSealed,
     getUPeerIdFromPublicKey,
-    verify
 } from '../security/identity.js';
 import { decryptSealedWithDevice } from '../security/deviceMessaging.js';
 
@@ -22,12 +21,11 @@ import {
     updateLastSeen
 } from '../storage/contacts/status.js';
 
-import { handleDhtPacket } from './dht/handlers.js';
-import { handleHandshakeAccept, handleHandshakeReq } from './handlers/contacts.js';
 import { unsealPacket } from './sealed.js';
-import { canonicalStringify } from './utils.js';
 import { routeVerifiedPacket } from './verifiedPacketRouter.js';
 import { decodeBinaryCallMedia, isBinaryCallMedia } from './binaryCallMedia.js';
+import { routeEarlyPacket } from './earlyPacketRouter.js';
+import { verifyPacketSignature } from './signatureVerification.js';
 
 
 const rateLimiter = new IdentityRateLimiter();
@@ -154,29 +152,18 @@ export async function handlePacket(
             return;
         }
 
-        // 1. HANDSHAKE
-        if (pktType === 'HANDSHAKE_REQ') {
-            await handleHandshakeReq(data as NetworkPacket, signature ?? '', senderUpeerId ?? '', senderYggAddress ?? '', rinfo, win, sendResponse as (ip: string, data: Record<string, unknown>) => void, tcpSourceAddress);
-            return;
-        }
-
-        if (pktType === 'HANDSHAKE_ACCEPT') {
-            await handleHandshakeAccept(data as NetworkPacket, signature ?? '', senderUpeerId ?? '', senderYggAddress ?? '', rinfo, win, sendResponse as (ip: string, data: Record<string, unknown>) => void, tcpSourceAddress);
-            return;
-        }
-
-        // 1b. DHT
-        if (pktType.startsWith('DHT_') && senderUpeerId) {
-            const kademliaHandled = await handleDhtPacket(
-                pktType,
-                data as NetworkPacket,
-                senderUpeerId,
-                rinfo.address,
-                win,
-                sendResponse as any
-            );
-            if (kademliaHandled) return;
-        }
+        const earlyHandled = await routeEarlyPacket({
+            pktType,
+            data,
+            signature,
+            senderUpeerId,
+            senderYggAddress,
+            rinfo,
+            win,
+            sendResponse,
+            tcpSourceAddress,
+        });
+        if (earlyHandled) return;
 
         // 2. SECURITY CHECK
         const upeerId = senderUpeerId;
@@ -243,84 +230,20 @@ export async function handlePacket(
         };
         const updatePresence = Boolean(directContact);
 
-        // Debug logging for FILE_CHUNK
-        if (pktType === 'FILE_CHUNK') {
-            debug('FILE_CHUNK pre-verify', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
-        }
+        const verified = verifyPacketSignature({
+            data,
+            fullPacket,
+            publicKey,
+            senderDevicePublicKey,
+            signature,
+            senderUpeerId,
+            senderYggAddress,
+            binaryMediaHash,
+            pktType,
+            peerAddress: rinfo.address,
+        });
+        if (!verified) return;
 
-        // Exclude fields not part of signature
-        const fieldsToExclude = ['contactCache', 'renewalToken'];
-        const dataForVerification: PacketRecord = { ...data };
-        if (binaryMediaHash) {
-            delete dataForVerification.data;
-            dataForVerification.mediaHash = binaryMediaHash;
-        }
-        fieldsToExclude.forEach(field => { delete dataForVerification[field]; });
-
-        const payloadForVerification: PacketRecord = { ...dataForVerification, senderUpeerId };
-        if (senderYggAddress !== undefined) {
-            payloadForVerification.senderYggAddress = senderYggAddress;
-        }
-
-        if (!signature || typeof signature !== 'string') {
-            security('Packet missing signature', { ip: rinfo.address, upeerId, type: pktType }, 'network');
-            return;
-        }
-
-        let verified: boolean;
-        if (binaryMediaHash) {
-            verified = verify(
-                Buffer.from(canonicalStringify(payloadForVerification)),
-                Buffer.from(signature, 'hex'),
-                Buffer.from(publicKey, 'hex')
-            );
-        } else {
-            verified = verify(
-                Buffer.from(canonicalStringify(payloadForVerification)),
-                Buffer.from(signature, 'hex'),
-                Buffer.from(publicKey, 'hex')
-            );
-            if (!verified && senderYggAddress !== undefined) {
-                const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
-                verified = verify(
-                    Buffer.from(canonicalStringify(legacyPayload)),
-                    Buffer.from(signature, 'hex'),
-                    Buffer.from(publicKey, 'hex')
-                );
-            }
-        }
-
-        if (!verified && senderDevicePublicKey) {
-            const deviceKey = Buffer.from(senderDevicePublicKey, 'hex');
-            verified = verify(
-                Buffer.from(canonicalStringify(payloadForVerification)),
-                Buffer.from(signature, 'hex'),
-                deviceKey
-            );
-            if (!verified && senderYggAddress !== undefined) {
-                const legacyPayload: PacketRecord = { ...dataForVerification, senderUpeerId };
-                verified = verify(
-                    Buffer.from(canonicalStringify(legacyPayload)),
-                    Buffer.from(signature, 'hex'),
-                    deviceKey
-                );
-            }
-        }
-
-        if (!verified) {
-            if (pktType !== 'CALL_MEDIA') {
-                security('Invalid signature', {
-                    upeerId,
-                    ip: rinfo.address,
-                    type: pktType,
-                    payload: canonicalStringify(payloadForVerification),
-                    fullPacket
-                }, 'network');
-            }
-            return;
-        } else if (pktType === 'FILE_CHUNK') {
-            debug('FILE_CHUNK signature verified', { fileId: data.fileId, chunkIndex: data.chunkIndex }, 'file-transfer');
-        }
         if (pktType === 'GROUP_MSG' && groupMessage && !groupMessage.memberPublicKeys?.[upeerId] && groupPublicKey) {
             mergeGroupMemberPublicKeys(data.groupId as string, { [upeerId]: groupPublicKey });
         }
@@ -366,7 +289,7 @@ export async function handlePacket(
                 address?: string;
             },
             data: data as NetworkPacket,
-            signature,
+            signature: signature ?? '',
             rinfo,
             win,
             sendResponse: sendResponse as (ip: string, data: Record<string, unknown>) => void,

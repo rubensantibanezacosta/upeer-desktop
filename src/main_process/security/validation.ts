@@ -3,6 +3,7 @@ export * from './validationMessaging.js';
 export * from './validationDht.js';
 export * from './validationFiles.js';
 export * from './validationVaultGroups.js';
+export * from './validationSync.js';
 
 import {
     validateAck,
@@ -58,6 +59,13 @@ import {
     validateVaultStore,
 } from './validationVaultGroups.js';
 import { validateCallMessage } from './validationCalls.js';
+import {
+    validateSyncAck,
+    validateSyncEnvelope,
+    validateSyncHello,
+    validateSyncHistoryRequest,
+    validateSyncHistoryResponse,
+} from './validationSync.js';
 import type { ValidationResult } from './validationShared.js';
 
 const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
@@ -87,6 +95,11 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     DHT_PING: validateDhtPing,
     DHT_PONG: validateDhtPong,
     SYNC_PULSE: validateSyncPulse,
+    SYNC_HELLO: validateSyncHello,
+    SYNC_ENVELOPE: validateSyncEnvelope,
+    SYNC_HISTORY_REQ: validateSyncHistoryRequest,
+    SYNC_HISTORY_RES: validateSyncHistoryResponse,
+    SYNC_ACK: validateSyncAck,
     IDENTITY_UPDATE: validateIdentityUpdate,
     FILE_PROPOSAL: validateFileProposal,
     FILE_START: validateFileProposal,

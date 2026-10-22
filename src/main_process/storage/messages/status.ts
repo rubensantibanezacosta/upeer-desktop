@@ -1,4 +1,5 @@
 import { getDb, getSchema, eq } from '../shared.js';
+import { emitSyncEvent } from '../sync/eventSink.js';
 
 export type MessageDeliveryStatus = 'failed' | 'sent' | 'delivered' | 'read' | 'vaulted';
 
@@ -28,7 +29,8 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
             .set({ status })
             .where(eq(schema.messages.id, id))
             .run();
-        return result.changes > 0;
+        if ((result?.changes ?? 0) > 0) emitSyncEvent('MESSAGE_STATUS', { id, status });
+        return (result?.changes ?? 0) > 0;
     }
 
     if (currentStatus === 'failed' && status === 'sent') {
@@ -37,7 +39,8 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
             .set({ status })
             .where(eq(schema.messages.id, id))
             .run();
-        return result.changes > 0;
+        if ((result?.changes ?? 0) > 0) emitSyncEvent('MESSAGE_STATUS', { id, status });
+        return (result?.changes ?? 0) > 0;
     }
 
     const currentRank = statusOrder[currentStatus] ?? 0;
@@ -51,7 +54,8 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
         .where(eq(schema.messages.id, id))
         .run();
 
-    return result.changes > 0;
+    if ((result?.changes ?? 0) > 0) emitSyncEvent('MESSAGE_STATUS', { id, status });
+    return (result?.changes ?? 0) > 0;
 }
 
 export function getMessageStatus(id: string) {

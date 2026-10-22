@@ -37,7 +37,12 @@ export type MessageType =
     | 'VAULT_ACK'
     | 'VAULT_SYNC_REQ'
     | 'VAULT_SYNC_RES'
-    | 'VAULT_RENEW';  // Custodio renueva entry próxima a expirar
+    | 'VAULT_RENEW'
+    | 'SYNC_HELLO'
+    | 'SYNC_ENVELOPE'
+    | 'SYNC_HISTORY_REQ'
+    | 'SYNC_HISTORY_RES'
+    | 'SYNC_ACK';
 
 
 export interface DeviceMetadata {

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { serializeState, type RatchetState } from '../../security/ratchet.js';
 import { getDb, getSchema, runTransaction } from '../shared.js';
+import { emitSyncEvent } from '../sync/eventSink.js';
 
 export type RatchetIncomingMessage = {
     id: string;
@@ -66,6 +67,23 @@ export function commitRatchetIncomingMessage(
             set: { state: serializedState, spkIdUsed, updatedAt: now },
         }).run();
     });
+
+    if (changes > 0) {
+        emitSyncEvent('MESSAGE_UPSERT', {
+            id: message.id,
+            chatUpeerId: message.chatUpeerId,
+            senderUpeerId: message.senderUpeerId ?? null,
+            isMine: message.isMine,
+            message: message.message,
+            replyTo: message.replyTo ?? null,
+            signature: message.signature ?? null,
+            status: message.status,
+            version: 1,
+            isDeleted: false,
+            isEdited: false,
+            timestamp,
+        });
+    }
 
     return { changes };
 }

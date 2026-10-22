@@ -68,6 +68,8 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
   if (!isSessionLocked()) {
     startUDPServer(mainWindow);
+    const { startSyncDiscovery } = await import('../network/sync/pipeline.js');
+    startSyncDiscovery();
   }
 
   try {
