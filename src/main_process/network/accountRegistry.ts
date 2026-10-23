@@ -9,7 +9,7 @@ import {
     getDeviceIdentity,
     verifyDeviceCertificate,
 } from '../security/deviceIdentity.js';
-import { loadAccountRegistryStateResult } from '../security/accountRegistryState.js';
+import { loadAccountRegistryStateResult, type AccountRegistryState } from '../security/accountRegistryState.js';
 
 const REGISTRY_KEY_PREFIX = 'upeer-account-registry:';
 const REGISTRY_MAX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,14 +57,45 @@ export function getMyAccountRegistry(now = Date.now()): AccountRegistry | null {
     const sameAccount = persisted.status === 'ready' && persisted.state.accountUpeerId === certificate.accountUpeerId
         ? persisted.state
         : null;
+    const devices = mergeRegistryDevices(certificate, sameAccount, now);
+    const issuedAt = Math.max(certificate.issuedAt, sameAccount?.issuedAt ?? 0);
+    const latestDeviceExpiry = Math.max(certificate.expiresAt, ...devices.map(device => device.expiresAt));
     const registry: AccountRegistry = {
         version: 1,
         accountUpeerId: certificate.accountUpeerId,
         accountPublicKey: certificate.accountPublicKey,
-        epoch: Math.max(certificate.epoch, sameAccount?.epoch ?? 0),
-        issuedAt: Math.max(certificate.issuedAt, sameAccount?.issuedAt ?? 0),
-        expiresAt: certificate.expiresAt,
-        devices: [{
+        epoch: Math.max(certificate.epoch, sameAccount?.epoch ?? 0, ...devices.map(device => device.epoch)),
+        issuedAt,
+        expiresAt: Math.min(latestDeviceExpiry, issuedAt + REGISTRY_MAX_TTL_MS),
+        devices,
+        revoked: sameAccount ? [...sameAccount.revoked] : [],
+        signature: '',
+    };
+    registry.signature = signRegistry(registry);
+    return registry;
+}
+
+function mergeRegistryDevices(
+    certificate: AccountDeviceCertificate,
+    state: AccountRegistryState | null,
+    now: number,
+): AccountRegistryDevice[] {
+    const revoked = new Set((state?.revoked ?? []).map(item => item.deviceId));
+    const merged = new Map<string, AccountRegistryDevice>();
+    for (const device of state?.devices ?? []) {
+        if (revoked.has(device.deviceId) || device.expiresAt <= now) continue;
+        merged.set(device.deviceId, {
+            deviceId: device.deviceId,
+            devicePublicKey: device.devicePublicKey,
+            platform: device.platform,
+            capabilities: device.capabilities,
+            authorizedAt: device.authorizedAt,
+            expiresAt: device.expiresAt,
+            epoch: device.epoch,
+        });
+    }
+    if (!revoked.has(certificate.deviceId)) {
+        merged.set(certificate.deviceId, {
             deviceId: certificate.deviceId,
             devicePublicKey: certificate.devicePublicKey,
             platform: certificate.platform,
@@ -72,12 +103,11 @@ export function getMyAccountRegistry(now = Date.now()): AccountRegistry | null {
             authorizedAt: certificate.issuedAt,
             expiresAt: certificate.expiresAt,
             epoch: certificate.epoch,
-        }],
-        revoked: sameAccount ? [...sameAccount.revoked] : [],
-        signature: '',
-    };
-    registry.signature = signRegistry(registry);
-    return registry;
+        });
+    }
+    return [...merged.values()]
+        .sort((left, right) => left.deviceId.localeCompare(right.deviceId))
+        .slice(0, MAX_DEVICES);
 }
 
 export async function publishMyAccountRegistry(now = Date.now()): Promise<boolean> {

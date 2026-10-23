@@ -8,6 +8,7 @@ import { warn } from './secure-logger.js';
 
 const STATE_FILE = 'account-registry.enc';
 const MAX_REVOKED = 32;
+export const MAX_AUTHORIZED_DEVICES = 10;
 const MAX_REASON_LENGTH = 160;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -17,12 +18,23 @@ export type AccountRegistryRevocation = {
     reason: string;
 };
 
+export type AuthorizedDeviceRecord = {
+    deviceId: string;
+    devicePublicKey: string;
+    platform?: string;
+    capabilities?: string[];
+    authorizedAt: number;
+    expiresAt: number;
+    epoch: number;
+};
+
 export type AccountRegistryState = {
     version: 1;
     accountUpeerId: string;
     epoch: number;
     issuedAt: number;
     revoked: AccountRegistryRevocation[];
+    devices: AuthorizedDeviceRecord[];
 };
 
 export type AccountRegistryStateLoad =
@@ -71,11 +83,11 @@ export function loadAccountRegistryStateResult(now = Date.now()): AccountRegistr
     }
 }
 
-export function saveAccountRegistryState(state: AccountRegistryState): boolean {
+export function saveAccountRegistryState(state: AccountRegistryState, now = Date.now()): boolean {
     const file = stateFile();
     if (!file || !identityState.userDataPath) return false;
     try {
-        const normalized = parseState(state, Date.now());
+        const normalized = parseState(state, now);
         if (!normalized || normalized.accountUpeerId !== identityState.upeerId) return false;
         const deviceKey = getOrCreateDeviceKey(identityState.userDataPath);
         const payload = Buffer.from(JSON.stringify(normalized), 'utf8');
@@ -101,16 +113,54 @@ export function appendAccountRegistryRevocation(
 ): AccountRegistryState {
     const current = state && state.accountUpeerId === accountUpeerId
         ? state
-        : { version: 1 as const, accountUpeerId, epoch: 0, issuedAt: 0, revoked: [] };
+        : emptyState(accountUpeerId);
     if (current.revoked.some(item => item.deviceId === revocation.deviceId)) return current;
     if (current.revoked.length >= MAX_REVOKED) throw new Error('account registry revocation limit reached');
     return {
-        version: 1,
-        accountUpeerId,
+        ...current,
         epoch: Math.max(epoch, current.epoch) + 1,
         issuedAt: Math.max(issuedAt, current.issuedAt),
         revoked: [...current.revoked, revocation].sort((left, right) => left.deviceId.localeCompare(right.deviceId)),
+        devices: current.devices.filter(device => device.deviceId !== revocation.deviceId),
     };
+}
+
+export function appendAuthorizedDevice(
+    state: AccountRegistryState | null,
+    accountUpeerId: string,
+    certificate: { deviceId: string; devicePublicKey: string; platform?: string; capabilities?: string[]; issuedAt: number; expiresAt: number; epoch: number },
+): AccountRegistryState {
+    const current = state && state.accountUpeerId === accountUpeerId
+        ? state
+        : emptyState(accountUpeerId);
+    if (current.revoked.some(item => item.deviceId === certificate.deviceId)) {
+        throw new Error('device is revoked');
+    }
+    const devices = [
+        ...current.devices.filter(device => device.deviceId !== certificate.deviceId),
+        {
+            deviceId: certificate.deviceId,
+            devicePublicKey: certificate.devicePublicKey,
+            platform: certificate.platform,
+            capabilities: certificate.capabilities ? [...certificate.capabilities] : undefined,
+            authorizedAt: certificate.issuedAt,
+            expiresAt: certificate.expiresAt,
+            epoch: certificate.epoch,
+        },
+    ].sort((left, right) => left.deviceId.localeCompare(right.deviceId));
+    if (devices.length > MAX_AUTHORIZED_DEVICES) throw new Error('account registry device limit reached');
+    return {
+        version: 1,
+        accountUpeerId,
+        epoch: Math.max(certificate.epoch, current.epoch) + 1,
+        issuedAt: Math.max(certificate.issuedAt, current.issuedAt),
+        revoked: [...current.revoked],
+        devices,
+    };
+}
+
+export function emptyState(accountUpeerId: string): AccountRegistryState {
+    return { version: 1, accountUpeerId, epoch: 0, issuedAt: 0, revoked: [], devices: [] };
 }
 
 export function normalizeRevocation(
@@ -140,9 +190,25 @@ function parseState(value: unknown, now: number): AccountRegistryState | null {
     if (typeof record.accountUpeerId !== 'string' || !isHex(record.accountUpeerId, 32)) return null;
     if (typeof record.epoch !== 'number' || !Number.isInteger(record.epoch) || record.epoch < 0) return null;
     if (typeof record.issuedAt !== 'number' || record.issuedAt <= 0 || record.issuedAt > now + CLOCK_SKEW_MS) return null;
-    if (!Array.isArray(record.revoked) || record.revoked.length > MAX_REVOKED) return null;
+    const revoked = parseRevoked(record.revoked, now);
+    if (!revoked) return null;
+    const devices = parseDevices(record.devices, now);
+    if (!devices) return null;
+    return {
+        version: 1,
+        accountUpeerId: record.accountUpeerId.toLowerCase(),
+        epoch: record.epoch,
+        issuedAt: record.issuedAt,
+        revoked,
+        devices,
+    };
+}
+
+function parseRevoked(value: unknown, now: number): AccountRegistryRevocation[] | null {
+    const raw = value === undefined ? [] : value;
+    if (!Array.isArray(raw) || raw.length > MAX_REVOKED) return null;
     const revoked: AccountRegistryRevocation[] = [];
-    for (const item of record.revoked) {
+    for (const item of raw) {
         if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
         const entry = item as Record<string, unknown>;
         if (typeof entry.deviceId !== 'string' || !isHex(entry.deviceId, 32)) return null;
@@ -156,13 +222,40 @@ function parseState(value: unknown, now: number): AccountRegistryState | null {
             reason: entry.reason,
         });
     }
-    return {
-        version: 1,
-        accountUpeerId: record.accountUpeerId.toLowerCase(),
-        epoch: record.epoch,
-        issuedAt: record.issuedAt,
-        revoked,
-    };
+    return revoked;
+}
+
+function parseDevices(value: unknown, now: number): AuthorizedDeviceRecord[] | null {
+    const raw = value === undefined ? [] : value;
+    if (!Array.isArray(raw) || raw.length > MAX_AUTHORIZED_DEVICES) return null;
+    const devices: AuthorizedDeviceRecord[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+        const entry = item as Record<string, unknown>;
+        if (typeof entry.deviceId !== 'string' || !isHex(entry.deviceId, 32)) return null;
+        if (typeof entry.devicePublicKey !== 'string' || !isHex(entry.devicePublicKey, 32)) return null;
+        if (entry.platform !== undefined && typeof entry.platform !== 'string') return null;
+        if (entry.capabilities !== undefined) {
+            if (!Array.isArray(entry.capabilities) || entry.capabilities.some(capability => typeof capability !== 'string')) {
+                return null;
+            }
+        }
+        if (typeof entry.authorizedAt !== 'number' || entry.authorizedAt <= 0 || entry.authorizedAt > now + CLOCK_SKEW_MS) return null;
+        if (typeof entry.expiresAt !== 'number' || entry.expiresAt <= entry.authorizedAt) return null;
+        if (typeof entry.epoch !== 'number' || !Number.isInteger(entry.epoch) || entry.epoch < 0) return null;
+        const deviceId = entry.deviceId.toLowerCase();
+        if (devices.some(existing => existing.deviceId === deviceId)) return null;
+        devices.push({
+            deviceId,
+            devicePublicKey: entry.devicePublicKey.toLowerCase(),
+            platform: entry.platform as string | undefined,
+            capabilities: entry.capabilities as string[] | undefined,
+            authorizedAt: entry.authorizedAt,
+            expiresAt: entry.expiresAt,
+            epoch: entry.epoch,
+        });
+    }
+    return devices;
 }
 
 function stateFile(): string | null {

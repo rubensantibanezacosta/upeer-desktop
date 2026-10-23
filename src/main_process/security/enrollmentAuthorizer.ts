@@ -1,5 +1,6 @@
 import { getDeviceIdentity } from './deviceIdentity.js';
 import { identityPeriod, type AccountDeviceCertificate } from './deviceCertificate.js';
+import { appendAuthorizedDevice, loadAccountRegistryState, saveAccountRegistryState } from './accountRegistryState.js';
 import {
     createEnrollmentInvite,
     issueEnrollmentCertificate,
@@ -12,6 +13,7 @@ import {
 import { consumeEnrollmentInvite, getEnrollmentInvite, registerEnrollmentInvite } from './enrollmentInvites.js';
 import { requireRootIdentity } from './identityMode.js';
 import { identityState } from './identityState.js';
+import { publishMyAccountRegistry } from '../network/accountRegistry.js';
 import { warn } from './secure-logger.js';
 
 export interface IssuedEnrollment {
@@ -71,7 +73,24 @@ export function completeAuthorizerEnrollment(sealed: unknown, now = Date.now()):
         warn('Enrolamiento rechazado: la invitación ya se consumió', {}, 'identity');
         return null;
     }
+    recordAuthorizedDevice(certificate, now);
+    void publishMyAccountRegistry(now).catch(() => false);
     return { request, certificate, response };
+}
+
+function recordAuthorizedDevice(certificate: AccountDeviceCertificate, now: number): void {
+    try {
+        const state = loadAccountRegistryState(now);
+        const next = appendAuthorizedDevice(state, certificate.accountUpeerId, certificate);
+        if (!saveAccountRegistryState(next, now)) {
+            warn('No se pudo persistir el dispositivo autorizado', { deviceId: certificate.deviceId }, 'identity');
+        }
+    } catch (err) {
+        warn('No se pudo registrar el dispositivo autorizado', {
+            deviceId: certificate.deviceId,
+            error: err instanceof Error ? err.message : String(err),
+        }, 'identity');
+    }
 }
 
 function readInviteId(sealed: unknown): string | null {

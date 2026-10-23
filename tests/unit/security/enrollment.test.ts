@@ -21,7 +21,14 @@ import {
     completeAuthorizerEnrollment,
     createAuthorizerEnrollmentInvite,
 } from '../../../src/main_process/security/enrollmentAuthorizer.js';
-import { clearEnrollmentInvites } from '../../../src/main_process/security/enrollmentInvites.js';
+import { clearEnrollmentInvites, getEnrollmentInvite } from '../../../src/main_process/security/enrollmentInvites.js';
+import {
+    appendAccountRegistryRevocation,
+    loadAccountRegistryState,
+    normalizeRevocation,
+    saveAccountRegistryState,
+} from '../../../src/main_process/security/accountRegistryState.js';
+import { getMyAccountRegistry, verifyAccountRegistry, verifyDeviceAdmission } from '../../../src/main_process/network/accountRegistry.js';
 import { deriveDeviceId } from '../../../src/main_process/security/deviceCertificate.js';
 import { getDeviceIdentity, resetDeviceIdentityCache } from '../../../src/main_process/security/deviceIdentity.js';
 import { getUPeerIdFromPublicKey } from '../../../src/main_process/security/identityCrypto.js';
@@ -295,5 +302,59 @@ describe('flujo completo de enrolamiento', () => {
         identityState.userDataPath = userDataPath;
 
         expect(beginEnrollment(invite.code, now)).toBeNull();
+    });
+});
+
+describe('persistencia y registro de dispositivos', () => {
+    it('conserva las invitaciones pendientes tras un reinicio', () => {
+        startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+
+        clearEnrollmentInvites();
+
+        expect(getEnrollmentInvite(invite.offer.inviteId, now)?.code).toBe(invite.code);
+    });
+
+    it('no restaura invitaciones caducadas al reiniciar', () => {
+        startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+
+        clearEnrollmentInvites();
+
+        expect(getEnrollmentInvite(invite.offer.inviteId, now + 16 * 60 * 1000)).toBeNull();
+    });
+
+    it('publica el registro con el dispositivo enrolado y sube el epoch', () => {
+        const account = startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+        const device = keypair();
+        const issued = required(completeAuthorizerEnrollment(sealedRequestFor(invite, device), now));
+
+        const registry = required(getMyAccountRegistry(now));
+
+        expect(registry.devices.map(item => item.deviceId)).toContain(issued.certificate.deviceId);
+        expect(registry.epoch).toBeGreaterThan(issued.certificate.epoch);
+        expect(verifyAccountRegistry(registry, account.upeerId, now)).not.toBeNull();
+        expect(verifyDeviceAdmission(issued.certificate, registry, now)).toBe(true);
+    });
+
+    it('excluye del registro los dispositivos revocados', () => {
+        startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+        const issued = required(completeAuthorizerEnrollment(sealedRequestFor(invite, keypair()), now));
+
+        const state = required(loadAccountRegistryState(now));
+        saveAccountRegistryState(appendAccountRegistryRevocation(
+            state,
+            state.accountUpeerId,
+            state.epoch,
+            now,
+            normalizeRevocation(issued.certificate.deviceId, 'prueba', now),
+        ), now);
+
+        const registry = required(getMyAccountRegistry(now));
+
+        expect(registry.devices.map(item => item.deviceId)).not.toContain(issued.certificate.deviceId);
+        expect(verifyDeviceAdmission(issued.certificate, registry, now)).toBe(false);
     });
 });

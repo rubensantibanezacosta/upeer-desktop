@@ -28,7 +28,7 @@ export function revokeMyAccountDevice(
         Math.max(now, identity.certificate.issuedAt),
         revocation,
     );
-    if (!saveAccountRegistryState(state)) throw new Error('account revocation state could not be persisted');
+    if (!saveAccountRegistryState(state, now)) throw new Error('account revocation state could not be persisted');
     const updated = getMyAccountRegistry(now);
     if (!updated || updated.epoch <= current.epoch) throw new Error('account registry epoch did not advance');
     return updated;
