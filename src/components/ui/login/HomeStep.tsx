@@ -5,6 +5,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DownloadIcon from '@mui/icons-material/Download';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 interface HomeStepProps {
@@ -13,9 +14,10 @@ interface HomeStepProps {
     onImport: () => void;
     onUnlock: () => void;
     onSwitchAccount: () => void;
+    onLinkDevice: () => void;
 }
 
-export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImport, onUnlock, onSwitchAccount }) => {
+export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImport, onUnlock, onSwitchAccount, onLinkDevice }) => {
     if (isLocked) {
         return (
             <Stack spacing={2.5}>
@@ -24,6 +26,9 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
                 </Alert>
                 <Button fullWidth size="lg" startDecorator={<LockOpenIcon />} onClick={onUnlock} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Entrar a mi cuenta
+                </Button>
+                <Button fullWidth size="lg" variant="outlined" color="primary" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+                    Vincular este dispositivo
                 </Button>
                 <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<AddIcon />} onClick={onSwitchAccount} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Crear cuenta nueva
@@ -56,6 +61,9 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
             </Button>
             <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<DownloadIcon />} onClick={onImport} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
                 Ya tengo una cuenta
+            </Button>
+            <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
+                Vincular un dispositivo a mi cuenta
             </Button>
         </Stack>
     );

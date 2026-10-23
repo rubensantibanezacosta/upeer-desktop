@@ -114,6 +114,21 @@ import type {
     YggstackStatusEvent,
     SyncStatusEvent,
 } from './ipc-events.js';
+import type {
+    EnrollmentInviteResponse,
+    EnrollmentListInvitesResponse,
+    EnrollmentCompleteRequest,
+    EnrollmentCompleteResponse,
+    EnrollmentBeginRequest,
+    EnrollmentBeginResponse,
+    EnrollmentFinishRequest,
+    EnrollmentFinishResponse,
+    EnrollmentCancelResponse,
+    EnrollmentStatusResponse,
+    AuthorizedDevicesResponse,
+    RevokeAuthorizedDeviceRequest,
+    RevokeAuthorizedDeviceResponse,
+} from './ipc-enrollment.js';
 
 export interface IPCMap {
     'get-ygg-ip': { request: void; response: GetMyNetworkAddressResponse };
@@ -136,6 +151,15 @@ export interface IPCMap {
     'unblock-contact': { request: UnblockContactRequest; response: UnblockContactResponse };
     'get-blocked-contacts': { request: void; response: GetBlockedContactsResponse };
     'get-contacts': { request: void; response: GetContactsResponse };
+    'enrollment-create-invite': { request: void; response: EnrollmentInviteResponse };
+    'enrollment-list-invites': { request: void; response: EnrollmentListInvitesResponse };
+    'enrollment-complete': { request: EnrollmentCompleteRequest; response: EnrollmentCompleteResponse };
+    'enrollment-begin': { request: EnrollmentBeginRequest; response: EnrollmentBeginResponse };
+    'enrollment-finish': { request: EnrollmentFinishRequest; response: EnrollmentFinishResponse };
+    'enrollment-cancel': { request: void; response: EnrollmentCancelResponse };
+    'enrollment-status': { request: void; response: EnrollmentStatusResponse };
+    'get-authorized-devices': { request: void; response: AuthorizedDevicesResponse };
+    'revoke-authorized-device': { request: RevokeAuthorizedDeviceRequest; response: RevokeAuthorizedDeviceResponse };
     'send-p2p-message': { request: SendMessageRequest; response: SendMessageResponse };
     'send-typing-indicator': { request: SendTypingIndicatorRequest; response: SendTypingIndicatorResponse };
     'send-read-receipt': { request: SendReadReceiptRequest; response: SendReadReceiptResponse };

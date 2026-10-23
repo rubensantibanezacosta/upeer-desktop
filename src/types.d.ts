@@ -204,6 +204,33 @@ declare global {
                 lastSeen: number;
                 address: string;
             }>>;
+            /** Dispositivos autorizados en el registro de la cuenta */
+            getAuthorizedDevices: () => Promise<{
+                devices: Array<{
+                    deviceId: string;
+                    devicePublicKey: string;
+                    platform?: string;
+                    capabilities?: string[];
+                    authorizedAt: number;
+                    expiresAt: number;
+                    epoch: number;
+                }>;
+                epoch: number | null;
+            }>;
+            revokeAuthorizedDevice: (deviceId: string) => Promise<{ success: boolean; epoch?: number; published?: boolean; error?: string }>;
+            /** Enrolamiento sin raíz por canal fuera de banda */
+            createEnrollmentInvite: () => Promise<{ success: boolean; code?: string; inviteId?: string; expiresAt?: number; error?: string }>;
+            listEnrollmentInvites: () => Promise<{ invites: Array<{ inviteId: string; authorizerDeviceId: string; expiresAt: number }> }>;
+            completeEnrollment: (code: string) => Promise<{ success: boolean; code?: string; deviceId?: string; expiresAt?: number; error?: string }>;
+            beginEnrollment: (code: string) => Promise<{ success: boolean; requestCode?: string; accountUpeerId?: string; expiresAt?: number; error?: string }>;
+            finishEnrollment: (code: string) => Promise<{ success: boolean; deviceId?: string; upeerId?: string; expiresAt?: number; error?: string }>;
+            cancelEnrollment: () => Promise<{ success: boolean }>;
+            enrollmentStatus: () => Promise<{
+                pending: boolean;
+                accountUpeerId?: string;
+                expiresAt?: number;
+                deviceStatus: 'root' | 'ready' | 'renewal-required' | 'locked';
+            }>;
             /** PIN y seguridad local */
             isPinEnabled: () => Promise<boolean>;
             setPin: (args: { newPin: string; currentPin?: string }) => Promise<{ success: boolean; error?: string }>;

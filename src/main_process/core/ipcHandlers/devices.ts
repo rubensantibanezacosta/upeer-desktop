@@ -3,6 +3,8 @@ import { getMyUPeerId } from '../../security/identity.js';
 import { getDevicesByUPeerId, setDeviceTrust, deleteDevice } from '../../storage/devices-operations.js';
 import { publishMyAccountRegistry } from '../../network/accountRegistry.js';
 import { revokeMyAccountDevice } from '../../network/accountRegistryRevocation.js';
+import { loadAccountRegistryState } from '../../security/accountRegistryState.js';
+import { warn } from '../../security/secure-logger.js';
 
 /**
  * Registra los manejadores IPC para la gestión de múltiples dispositivos
@@ -37,5 +39,36 @@ export function registerDeviceHandlers(): void {
         await deleteDevice(myId, deviceId);
         const published = await publishMyAccountRegistry();
         return { success: true, epoch: registry.epoch, published };
+    });
+
+    ipcMain.handle('get-authorized-devices', () => {
+        const state = loadAccountRegistryState();
+        if (!state) return { devices: [], epoch: null };
+        return {
+            devices: state.devices.map(device => ({
+                deviceId: device.deviceId,
+                devicePublicKey: device.devicePublicKey,
+                platform: device.platform,
+                capabilities: device.capabilities,
+                authorizedAt: device.authorizedAt,
+                expiresAt: device.expiresAt,
+                epoch: device.epoch,
+            })),
+            epoch: state.epoch,
+        };
+    });
+
+    ipcMain.handle('revoke-authorized-device', async (_event, { deviceId }: { deviceId: string }) => {
+        try {
+            const registry = revokeMyAccountDevice(deviceId, 'device revoked by the account owner');
+            const myId = getMyUPeerId();
+            if (myId) await deleteDevice(myId, deviceId);
+            const published = await publishMyAccountRegistry();
+            return { success: true, epoch: registry.epoch, published };
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            warn('No se pudo revocar el dispositivo autorizado', { deviceId, error: detail }, 'security');
+            return { success: false, error: 'No se pudo revocar el dispositivo.' };
+        }
     });
 }

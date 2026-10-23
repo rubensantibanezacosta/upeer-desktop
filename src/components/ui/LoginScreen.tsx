@@ -3,6 +3,7 @@ import { Box, CircularProgress } from '@mui/joy';
 import { CreateConfirmStep, CreateExplainStep, CreateGenerateStep } from './login/CreateFlow.js';
 import { HomeStep, SwitchAccountWarnStep } from './login/HomeStep.js';
 import { ImportStep } from './login/ImportStep.js';
+import { LinkDeviceStep } from './login/LinkDeviceStep.js';
 import { LoginShell } from './login/LoginShell.js';
 import type { Screen } from './login/types.js';
 import { resetAccountStores } from '../../store/resetAccountStores.js';
@@ -43,6 +44,14 @@ const getShellCopy = (screen: Screen, isLocked: boolean) => {
             description: isLocked
                 ? 'Tu identidad sigue en este dispositivo, pero está protegida hasta que introduzcas tus 12 palabras.'
                 : 'Introduce tu frase secreta para reconstruir la misma identidad en este dispositivo.'
+        };
+    }
+
+    if (screen === 'link-device') {
+        return {
+            stepLabel: 'Dispositivo vinculado',
+            title: 'Vincula este dispositivo a tu cuenta',
+            description: 'El dispositivo recibe un certificado firmado por la cuenta y nunca guarda la frase semilla.'
         };
     }
 
@@ -176,6 +185,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onUnlocked }) => {
                     onImport={() => setScreen('import')}
                     onUnlock={() => setScreen('import')}
                     onSwitchAccount={() => setScreen('switch-warn')}
+                    onLinkDevice={() => setScreen('link-device')}
+                />
+            )}
+
+            {screen === 'link-device' && (
+                <LinkDeviceStep
+                    onBack={() => setScreen('home')}
+                    onLinked={() => {
+                        resetAccountStores();
+                        onUnlocked();
+                    }}
                 />
             )}
 

@@ -130,7 +130,10 @@ describe('modo de identidad sin raíz', () => {
 
     it('restaura el modo dispositivo al arrancar sin raíz', () => {
         enableDeviceMode();
+        const device = createDeviceKeypair();
+        installDeviceCertificate(device.secretKey.toString('hex'), issueCertificate(device.publicKey));
         clearIdentityState();
+        resetDeviceIdentityCache();
 
         initIdentity(userDataPath);
 
@@ -138,6 +141,18 @@ describe('modo de identidad sin raíz', () => {
         expect(isLocked()).toBe(false);
         expect(getMyUPeerId()).toBe(account.upeerId);
         expect(identityState.secretKey).toBeNull();
+    });
+
+    it('bloquea el arranque sin raíz cuando falta el certificado de dispositivo', () => {
+        enableDeviceMode();
+        clearIdentityState();
+        resetDeviceIdentityCache();
+
+        initIdentity(userDataPath);
+
+        expect(getIdentityMode()).toBe('device');
+        expect(isLocked()).toBe(true);
+        expect(getDeviceIdentityStatus()).toBe('locked');
     });
 
     it('rechaza una cuenta cuya clave pública no deriva en el upeerId', () => {
@@ -267,5 +282,24 @@ describe('modo de identidad sin raíz', () => {
         expect(isLocked()).toBe(true);
         expect(getDeviceIdentity()).toBeNull();
         expect(getDeviceIdentityStatus()).toBe('locked');
+    });
+
+    it('un nuevo enrolamiento desbloquea el dispositivo y sobrevive al reinicio', () => {
+        enableDeviceMode();
+        const device = createDeviceKeypair();
+        installDeviceCertificate(device.secretKey.toString('hex'), issueCertificate(device.publicKey));
+        lockSession();
+        expect(fs.existsSync(path.join(userDataPath, 'session.locked'))).toBe(true);
+
+        expect(installDeviceCertificate(device.secretKey.toString('hex'), issueCertificate(device.publicKey))).toBe(true);
+        expect(fs.existsSync(path.join(userDataPath, 'session.locked'))).toBe(false);
+        expect(isLocked()).toBe(false);
+
+        clearIdentityState();
+        resetDeviceIdentityCache();
+        initIdentity(userDataPath);
+
+        expect(isLocked()).toBe(false);
+        expect(getDeviceIdentityStatus()).toBe('ready');
     });
 });

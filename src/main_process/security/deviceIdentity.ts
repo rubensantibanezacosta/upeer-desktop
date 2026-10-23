@@ -1,6 +1,8 @@
 import sodium from 'sodium-native';
+import fs from 'node:fs';
+import path from 'node:path';
 import { canonicalStringify, safeBufferFromHex } from '../network/cryptoUtils.js';
-import { identityState } from './identityState.js';
+import { identityState, SESSION_LOCKED_FILE } from './identityState.js';
 import { incrementDhtSeq } from './identityLifecycleInternal.js';
 import { getUPeerIdFromPublicKey, verify } from './identityCrypto.js';
 import { isDeviceOnlyMode } from './identityMode.js';
@@ -219,10 +221,24 @@ export function installDeviceCertificate(secretKeyHex: string, certificateValue:
         certificate,
     };
     saveStoredDeviceIdentity(identity.secretKey, identity.certificate);
+    clearSessionLock();
     resetDeviceIdentityCache();
     cached = { account: certificate.accountUpeerId, identity };
     debug('Certificado de dispositivo instalado', { deviceId: certificate.deviceId }, 'identity');
     return true;
+}
+
+function clearSessionLock(): void {
+    if (!identityState.userDataPath) return;
+    const locked = path.join(identityState.userDataPath, SESSION_LOCKED_FILE);
+    try {
+        if (fs.existsSync(locked)) fs.rmSync(locked, { force: true });
+    } catch (err) {
+        warn('No se pudo limpiar el bloqueo previo del dispositivo', {
+            error: err instanceof Error ? err.message : String(err),
+        }, 'identity');
+    }
+    identityState.isLocked = false;
 }
 
 function loadStoredIdentity(account: string, now: number): DeviceIdentity | null {

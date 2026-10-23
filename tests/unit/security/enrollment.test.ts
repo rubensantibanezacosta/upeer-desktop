@@ -30,10 +30,11 @@ import {
 } from '../../../src/main_process/security/accountRegistryState.js';
 import { getMyAccountRegistry, verifyAccountRegistry, verifyDeviceAdmission } from '../../../src/main_process/network/accountRegistry.js';
 import { deriveDeviceId } from '../../../src/main_process/security/deviceCertificate.js';
-import { getDeviceIdentity, resetDeviceIdentityCache } from '../../../src/main_process/security/deviceIdentity.js';
+import { getDeviceIdentity, getDeviceIdentityStatus, resetDeviceIdentityCache } from '../../../src/main_process/security/deviceIdentity.js';
 import { getUPeerIdFromPublicKey } from '../../../src/main_process/security/identityCrypto.js';
 import { clearIdentityState, initIdentity } from '../../../src/main_process/security/identity.js';
 import { identityState } from '../../../src/main_process/security/identityState.js';
+import { applyDeviceOnlyIdentity } from '../../../src/main_process/security/identityMode.js';
 import {
     beginEnrollment,
     buildSealedEnrollmentRequest,
@@ -282,7 +283,10 @@ describe('flujo completo de enrolamiento', () => {
         const issued = required(completeAuthorizerEnrollment(sealedRequest, now));
 
         clearIdentityState();
-        initIdentity(userDataPath);
+        applyDeviceOnlyIdentity(userDataPath, {
+            accountUpeerId,
+            accountPublicKey: accountPublicKey.toString('hex'),
+        });
         expect(getPendingEnrollmentOffer()).not.toBeNull();
         const certificate = required(finishEnrollment(issued.response, now));
 
@@ -302,6 +306,25 @@ describe('flujo completo de enrolamiento', () => {
         identityState.userDataPath = userDataPath;
 
         expect(beginEnrollment(invite.code, now)).toBeNull();
+    });
+
+    it('un enrolamiento interrumpido exige reenrolarse al reiniciar', () => {
+        startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+
+        clearIdentityState();
+        identityState.userDataPath = userDataPath;
+        expect(beginEnrollment(invite.code, now)).not.toBeNull();
+        expect(buildSealedEnrollmentRequest()).not.toBeNull();
+
+        clearIdentityState();
+        initIdentity(userDataPath);
+
+        expect(identityState.isLocked).toBe(true);
+        expect(identityState.identityMode).toBe('device');
+        expect(getDeviceIdentity(now)).toBeNull();
+        expect(getDeviceIdentityStatus()).toBe('locked');
+        expect(beginEnrollment(invite.code, now)).not.toBeNull();
     });
 });
 

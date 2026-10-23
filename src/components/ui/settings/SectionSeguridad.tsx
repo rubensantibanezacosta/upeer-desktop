@@ -7,6 +7,8 @@ import {
 
 import { ToggleRow } from './shared.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
+import { DeviceEnrollmentPanel } from './DeviceEnrollmentPanel.js';
+import { AuthorizedDeviceList } from './AuthorizedDeviceList.js';
 import { DeleteAccountModal, RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
 import { DangerZoneSection, RecoverySection, SecurityStatusCard } from './securitySections.js';
 import { resetAccountStores } from '../../../store/resetAccountStores.js';
@@ -223,6 +225,9 @@ export const SectionSeguridad: React.FC = () => {
 
             <Divider />
             <DeviceSessionList />
+
+            <DeviceEnrollmentPanel />
+            <AuthorizedDeviceList />
 
             <DangerZoneSection onDeleteClick={handleDeleteClick} />
 

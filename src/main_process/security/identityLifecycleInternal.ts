@@ -2,7 +2,7 @@ import sodium from 'sodium-native';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as bip39 from 'bip39';
-import { debug, error, info } from './secure-logger.js';
+import { debug, error, info, warn } from './secure-logger.js';
 import {
     MAX_PREVIOUS_EPH_KEYS,
     MAX_PREVIOUS_SPK,
@@ -27,7 +27,7 @@ import {
     loadAccountPublicIdentity,
     resetIdentityMode,
 } from './identityMode.js';
-import { resetDeviceIdentityCache } from './deviceIdentity.js';
+import { getDeviceIdentityStatus, resetDeviceIdentityCache } from './deviceIdentity.js';
 
 export function incrementDhtSeq(): number {
     identityState.dhtSeq++;
@@ -105,6 +105,11 @@ export function initIdentity(userDataPath: string): void {
         if (fs.existsSync(path.join(userDataPath, SESSION_LOCKED_FILE))) {
             identityState.isLocked = true;
             info('Dispositivo sin raíz bloqueado por el usuario; requiere reenrolamiento.', {}, 'identity');
+            return;
+        }
+        if (getDeviceIdentityStatus() !== 'ready') {
+            identityState.isLocked = true;
+            warn('Enrolamiento sin certificado utilizable; el dispositivo requiere reenrolamiento.', {}, 'identity');
             return;
         }
         rotateEphemeralKey();

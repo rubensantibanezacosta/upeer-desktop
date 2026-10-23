@@ -157,6 +157,18 @@ const deviceApi = {
     setDeviceTrust: (deviceId: string, isTrusted: boolean) => ipcRenderer.invoke('set-device-trust', { deviceId, isTrusted }),
     deleteDevice: (deviceId: string) => ipcRenderer.invoke('delete-device', { deviceId }),
     getMyDevices: () => ipcRenderer.invoke('get-my-devices'),
+    getAuthorizedDevices: () => ipcRenderer.invoke('get-authorized-devices'),
+    revokeAuthorizedDevice: (deviceId: string) => ipcRenderer.invoke('revoke-authorized-device', { deviceId }),
+};
+
+const enrollmentApi = {
+    createEnrollmentInvite: () => ipcRenderer.invoke('enrollment-create-invite'),
+    listEnrollmentInvites: () => ipcRenderer.invoke('enrollment-list-invites'),
+    completeEnrollment: (code: string) => ipcRenderer.invoke('enrollment-complete', { code }),
+    beginEnrollment: (code: string) => ipcRenderer.invoke('enrollment-begin', { code }),
+    finishEnrollment: (code: string) => ipcRenderer.invoke('enrollment-finish', { code }),
+    cancelEnrollment: () => ipcRenderer.invoke('enrollment-cancel'),
+    enrollmentStatus: () => ipcRenderer.invoke('enrollment-status'),
 };
 
 const groupApi = {
@@ -290,6 +302,7 @@ export const buildPreloadBridge = () => ({
     ...contactApi,
     ...messagingApi,
     ...deviceApi,
+    ...enrollmentApi,
     ...callApi,
     ...groupApi,
     ...fileApi,
