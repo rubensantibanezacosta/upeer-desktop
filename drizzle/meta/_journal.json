@@ -85,6 +85,13 @@
       "when": 1792920003000,
       "tag": "0012_relay_sync_events",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792920004000,
+      "tag": "0013_sync_origin_signature",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import { registerSyncEventSink, type SyncEventDraft } from '../../storage/sync/e
 import { listSyncPeers } from '../../storage/sync/peers.js';
 import { getSelfAddresses } from '../messaging/chatSupport.js';
 import { getMySyncIdentity } from './auth.js';
+import { signSyncEventOrigin } from './origin.js';
 import { nextSyncSequence, sendSyncEnvelope, sendSyncHello } from './transport.js';
 
 let discoveryTimer: ReturnType<typeof setInterval> | null = null;
@@ -13,13 +14,24 @@ let discoveryRunning = false;
 export async function broadcastSyncEvent(event: SyncEventDraft): Promise<void> {
     const myId = getMyUPeerId();
     const sequence = nextSyncSequence();
-    const recorded = recordSyncEvent({
+    const plainEvent = signSyncEventOrigin({
         eventId: event.eventId,
-        originDeviceId: getMySyncIdentity()?.deviceId ?? 'unknown-device',
         kind: event.kind,
         occurredAt: event.occurredAt,
         sequence,
-        payload: JSON.stringify(event.payload),
+        payload: event.payload,
+    });
+    const recorded = recordSyncEvent({
+        eventId: plainEvent.eventId,
+        originDeviceId: plainEvent.originDeviceId ?? getMySyncIdentity()?.deviceId ?? 'unknown-device',
+        kind: plainEvent.kind,
+        occurredAt: plainEvent.occurredAt,
+        sequence: plainEvent.sequence,
+        payload: JSON.stringify(plainEvent.payload),
+        originSignature: plainEvent.originSignature ?? null,
+        originCertificate: plainEvent.originCertificate
+            ? JSON.stringify(plainEvent.originCertificate)
+            : null,
         direction: 'outbound',
         appliedAt: Date.now(),
     });
@@ -30,14 +42,6 @@ export async function broadcastSyncEvent(event: SyncEventDraft): Promise<void> {
         discoverSyncPeers().catch(err => warn('Sync peer discovery failed', err, 'sync'));
         return;
     }
-    const plainEvent = {
-        eventId: event.eventId,
-        kind: event.kind,
-        occurredAt: event.occurredAt,
-        sequence,
-        originDeviceId: getMySyncIdentity()?.deviceId,
-        payload: event.payload,
-    };
     for (const peer of peers) {
         sendSyncEnvelope(peer, plainEvent).catch(err => {
             warn('Sync envelope delivery failed', { deviceId: peer.deviceId, err: String(err) }, 'sync');

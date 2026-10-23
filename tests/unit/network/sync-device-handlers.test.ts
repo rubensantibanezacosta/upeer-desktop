@@ -73,6 +73,10 @@ vi.mock('../../../src/main_process/network/sync/relay.js', () => ({
     relaySyncEvent: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../../src/main_process/network/sync/origin.js', () => ({
+    verifySyncEventOrigin: vi.fn(() => true),
+}));
+
 vi.mock('../../../src/main_process/network/sync/replay.js', () => ({
     replayAfterAck: vi.fn(() => Promise.resolve()),
     replayPendingSyncEvents: vi.fn(() => Promise.resolve()),
@@ -103,6 +107,8 @@ import {
 } from '../../../src/main_process/network/sync/history.js';
 import { recordSyncEvent } from '../../../src/main_process/storage/sync/events.js';
 import { isSyncRelayTarget, markSyncRelayAcked } from '../../../src/main_process/storage/sync/relay.js';
+import { relaySyncEvent } from '../../../src/main_process/network/sync/relay.js';
+import { verifySyncEventOrigin } from '../../../src/main_process/network/sync/origin.js';
 import { getSyncPeer, touchSyncPeer, updateSyncPeerAck, upsertSyncPeer } from '../../../src/main_process/storage/sync/peers.js';
 import { sendSyncAck, sendSyncHello } from '../../../src/main_process/network/sync/transport.js';
 
@@ -165,6 +171,66 @@ describe('Sync device handlers', () => {
         expect(applySyncEvent).toHaveBeenCalled();
         expect(touchSyncPeer).toHaveBeenCalledWith(deviceId, '200::2', 11);
         expect(sendSyncAck).toHaveBeenCalled();
+    });
+
+    it('rejects relayed envelopes without a valid origin signature', async () => {
+        const originDeviceId = '9'.repeat(64);
+        vi.mocked(verifySyncEventOrigin).mockReturnValue(false);
+        vi.mocked(decryptDoubleRatchetPayload).mockResolvedValue(JSON.stringify({
+            eventId: 'event-1',
+            kind: 'MESSAGE_UPSERT',
+            occurredAt: 10,
+            sequence: 11,
+            originDeviceId,
+            payload: { id: 'm1' },
+        }));
+
+        await handleSyncEnvelope(deviceId, {
+            type: 'SYNC_ENVELOPE',
+            recipientDeviceId: deviceId,
+            eventId: 'event-1',
+            kind: 'MESSAGE_UPSERT',
+            occurredAt: 10,
+            sequence: 11,
+            originDeviceId,
+        }, '200::2', null);
+
+        expect(verifySyncEventOrigin).toHaveBeenCalled();
+        expect(recordSyncEvent).not.toHaveBeenCalled();
+        expect(applySyncEvent).not.toHaveBeenCalled();
+        expect(relaySyncEvent).not.toHaveBeenCalled();
+        expect(sendSyncAck).toHaveBeenCalled();
+    });
+
+    it('relays envelopes signed by another origin device', async () => {
+        const originDeviceId = '9'.repeat(64);
+        vi.mocked(verifySyncEventOrigin).mockReturnValue(true);
+        vi.mocked(decryptDoubleRatchetPayload).mockResolvedValue(JSON.stringify({
+            eventId: 'event-1',
+            kind: 'MESSAGE_UPSERT',
+            occurredAt: 10,
+            sequence: 11,
+            originDeviceId,
+            originSignature: '9'.repeat(128),
+            payload: { id: 'm1' },
+        }));
+
+        await handleSyncEnvelope(deviceId, {
+            type: 'SYNC_ENVELOPE',
+            recipientDeviceId: deviceId,
+            eventId: 'event-1',
+            kind: 'MESSAGE_UPSERT',
+            occurredAt: 10,
+            sequence: 11,
+            originDeviceId,
+        }, '200::2', null);
+
+        expect(applySyncEvent).toHaveBeenCalled();
+        expect(relaySyncEvent).toHaveBeenCalledWith(
+            expect.objectContaining({ originDeviceId, originSignature: '9'.repeat(128) }),
+            deviceId,
+            expect.any(String),
+        );
     });
 
     it('acknowledges duplicates without applying them again', async () => {

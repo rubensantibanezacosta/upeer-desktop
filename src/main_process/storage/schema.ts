@@ -220,6 +220,8 @@ export const syncEvents = sqliteTable('sync_events', {
     occurredAt: integer('occurred_at').notNull(),
     sequence: integer('sequence').notNull().default(0),
     payload: text('payload').notNull(),
+    originSignature: text('origin_signature'),
+    originCertificate: text('origin_certificate'),
     direction: text('direction').notNull(),
     appliedAt: integer('applied_at').notNull(),
 }, (table) => ({

@@ -50,6 +50,8 @@ export function listPendingSyncRelay(targetDeviceId: string, limit = 200): SyncE
         occurredAt: schema.syncEvents.occurredAt,
         sequence: schema.syncEvents.sequence,
         payload: schema.syncEvents.payload,
+        originSignature: schema.syncEvents.originSignature,
+        originCertificate: schema.syncEvents.originCertificate,
         direction: schema.syncEvents.direction,
         appliedAt: schema.syncEvents.appliedAt,
     }).from(schema.syncRelay)

@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
+import { parseCertificate } from '../../security/deviceCertificate.js';
 import { warn } from '../../security/secure-logger.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
 import { recordSyncEvent } from '../../storage/sync/events.js';
@@ -15,6 +16,7 @@ import { decryptDoubleRatchetPayload } from '../handlers/doubleRatchetDecrypt.js
 import { applySyncEvent } from './apply.js';
 import { certificateFromPacket, getMySyncIdentity, verifySyncHelloBinding } from './auth.js';
 import { applySyncHistoryResponse, requestSyncHistory, respondSyncHistory } from './history.js';
+import { verifySyncEventOrigin } from './origin.js';
 import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
 import { sendSyncAck, sendSyncHello } from './transport.js';
@@ -74,21 +76,31 @@ export async function handleSyncEnvelope(
     const event = await decryptEvent(peer, data, 'SYNC_ENVELOPE');
     if (!event || !matchesEnvelope(data, event)) return;
     const originDeviceId = event.originDeviceId ?? senderDeviceId;
+    const myDeviceId = getMySyncIdentity()?.deviceId;
+    if (originDeviceId === myDeviceId && senderDeviceId !== myDeviceId) return;
+    if (originDeviceId !== senderDeviceId && !verifySyncEventOrigin(event, getMyUPeerId(), now)) {
+        warn('Rejected relayed sync event without a valid origin signature', { eventId: event.eventId }, 'sync');
+        sendSyncAck(peer, event.eventId, event.sequence);
+        return;
+    }
+    const signedEvent: SyncPlainEvent = { ...event, originDeviceId };
     const recorded = recordSyncEvent({
-        eventId: event.eventId,
+        eventId: signedEvent.eventId,
         originDeviceId,
-        kind: event.kind,
-        occurredAt: event.occurredAt,
-        sequence: event.sequence,
-        payload: JSON.stringify(event.payload),
+        kind: signedEvent.kind,
+        occurredAt: signedEvent.occurredAt,
+        sequence: signedEvent.sequence,
+        payload: JSON.stringify(signedEvent.payload),
+        originSignature: signedEvent.originSignature ?? null,
+        originCertificate: signedEvent.originCertificate
+            ? JSON.stringify(signedEvent.originCertificate)
+            : null,
         direction: 'inbound',
         appliedAt: now,
     });
     if (recorded) {
-        await applySyncEvent({ ...event, originDeviceId }, win);
-        if (originDeviceId !== getMySyncIdentity()?.deviceId) {
-            await relaySyncEvent({ ...event, originDeviceId }, senderDeviceId, getMyUPeerId());
-        }
+        await applySyncEvent(signedEvent, win);
+        await relaySyncEvent(signedEvent, senderDeviceId, getMyUPeerId());
     }
     touchSyncPeer(senderDeviceId, address, event.sequence);
     sendSyncAck(peer, event.eventId, event.sequence);
@@ -235,6 +247,11 @@ function toSyncEvent(value: unknown): SyncPlainEvent | null {
     if (typeof record.occurredAt !== 'number' || !Number.isFinite(record.occurredAt)) return null;
     if (typeof record.sequence !== 'number' || !Number.isSafeInteger(record.sequence)) return null;
     if (record.originDeviceId !== undefined && (typeof record.originDeviceId !== 'string' || !/^[0-9a-f]{64}$/i.test(record.originDeviceId))) return null;
+    if (record.originSignature !== undefined && (typeof record.originSignature !== 'string' || !/^[0-9a-f]{128}$/i.test(record.originSignature))) return null;
+    const originCertificate = record.originCertificate === undefined
+        ? undefined
+        : parseCertificate(record.originCertificate) ?? undefined;
+    if (record.originCertificate !== undefined && !originCertificate) return null;
     if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) return null;
     return {
         eventId: record.eventId,
@@ -242,6 +259,8 @@ function toSyncEvent(value: unknown): SyncPlainEvent | null {
         occurredAt: record.occurredAt,
         sequence: record.sequence,
         originDeviceId: typeof record.originDeviceId === 'string' ? record.originDeviceId.toLowerCase() : undefined,
+        originSignature: typeof record.originSignature === 'string' ? record.originSignature.toLowerCase() : undefined,
+        originCertificate,
         payload: record.payload as Record<string, unknown>,
     };
 }

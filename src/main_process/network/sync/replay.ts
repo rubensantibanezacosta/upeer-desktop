@@ -1,4 +1,5 @@
 import { warn } from '../../security/secure-logger.js';
+import { parseCertificate } from '../../security/deviceCertificate.js';
 import { listOutboundSyncEventsAfter, type SyncEventRecord } from '../../storage/sync/events.js';
 import { getSyncPeer, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { sendSyncEnvelope } from './transport.js';
@@ -32,7 +33,10 @@ export function toPlainEvent(record: SyncEventRecord): SyncPlainEvent | null {
     try {
         const payload = JSON.parse(record.payload) as unknown;
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-        return {
+        const originCertificate = record.originCertificate
+            ? parseCertificate(record.originCertificate)
+            : undefined;
+        const event: SyncPlainEvent = {
             eventId: record.eventId,
             kind: record.kind,
             occurredAt: record.occurredAt,
@@ -40,6 +44,11 @@ export function toPlainEvent(record: SyncEventRecord): SyncPlainEvent | null {
             originDeviceId: record.originDeviceId,
             payload: payload as Record<string, unknown>,
         };
+        if (record.originSignature && originCertificate) {
+            event.originSignature = record.originSignature;
+            event.originCertificate = originCertificate;
+        }
+        return event;
     } catch {
         warn('Stored sync event payload is not valid JSON', { eventId: record.eventId }, 'sync');
         return null;

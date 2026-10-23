@@ -9,6 +9,8 @@ export type SyncEventRecord = {
     occurredAt: number;
     sequence: number;
     payload: string;
+    originSignature?: string | null;
+    originCertificate?: string | null;
     direction: 'inbound' | 'outbound';
     appliedAt: number;
 };

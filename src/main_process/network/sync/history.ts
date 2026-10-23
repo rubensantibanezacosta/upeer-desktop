@@ -6,7 +6,9 @@ import { listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/s
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { applySyncEvent } from './apply.js';
 import { getMySyncIdentity } from './auth.js';
+import { signSyncEventOrigin } from './origin.js';
 import { sendEncryptedSync } from './transport.js';
+import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
 
 const HISTORY_PAGE_SIZE = 50;
@@ -35,7 +37,7 @@ export async function respondSyncHistory(
     const limit = Math.max(1, Math.min(200, request.limit));
     const page = listSyncHistoryMessages(cursor.timestamp, cursor.id, limit);
     const deviceId = getMySyncIdentity()?.deviceId ?? 'unknown-device';
-    const entries = page.messages.map((message) => ({
+    const entries = page.messages.map((message) => signSyncEventOrigin({
         eventId: `history:${deviceId}:${message.id}`,
         kind: 'MESSAGE_UPSERT' as const,
         occurredAt: message.timestamp,
@@ -62,15 +64,17 @@ export async function applySyncHistoryResponse(
         if (!entry) continue;
         const recorded = recordSyncEvent({
             eventId: entry.eventId,
-            originDeviceId: peer.deviceId,
+            originDeviceId: entry.originDeviceId ?? peer.deviceId,
             kind: entry.kind,
             occurredAt: entry.occurredAt,
             sequence: entry.sequence,
             payload: JSON.stringify(entry.payload),
+            originSignature: entry.originSignature ?? null,
+            originCertificate: entry.originCertificate ? JSON.stringify(entry.originCertificate) : null,
             direction: 'inbound',
             appliedAt: now,
         });
-        if (recorded) await applySyncEvent(entry, win);
+        if (recorded) await applySyncEvent({ ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId }, win);
     }
     updateSyncPeerHistory(peer.deviceId, payload.nextCursor, payload.done);
     if (!payload.done && payload.nextCursor) {
@@ -87,12 +91,21 @@ function toSyncEvent(value: unknown): SyncPlainEvent | null {
     if (typeof record.kind !== 'string' || !SYNC_EVENT_KINDS.includes(record.kind as never)) return null;
     if (typeof record.occurredAt !== 'number' || !Number.isFinite(record.occurredAt)) return null;
     if (typeof record.sequence !== 'number' || !Number.isSafeInteger(record.sequence)) return null;
+    if (record.originDeviceId !== undefined && (typeof record.originDeviceId !== 'string' || !/^[0-9a-f]{64}$/i.test(record.originDeviceId))) return null;
+    if (record.originSignature !== undefined && (typeof record.originSignature !== 'string' || !/^[0-9a-f]{128}$/i.test(record.originSignature))) return null;
+    const originCertificate = record.originCertificate === undefined
+        ? undefined
+        : parseCertificate(record.originCertificate) ?? undefined;
+    if (record.originCertificate !== undefined && !originCertificate) return null;
     if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) return null;
     return {
         eventId: record.eventId,
         kind: record.kind as SyncPlainEvent['kind'],
         occurredAt: record.occurredAt,
         sequence: record.sequence,
+        originDeviceId: typeof record.originDeviceId === 'string' ? record.originDeviceId.toLowerCase() : undefined,
+        originSignature: typeof record.originSignature === 'string' ? record.originSignature.toLowerCase() : undefined,
+        originCertificate,
         payload: record.payload as Record<string, unknown>,
     };
 }

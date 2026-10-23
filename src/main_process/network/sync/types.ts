@@ -40,6 +40,8 @@ export type SyncPlainEvent = {
     occurredAt: number;
     sequence: number;
     originDeviceId?: string;
+    originSignature?: string;
+    originCertificate?: AccountDeviceCertificate;
     payload: Record<string, unknown>;
 };
 
