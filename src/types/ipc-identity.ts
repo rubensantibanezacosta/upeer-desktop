@@ -17,10 +17,13 @@ export interface GetVaultStatsResponse {
     replicationFactor: number;
 }
 
+export type IdentityMode = 'root' | 'device';
+
 export interface IdentityStatusResponse {
     isMnemonicMode: boolean;
     isLocked: boolean;
     upeerId: string | null;
+    mode: IdentityMode;
 }
 
 export interface GenerateMnemonicResponse {

@@ -21,6 +21,13 @@ import {
     tryLoadEncryptedSession,
 } from './identityStorage.js';
 import { getUPeerIdFromPublicKey } from './identityCrypto.js';
+import {
+    applyDeviceOnlyIdentity,
+    clearAccountPublicIdentity,
+    loadAccountPublicIdentity,
+    resetIdentityMode,
+} from './identityMode.js';
+import { resetDeviceIdentityCache } from './deviceIdentity.js';
 
 export function incrementDhtSeq(): number {
     identityState.dhtSeq++;
@@ -92,6 +99,19 @@ export function initIdentity(userDataPath: string): void {
     loadDhtSeq();
     loadProfileFiles();
 
+    const accountPublic = identityState.isMnemonicBased ? null : loadAccountPublicIdentity(userDataPath);
+    if (accountPublic) {
+        applyDeviceOnlyIdentity(userDataPath, accountPublic);
+        if (fs.existsSync(path.join(userDataPath, SESSION_LOCKED_FILE))) {
+            identityState.isLocked = true;
+            info('Dispositivo sin raíz bloqueado por el usuario; requiere reenrolamiento.', {}, 'identity');
+            return;
+        }
+        rotateEphemeralKey();
+        info('Sesión restaurada en modo dispositivo, sin raíz de la cuenta.', { upeerId: accountPublic.accountUpeerId }, 'identity');
+        return;
+    }
+
     if (!identityState.isMnemonicBased) {
         identityState.isLocked = true;
         info('Primera ejecución. Se requiere crear o importar una frase semilla.', {}, 'identity');
@@ -133,6 +153,8 @@ export function unlockSession(mnemonic: string): boolean {
     identityState.upeerId = getUPeerIdFromPublicKey(identityState.publicKey);
     identityState.isLocked = false;
     identityState.isMnemonicBased = true;
+    resetIdentityMode();
+    clearAccountPublicIdentity(identityState.userDataPath);
     fs.writeFileSync(path.join(identityState.userDataPath, MNEMONIC_MODE_FLAG), '1');
     saveEncryptedSession(identityState.userDataPath);
     rotateEphemeralKey();
@@ -161,6 +183,7 @@ export function lockSession(): void {
         }
     }
     fs.writeFileSync(path.join(identityState.userDataPath, SESSION_LOCKED_FILE), '1');
+    resetDeviceIdentityCache();
     if (identityState.secretKey) sodium.sodium_memzero(identityState.secretKey);
     identityState.mnemonic = null;
     if (identityState.ephemeralSecretKey) sodium.sodium_memzero(identityState.ephemeralSecretKey);
@@ -174,6 +197,7 @@ export function lockSession(): void {
 }
 
 export function clearIdentityState(): void {
+    resetDeviceIdentityCache();
     if (identityState.secretKey) sodium.sodium_memzero(identityState.secretKey);
     if (identityState.ephemeralSecretKey) sodium.sodium_memzero(identityState.ephemeralSecretKey);
     if (identityState.spkSecretKey) sodium.sodium_memzero(identityState.spkSecretKey);
@@ -200,6 +224,7 @@ export function clearIdentityState(): void {
     identityState.isLocked = true;
     identityState.isMnemonicBased = false;
     identityState.mnemonic = null;
+    resetIdentityMode();
 }
 
 export function validateMnemonicIdentity(mnemonic: string): boolean {
@@ -215,6 +240,7 @@ export function validateMnemonicIdentity(mnemonic: string): boolean {
 
 export function resetIdentityForEmptyDevice(userDataPath: string): void {
     clearIdentityState();
+    clearAccountPublicIdentity(userDataPath);
     identityState.userDataPath = userDataPath;
     identityState.dhtStatePath = path.join(userDataPath, 'dht_state.json');
     identityState.isLocked = true;

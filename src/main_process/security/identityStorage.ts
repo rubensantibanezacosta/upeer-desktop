@@ -14,10 +14,14 @@ import {
     SPK_STATE_FILE,
 } from './identityState.js';
 
-function getUPeerIdFromPublicKey(publicKey: Buffer): string {
+export function deriveUPeerId(publicKey: Buffer): string {
     const hash = Buffer.alloc(sodium.crypto_generichash_BYTES);
     sodium.crypto_generichash(hash, publicKey);
     return hash.toString('hex');
+}
+
+function getUPeerIdFromPublicKey(publicKey: Buffer): string {
+    return deriveUPeerId(publicKey);
 }
 
 export function getOrCreateDeviceKey(userDataPath: string): Buffer {

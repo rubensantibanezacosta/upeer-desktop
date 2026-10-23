@@ -80,7 +80,7 @@ declare global {
             setMyAlias: (alias: string) => Promise<{ success: boolean }>;
             setMyAvatar: (dataUrl: string) => Promise<{ success: boolean }>;
             // Identity / Wallet Auth
-            identityStatus: () => Promise<{ isMnemonicMode: boolean; isLocked: boolean; upeerId: string | null }>;
+            identityStatus: () => Promise<{ isMnemonicMode: boolean; isLocked: boolean; upeerId: string | null; mode: 'root' | 'device' }>;
             generateMnemonic: () => Promise<{ mnemonic: string }>;
             createMnemonicIdentity: (mnemonic: string, alias?: string, avatar?: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;
             unlockSession: (mnemonic: string) => Promise<{ success: boolean; upeerId?: string; error?: string }>;

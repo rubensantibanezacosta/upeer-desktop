@@ -71,5 +71,8 @@ describe('deleteAllUserData', () => {
         expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/assets', { recursive: true, force: true });
         expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/p2p-chat.db', { force: true });
         expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/yggstack.conf', { force: true });
+        expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/account-public.enc', { force: true });
+        expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/device-identity.enc', { force: true });
+        expect(mocks.rmSync).toHaveBeenCalledWith('/user-data/device-spk.enc', { force: true });
     });
 });

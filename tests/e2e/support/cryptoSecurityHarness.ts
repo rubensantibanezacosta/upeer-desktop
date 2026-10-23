@@ -62,7 +62,7 @@ export async function installIdentityHarness(page: Page, config: IdentityHarness
                 queueMicrotask(patchBridge);
                 return;
             }
-            window.upeer.identityStatus = async () => ({ isLocked: state.locked, isMnemonicMode: state.mnemonicMode, upeerId: state.locked ? null : 'self-id' });
+            window.upeer.identityStatus = async () => ({ isLocked: state.locked, isMnemonicMode: state.mnemonicMode, upeerId: state.locked ? null : 'self-id', mode: 'root' });
             window.upeer.generateMnemonic = async () => ({ mnemonic: state.mnemonic });
             window.upeer.createMnemonicIdentity = async (mnemonic, alias) => {
                 if (mnemonic !== state.mnemonic) {

@@ -1,3 +1,5 @@
+export type IdentityMode = 'root' | 'device';
+
 export interface PreviousSpkEntry {
     spkId: number;
     spkPk: Buffer;
@@ -26,6 +28,7 @@ export interface IdentityState {
     isLocked: boolean;
     isMnemonicBased: boolean;
     mnemonic: string | null;
+    identityMode: IdentityMode;
 }
 
 export const SPK_ROTATION_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -42,6 +45,7 @@ export const ALIAS_FILE = 'identity.alias';
 export const AVATAR_FILE = 'identity.avatar';
 export const SPK_STATE_FILE = 'spk.enc';
 export const MNEMONIC_ENC_FILE = 'identity.mnemonic.enc';
+export const ACCOUNT_PUBLIC_FILE = 'account-public.enc';
 
 export const identityState: IdentityState = {
     publicKey: null,
@@ -65,4 +69,5 @@ export const identityState: IdentityState = {
     isLocked: true,
     isMnemonicBased: false,
     mnemonic: null,
+    identityMode: 'root',
 };

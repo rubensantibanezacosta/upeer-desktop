@@ -18,6 +18,7 @@ import {
 } from '../../security/identity.js';
 import * as bip39 from 'bip39';
 import { verifyAccessPin } from '../../security/pin.js';
+import { getIdentityMode } from '../../security/identityMode.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { closeUDPServer, startUDPServer } from '../../network/server/tcpServer.js';
@@ -90,6 +91,7 @@ export function registerIdentityHandlers(): void {
     isMnemonicMode: isMnemonicMode(),
     isLocked: isSessionLocked(),
     upeerId: !isSessionLocked() ? getMyUPeerId() : null,
+    mode: getIdentityMode(),
   }));
 
   ipcMain.handle('generate-mnemonic', () => ({

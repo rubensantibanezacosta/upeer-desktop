@@ -1,5 +1,6 @@
 import sodium from 'sodium-native';
 import { identityState } from './identityState.js';
+import { isDeviceOnlyMode, requireRootIdentity } from './identityMode.js';
 
 export function getUPeerIdFromPublicKey(publicKey: Buffer): string {
     const hash = Buffer.alloc(sodium.crypto_generichash_BYTES);
@@ -8,9 +9,9 @@ export function getUPeerIdFromPublicKey(publicKey: Buffer): string {
 }
 
 export function sign(message: Buffer): Buffer {
-    if (identityState.isLocked || !identityState.secretKey) throw new Error('Identity is locked');
+    requireRootIdentity('sign');
     const signature = Buffer.alloc(sodium.crypto_sign_BYTES);
-    sodium.crypto_sign_detached(signature, message, identityState.secretKey);
+    sodium.crypto_sign_detached(signature, message, identityState.secretKey as Buffer);
     return signature;
 }
 
@@ -52,6 +53,7 @@ export function decryptWithIdentityKey(nonce: Buffer, ciphertext: Buffer, sender
 }
 
 export function decryptX3DH(nonce: Buffer, ciphertext: Buffer, senderEphemeralPublicKey: Buffer, recipientSpkId: number): Buffer | null {
+    if (isDeviceOnlyMode()) return null;
     let targetSecretKey: Buffer | null = null;
     if (recipientSpkId === identityState.spkId) {
         targetSecretKey = identityState.spkSecretKey;

@@ -26,6 +26,7 @@ import {
 import { identityState } from './identityState.js';
 import { EPHEMERAL_KEY_MAX_MESSAGES } from './identityState.js';
 import { getOrCreateDeviceKey } from './identityStorage.js';
+import { requireRootIdentity } from './identityMode.js';
 
 export {
     decrypt,
@@ -85,8 +86,8 @@ export function getMyPublicKey(): Buffer {
 }
 
 export function getMyIdentitySkBuffer(): Buffer {
-    if (identityState.isLocked || !identityState.secretKey) throw new Error('Identity is locked');
-    return identityState.secretKey;
+    requireRootIdentity('getMyIdentitySkBuffer');
+    return identityState.secretKey as Buffer;
 }
 
 export function getMyEphemeralPublicKey(): Buffer {
@@ -102,7 +103,8 @@ export function getSpkBySpkId(id: number): { spkPk: Buffer; spkSk: Buffer } | nu
 }
 
 export function getMySignedPreKey(): { spkPub: string; spkSig: string; spkId: number } {
-    if (!identityState.spkPublicKey || !identityState.secretKey) {
+    requireRootIdentity('getMySignedPreKey');
+    if (!identityState.spkPublicKey) {
         rotateSpk();
     }
     const signature = Buffer.alloc(sodium.crypto_sign_BYTES);

@@ -1,12 +1,11 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import sodium from 'sodium-native';
 import { canonicalStringify, safeBufferFromHex } from '../network/cryptoUtils.js';
-import { getOrCreateDeviceKey } from './identityStorage.js';
 import { identityState } from './identityState.js';
 import { incrementDhtSeq } from './identityLifecycleInternal.js';
 import { getUPeerIdFromPublicKey, verify } from './identityCrypto.js';
+import { isDeviceOnlyMode } from './identityMode.js';
 import { debug, warn } from './secure-logger.js';
+import { readStoredDeviceIdentity, saveStoredDeviceIdentity } from './deviceIdentityStorage.js';
 import {
     certificatePayload,
     certificateUsable,
@@ -18,8 +17,6 @@ import {
     type AccountDeviceCertificate,
 } from './deviceCertificate.js';
 
-const STATE_FILE = 'device-identity.enc';
-
 export interface DeviceIdentity {
     secretKey: Buffer;
     publicKey: string;
@@ -29,11 +26,21 @@ export interface DeviceIdentity {
 
 let cached: { account: string; identity: DeviceIdentity } | null = null;
 
+export type DeviceIdentityStatus = 'root' | 'ready' | 'renewal-required' | 'locked';
+
+export function getDeviceIdentityStatus(now = Date.now()): DeviceIdentityStatus {
+    if (!isDeviceOnlyMode()) return 'root';
+    if (identityState.isLocked) return 'locked';
+    return getDeviceIdentity(now) ? 'ready' : 'renewal-required';
+}
+
 export function getDeviceIdentity(now = Date.now()): DeviceIdentity | null {
-    if (identityState.isLocked || !identityState.secretKey || !identityState.publicKey || !identityState.userDataPath) {
+    if (identityState.isLocked || !identityState.publicKey || !identityState.userDataPath) {
         return null;
     }
     const account = identityState.upeerId;
+    if (isDeviceOnlyMode()) return loadEnrolledIdentity(account, now);
+    if (!identityState.secretKey) return null;
     const period = identityPeriod(now);
     if (
         cached?.account === account &&
@@ -50,11 +57,12 @@ export function getDeviceIdentity(now = Date.now()): DeviceIdentity | null {
     const created = createIdentity(now);
     if (!created) return null;
     cached = { account, identity: created };
-    saveStoredIdentity(created);
+    saveStoredDeviceIdentity(created.secretKey, created.certificate);
     return created;
 }
 
 export function resetDeviceIdentityCache(): void {
+    if (cached) sodium.sodium_memzero(cached.identity.secretKey);
     cached = null;
 }
 
@@ -127,6 +135,7 @@ function createIdentity(now: number): DeviceIdentity | null {
 }
 
 function buildIdentity(secretKey: Buffer, publicKey: Buffer, now: number, minimumEpoch = 0): DeviceIdentity | null {
+    if (isDeviceOnlyMode() || !identityState.secretKey) return null;
     const devicePublicKey = publicKey.toString('hex');
     const deviceId = deriveDeviceId(devicePublicKey);
     if (!deviceId || !identityState.secretKey) return null;
@@ -161,61 +170,76 @@ function signCertificate(certificate: AccountDeviceCertificate): string {
     return signature.toString('hex');
 }
 
-function loadStoredIdentity(account: string, now: number): DeviceIdentity | null {
-    const file = stateFile();
-    if (!file || !fs.existsSync(file)) return null;
-    try {
-        const deviceKey = getOrCreateDeviceKey(identityState.userDataPath);
-        const blob = fs.readFileSync(file);
-        const nonce = blob.subarray(0, sodium.crypto_secretbox_NONCEBYTES);
-        const cipher = blob.subarray(sodium.crypto_secretbox_NONCEBYTES);
-        const plain = Buffer.alloc(cipher.length - sodium.crypto_secretbox_MACBYTES);
-        if (!sodium.crypto_secretbox_open_easy(plain, cipher, nonce, deviceKey)) return null;
-        const stored = JSON.parse(plain.toString('utf8')) as { secretKey?: unknown; certificate?: unknown };
-        if (typeof stored.secretKey !== 'string' || !isHex(stored.secretKey, 64)) return null;
-        const certificate = parseCertificate(stored.certificate);
-        if (!certificate || certificate.accountUpeerId !== account.toLowerCase()) return null;
-        const secretKey = Buffer.from(stored.secretKey, 'hex');
-        const publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
-        sodium.crypto_sign_ed25519_sk_to_pk(publicKey, secretKey);
-        if (!verifyDeviceCertificate(certificate, account, now)) {
-            incrementDhtSeq();
-            const rebuilt = buildIdentity(secretKey, publicKey, now, certificate.epoch + 1);
-            if (rebuilt) saveStoredIdentity(rebuilt);
-            return rebuilt;
-        }
-        if (certificate.epoch < identityPeriod(now).epoch) {
-            incrementDhtSeq();
-            const rebuilt = buildIdentity(secretKey, publicKey, now);
-            if (rebuilt) saveStoredIdentity(rebuilt);
-            return rebuilt;
-        }
-        return { secretKey, publicKey: publicKey.toString('hex'), deviceId: certificate.deviceId, certificate };
-    } catch (err) {
-        warn('Device identity could not be loaded', { error: err instanceof Error ? err.message : String(err) }, 'identity');
+function loadEnrolledIdentity(account: string, now: number): DeviceIdentity | null {
+    if (cached?.account === account && certificateUsable(cached.identity.certificate, account, now)) {
+        return cached.identity;
+    }
+    const stored = readStoredDeviceIdentity(account);
+    if (!stored) {
+        warn('El dispositivo no tiene identidad enrolada', { upeerId: account }, 'identity');
         return null;
     }
-}
-
-function saveStoredIdentity(identity: DeviceIdentity): void {
-    const file = stateFile();
-    if (!file) return;
-    try {
-        const deviceKey = getOrCreateDeviceKey(identityState.userDataPath);
-        const payload = Buffer.from(JSON.stringify({
-            secretKey: identity.secretKey.toString('hex'),
-            certificate: identity.certificate,
-        }), 'utf8');
-        const nonce = Buffer.alloc(sodium.crypto_secretbox_NONCEBYTES);
-        sodium.randombytes_buf(nonce);
-        const cipher = Buffer.alloc(payload.length + sodium.crypto_secretbox_MACBYTES);
-        sodium.crypto_secretbox_easy(cipher, payload, nonce, deviceKey);
-        fs.writeFileSync(file, Buffer.concat([nonce, cipher]), { mode: 0o600 });
-    } catch (err) {
-        warn('Device identity could not be persisted', { error: err instanceof Error ? err.message : String(err) }, 'identity');
+    if (!verifyDeviceCertificate(stored.certificate, account, now)) {
+        warn('El certificado del dispositivo no es utilizable sin la raíz', { upeerId: account }, 'identity');
+        return null;
     }
+    const identity: DeviceIdentity = {
+        secretKey: stored.secretKey,
+        publicKey: stored.publicKey.toString('hex'),
+        deviceId: stored.certificate.deviceId,
+        certificate: stored.certificate,
+    };
+    cached = { account, identity };
+    return identity;
 }
 
-function stateFile(): string | null {
-    return identityState.userDataPath ? path.join(identityState.userDataPath, STATE_FILE) : null;
+export function installDeviceCertificate(secretKeyHex: string, certificateValue: unknown, now = Date.now()): boolean {
+    if (!isDeviceOnlyMode() || !identityState.userDataPath) return false;
+    if (typeof secretKeyHex !== 'string' || !isHex(secretKeyHex, 64)) {
+        warn('Se rechaza el certificado de dispositivo con clave secreta inválida', {}, 'identity');
+        return false;
+    }
+    const certificate = verifyDeviceCertificate(certificateValue, identityState.upeerId, now);
+    if (!certificate) {
+        warn('Se rechaza el certificado de dispositivo no verificable', {}, 'identity');
+        return false;
+    }
+    const secretKey = Buffer.from(secretKeyHex, 'hex');
+    const publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
+    sodium.crypto_sign_ed25519_sk_to_pk(publicKey, secretKey);
+    if (publicKey.toString('hex') !== certificate.devicePublicKey) {
+        warn('Se rechaza el certificado de dispositivo de otra clave', {}, 'identity');
+        sodium.sodium_memzero(secretKey);
+        return false;
+    }
+    const identity: DeviceIdentity = {
+        secretKey,
+        publicKey: certificate.devicePublicKey,
+        deviceId: certificate.deviceId,
+        certificate,
+    };
+    saveStoredDeviceIdentity(identity.secretKey, identity.certificate);
+    resetDeviceIdentityCache();
+    cached = { account: certificate.accountUpeerId, identity };
+    debug('Certificado de dispositivo instalado', { deviceId: certificate.deviceId }, 'identity');
+    return true;
+}
+
+function loadStoredIdentity(account: string, now: number): DeviceIdentity | null {
+    const stored = readStoredDeviceIdentity(account);
+    if (!stored) return null;
+    const { secretKey, publicKey, certificate } = stored;
+    if (!verifyDeviceCertificate(certificate, account, now)) {
+        incrementDhtSeq();
+        const rebuilt = buildIdentity(secretKey, publicKey, now, certificate.epoch + 1);
+        if (rebuilt) saveStoredDeviceIdentity(rebuilt.secretKey, rebuilt.certificate);
+        return rebuilt;
+    }
+    if (certificate.epoch < identityPeriod(now).epoch) {
+        incrementDhtSeq();
+        const rebuilt = buildIdentity(secretKey, publicKey, now);
+        if (rebuilt) saveStoredDeviceIdentity(rebuilt.secretKey, rebuilt.certificate);
+        return rebuilt;
+    }
+    return { secretKey, publicKey: publicKey.toString('hex'), deviceId: certificate.deviceId, certificate };
 }
