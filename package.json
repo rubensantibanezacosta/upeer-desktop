@@ -25,7 +25,7 @@
     "test-file-transfer": "vitest run tests/unit/network/*file-transfer*.test.ts",
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
     "test:e2e:serve": "vite --config vite.renderer.config.ts --host 127.0.0.1 --port 4173",
     "test:e2e": "playwright test",
     "test:all": "pnpm run test:unit && pnpm run test:integration && pnpm run test:e2e",
