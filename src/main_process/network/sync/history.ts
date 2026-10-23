@@ -40,6 +40,7 @@ export async function respondSyncHistory(
         kind: 'MESSAGE_UPSERT' as const,
         occurredAt: message.timestamp,
         sequence: message.timestamp,
+        originDeviceId: deviceId,
         payload: message as unknown as Record<string, unknown>,
     }));
     await sendEncryptedSync(peer, 'SYNC_HISTORY_RES', {

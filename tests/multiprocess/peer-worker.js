@@ -18,7 +18,7 @@ const contacts = await import('../../src/main_process/storage/contacts/operation
 const messages = await import('../../src/main_process/storage/messages/operations.js');
 const messagesReactions = await import('../../src/main_process/storage/messages/reactions.js');
 const { updateContactSignedPreKey } = await import('../../src/main_process/storage/contacts/keys.js');
-const { sendUDPMessage } = await import('../../src/main_process/network/messaging/chatSend.js');
+const { sendChatMessage } = await import('../../src/main_process/network/messaging/chatSend.js');
 const { sendTypingIndicator } = await import('../../src/main_process/network/messaging/chatSend.js');
 const { sendReadReceipt, sendChatReaction, sendContactCard } = await import('../../src/main_process/network/messaging/chatInteractions.js');
 const { sendChatUpdate, sendChatDelete, sendChatClear } = await import('../../src/main_process/network/messaging/chatMutations.js');
@@ -29,10 +29,14 @@ const { getMessageStatus } = await import('../../src/main_process/storage/messag
 const { fileTransferManager } = await import('../../src/main_process/network/file-transfer/transfer-manager.js');
 const { VaultManager } = await import('../../src/main_process/network/vault/manager.js');
 const { callManager } = await import('../../src/main_process/network/call/callManager.js');
+const { startCallMediaUdpServer } = await import('../../src/main_process/network/server/callMediaUdp.js');
 const { sendCallOffer, sendCallAccept, sendCallEnd, sendCallMedia, startGroupCall } = await import('../../src/main_process/network/call/callSignaling.js');
 const { BrowserWindow } = await import('electron');
 const { getSqlite } = await import('../../src/main_process/storage/shared.js');
 const { setKademliaInstance } = await import('../../src/main_process/network/dht/handlers.js');
+const { listSyncPeers } = await import('../../src/main_process/storage/sync/peers.js');
+const { discoverSyncPeers, startSyncDiscovery } = await import('../../src/main_process/network/sync/pipeline.js');
+const { getDeviceIdentity } = await import('../../src/main_process/security/deviceIdentity.js');
 
 const peerId = process.env.PEER_ID || '';
 const mnemonic = process.env.PEER_MNEMONIC || null;
@@ -60,15 +64,25 @@ const pubKey = identity.getMyPublicKeyHex();
 
 if (selfAddresses.length > 0) {
     setKademliaInstance({
+        upeerId: myId,
         findClosestContacts: () => selfAddresses.map((address) => ({ upeerId: myId, address })),
+        findLocationBlock: async () => null,
+        storeLocationBlock: async () => undefined,
+        findValue: async () => null,
+        storeValue: async () => undefined,
+        getAllStoredValues: () => [],
+        addContact: () => undefined,
+        handleMessage: () => undefined,
+        performMaintenance: async () => undefined,
     });
 }
 
 state.setTcpServer({ listening: true });
 state.setNetworkReady(true);
 
-const sendResponse = (ip, data) => transport.sendSecureUDPMessage(ip, data);
+const sendResponse = (ip, data) => transport.sendSecurePacket(ip, data);
 const win = new BrowserWindow();
+startCallMediaUdpServer(win, 0);
 fileTransferManager.initialize(sendResponse, win);
 
 const socketPeerIds = new Map();
@@ -108,6 +122,7 @@ const server = net.createServer((socket) => {
     });
 });
 await new Promise((res) => server.listen(port, '127.0.0.1', () => res()));
+startSyncDiscovery(300_000);
 
 function reply(id, payload) {
     process.send({ type: 'reply', _id: id, ...payload });
@@ -118,7 +133,7 @@ process.on('message', (msg) => {
     const run = async () => {
         switch (msg.type) {
             case 'sendMessage':
-                await sendUDPMessage(msg.to, msg.content)
+                await sendChatMessage(msg.to, msg.content)
                     .then((result) => reply(msg._id, { ok: true, result }))
                     .catch((e) => reply(msg._id, { ok: false, error: String(e) }));
                 break;
@@ -235,7 +250,10 @@ process.on('message', (msg) => {
             }
             case 'sendMedia': {
                 const active = callManager.getActive();
-                if (active) sendCallMedia(active.peerUpeerId, active.callId, msg.data);
+                if (active) {
+                    const payload = msg.data instanceof Uint8Array ? msg.data : new TextEncoder().encode(String(msg.data));
+                    sendCallMedia(active.peerUpeerId, active.callId, payload);
+                }
                 reply(msg._id, { ok: true });
                 break;
             }
@@ -301,6 +319,14 @@ process.on('message', (msg) => {
             case 'getGroups':
                 reply(msg._id, { ok: true, groups: groupOps.getGroups() });
                 break;
+            case 'discoverSyncPeers':
+                await discoverSyncPeers();
+                reply(msg._id, { ok: true });
+                break;
+            case 'getSyncPeers':
+                reply(msg._id, { ok: true, peers: listSyncPeers(myId) });
+                break;
+
             case 'shutdown':
                 server.close();
                 process.exit(0);
@@ -312,4 +338,4 @@ process.on('message', (msg) => {
     run().catch((e) => reply(msg._id, { ok: false, error: String(e) }));
 });
 
-process.send({ type: 'ready', peerId, upeerId: myId, pubKey, port, dir, spk: identity.getMySignedPreKey() });
+process.send({ type: 'ready', peerId, upeerId: myId, pubKey, port, dir, deviceId: getDeviceIdentity()?.deviceId, spk: identity.getMySignedPreKey() });

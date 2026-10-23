@@ -116,9 +116,9 @@ describe('Sync validation', () => {
         }).valid).toBe(true);
         expect(validateSyncHistoryRequest({
             ...encrypted,
-            requestId: 'req-1',
+            requestId: '',
             cursor: null,
-            limit: 0,
+            limit: 50,
         }).valid).toBe(false);
         expect(validateSyncHistoryResponse({
             ...encrypted,
@@ -129,10 +129,10 @@ describe('Sync validation', () => {
         }).valid).toBe(true);
         expect(validateSyncHistoryResponse({
             ...encrypted,
-            requestId: 'req-1',
+            requestId: '',
             entries: [],
             nextCursor: null,
-            done: 'yes',
+            done: true,
         }).valid).toBe(false);
     });
 

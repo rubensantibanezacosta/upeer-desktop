@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 
+vi.unmock('sodium-native');
+
 const registry = vi.hoisted(() => {
     const nodes = new Map<string, number>();
     const publicKeys = new Map<string, string>();
@@ -64,6 +66,7 @@ vi.mock('electron', () => ({
     app: {
         isPackaged: false,
         getPath: () => '/tmp',
+        getAppPath: () => process.cwd(),
     },
 }));
 
@@ -110,8 +113,8 @@ async function createNode(id: string): Promise<E2ENode> {
         if (onDelivery) onDelivery(senderId, data);
     };
 
-    let frameBuf = Buffer.alloc(0);
     const server = net.createServer((socket) => {
+        let frameBuf = Buffer.alloc(0);
         socket.on('data', (chunk: Buffer) => {
             frameBuf = Buffer.concat([frameBuf, chunk]);
             while (frameBuf.length >= 4) {

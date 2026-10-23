@@ -57,7 +57,7 @@ async function decryptDoubleRatchetContentUnlocked(
         const canUseFreshX3dh = !session || retryStartsNewRatchet;
         if (canUseFreshX3dh && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(spkId);
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
                 error('X3DH: SPK no encontrado por ID', { spkId, upeerId }, 'security');
@@ -95,7 +95,7 @@ async function decryptDoubleRatchetContentUnlocked(
 
         if (sessionResult && data.x3dhInit && !isDuplicate) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(spkId);
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (spkEntry) {
                 const sharedSecret = x3dhResponder(

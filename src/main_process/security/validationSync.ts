@@ -2,7 +2,6 @@ import type { ValidationResult } from './validationShared.js';
 import { SYNC_EVENT_KINDS } from '../network/sync/types.js';
 
 const MAX_CONTENT_LENGTH = 8_000_000;
-const MAX_CURSOR_LENGTH = 256;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -114,12 +113,6 @@ export function validateSyncHistoryRequest(data: Record<string, unknown>): Valid
     if (typeof data.requestId !== 'string' || data.requestId.length === 0 || data.requestId.length > 128) {
         return { valid: false, error: 'Invalid requestId' };
     }
-    if (data.cursor !== null && (typeof data.cursor !== 'string' || data.cursor.length > MAX_CURSOR_LENGTH)) {
-        return { valid: false, error: 'Invalid cursor' };
-    }
-    if (typeof data.limit !== 'number' || !Number.isInteger(data.limit) || data.limit < 1 || data.limit > 200) {
-        return { valid: false, error: 'Invalid limit' };
-    }
     return { valid: true };
 }
 
@@ -128,15 +121,6 @@ export function validateSyncHistoryResponse(data: Record<string, unknown>): Vali
     if (!encrypted.valid) return encrypted;
     if (typeof data.requestId !== 'string' || data.requestId.length === 0 || data.requestId.length > 128) {
         return { valid: false, error: 'Invalid requestId' };
-    }
-    if (!Array.isArray(data.entries) || data.entries.length > 200) {
-        return { valid: false, error: 'Invalid entries' };
-    }
-    if (data.nextCursor !== null && (typeof data.nextCursor !== 'string' || data.nextCursor.length > MAX_CURSOR_LENGTH)) {
-        return { valid: false, error: 'Invalid nextCursor' };
-    }
-    if (typeof data.done !== 'boolean') {
-        return { valid: false, error: 'Invalid done flag' };
     }
     return { valid: true };
 }

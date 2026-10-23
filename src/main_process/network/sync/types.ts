@@ -39,6 +39,7 @@ export type SyncPlainEvent = {
     kind: SyncEventKind;
     occurredAt: number;
     sequence: number;
+    originDeviceId?: string;
     payload: Record<string, unknown>;
 };
 

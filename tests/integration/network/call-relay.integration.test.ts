@@ -102,7 +102,7 @@ describe('call relay integración (SFU distribuido)', () => {
         await signaling.recomputeRelay(session.callId);
         const data = new Uint8Array(17);
         data[0] = 1;
-        data[16] = 1;
+        data[1] = 1;
 
         handleCallPacket('p1', { type: 'CALL_META', callId: session.callId, meta: { type: 'speaker', active: true } }, null);
         handleCallPacket('p2', { type: 'CALL_MEDIA', callId: session.callId, data, timestamp: Date.now() }, null);

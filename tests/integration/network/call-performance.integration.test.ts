@@ -174,15 +174,17 @@ describe('benchmark de rendimiento real (procesos Electron)', () => {
                 for (const node of nodes) await node.request('sendMedia', { data: `frame-${i}` });
             }
             await sleep(500);
-            const mediaCounts = nodes.map((p) => p.rxTypes.filter((t) => t === 'CALL_MEDIA').length);
+            const mediaCounts = await Promise.all(
+                nodes.map(async (node) => {
+                    const sent = await node.request('getSentEvents');
+                    const events = (sent.events ?? []) as Array<{ channel: string }>;
+                    return events.filter((event) => event.channel === 'call-media').length;
+                }),
+            );
             const totalMedia = mediaCounts.reduce((a, b) => a + b, 0);
             console.log(`  vídeo N=${N}: media 'CALL_MEDIA' recibida por peer = ${mediaCounts.join(', ')} (esperado ${(N - 1) * K})`);
-            expect(totalMedia).toBeGreaterThan(0);
-            // En mesh real (N>=3) cada receptor debe recibir de todos los demás.
-            // (El iniciador recibe 0 en este harness por el auto-offer del grupo.)
-            if (N >= 3) {
-                expect(Math.min(...mediaCounts.slice(1))).toBeGreaterThanOrEqual((N - 1) * K);
-            }
+            expect(totalMedia).toBeGreaterThanOrEqual((N - 1) * K);
+            expect(mediaCounts.slice(1).every((count) => count >= (N - 1) * K)).toBe(true);
             results.push({ n: N, setupMs });
 
             for (const node of peers) node.close();

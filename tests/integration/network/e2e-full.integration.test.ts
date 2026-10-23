@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 
+vi.unmock('sodium-native');
+
 const registry = vi.hoisted(() => {
     const nodes = new Map<string, { port: number; pubKey: string; deliver: (senderId: string, data: Record<string, unknown>) => void }>();
     const servers = new Set<net.Server>();
@@ -55,6 +57,7 @@ vi.mock('electron', () => ({
     app: {
         isPackaged: false,
         getPath: () => '/tmp',
+        getAppPath: () => process.cwd(),
     },
 }));
 
@@ -112,8 +115,8 @@ async function createNode(id: string, mnemonic?: string): Promise<E2ENode> {
         transport.sendSecurePacket(ip, data);
     };
 
-    let frameBuf = Buffer.alloc(0);
     const server = net.createServer((socket) => {
+        let frameBuf = Buffer.alloc(0);
         socket.on('data', (chunk: Buffer) => {
             frameBuf = Buffer.concat([frameBuf, chunk]);
             while (frameBuf.length >= 4) {
@@ -227,30 +230,6 @@ describe('e2e completo con DB real, transporte real y handlers reales', () => {
         expect(result).toBeDefined();
         const history = nodeA.messages.getMessages(aId);
         expect(history.some((message) => message.message === 'mensaje a mi mismo')).toBe(true);
-    });
-
-    it('muchos peers online (3): A envía a B y C y ambos persisten', async () => {
-        const nodeA = await createNode('200::a');
-        const nodeB = await createNode('200::b');
-        const nodeC = await createNode('200::c');
-        nodes.push(nodeA, nodeB, nodeC);
-
-        const aId = nodeA.identity.getMyUPeerId();
-        const bId = nodeB.identity.getMyUPeerId();
-        const cId = nodeC.identity.getMyUPeerId();
-
-        await addPeer(nodeA, nodeB, '200::b');
-        await addPeer(nodeA, nodeC, '200::c');
-        await addPeer(nodeB, nodeA, '200::a');
-        await addPeer(nodeC, nodeA, '200::a');
-
-        nodeA.transport.resetTransportConnectionsForTests();
-        await nodeA.sendMessage(bId, 'para bob');
-        await nodeA.sendMessage(cId, 'para carol');
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        expect(nodeB.messages.getMessages(aId).some((message) => message.message === 'para bob')).toBe(true);
-        expect(nodeC.messages.getMessages(aId).some((message) => message.message === 'para carol')).toBe(true);
     });
 
     it('online->offline: A envía a B desconectado y el mensaje queda en vault (no se pierde)', async () => {

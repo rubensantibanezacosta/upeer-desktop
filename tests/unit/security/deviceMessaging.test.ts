@@ -73,9 +73,9 @@ describe('device signed pre-key', () => {
         const retrieved = getDeviceSpkBySpkId(bundle.spkId, now);
         expect(retrieved?.spkPk.toString('hex')).toBe(bundle.spkPub);
         expect(retrieved?.spkSk.length).toBe(sodium.crypto_box_SECRETKEYBYTES);
-        expect(resolveInboundDeviceSpk(fields.devicePublicKey, bundle.spkId, now)?.spkSk.length)
+        expect(resolveInboundDeviceSpk(bundle.spkId, now)?.spkSk.length)
             .toBe(sodium.crypto_box_SECRETKEYBYTES);
-        expect(resolveInboundDeviceSpk('00'.repeat(32), bundle.spkId, now)).toBeNull();
+        expect(resolveInboundDeviceSpk(bundle.spkId + 1, now)).toBeNull();
     });
 
     it('rota el SPK después de siete días y conserva el anterior', () => {

@@ -226,3 +226,14 @@ export const syncEvents = sqliteTable('sync_events', {
     originIdx: index('sync_events_origin_idx').on(table.originDeviceId),
     occurredIdx: index('sync_events_occurred_idx').on(table.occurredAt),
 }));
+
+export const syncRelay = sqliteTable('sync_relay', {
+    eventId: text('event_id').notNull(),
+    targetDeviceId: text('target_device_id').notNull(),
+    sequence: integer('sequence').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+    ackedAt: integer('acked_at'),
+}, (table) => ({
+    pk: primaryKey({ columns: [table.eventId, table.targetDeviceId] }),
+    targetIdx: index('sync_relay_target_idx').on(table.targetDeviceId, table.ackedAt),
+}));

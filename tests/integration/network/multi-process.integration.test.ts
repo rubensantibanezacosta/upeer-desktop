@@ -28,6 +28,7 @@ type PeerInfo = {
     pubKey: string;
     port: number;
     dir: string;
+    deviceId: string;
     spk: { spkPub: string; spkSig: string; spkId: number };
 };
 
@@ -204,6 +205,52 @@ describe('e2e multiproceso: un proceso por peer (aislamiento real)', () => {
             (a2Messages.messages as Array<{ message: string }>).some((m) => m.message === 'self-sync real') ||
             (a2ConversationWithB.messages as Array<{ message: string }>).some((m) => m.message === 'self-sync real');
         expect(synced).toBe(true);
+    });
+
+    it('multi-dispositivo: relay de eventos entre tres dispositivos con topología en cadena', { timeout: 30000 }, async () => {
+        const routing = {
+            '200::d1': await freePort(),
+            '200::d2': await freePort(),
+            '200::d3': await freePort(),
+            '200::b': await freePort(),
+        };
+        const nodeD1 = new PeerProcess('200::d1');
+        const nodeD2 = new PeerProcess('200::d2');
+        const nodeD3 = new PeerProcess('200::d3');
+        const nodeB = new PeerProcess('200::b');
+        peers.push(nodeD1, nodeD2, nodeD3, nodeB);
+
+        const d1Info = await nodeD1.start({ routing, selfAddresses: ['200::d2'] });
+        const mnemonic = (await nodeD1.request('getMnemonic')).mnemonic as string;
+        const d2Info = await nodeD2.start({ routing, mnemonic, selfAddresses: ['200::d1', '200::d3'] });
+        const bInfo = await nodeB.start({ routing });
+
+        await nodeD1.addPeer(nodeB, '200::b');
+        await nodeD1.request('discoverSyncPeers');
+        await nodeD2.request('discoverSyncPeers');
+        await sleep(1000);
+
+        await nodeD1.request('sendMessage', { to: bInfo.upeerId, content: 'relay entre tres dispositivos' });
+        await sleep(800);
+
+        const d3Info = await nodeD3.start({ routing, mnemonic, selfAddresses: ['200::d2'] });
+        await nodeD3.request('discoverSyncPeers');
+        await sleep(2000);
+
+        expect(d1Info.upeerId).toBe(d2Info.upeerId);
+        expect(d2Info.upeerId).toBe(d3Info.upeerId);
+        expect(new Set([d1Info.deviceId, d2Info.deviceId, d3Info.deviceId]).size).toBe(3);
+
+        const d1Peers = (await nodeD1.request('getSyncPeers')).peers as Array<{ deviceId: string }>;
+        const d3Peers = (await nodeD3.request('getSyncPeers')).peers as Array<{ deviceId: string }>;
+        expect(d1Peers.map((peer) => peer.deviceId)).toEqual([d2Info.deviceId]);
+        expect(d3Peers.map((peer) => peer.deviceId)).toContain(d2Info.deviceId);
+        expect(d3Peers.map((peer) => peer.deviceId)).not.toContain(d1Info.deviceId);
+
+        const d2Messages = await nodeD2.request('getMessages', { contactId: bInfo.upeerId });
+        const d3Messages = await nodeD3.request('getMessages', { contactId: bInfo.upeerId });
+        expect((d2Messages.messages as Array<{ message: string }>).some((m) => m.message === 'relay entre tres dispositivos')).toBe(true);
+        expect((d3Messages.messages as Array<{ message: string }>).some((m) => m.message === 'relay entre tres dispositivos')).toBe(true);
     });
 
     it('3 peers online con procesos separados: entrega a todos los contactos', async () => {

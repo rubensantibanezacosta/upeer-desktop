@@ -97,6 +97,11 @@ vi.mock('electron', () => ({
     BrowserWindow: {
         getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]),
     },
+    app: {
+        isPackaged: false,
+        getPath: () => '/tmp',
+        getAppPath: () => process.cwd(),
+    },
 }));
 
 describe('no-pérdida de eventos de mutación (edición, borrado, reacción, read)', () => {

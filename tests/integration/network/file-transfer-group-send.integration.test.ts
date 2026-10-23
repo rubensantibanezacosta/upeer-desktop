@@ -5,7 +5,10 @@ import fs from 'node:fs/promises';
 
 vi.mock('electron', () => ({
     ipcMain: { handle: vi.fn() },
-    app: { getPath: vi.fn((name: string) => (name === 'userData' ? '/home/user/.config/upeer' : '/home/user')) },
+    app: {
+        getPath: vi.fn((name: string) => (name === 'userData' ? '/home/user/.config/upeer' : '/home/user')),
+        getAppPath: vi.fn(() => process.cwd()),
+    },
 }));
 
 vi.mock('node:fs/promises', () => ({ default: { stat: vi.fn() } }));

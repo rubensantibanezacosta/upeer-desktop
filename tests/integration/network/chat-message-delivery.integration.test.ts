@@ -104,6 +104,11 @@ vi.mock('electron', () => ({
     BrowserWindow: {
         getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]),
     },
+    app: {
+        isPackaged: false,
+        getPath: () => '/tmp',
+        getAppPath: () => process.cwd(),
+    },
 }));
 
 vi.mock('../../../src/main_process/sidecars/yggstack.js', () => ({

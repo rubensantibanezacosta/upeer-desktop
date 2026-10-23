@@ -78,6 +78,13 @@
       "when": 1792920002000,
       "tag": "0011_sync_multidevice",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792920003000,
+      "tag": "0012_relay_sync_events",
+      "breakpoints": true
     }
   ]
 }

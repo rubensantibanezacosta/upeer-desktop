@@ -28,7 +28,7 @@ export async function replayAfterAck(deviceId: string): Promise<void> {
     await replayPendingSyncEvents(peer).catch(err => warn('Sync replay failed', err, 'sync'));
 }
 
-function toPlainEvent(record: SyncEventRecord): SyncPlainEvent | null {
+export function toPlainEvent(record: SyncEventRecord): SyncPlainEvent | null {
     try {
         const payload = JSON.parse(record.payload) as unknown;
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
@@ -37,6 +37,7 @@ function toPlainEvent(record: SyncEventRecord): SyncPlainEvent | null {
             kind: record.kind,
             occurredAt: record.occurredAt,
             sequence: record.sequence,
+            originDeviceId: record.originDeviceId,
             payload: payload as Record<string, unknown>,
         };
     } catch {

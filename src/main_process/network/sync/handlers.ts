@@ -1,7 +1,9 @@
 import type { BrowserWindow } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { warn } from '../../security/secure-logger.js';
+import { getRatchetSession } from '../../storage/ratchet/operations.js';
 import { recordSyncEvent } from '../../storage/sync/events.js';
+import { isSyncRelayTarget, markSyncRelayAcked } from '../../storage/sync/relay.js';
 import {
     getSyncPeer,
     touchSyncPeer,
@@ -13,6 +15,7 @@ import { decryptDoubleRatchetPayload } from '../handlers/doubleRatchetDecrypt.js
 import { applySyncEvent } from './apply.js';
 import { certificateFromPacket, getMySyncIdentity, verifySyncHelloBinding } from './auth.js';
 import { applySyncHistoryResponse, requestSyncHistory, respondSyncHistory } from './history.js';
+import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
 import { sendSyncAck, sendSyncHello } from './transport.js';
 import { SYNC_EVENT_KINDS, type SyncHelloPayload, type SyncPlainEvent } from './types.js';
@@ -48,7 +51,10 @@ export async function handleSyncHello(
     const peer = getSyncPeer(binding.deviceId);
     if (peer) {
         replayPendingSyncEvents(peer).catch(err => warn('Sync replay failed', err, 'sync'));
-        if (!peer.historyCompleted) {
+        relayBacklogToPeer(peer).catch(err => warn('Sync relay backlog failed', err, 'sync'));
+        const myDeviceId = getMySyncIdentity()?.deviceId ?? '';
+        const hasSession = Boolean(getRatchetSession(myId, `sync:${peer.deviceId}`));
+        if (myDeviceId <= peer.deviceId && (!peer.historyCompleted || !hasSession)) {
             requestSyncHistory(peer).catch(err => warn('Sync history request failed', err, 'sync'));
         }
     }
@@ -67,9 +73,10 @@ export async function handleSyncEnvelope(
     if (!peer) return;
     const event = await decryptEvent(peer, data, 'SYNC_ENVELOPE');
     if (!event || !matchesEnvelope(data, event)) return;
+    const originDeviceId = event.originDeviceId ?? senderDeviceId;
     const recorded = recordSyncEvent({
         eventId: event.eventId,
-        originDeviceId: senderDeviceId,
+        originDeviceId,
         kind: event.kind,
         occurredAt: event.occurredAt,
         sequence: event.sequence,
@@ -77,7 +84,12 @@ export async function handleSyncEnvelope(
         direction: 'inbound',
         appliedAt: now,
     });
-    if (recorded) await applySyncEvent(event, win);
+    if (recorded) {
+        await applySyncEvent({ ...event, originDeviceId }, win);
+        if (originDeviceId !== getMySyncIdentity()?.deviceId) {
+            await relaySyncEvent({ ...event, originDeviceId }, senderDeviceId, getMyUPeerId());
+        }
+    }
     touchSyncPeer(senderDeviceId, address, event.sequence);
     sendSyncAck(peer, event.eventId, event.sequence);
 }
@@ -101,6 +113,8 @@ export async function handleSyncHistoryRequest(
         cursor: request.cursor as string | null,
         limit: request.limit,
     });
+    await replayPendingSyncEvents(peer);
+    await relayBacklogToPeer(peer);
 }
 
 export async function handleSyncHistoryResponse(
@@ -116,7 +130,7 @@ export async function handleSyncHistoryResponse(
     touchSyncPeer(senderDeviceId, address, peer.lastSequence);
     const response = await decryptPayload(peer, data, 'SYNC_HISTORY_RES');
     if (!response) return;
-    if (typeof response.requestId !== 'string' || !Array.isArray(response.entries)) return;
+    if (typeof response.requestId !== 'string' || !Array.isArray(response.entries) || response.entries.length > 200) return;
     if (typeof response.done !== 'boolean') return;
     if (response.nextCursor !== null && typeof response.nextCursor !== 'string') return;
     await applySyncHistoryResponse(peer, {
@@ -125,10 +139,16 @@ export async function handleSyncHistoryResponse(
         nextCursor: response.nextCursor as string | null,
         done: response.done,
     }, now, win);
+    await replayPendingSyncEvents(peer);
 }
 
 export function handleSyncAck(senderDeviceId: string, data: SyncPacket): void {
     if (typeof data.sequence !== 'number' || !Number.isSafeInteger(data.sequence)) return;
+    const eventId = typeof data.eventId === 'string' ? data.eventId : '';
+    if (eventId && isSyncRelayTarget(eventId, senderDeviceId)) {
+        markSyncRelayAcked(eventId, senderDeviceId);
+        return;
+    }
     updateSyncPeerAck(senderDeviceId, data.sequence);
     void replayAfterAck(senderDeviceId);
 }
@@ -201,7 +221,10 @@ function matchesEnvelope(data: SyncPacket, event: SyncPlainEvent): boolean {
     return data.eventId === event.eventId
         && data.kind === event.kind
         && data.occurredAt === event.occurredAt
-        && data.sequence === event.sequence;
+        && data.sequence === event.sequence
+        && (data.originDeviceId === undefined
+            || event.originDeviceId === undefined
+            || data.originDeviceId === event.originDeviceId);
 }
 
 function toSyncEvent(value: unknown): SyncPlainEvent | null {
@@ -211,12 +234,14 @@ function toSyncEvent(value: unknown): SyncPlainEvent | null {
     if (typeof record.kind !== 'string' || !SYNC_EVENT_KINDS.includes(record.kind as never)) return null;
     if (typeof record.occurredAt !== 'number' || !Number.isFinite(record.occurredAt)) return null;
     if (typeof record.sequence !== 'number' || !Number.isSafeInteger(record.sequence)) return null;
+    if (record.originDeviceId !== undefined && (typeof record.originDeviceId !== 'string' || !/^[0-9a-f]{64}$/i.test(record.originDeviceId))) return null;
     if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) return null;
     return {
         eventId: record.eventId,
         kind: record.kind as SyncPlainEvent['kind'],
         occurredAt: record.occurredAt,
         sequence: record.sequence,
+        originDeviceId: typeof record.originDeviceId === 'string' ? record.originDeviceId.toLowerCase() : undefined,
         payload: record.payload as Record<string, unknown>,
     };
 }

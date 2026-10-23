@@ -136,11 +136,9 @@ export function decryptSealedWithDevice(ciphertext: Buffer, now = Date.now()): B
 }
 
 export function resolveInboundDeviceSpk(
-    identityPublicKeyHex: string,
     spkId: number,
     now = Date.now(),
 ): { secretKey: Buffer; spkPk: Buffer; spkSk: Buffer } | null {
-    if (!isMyDevicePublicKey(identityPublicKeyHex, now)) return null;
     const identity = getDeviceIdentity(now);
     const spk = getDeviceSpkBySpkId(spkId, now);
     if (!identity || !spk) return null;

@@ -76,7 +76,7 @@ describe('escalabilidad de mensajería (grupos, chats, multimedia, vault)', () =
             for (let i = 0; i < N - 1; i += 1) {
                 const id = `peer-${N}-${i}`;
                 members.push(id);
-                contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${id}` };
+                contactStatuses[id] = { status: 'connected', publicKey: 'aa'.repeat(32), address: `200::${i + 1}` };
             }
             vi.mocked(groupsOps.getGroupById).mockReturnValue({
                 groupId: `g-${N}`,

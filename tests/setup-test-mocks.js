@@ -27,6 +27,7 @@ vi.mock('@mui/icons-material/VerifiedUser', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/GppMaybe', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/NewReleases', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Chat', () => ({ default: () => null }));
+vi.mock('@mui/icons-material/Call', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Groups', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/Settings', () => ({ default: () => null }));
 vi.mock('@mui/icons-material/AccountCircle', () => ({ default: () => null }));

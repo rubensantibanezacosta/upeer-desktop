@@ -6,6 +6,7 @@ import type { SyncDeviceBinding, SyncPlainEvent } from './types.js';
 import type { SyncPeerRecord } from '../../storage/sync/peers.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { getMaxSyncSequence } from '../../storage/sync/events.js';
+import { getRatchetSession } from '../../storage/ratchet/operations.js';
 
 let sequence = 0;
 
@@ -24,6 +25,7 @@ export function sendSyncHello(address: string, ack: boolean): boolean {
         type: 'SYNC_HELLO',
         ...hello,
         senderDeviceId: identity.deviceId,
+        senderDeviceCertificate: identity.certificate,
     });
     return true;
 }
@@ -36,15 +38,31 @@ export async function sendEncryptedSync(
     if (!peer.address) return false;
     const identity = getMySyncIdentity();
     if (!identity) return false;
+    const contextId = `sync:${peer.deviceId}`;
+    const session = getRatchetSession(getMyUPeerId(), contextId);
+    if (!session && identity.deviceId > peer.deviceId) return false;
     const encrypted = await encryptChatPayload(
         getMyUPeerId(),
         JSON.stringify(payload),
         peerContact(peer),
-        `sync:${peer.deviceId}`,
+        contextId,
         { allowDeviceIdentity: true },
     );
+    const envelopeMetadata: Record<string, unknown> = {};
+    if (type === 'SYNC_ENVELOPE') {
+        if (typeof payload.eventId === 'string') envelopeMetadata.eventId = payload.eventId;
+        if (typeof payload.kind === 'string') envelopeMetadata.kind = payload.kind;
+        if (typeof payload.occurredAt === 'number') envelopeMetadata.occurredAt = payload.occurredAt;
+        if (typeof payload.sequence === 'number') envelopeMetadata.sequence = payload.sequence;
+        if (typeof payload.originDeviceId === 'string') envelopeMetadata.originDeviceId = payload.originDeviceId;
+        envelopeMetadata.epoch = identity.certificate.epoch;
+    }
+    if ((type === 'SYNC_HISTORY_REQ' || type === 'SYNC_HISTORY_RES') && typeof payload.requestId === 'string') {
+        envelopeMetadata.requestId = payload.requestId;
+    }
     sendSecurePacket(peer.address, {
         type,
+        ...envelopeMetadata,
         ...encrypted,
         senderDeviceId: identity.deviceId,
         senderDeviceCertificate: identity.certificate,

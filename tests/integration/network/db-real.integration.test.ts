@@ -10,6 +10,7 @@ vi.mock('electron', () => ({
     app: {
         isPackaged: false,
         getPath: () => '/tmp',
+        getAppPath: () => process.cwd(),
     },
 }));
 

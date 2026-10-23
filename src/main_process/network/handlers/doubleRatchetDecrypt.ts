@@ -58,7 +58,7 @@ async function decryptDoubleRatchetPayloadUnlocked(
 
         if (!session && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(spkId);
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (!spkEntry) {
                 await onReset?.(createResetPacket(contextId, data.senderDeviceId));
@@ -94,7 +94,7 @@ async function decryptDoubleRatchetPayloadUnlocked(
         );
         if (canRecoverFromFreshX3dh && data.x3dhInit) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
-            const deviceSpkEntry = resolveInboundDeviceSpk(ikPub, spkId);
+            const deviceSpkEntry = resolveInboundDeviceSpk(spkId);
             const spkEntry = deviceSpkEntry ?? getSpkBySpkId(spkId);
             if (spkEntry) {
                 const sharedSecret = x3dhResponder(

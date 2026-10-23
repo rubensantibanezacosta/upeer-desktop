@@ -43,8 +43,19 @@ vi.mock('../../../src/main_process/storage/sync/peers.js', () => ({
     upsertSyncPeer: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
+    getRatchetSession: vi.fn(() => null),
+}));
+
 vi.mock('../../../src/main_process/storage/sync/events.js', () => ({
     recordSyncEvent: vi.fn(() => true),
+}));
+
+vi.mock('../../../src/main_process/storage/sync/relay.js', () => ({
+    isSyncRelayTarget: vi.fn(() => false),
+    markSyncRelayAcked: vi.fn(),
+    relayBacklogToPeer: vi.fn(() => Promise.resolve()),
+    relaySyncEvent: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../src/main_process/network/sync/apply.js', () => ({
@@ -55,6 +66,11 @@ vi.mock('../../../src/main_process/network/sync/history.js', () => ({
     applySyncHistoryResponse: vi.fn(),
     requestSyncHistory: vi.fn(() => Promise.resolve()),
     respondSyncHistory: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/sync/relay.js', () => ({
+    relayBacklogToPeer: vi.fn(() => Promise.resolve()),
+    relaySyncEvent: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../src/main_process/network/sync/replay.js', () => ({
@@ -86,6 +102,7 @@ import {
     respondSyncHistory,
 } from '../../../src/main_process/network/sync/history.js';
 import { recordSyncEvent } from '../../../src/main_process/storage/sync/events.js';
+import { isSyncRelayTarget, markSyncRelayAcked } from '../../../src/main_process/storage/sync/relay.js';
 import { getSyncPeer, touchSyncPeer, updateSyncPeerAck, upsertSyncPeer } from '../../../src/main_process/storage/sync/peers.js';
 import { sendSyncAck, sendSyncHello } from '../../../src/main_process/network/sync/transport.js';
 
@@ -102,6 +119,7 @@ describe('Sync device handlers', () => {
         vi.clearAllMocks();
         vi.mocked(getSyncPeer).mockReturnValue(peer as never);
         vi.mocked(recordSyncEvent).mockReturnValue(true);
+        vi.mocked(isSyncRelayTarget).mockReturnValue(false);
         vi.mocked(decryptDoubleRatchetPayload).mockResolvedValue(null);
     });
 
@@ -222,6 +240,19 @@ describe('Sync device handlers', () => {
     it('updates the peer acknowledgement sequence', () => {
         handleSyncAck(deviceId, { sequence: 99 });
         expect(updateSyncPeerAck).toHaveBeenCalledWith(deviceId, 99);
+    });
+
+    it('marks relayed events as acknowledged without advancing local replay', () => {
+        vi.mocked(isSyncRelayTarget).mockReturnValue(true);
+        handleSyncAck(deviceId, { eventId: 'event-1', sequence: 11 });
+        expect(markSyncRelayAcked).toHaveBeenCalledWith('event-1', deviceId);
+        expect(updateSyncPeerAck).not.toHaveBeenCalled();
+    });
+
+    it('advances replay for direct inbound events even when they carry an event id', () => {
+        handleSyncAck(deviceId, { eventId: 'event-1', sequence: 11 });
+        expect(updateSyncPeerAck).toHaveBeenCalledWith(deviceId, 11);
+        expect(markSyncRelayAcked).not.toHaveBeenCalled();
     });
 });
 

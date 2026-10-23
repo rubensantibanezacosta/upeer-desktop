@@ -35,6 +35,7 @@ export async function broadcastSyncEvent(event: SyncEventDraft): Promise<void> {
         kind: event.kind,
         occurredAt: event.occurredAt,
         sequence,
+        originDeviceId: getMySyncIdentity()?.deviceId,
         payload: event.payload,
     };
     for (const peer of peers) {
