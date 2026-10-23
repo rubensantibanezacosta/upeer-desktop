@@ -6,7 +6,10 @@ export type SyncEventKind =
     | 'MESSAGE_EDIT'
     | 'MESSAGE_DELETE'
     | 'CHAT_CLEAR'
-    | 'REACTION_SET';
+    | 'REACTION_SET'
+    | 'GROUP_UPSERT'
+    | 'GROUP_DELETE'
+    | 'CONTACT_PROFILE';
 
 export type SyncEventDraft = {
     eventId: string;

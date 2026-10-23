@@ -1,5 +1,6 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
+import { emitSyncEvent } from '../sync/eventSink.js';
 import type { Contact } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
@@ -192,30 +193,47 @@ export function updateContactName(upeerId: string, name: string) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
+    const result = db.update(schema.contacts)
         .set({ name })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitContactProfile(upeerId);
+    return result;
 }
 
 export function updateContactAvatar(upeerId: string, avatar: string) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
+    const result = db.update(schema.contacts)
         .set({ avatar })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitContactProfile(upeerId);
+    return result;
 }
 
 export function setContactFavorite(upeerId: string, isFavorite: boolean) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
+    const result = db.update(schema.contacts)
         .set({ isFavorite })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitContactProfile(upeerId);
+    return result;
+}
+
+function emitContactProfile(upeerId: string): void {
+    const contact = getContactByUpeerId(upeerId) as { name?: string; avatar?: string | null; isFavorite?: boolean } | undefined;
+    if (!contact) return;
+    emitSyncEvent('CONTACT_PROFILE', {
+        upeerId,
+        name: contact.name ?? '',
+        avatar: contact.avatar ?? null,
+        isFavorite: contact.isFavorite === true,
+    });
 }
 
 export function blockContact(upeerId: string) {

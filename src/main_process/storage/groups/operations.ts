@@ -1,5 +1,6 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 import { getUPeerIdFromPublicKey } from '../../security/identity.js';
+import { emitSyncEvent } from '../sync/eventSink.js';
 
 export interface GroupRecord {
     groupId: string;
@@ -81,6 +82,65 @@ function parseGroup(raw: GroupRow): GroupRecord {
     };
 }
 
+export interface GroupMetadata {
+    groupId: string;
+    name: string;
+    adminUpeerId: string;
+    members: string[];
+    status: 'active' | 'invited' | 'removed';
+    isFavorite: boolean;
+    avatar: string | null;
+    createdAt: number | null;
+}
+
+function emitGroupMetadata(groupId: string): void {
+    const group = getGroupById(groupId);
+    if (!group) return;
+    emitSyncEvent('GROUP_UPSERT', {
+        groupId: group.groupId,
+        name: group.name,
+        adminUpeerId: group.adminUpeerId,
+        members: group.members,
+        status: group.status,
+        isFavorite: group.isFavorite === true,
+        avatar: group.avatar ?? null,
+        createdAt: group.createdAt ?? null,
+    });
+}
+
+export function upsertGroupMetadata(meta: GroupMetadata): void {
+    const db = getDb();
+    const schema = getSchema();
+    const existing = getGroupById(meta.groupId);
+    if (!existing) {
+        db.insert(schema.groups).values({
+            groupId: meta.groupId,
+            name: meta.name,
+            adminUpeerId: meta.adminUpeerId,
+            members: JSON.stringify(meta.members),
+            memberPublicKeys: '{}',
+            status: meta.status,
+            isFavorite: meta.isFavorite,
+            avatar: meta.avatar,
+            createdAt: meta.createdAt ?? Date.now(),
+        }).run();
+        return;
+    }
+    const memberSet = new Set(meta.members);
+    const memberPublicKeys = Object.fromEntries(
+        Object.entries(existing.memberPublicKeys ?? {}).filter(([memberId]) => memberSet.has(memberId)),
+    );
+    db.update(schema.groups).set({
+        name: meta.name,
+        adminUpeerId: meta.adminUpeerId,
+        members: JSON.stringify(meta.members),
+        memberPublicKeys: JSON.stringify(memberPublicKeys),
+        status: meta.status,
+        isFavorite: meta.isFavorite,
+        avatar: meta.avatar,
+    }).where(eq(schema.groups.groupId, meta.groupId)).run();
+}
+
 export function saveGroup(
     groupId: string,
     name: string,
@@ -119,15 +179,17 @@ export function saveGroup(
             ...(avatar !== undefined ? { avatar } : {})
         }
     }).run();
+    emitGroupMetadata(groupId);
 }
 
 export function updateGroupAvatar(groupId: string, avatar: string): void {
     const db = getDb();
     const schema = getSchema();
-    db.update(schema.groups)
+    const result = db.update(schema.groups)
         .set({ avatar })
         .where(eq(schema.groups.groupId, groupId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitGroupMetadata(groupId);
 }
 
 export function updateGroupInfo(groupId: string, fields: { name?: string; avatar?: string | null }): void {
@@ -137,7 +199,8 @@ export function updateGroupInfo(groupId: string, fields: { name?: string; avatar
     if (fields.name !== undefined) set.name = fields.name;
     if (fields.avatar !== undefined) set.avatar = fields.avatar;
     if (Object.keys(set).length === 0) return;
-    db.update(schema.groups).set(set).where(eq(schema.groups.groupId, groupId)).run();
+    const result = db.update(schema.groups).set(set).where(eq(schema.groups.groupId, groupId)).run();
+    if ((result?.changes ?? 0) > 0) emitGroupMetadata(groupId);
 }
 
 export function getGroups(): GroupRecord[] {
@@ -190,6 +253,7 @@ export function updateGroupMembers(groupId: string, members: string[]): void {
         .set({ members: JSON.stringify(members), memberPublicKeys: JSON.stringify(memberPublicKeys) })
         .where(eq(schema.groups.groupId, groupId))
         .run();
+    emitGroupMetadata(groupId);
 }
 
 export function mergeGroupMemberPublicKeys(groupId: string, entries: Record<string, string>): void {
@@ -233,32 +297,36 @@ export function updateGroupCrypto(groupId: string, cryptoState: GroupCryptoState
 export function updateGroupStatus(groupId: string, status: 'active' | 'invited' | 'removed'): void {
     const db = getDb();
     const schema = getSchema();
-    db.update(schema.groups)
+    const result = db.update(schema.groups)
         .set({ status })
         .where(eq(schema.groups.groupId, groupId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitGroupMetadata(groupId);
 }
 
 export function updateGroupAdmin(groupId: string, adminUpeerId: string): void {
     const db = getDb();
     const schema = getSchema();
-    db.update(schema.groups)
+    const result = db.update(schema.groups)
         .set({ adminUpeerId })
         .where(eq(schema.groups.groupId, groupId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitGroupMetadata(groupId);
 }
 
 export function setGroupFavorite(groupId: string, isFavorite: boolean): void {
     const db = getDb();
     const schema = getSchema();
-    db.update(schema.groups)
+    const result = db.update(schema.groups)
         .set({ isFavorite })
         .where(eq(schema.groups.groupId, groupId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitGroupMetadata(groupId);
 }
 
 export function deleteGroup(groupId: string): void {
     const db = getDb();
     const schema = getSchema();
-    db.delete(schema.groups).where(eq(schema.groups.groupId, groupId)).run();
+    const result = db.delete(schema.groups).where(eq(schema.groups.groupId, groupId)).run();
+    if ((result?.changes ?? 0) > 0) emitSyncEvent('GROUP_DELETE', { groupId });
 }

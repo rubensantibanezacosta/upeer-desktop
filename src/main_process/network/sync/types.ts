@@ -9,6 +9,9 @@ export const SYNC_EVENT_KINDS: SyncEventKind[] = [
     'MESSAGE_DELETE',
     'CHAT_CLEAR',
     'REACTION_SET',
+    'GROUP_UPSERT',
+    'GROUP_DELETE',
+    'CONTACT_PROFILE',
 ];
 
 export type SyncDeviceBinding = {
