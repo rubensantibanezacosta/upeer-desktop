@@ -204,5 +204,6 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
         });
         get().refreshContacts();
         get().refreshGroups();
+        get().refreshSyncStatus();
     },
 });

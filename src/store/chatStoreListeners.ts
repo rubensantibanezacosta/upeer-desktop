@@ -203,6 +203,9 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
         window.upeer.onGroupInvite(() => get().refreshGroups());
         window.upeer.onGroupUpdated(() => get().refreshGroups());
 
+        window.upeer.onSyncStatus?.((syncStatus) => set({ syncStatus }));
+        void get().refreshSyncStatus?.();
+
         window.upeer.onMessageDelivered((data) => {
             get().refreshContacts();
             set((state) => ({

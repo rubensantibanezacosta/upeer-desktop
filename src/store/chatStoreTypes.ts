@@ -21,6 +21,7 @@ export interface ChatState {
     keyChangeAlerts: Record<string, KeyChangeAlert>;
     pendingFiles: PendingFile[];
     isDragging: boolean;
+    syncStatus: UpeerSyncStatus;
 }
 
 export interface ChatActions {
@@ -38,6 +39,7 @@ export interface ChatActions {
     loadOlderHistory: () => Promise<void>;
     refreshContacts: () => Promise<void>;
     refreshGroups: () => Promise<void>;
+    refreshSyncStatus: () => Promise<void>;
     refreshData: () => Promise<void>;
     handleSend: (linkPreview?: LinkPreview | null) => Promise<void>;
     handleShareContact: (contact: { name: string; address: string; upeerId?: string; publicKey?: string; avatar?: string }) => Promise<void>;

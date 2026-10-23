@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { BrowserWindow } from 'electron';
 
 import { recordSyncEvent } from '../../storage/sync/events.js';
+import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { applySyncEvent } from './apply.js';
@@ -69,6 +70,7 @@ export async function applySyncHistoryResponse(
             occurredAt: entry.occurredAt,
             sequence: entry.sequence,
             payload: JSON.stringify(entry.payload),
+            entityId: syncEntityId(entry.kind, entry.payload),
             originSignature: entry.originSignature ?? null,
             originCertificate: entry.originCertificate ? JSON.stringify(entry.originCertificate) : null,
             direction: 'inbound',

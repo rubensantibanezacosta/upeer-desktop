@@ -164,3 +164,17 @@ export interface YggstackStatusEvent {
     status: 'connecting' | 'up' | 'down' | 'reconnecting';
     address?: string;
 }
+
+export interface SyncPeerStateEvent {
+    deviceId: string;
+    state: 'pending' | 'synced';
+    ackSequence: number;
+    lastSeen: number;
+}
+
+export interface SyncStatusEvent {
+    state: 'disabled' | 'pending' | 'synced';
+    pendingEvents: number;
+    pendingEntityIds: string[];
+    peers: SyncPeerStateEvent[];
+}

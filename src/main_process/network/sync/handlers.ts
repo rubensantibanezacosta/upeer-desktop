@@ -4,6 +4,7 @@ import { parseCertificate } from '../../security/deviceCertificate.js';
 import { warn } from '../../security/secure-logger.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
 import { recordSyncEvent } from '../../storage/sync/events.js';
+import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { isSyncRelayTarget, markSyncRelayAcked } from '../../storage/sync/relay.js';
 import {
     getSyncPeer,
@@ -19,6 +20,7 @@ import { applySyncHistoryResponse, requestSyncHistory, respondSyncHistory } from
 import { verifySyncEventOrigin } from './origin.js';
 import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
+import { notifySyncStatus } from './statusNotify.js';
 import { sendSyncAck, sendSyncHello } from './transport.js';
 import { SYNC_EVENT_KINDS, type SyncHelloPayload, type SyncPlainEvent } from './types.js';
 
@@ -91,6 +93,7 @@ export async function handleSyncEnvelope(
         occurredAt: signedEvent.occurredAt,
         sequence: signedEvent.sequence,
         payload: JSON.stringify(signedEvent.payload),
+        entityId: syncEntityId(signedEvent.kind, signedEvent.payload),
         originSignature: signedEvent.originSignature ?? null,
         originCertificate: signedEvent.originCertificate
             ? JSON.stringify(signedEvent.originCertificate)
@@ -179,6 +182,7 @@ export async function routeSyncPacket(
     switch (data.type) {
         case 'SYNC_HELLO':
             await handleSyncHello(address, data);
+            notifySyncStatus(win);
             break;
         case 'SYNC_ENVELOPE':
             await handleSyncEnvelope(senderDeviceId, data, address, win);
@@ -191,6 +195,7 @@ export async function routeSyncPacket(
             break;
         case 'SYNC_ACK':
             handleSyncAck(senderDeviceId, data);
+            notifySyncStatus(win);
             break;
         default:
             break;

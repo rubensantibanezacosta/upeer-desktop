@@ -230,7 +230,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                             <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px', opacity: 0.8 }}>
                                                 {msg.timestamp}
                                             </Typography>
-                                            {isMe ? <MessageStatus status={msg.status} onRetry={msg.id && msg.status === 'failed' ? () => onRetryMessage?.(msg.id as string) : undefined} /> : null}
+                                            {isMe ? <MessageStatus status={msg.status} messageId={msg.id} onRetry={msg.id && msg.status === 'failed' ? () => onRetryMessage?.(msg.id as string) : undefined} /> : null}
                                         </Box>
                                     </Box>
                                 )}

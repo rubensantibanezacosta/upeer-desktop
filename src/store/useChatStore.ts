@@ -3,6 +3,7 @@ import { createChatHistoryActions } from './chatStoreHistory.js';
 import { createChatListenerActions } from './chatStoreListeners.js';
 import { createChatOperationActions } from './chatStoreOperations.js';
 import { createChatTransferActions } from './chatStoreTransferActions.js';
+import { createSyncStatusActions } from './chatStoreSyncStatus.js';
 import type { ChatStore } from './chatStoreTypes.js';
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -27,6 +28,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     isDragging: false,
     setMyIdentity: (identity) => set({ myIdentity: identity }),
     setNetworkAddress: (networkAddress) => set({ networkAddress }),
+    ...createSyncStatusActions(set),
     ...createChatHistoryActions(set, get),
     ...createChatOperationActions(set, get),
     ...createChatTransferActions(set, get),

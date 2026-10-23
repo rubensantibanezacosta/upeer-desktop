@@ -4,13 +4,19 @@ import { IconButton } from '@mui/joy';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import ReplayIcon from '@mui/icons-material/Replay';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { useChatStore } from '../../../store/useChatStore.js';
 
 interface MessageStatusProps {
     status: string;
+    messageId?: string;
     onRetry?: () => void;
 }
 
-export const MessageStatus: React.FC<MessageStatusProps> = ({ status, onRetry }) => {
+export const MessageStatus: React.FC<MessageStatusProps> = ({ status, messageId, onRetry }) => {
+    const syncPending = useChatStore((state) => (
+        Boolean(messageId) && state.syncStatus.pendingEntityIds.includes(messageId as string)
+    ));
     if (status === 'failed') {
         return (
             <IconButton
@@ -34,7 +40,13 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, onRetry })
     const Icon = isSingleCheck ? DoneIcon : DoneAllIcon;
     const readableStatus = isRead ? 'leído' : isSingleCheck ? 'enviado' : 'entregado';
     return (
-        <Box component="span" aria-label={`Estado del mensaje: ${readableStatus}`} sx={{ display: 'inline-flex', alignItems: 'center' }}>
+        <Box component="span" aria-label={`Estado del mensaje: ${readableStatus}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
+            {syncPending && (
+                <CloudUploadIcon
+                    aria-label="Pendiente de sincronizar con tus dispositivos"
+                    sx={{ fontSize: '13px', opacity: 0.7, verticalAlign: 'middle' }}
+                />
+            )}
             <Icon sx={{
                 fontSize: '16px',
                 lineHeight: 1,

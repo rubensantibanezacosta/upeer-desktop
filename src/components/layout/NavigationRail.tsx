@@ -7,6 +7,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
+import { SyncStatusIndicator } from './SyncStatusIndicator.js';
 
 interface NavigationRailProps {
     myIp: string;
@@ -110,6 +111,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <SyncStatusIndicator />
             <Tooltip title="Ajustes" placement="right">
                 <IconButton
                     aria-label="Ajustes"

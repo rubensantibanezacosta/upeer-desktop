@@ -35,6 +35,18 @@ declare global {
     type UpeerIncomingRequest = import('./types/chat.js').IncomingRequest;
     type UpeerPendingFile = import('./types/chat.js').PendingFile;
     type UpeerDevice = import('./store/useDeviceStore.js').Device;
+    type UpeerSyncPeerState = {
+        deviceId: string;
+        state: 'pending' | 'synced';
+        ackSequence: number;
+        lastSeen: number;
+    };
+    type UpeerSyncStatus = {
+        state: 'disabled' | 'pending' | 'synced';
+        pendingEvents: number;
+        pendingEntityIds: string[];
+        peers: UpeerSyncPeerState[];
+    };
 
     interface Window {
         upeer: {
@@ -179,6 +191,9 @@ declare global {
             onYggstackAddress: (callback: (address: string) => void) => UpeerUnsubscribe;
             /** Callback para cambios de estado de la red: 'connecting'|'up'|'down'|'reconnecting' */
             onYggstackStatus: (callback: (status: string, address?: string) => void) => UpeerUnsubscribe;
+            /** Estado de sincronización con los demás dispositivos propios */
+            getSyncStatus: () => Promise<UpeerSyncStatus>;
+            onSyncStatus: (callback: (status: UpeerSyncStatus) => void) => UpeerUnsubscribe;
             /** Obtiene la lista de dispositivos (nodos) activos ligados a esta Identidad */
             getDevices: () => Promise<UpeerDevice[]>;
             setDeviceTrust: (deviceId: string, isTrusted: boolean) => Promise<{ success: boolean; error?: string }>;

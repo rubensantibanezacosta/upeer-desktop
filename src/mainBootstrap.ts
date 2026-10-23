@@ -3,6 +3,7 @@ import { registerContactHandlers } from './main_process/core/ipcHandlers/contact
 import { registerCallHandlers } from './main_process/core/ipcHandlers/calls.js';
 import { registerClipboardHandlers } from './main_process/core/ipcHandlers/clipboard.js';
 import { registerDeviceHandlers } from './main_process/core/ipcHandlers/devices.js';
+import { registerSyncHandlers } from './main_process/core/ipcHandlers/sync.js';
 import { registerFileHandlers } from './main_process/core/ipcHandlers/files.js';
 import { registerFileTransferHandlers } from './main_process/core/ipcHandlers/fileTransfer.js';
 import { registerGroupHandlers } from './main_process/core/ipcHandlers/groups.js';
@@ -43,5 +44,6 @@ export const registerIpcHandlers = () => {
     registerVaultHandlers();
     registerSecurityHandlers();
     registerDeviceHandlers();
+    registerSyncHandlers();
     registerScreenShareHandlers();
 };

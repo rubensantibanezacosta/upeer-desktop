@@ -11,6 +11,7 @@ export type SyncEventRecord = {
     payload: string;
     originSignature?: string | null;
     originCertificate?: string | null;
+    entityId?: string | null;
     direction: 'inbound' | 'outbound';
     appliedAt: number;
 };

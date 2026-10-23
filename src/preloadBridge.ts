@@ -231,6 +231,7 @@ const callApi = {
 const networkApi = {
     fetchOgPreview: (url: string) => ipcRenderer.invoke('fetch-og-preview', { url }),
     getNetworkStats: () => ipcRenderer.invoke('get-network-stats'),
+    getSyncStatus: () => ipcRenderer.invoke('get-sync-status'),
     restartYggstack: () => ipcRenderer.invoke('restart-yggstack'),
 };
 
@@ -270,6 +271,7 @@ const eventApi = {
     onVaultRecoveryStatus: (callback: (data: VaultRecoveryStatusPayload) => void) => subscribe<[VaultRecoveryStatusPayload]>('vault-recovery-status', callback),
     onYggstackAddress: (callback: (address: string) => void) => subscribe('yggstack-address', (address: string) => callback(address)),
     onYggstackStatus: (callback: (status: string, address?: string) => void) => subscribe('yggstack-status', (status: string, address?: string) => callback(status, address)),
+    onSyncStatus: (callback: (status: UpeerSyncStatus) => void) => subscribe<[UpeerSyncStatus]>('sync-status', (status) => callback(status)),
     onCallIncoming: (callback: (data: { callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[]; groupId?: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string; kind: 'audio' | 'video'; isGroup?: boolean; groupMembers?: string[]; groupId?: string }]>('call-incoming', (data) => callback(data)),
     onCallRing: (callback: (data: { callId: string; peerUpeerId: string }) => void) => subscribe<[{ callId: string; peerUpeerId: string }]>('call-ring', (data) => callback(data)),
     onCallAccepted: (callback: (data: { callId: string; peerUpeerId: string; connectedAt?: number }) => void) => subscribe<[{ callId: string; peerUpeerId: string; connectedAt?: number }]>('call-accepted', (data) => callback(data)),

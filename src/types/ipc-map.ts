@@ -112,6 +112,7 @@ import type {
     FileTransferFailedEvent,
     YggstackAddressEvent,
     YggstackStatusEvent,
+    SyncStatusEvent,
 } from './ipc-events.js';
 
 export interface IPCMap {
@@ -159,6 +160,7 @@ export interface IPCMap {
     'get-file-transfers': { request: void; response: GetFileTransfersResponse };
     'save-transferred-file': { request: SaveTransferredFileRequest; response: SaveTransferredFileResponse };
     'get-network-stats': { request: void; response: GetNetworkStatsResponse };
+    'get-sync-status': { request: void; response: SyncStatusEvent };
     'restart-yggstack': { request: void; response: RestartYggstackResponse };
     'show-save-dialog': { request: ShowSaveDialogOptions; response: ShowSaveDialogResponse };
     'open-file': { request: OpenFileRequest; response: OpenFileResponse };
@@ -189,4 +191,5 @@ export interface IPCEventMap {
     'file-transfer-failed': FileTransferFailedEvent;
     'yggstack-address': YggstackAddressEvent;
     'yggstack-status': YggstackStatusEvent;
+    'sync-status': SyncStatusEvent;
 }

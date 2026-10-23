@@ -7,6 +7,7 @@ import { getSelfAddresses } from '../messaging/chatSupport.js';
 import { getMySyncIdentity } from './auth.js';
 import { signSyncEventOrigin } from './origin.js';
 import { nextSyncSequence, sendSyncEnvelope, sendSyncHello } from './transport.js';
+import { notifySyncStatus } from './statusNotify.js';
 
 let discoveryTimer: ReturnType<typeof setInterval> | null = null;
 let discoveryRunning = false;
@@ -28,6 +29,7 @@ export async function broadcastSyncEvent(event: SyncEventDraft): Promise<void> {
         occurredAt: plainEvent.occurredAt,
         sequence: plainEvent.sequence,
         payload: JSON.stringify(plainEvent.payload),
+        entityId: event.entityId,
         originSignature: plainEvent.originSignature ?? null,
         originCertificate: plainEvent.originCertificate
             ? JSON.stringify(plainEvent.originCertificate)
@@ -47,6 +49,7 @@ export async function broadcastSyncEvent(event: SyncEventDraft): Promise<void> {
             warn('Sync envelope delivery failed', { deviceId: peer.deviceId, err: String(err) }, 'sync');
         });
     }
+    notifySyncStatus();
 }
 
 export async function discoverSyncPeers(): Promise<void> {

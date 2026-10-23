@@ -15,6 +15,7 @@ export type SyncEventDraft = {
     eventId: string;
     kind: SyncEventKind;
     occurredAt: number;
+    entityId: string;
     payload: Record<string, unknown>;
 };
 
@@ -33,8 +34,22 @@ export function emitSyncEvent(kind: SyncEventKind, payload: Record<string, unkno
         eventId: crypto.randomUUID(),
         kind,
         occurredAt: Date.now(),
+        entityId: syncEntityId(kind, payload),
         payload,
     });
+}
+
+export function syncEntityId(kind: SyncEventKind, payload: Record<string, unknown>): string {
+    const candidate = kind === 'CHAT_CLEAR'
+        ? payload.chatUpeerId
+        : kind === 'REACTION_SET'
+            ? payload.messageId
+            : kind === 'GROUP_UPSERT' || kind === 'GROUP_DELETE'
+                ? payload.groupId
+                : kind === 'CONTACT_PROFILE'
+                    ? payload.upeerId
+                    : payload.id;
+    return typeof candidate === 'string' ? candidate : '';
 }
 
 export function withSyncEventSuppression<T>(fn: () => T): T {

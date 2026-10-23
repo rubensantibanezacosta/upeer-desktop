@@ -222,10 +222,12 @@ export const syncEvents = sqliteTable('sync_events', {
     payload: text('payload').notNull(),
     originSignature: text('origin_signature'),
     originCertificate: text('origin_certificate'),
+    entityId: text('entity_id'),
     direction: text('direction').notNull(),
     appliedAt: integer('applied_at').notNull(),
 }, (table) => ({
     originIdx: index('sync_events_origin_idx').on(table.originDeviceId),
+    entityIdx: index('sync_events_entity_idx').on(table.entityId, table.direction),
     occurredIdx: index('sync_events_occurred_idx').on(table.occurredAt),
 }));
 
