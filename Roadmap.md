@@ -78,6 +78,7 @@ El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](.
 - [x] Respuestas/citas — por UUID con vista previa del mensaje original
 - [x] Indicador "Escribiendo…" — en tiempo real con debounce (2,5 s)
 - [x] Presencia — "En línea" / "Última vez visto" por heartbeats autenticados
+- [ ] Presencia corregida a actividad del usuario: hoy «En línea» sale de `lastSeen`, que mueve cualquier paquete autenticado (incluido el `PING`), así que mide alcanzabilidad del nodo y no que la persona esté delante. Ver «Presencia = actividad del usuario, no del nodo»
 - [x] Vault — almacén cifrado de mensajes para contactos offline (hasta 1 GB)
 - [x] **Mensajes de voz** — grabación (`useAudioRecorder` + `useRecordingWaveform`), envío como nota de voz (`isVoiceNote`) y reproducción (`AudioPlayer` con wavesurfer); funcionan en chats privados y grupos
 - [x] **Social Mesh Resilience** — entrega robusta de mensajes offline via Vault + punteros DHT automáticos
@@ -193,6 +194,16 @@ Bloqueos que también son nuestros y afectan a la paridad:
 ### Contador de no leídos en la pestaña Chats del móvil
 
 El móvil replica el `Badge` de `NavigationRail`: cuenta conversaciones con mensajes recibidos sin leer cuyo último mensaje no es propio y recorta a `99+`, con pruebas propias. Dos diferencias deliberadas, acordadas con el usuario: usa el acento del propio móvil (`theme.accent`/`theme.onAccent`, el mismo del contador de cada fila) en lugar del `danger` de escritorio, que en tema oscuro queda sucio; y se dibuja dentro de `tabBarIcon` porque el `tabBarBadge` de React Navigation impone su `lineHeight`. Al aparecer, el icono se desplaza 4 px a la izquierda y la píldora se superpone a la derecha, con animación.
+
+### Presencia = actividad del usuario, no del nodo
+
+Decisión de producto, común a los dos clientes y fijada el 26/10/2026: **«En línea» describe a la persona, no al nodo.** Que el servicio, el daemon de Yggdrasil o la VPN del par estén levantados es un detalle técnico de transporte; el usuario no debe verlo traducido a un punto verde. El arreglo anterior del `PING`/`PONG` sigue siendo válido para no dar por caído un par alcanzable, pero **un nodo que contesta no es una persona delante de la pantalla**.
+
+- Hoy `lastSeen` se refresca con cualquier paquete entrante autenticado, incluido el `PING` del heartbeat (~10 s), así que la ventana de presencia mide alcanzabilidad: un móvil con la app cerrada y el servicio vivo se queda «En línea» indefinidamente.
+- Se separan dos datos: `lastSeen` (transporte, diagnóstico y reachability del outbox) y `lastActive` (actividad humana: abrir la app, volver a primer plano, abrir conversación, escribir, enviar, leer, reaccionar). El ping, los ACK y los `DR_RESET` **no** mueven `lastActive`.
+- La etiqueta del usuario pasa a salir de `lastActive` con la misma ventana de antes (`ONLINE_WINDOW_MS`): dentro de 65 s, «En línea»; después, «Última vez …» con la hora de la última acción real. Aquí eso toca `topHeaderSupport` y la tarjeta «Última Actividad» de `ContactsPanelDetails`, que hoy dan «Ahora mismo» con el contacto simplemente alcanzable.
+- No se expone «nodo conectado», «servicio activo» ni equivalentes en lista, cabecera ni ficha: el estado de red y DHT se queda en Diagnóstico.
+- Pendiente: campo `lastActive` en el estado local y en el payload de presencia, emisión de la actividad propia desde el renderer y pruebas de que el `PING` no cuenta como presencia humana.
 
 ### Altura única en los campos de búsqueda del móvil
 
