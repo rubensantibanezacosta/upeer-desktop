@@ -190,6 +190,14 @@ Bloqueos que también son nuestros y afectan a la paridad:
 - [ ] Ajustes de Notificaciones sin lógica real: el móvil necesita el mismo contrato de preferencias.
 - [ ] Las anotaciones «Preview for phase 11» de `CHAT_REACTION`, `CHAT_DELETE` y `CHAT_UPDATE` en `network/types.ts` siguen ahí pese a estar implementados y probados: congelar el contrato antes de portarlos.
 
+### Contador de no leídos en la pestaña Chats del móvil
+
+El móvil replica el `Badge` de `NavigationRail`: cuenta conversaciones con mensajes recibidos sin leer cuyo último mensaje no es propio y recorta a `99+`, con pruebas propias. Dos diferencias deliberadas, acordadas con el usuario: usa el acento del propio móvil (`theme.accent`/`theme.onAccent`, el mismo del contador de cada fila) en lugar del `danger` de escritorio, que en tema oscuro queda sucio; y se dibuja dentro de `tabBarIcon` porque el `tabBarBadge` de React Navigation impone su `lineHeight`. Al aparecer, el icono se desplaza 4 px a la izquierda y la píldora se superpone a la derecha, con animación.
+
+### Altura única en los campos de búsqueda del móvil
+
+Regla de diseño para el móvil, fijada el 24/10/2026: **todos los campos de búsqueda comparten la altura de la barra de búsqueda de Chats** — caja de 50, icono de 18, texto de 14, aspa de 16, radio 8, `background.level1` y sin borde permanente. Contactos y el selector de contactos estaban en 35 con un `Input` de 40 que desbordaba la caja. La regla vive en un único `SearchField`, no repetida por pantalla.
+
 ### Escalabilidad (prioridad: fanout de grupos)
 
 **Problema:** el fanout de mensajes y control de grupos es secuencial O(N): `sendGroupMessage`, `broadcastGroupUpdatePacket` y `leaveGroup` hacen `await` por cada miembro (resolver contacto + import + entregar), por lo que un grupo de N miembros serializa N operaciones.
