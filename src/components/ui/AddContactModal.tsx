@@ -18,7 +18,10 @@ import {
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { isYggdrasilAddress } from '../../utils/yggdrasilAddress.js';
+import { parseContactQrPayload } from '../../utils/contactQr.js';
+import { QrScannerModal } from './QrScannerModal.js';
 
 interface AddContactModalProps {
     open: boolean;
@@ -30,6 +33,18 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
     const [id, setId] = useState('');
     const [name, setName] = useState('');
     const [error, setError] = useState('');
+    const [scanning, setScanning] = useState(false);
+
+    const applyScanned = (raw: string) => {
+        const result = parseContactQrPayload(raw);
+        setScanning(false);
+        if ('error' in result) {
+            setError(result.error);
+            return;
+        }
+        setId(`${result.upeerId}@${result.address}`);
+        setError('');
+    };
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -66,6 +81,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
     };
 
     return (
+        <>
         <Modal open={open} onClose={onClose}>
             <ModalDialog sx={{ width: 450, maxWidth: '95vw', borderRadius: 'xl', boxShadow: 'lg', p: 0, overflow: 'hidden' }}>
                 <Box sx={{
@@ -86,8 +102,19 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                 <Divider />
                 <DialogContent sx={{ p: 3 }}>
                     <Typography level="body-sm" sx={{ mb: 2.5 }}>
-                        Para añadir a alguien, necesitas su <b>Identidad upeer</b> completa en formato ID@IP. Una vez conectado, el sistema DHT mantendrá actualizada su dirección automáticamente, incluso si cambia.
+                        Para añadir a alguien, necesitas su <b>Identidad upeer</b> completa en formato ID@IP. Puedes pegartela o escanear el QR que muestra en Perfil → Mostrar QR. Una vez conectado, el sistema DHT mantendrá actualizada su dirección automáticamente, incluso si cambia.
                     </Typography>
+
+                    <Button
+                        variant="outlined"
+                        color="neutral"
+                        startDecorator={<QrCodeScannerIcon />}
+                        onClick={() => setScanning(true)}
+                        fullWidth
+                        sx={{ mb: 2.5 }}
+                    >
+                        Escanear QR del contacto
+                    </Button>
 
                     {error && (
                         <Alert
@@ -157,5 +184,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                 </DialogContent>
             </ModalDialog>
         </Modal>
+        <QrScannerModal open={scanning} onClose={() => setScanning(false)} onDetected={applyScanned} />
+        </>
     );
 };
