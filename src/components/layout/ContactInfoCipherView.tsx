@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     IconButton,
@@ -13,14 +13,34 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockPersonIcon from '@mui/icons-material/LockPerson';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 interface ContactInfoCipherViewProps {
     contactName: string;
+    upeerId: string;
     onBack: () => void;
     onShowSecurity?: () => void;
 }
 
-export const ContactInfoCipherView: React.FC<ContactInfoCipherViewProps> = ({ contactName, onBack, onShowSecurity }) => (
+export const ContactInfoCipherView: React.FC<ContactInfoCipherViewProps> = ({ contactName, upeerId, onBack, onShowSecurity }) => {
+    const [security, setSecurity] = useState<{ hasSession: boolean; hasContactKey: boolean; safetyNumber: string } | null>(null);
+    const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+    useEffect(() => {
+        let active = true;
+        window.upeer.getContactSecurity(upeerId)
+            .then((result) => { if (active) setSecurity(result); })
+            .catch(() => { if (active) setSecurity({ hasSession: false, hasContactKey: false, safetyNumber: '' }); });
+        return () => { active = false; };
+    }, [upeerId]);
+
+    const copySafetyNumber = async () => {
+        if (!security?.safetyNumber) return;
+        const result = await window.upeer.writeClipboardText(security.safetyNumber);
+        setCopyState(result.success ? 'copied' : 'failed');
+    };
+
+    return (
     <Box sx={{
         position: 'absolute',
         inset: 0,
@@ -72,8 +92,47 @@ export const ContactInfoCipherView: React.FC<ContactInfoCipherViewProps> = ({ co
                     </Box>
                     <Box>
                         <Typography level="body-sm" sx={{ fontWeight: 600, mb: 0.25 }}>Puedes comprobarlo</Typography>
-                        <Typography level="body-xs" color="neutral" sx={{ lineHeight: 1.6 }}>Si quieres asegurarte de que hablas con {contactName} y no con un impostor, puedes verificar la conexión.</Typography>
+                        <Typography level="body-xs" color="neutral" sx={{ lineHeight: 1.6 }}>Compara el número de seguridad con {contactName} por otro canal para descartar un impostor.</Typography>
                     </Box>
+                </Box>
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography level="body-xs" sx={{ fontWeight: 600 }}>Número de seguridad</Typography>
+                {security?.safetyNumber ? (
+                    <>
+                        <Box sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 'md',
+                            px: 2,
+                            py: 1.5,
+                            fontFamily: 'monospace',
+                            fontSize: 14,
+                            letterSpacing: '0.06em',
+                            wordBreak: 'break-all',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                        }}>
+                            <Box component="span" sx={{ flex: 1 }}>{security.safetyNumber}</Box>
+                            <IconButton aria-label="Copiar número de seguridad" size="sm" variant="plain" color="neutral" onClick={copySafetyNumber}>
+                                <ContentCopyIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                        </Box>
+                        <Typography level="body-xs" color="neutral">
+                            {copyState === 'copied' ? 'Número copiado' : copyState === 'failed' ? 'No se pudo copiar' : 'Ambos dispositivos calculan el mismo número. Si coincide, no hay nadie en medio.'}
+                        </Typography>
+                    </>
+                ) : (
+                    <Typography level="body-xs" color="neutral">
+                        {!security ? 'Leyendo la sesión cifrada…' : security.hasContactKey ? 'No se pudo calcular el número en este dispositivo.' : 'Todavía no hay clave del contacto para comparar.'}
+                    </Typography>
+                )}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: security?.hasSession ? 'success.400' : 'neutral.500' }} />
+                    <Typography level="body-xs" color="neutral">
+                        {security?.hasSession ? 'Sesión de doble ratchet activa' : 'Sin sesión establecida todavía'}
+                    </Typography>
                 </Box>
             </Box>
             {onShowSecurity && (
@@ -90,4 +149,5 @@ export const ContactInfoCipherView: React.FC<ContactInfoCipherViewProps> = ({ co
             )}
         </Box>
     </Box>
-);
+    );
+};

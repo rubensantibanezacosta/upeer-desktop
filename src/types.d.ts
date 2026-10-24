@@ -66,6 +66,7 @@ declare global {
             toggleFavoriteContact: (upeerId: string, isFavorite: boolean) => Promise<{ success: boolean; error?: string }>;
             clearChat: (upeerId: string) => Promise<{ success: boolean; error?: string }>;
             getBlockedContacts: () => Promise<UpeerContact[]>;
+            getContactSecurity: (upeerId: string) => Promise<{ hasSession: boolean; hasContactKey: boolean; safetyNumber: string }>;
             sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null, messageId?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;

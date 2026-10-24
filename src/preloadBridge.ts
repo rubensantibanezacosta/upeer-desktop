@@ -134,6 +134,7 @@ const contactApi = {
     toggleFavoriteContact: (upeerId: string, isFavorite: boolean) => ipcRenderer.invoke('toggle-favorite-contact', { upeerId, isFavorite }),
     clearChat: (upeerId: string) => ipcRenderer.invoke('clear-chat', { upeerId }),
     getBlockedContacts: () => ipcRenderer.invoke('get-blocked-contacts'),
+    getContactSecurity: (upeerId: string) => ipcRenderer.invoke('get-contact-security', { upeerId }),
     getContacts: () => ipcRenderer.invoke('get-contacts'),
 };
 

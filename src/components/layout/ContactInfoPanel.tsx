@@ -131,6 +131,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                 <SlidingPanelView active={currentView === 'cipher'} direction="right">
                     <ContactInfoCipherView
                         contactName={contact.name}
+                        upeerId={contact.upeerId}
                         onBack={() => setCurrentView('main')}
                         onShowSecurity={onShowSecurity}
                     />

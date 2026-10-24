@@ -15,7 +15,9 @@ import { deleteMessagesByChatId } from '../../storage/messages/operations.js';
 import { sendContactRequest, acceptContactRequest } from '../../network/messaging/contacts.js';
 import { sendChatClear } from '../../network/messaging/chat.js';
 import { computeScore, getDirectContactIds } from '../../security/reputation/vouches.js';
-import { getMyUPeerId } from '../../security/identity.js';
+import { getMyPublicKeyHex, getMyUPeerId } from '../../security/identity.js';
+import { computeSafetyNumber } from '../../security/safetyNumber.js';
+import { getRatchetSession } from '../../storage/ratchet/operations.js';
 import { warn } from '../../security/secure-logger.js';
 import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
 import { callManager } from '../../network/call/callManager.js';
@@ -164,6 +166,18 @@ export function registerContactHandlers(): void {
     return { success: true };
   });
   ipcMain.handle('get-blocked-contacts', () => getBlockedContacts());
+
+  ipcMain.handle('get-contact-security', async (_event, { upeerId }) => {
+    const contact = await getContactByUpeerId(upeerId);
+    if (!contact?.publicKey) {
+      return { hasSession: false, hasContactKey: false, safetyNumber: '' };
+    }
+    return {
+      hasSession: Boolean(getRatchetSession(upeerId)),
+      hasContactKey: true,
+      safetyNumber: computeSafetyNumber(getMyPublicKeyHex(), contact.publicKey),
+    };
+  });
 
   // Evento para notificar al renderer sobre contactos no confiables
   ipcMain.on('contact-untrustworthy', (event, data) => {
