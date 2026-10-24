@@ -181,7 +181,8 @@ Inventario completo en [`../ROADMAP.md`](../ROADMAP.md) y [`../upper/roadmap.md`
 - [ ] `READ`, `TYPING`, `CHAT_DELETE`, `CHAT_REACTION` y `CHAT_CONTACT`: existen aquí y no en Android.
 - [ ] `GROUP_MSG`/`GROUP_ACK`/`GROUP_INVITE`/`GROUP_UPDATE`, los nueve `FILE_*`, los siete `VAULT_*` y los catorce `CALL_*`: sin implementación móvil, así que ninguna prueba cruzada de grupos, adjuntos, vault ni llamadas es posible aún.
 - [ ] `SYNC_*` y los nueve `SYNC_EVENT_KINDS`: el móvil no participa en la sincronización multi-dispositivo.
-- [ ] `PING`/`PONG` de protocolo: el móvil mantiene la conexión desde el servicio, sin keepalive de protocolo.
+- [x] `PING`/`PONG` de protocolo: el móvil ya contesta al `PING` del heartbeat desde `ControlReplies`, que cuenta como presencia y responde `PONG` con `ControlSender.sendPong` (rate limit 60/10 s). Sin esto escritorio solo refrescaba `lastSeen` con tráfico real y marcaba «última vez hace 4 minutos» a un móvil alcanzable; verificado con el móvil inactivo más de 85 s.
+- [x] La tarjeta «Última Actividad» de la ficha no se contradice con la cabecera: escribe «Ahora mismo» cuando el contacto está en línea.
 
 Bloqueos que también son nuestros y afectan a la paridad:
 

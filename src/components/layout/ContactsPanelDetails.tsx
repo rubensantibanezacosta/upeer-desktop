@@ -155,7 +155,7 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                                         Última Actividad
                                     </Typography>
                                     <Typography level="body-sm" sx={{ fontWeight: 600, fontSize: '14px' }}>
-                                        {formatRelativeDate(activeContact.lastSeen)}
+                                        {isOnline ? 'Ahora mismo' : formatRelativeDate(activeContact.lastSeen)}
                                     </Typography>
                                 </Box>
                             )}
