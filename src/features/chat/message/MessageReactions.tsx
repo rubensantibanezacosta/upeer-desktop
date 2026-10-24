@@ -37,7 +37,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, i
                 width: 'max-content',
                 gap: 0,
                 position: 'absolute',
-                bottom: -14,
+                bottom: -18,
                 [isMe ? 'right' : 'left']: 8,
                 zIndex: 2,
                 borderRadius: 'md',

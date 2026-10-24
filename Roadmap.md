@@ -205,7 +205,11 @@ Decisión de producto, común a los dos clientes y fijada el 26/10/2026: **«En 
 - No se expone «nodo conectado», «servicio activo» ni equivalentes en lista, cabecera ni ficha: el estado de red y DHT se queda en Diagnóstico.
 - Pendiente: campo `lastActive` en el estado local y en el payload de presencia, emisión de la actividad propia desde el renderer y pruebas de que el `PING` no cuenta como presencia humana.
 
-### Altura única en los campos de búsqueda del móvil
+### Posición de la píldora de reacciones
+
+Las reacciones se dibujan con `position: absolute` y `bottom` negativo (`MessageReactions.tsx`), así que el valor decide cuánto asoma la píldora por debajo de la burbuja. Se ajustó de `-14` a `-18` (26/10/2026) porque quedaba demasiado metida dentro del mensaje; con `-18` apoya justo en el borde y se separa lo suficiente para no tapar el texto ni el timestamp. El móvil hace lo mismo por arriba, con `marginTop` negativo en su propia fila (`ChatReactionRow`), no con posicionamiento absoluto: replicar aquí el `marginTop` del móvil rompería la maquetación de Joy UI.
+
+
 
 Regla de diseño para el móvil, fijada el 24/10/2026: **todos los campos de búsqueda comparten la altura de la barra de búsqueda de Chats** — caja de 50, icono de 18, texto de 14, aspa de 16, radio 8, `background.level1` y sin borde permanente. Contactos y el selector de contactos estaban en 35 con un `Input` de 40 que desbordaba la caja. La regla vive en un único `SearchField`, no repetida por pantalla.
 
