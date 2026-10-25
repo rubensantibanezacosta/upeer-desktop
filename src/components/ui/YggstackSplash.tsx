@@ -139,7 +139,7 @@ function WarmupOverlay({ networkStatus, address }: { networkStatus: YggNetworkSt
             {!isUp && (
                 <LinearProgress
                     variant="soft"
-                    sx={{ width: 200, borderRadius: 'sm', '--LinearProgress-radius': '4px' }}
+                    sx={{ width: 200, flex: 'none', borderRadius: 'sm', '--LinearProgress-radius': '4px' }}
                 />
             )}
 
