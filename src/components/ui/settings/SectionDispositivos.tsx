@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, Typography } from '@mui/joy';
 import DevicesIcon from '@mui/icons-material/Devices';
 import { DeviceEnrollmentPanel } from './DeviceEnrollmentPanel.js';
 import { AuthorizedDeviceList } from './AuthorizedDeviceList.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
 
-export const SectionDispositivos: React.FC = () => (
+export const SectionDispositivos: React.FC = () => {
+    const [refreshKey, setRefreshKey] = useState(0);
+    const refresh = useCallback(() => setRefreshKey((current) => current + 1), []);
+
+    return (
     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         <Box
             sx={{
@@ -27,8 +31,9 @@ export const SectionDispositivos: React.FC = () => (
                 Ninguno recibe la frase semilla: cada uno guarda un certificado firmado por la cuenta.
             </Typography>
         </Box>
-        <DeviceEnrollmentPanel />
-        <AuthorizedDeviceList />
+        <DeviceEnrollmentPanel onEnrolled={refresh} />
+        <AuthorizedDeviceList key={`devices-${refreshKey}`} />
         <DeviceSessionList />
     </Box>
-);
+    );
+};

@@ -27,6 +27,7 @@ export interface EnrollmentOffer {
     authorizerDeviceId: string;
     inviteId: string;
     expiresAt: number;
+    authorizerAddress?: string;
 }
 
 export interface EnrollmentCode {
@@ -72,6 +73,7 @@ export function createEnrollmentInvite(input: {
     accountUpeerId: string;
     accountPublicKey: string;
     authorizerDeviceId: string;
+    authorizerAddress?: string;
     now?: number;
     ttlMs?: number;
     secret?: Buffer;
@@ -86,6 +88,8 @@ export function createEnrollmentInvite(input: {
     const secret = input.secret ?? Buffer.alloc(ENROLLMENT_SECRET_BYTES);
     if (!input.secret) sodium.randombytes_buf(secret);
     if (secret.length !== ENROLLMENT_SECRET_BYTES) return null;
+    const authorizerAddress = normalizeAuthorizerAddress(input.authorizerAddress);
+    if (input.authorizerAddress && !authorizerAddress) return null;
     const offer: EnrollmentOffer = {
         version: ENROLLMENT_VERSION,
         accountUpeerId,
@@ -94,6 +98,7 @@ export function createEnrollmentInvite(input: {
         inviteId: inviteIdFor(secret),
         expiresAt: now + ttlMs,
     };
+    if (authorizerAddress) offer.authorizerAddress = authorizerAddress;
     const code = Buffer.from(JSON.stringify({
         offer,
         secret: secret.toString('base64url'),
@@ -327,7 +332,7 @@ function parseOffer(value: unknown): EnrollmentOffer | null {
     const inviteId = normalizeHex(value.inviteId);
     if (!accountUpeerId || !accountPublicKey || !authorizerDeviceId || !inviteId) return null;
     if (typeof value.expiresAt !== 'number' || !Number.isFinite(value.expiresAt)) return null;
-    return {
+    const offer: EnrollmentOffer = {
         version: ENROLLMENT_VERSION,
         accountUpeerId,
         accountPublicKey,
@@ -335,6 +340,17 @@ function parseOffer(value: unknown): EnrollmentOffer | null {
         inviteId,
         expiresAt: value.expiresAt,
     };
+    const authorizerAddress = normalizeAuthorizerAddress(value.authorizerAddress);
+    if (authorizerAddress) offer.authorizerAddress = authorizerAddress;
+    return offer;
+}
+
+export function normalizeAuthorizerAddress(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const candidate = value.trim().toLowerCase();
+    if (candidate.length < 3 || candidate.length > 45) return null;
+    if (!candidate.includes(':')) return null;
+    return /^[0-9a-f:.]+$/.test(candidate) ? candidate : null;
 }
 
 function parseRequest(value: Record<string, unknown>): EnrollmentRequest | null {

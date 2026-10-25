@@ -141,3 +141,32 @@ export function validateSyncAck(data: Record<string, unknown>): ValidationResult
     return { valid: true };
 }
 
+
+export function validateEnrollRequest(data: Record<string, unknown>): ValidationResult {
+    if (!isRecord(data.sealed)) {
+        return { valid: false, error: 'Invalid sealed envelope' };
+    }
+    if (!isHex(data.sealed.inviteId, 32)) {
+        return { valid: false, error: 'Invalid inviteId' };
+    }
+    if (typeof data.sealed.nonce !== 'string' || typeof data.sealed.ciphertext !== 'string') {
+        return { valid: false, error: 'Invalid sealed payload' };
+    }
+    if (typeof data.senderAddress !== 'string' || !data.senderAddress.includes(':')) {
+        return { valid: false, error: 'Invalid senderAddress' };
+    }
+    return { valid: true };
+}
+
+export function validateEnrollResponse(data: Record<string, unknown>): ValidationResult {
+    if (typeof data.inviteId !== 'string' || data.inviteId.length > 64) {
+        return { valid: false, error: 'Invalid inviteId' };
+    }
+    if (typeof data.ok !== 'boolean') {
+        return { valid: false, error: 'Invalid ok flag' };
+    }
+    if (data.ok && !isRecord(data.sealed)) {
+        return { valid: false, error: 'Invalid sealed envelope' };
+    }
+    return { valid: true };
+}

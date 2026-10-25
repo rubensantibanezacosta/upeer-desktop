@@ -62,6 +62,8 @@ import { validateCallMessage } from './validationCalls.js';
 import {
     validateSyncAck,
     validateSyncEnvelope,
+    validateEnrollRequest,
+    validateEnrollResponse,
     validateSyncHello,
     validateSyncHistoryRequest,
     validateSyncHistoryResponse,
@@ -95,6 +97,8 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     DHT_PING: validateDhtPing,
     DHT_PONG: validateDhtPong,
     SYNC_PULSE: validateSyncPulse,
+    ENROLL_REQ: validateEnrollRequest,
+    ENROLL_RES: validateEnrollResponse,
     SYNC_HELLO: validateSyncHello,
     SYNC_ENVELOPE: validateSyncEnvelope,
     SYNC_HISTORY_REQ: validateSyncHistoryRequest,

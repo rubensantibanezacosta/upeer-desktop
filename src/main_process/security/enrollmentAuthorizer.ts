@@ -12,6 +12,7 @@ import {
 } from './enrollment.js';
 import { consumeEnrollmentInvite, getEnrollmentInvite, registerEnrollmentInvite } from './enrollmentInvites.js';
 import { requireRootIdentity } from './identityMode.js';
+import { getYggstackAddress } from '../sidecars/yggstack.js';
 import { identityState } from './identityState.js';
 import { publishMyAccountRegistry } from '../network/accountRegistry.js';
 import { warn } from './secure-logger.js';
@@ -33,6 +34,7 @@ export function createAuthorizerEnrollmentInvite(now = Date.now()): EnrollmentCo
         accountUpeerId: identityState.upeerId,
         accountPublicKey: device.certificate.accountPublicKey,
         authorizerDeviceId: device.deviceId,
+        authorizerAddress: getYggstackAddress() ?? undefined,
         now,
     });
     if (!code) return null;

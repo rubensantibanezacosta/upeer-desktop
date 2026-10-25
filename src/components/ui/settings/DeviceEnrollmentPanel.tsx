@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Alert, Box, Button, Stack, Textarea, Typography } from '@mui/joy';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Stack, Textarea, Typography } from '@mui/joy';
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import { EnrollmentCodeCard } from '../enrollment/EnrollmentCodeCard.js';
@@ -11,23 +11,64 @@ interface InviteState {
 }
 
 interface IssuedState {
-    code: string;
     deviceId: string;
     expiresAt: number;
 }
 
-export const DeviceEnrollmentPanel: React.FC = () => {
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 180_000;
+
+export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ onEnrolled }) => {
     const [invite, setInvite] = useState<InviteState | null>(null);
-    const [requestCode, setRequestCode] = useState('');
     const [issued, setIssued] = useState<IssuedState | null>(null);
+    const [manual, setManual] = useState(false);
+    const [requestCode, setRequestCode] = useState('');
+    const [manualResponse, setManualResponse] = useState('');
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
+    const knownDevices = useRef<Set<string>>(new Set());
+    const onEnrolledRef = useRef(onEnrolled);
+    onEnrolledRef.current = onEnrolled;
+
+    const snapshotDevices = useCallback(async () => {
+        const result = await window.upeer.getAuthorizedDevices();
+        knownDevices.current = new Set(result.devices.map((device) => device.deviceId));
+    }, []);
+
+    useEffect(() => {
+        if (!invite || issued) return;
+        let cancelled = false;
+        const deadline = Date.now() + POLL_TIMEOUT_MS;
+        const timer = setInterval(() => {
+            if (cancelled || Date.now() > deadline) {
+                clearInterval(timer);
+                return;
+            }
+            void window.upeer.getAuthorizedDevices().then((result) => {
+                if (cancelled) return;
+                const fresh = result.devices.find((device) => !knownDevices.current.has(device.deviceId));
+                if (!fresh) return;
+                clearInterval(timer);
+                setIssued({ deviceId: fresh.deviceId, expiresAt: fresh.expiresAt });
+                setInvite(null);
+                setError('');
+                onEnrolledRef.current?.();
+            }).catch(() => {
+                clearInterval(timer);
+            });
+        }, POLL_INTERVAL_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [invite, issued]);
 
     const createInvite = async () => {
         setBusy(true);
         setError('');
         setIssued(null);
         try {
+            await snapshotDevices();
             const result = await window.upeer.createEnrollmentInvite();
             if (!result.success || !result.code || !result.inviteId || !result.expiresAt) {
                 setError(result.error || 'No se pudo crear la invitación.');
@@ -35,6 +76,7 @@ export const DeviceEnrollmentPanel: React.FC = () => {
                 return;
             }
             setInvite({ code: result.code, inviteId: result.inviteId, expiresAt: result.expiresAt });
+            setManual(false);
         } catch {
             setError('No se pudo crear la invitación.');
         } finally {
@@ -42,18 +84,18 @@ export const DeviceEnrollmentPanel: React.FC = () => {
         }
     };
 
-    const authorize = async () => {
-        if (!invite) return;
+    const authorizeManually = async () => {
         setBusy(true);
         setError('');
         try {
             const result = await window.upeer.completeEnrollment(requestCode.trim());
-            if (!result.success || !result.code || !result.deviceId) {
+            if (!result.success || !result.deviceId) {
                 setError(result.error || 'La solicitud no se pudo autorizar.');
                 return;
             }
-            setIssued({ code: result.code, deviceId: result.deviceId, expiresAt: result.expiresAt ?? invite.expiresAt });
+            setManualResponse(result.code || '');
             setRequestCode('');
+            onEnrolledRef.current?.();
         } catch {
             setError('La solicitud no se pudo autorizar.');
         } finally {
@@ -64,7 +106,9 @@ export const DeviceEnrollmentPanel: React.FC = () => {
     const reset = () => {
         setInvite(null);
         setIssued(null);
+        setManual(false);
         setRequestCode('');
+        setManualResponse('');
         setError('');
     };
 
@@ -77,67 +121,77 @@ export const DeviceEnrollmentPanel: React.FC = () => {
                 </Typography>
             </Box>
             <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 1.5 }}>
-                El dispositivo nuevo solo obtiene un certificado firmado por esta cuenta.
+                Genera la invitación y escanéala en el dispositivo nuevo. El certificado se emite solo: no hay códigos que copiar de vuelta.
             </Typography>
 
-            {!invite && (
-                <Box>
-                    <Button
-                        startDecorator={<AddLinkIcon />}
-                        loading={busy}
-                        onClick={() => void createInvite()}
-                    >
-                        Generar invitación
-                    </Button>
-                </Box>
+            {!invite && !issued && (
+                <Button startDecorator={<AddLinkIcon />} loading={busy} onClick={() => void createInvite()}>
+                    Generar invitación
+                </Button>
             )}
 
             {invite && !issued && (
                 <Stack spacing={2}>
                     <EnrollmentCodeCard
-                        title="1. Invitación para el dispositivo nuevo"
-                        description="Escanea este código en el dispositivo que quieres añadir a tu cuenta. Caduca en pocos minutos y solo se puede usar una vez."
+                        title="Invitación para el dispositivo nuevo"
+                        description="Escanea este código desde el dispositivo que quieres añadir. Caduca en pocos minutos y solo sirve una vez."
                         code={invite.code}
                         expiresAt={invite.expiresAt}
                     />
-                    <Box>
-                        <Typography level="title-sm" sx={{ mb: 0.5 }}>2. Código de solicitud</Typography>
-                        <Typography level="body-sm" sx={{ color: 'text.secondary', mb: 1 }}>
-                            Pega aquí el código que muestra el dispositivo nuevo después de leer la invitación.
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size="sm" />
+                        <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+                            Esperando a que el dispositivo nuevo se presente…
                         </Typography>
-                        <Textarea
-                            minRows={3}
-                            maxRows={6}
-                            value={requestCode}
-                            placeholder="Pega el código de solicitud"
-                            onChange={(event) => setRequestCode(event.target.value)}
-                            sx={{ fontFamily: 'monospace', fontSize: '12px' }}
-                        />
                     </Box>
+                    {manual && (
+                        <Stack spacing={1.5}>
+                            <Alert color="warning" variant="soft" size="sm">
+                                Usa los códigos manuales solo si los dos dispositivos no se alcanzan en la red.
+                            </Alert>
+                            <Textarea
+                                minRows={3}
+                                maxRows={6}
+                                value={requestCode}
+                                placeholder="Pega el código de solicitud del dispositivo nuevo"
+                                onChange={(event) => setRequestCode(event.target.value)}
+                                sx={{ fontFamily: 'monospace', fontSize: '12px' }}
+                            />
+                            <Box>
+                                <Button
+                                    startDecorator={<VerifiedIcon />}
+                                    loading={busy}
+                                    disabled={requestCode.trim().length === 0}
+                                    onClick={() => void authorizeManually()}
+                                >
+                                    Autorizar con el código
+                                </Button>
+                            </Box>
+                            {manualResponse && (
+                                <EnrollmentCodeCard
+                                    title="Respuesta para el dispositivo nuevo"
+                                    description="Pega este código en el dispositivo nuevo para instalar su certificado."
+                                    code={manualResponse}
+                                    expiresAt={invite.expiresAt}
+                                />
+                            )}
+                        </Stack>
+                    )}
                     <Stack direction="row" spacing={1}>
-                        <Button
-                            startDecorator={<VerifiedIcon />}
-                            loading={busy}
-                            disabled={requestCode.trim().length === 0}
-                            onClick={() => void authorize()}
-                        >
-                            Autorizar dispositivo
-                        </Button>
+                        {!manual && (
+                            <Button variant="plain" color="neutral" onClick={() => setManual(true)}>
+                                Usar códigos manuales
+                            </Button>
+                        )}
                         <Button variant="plain" color="neutral" onClick={reset}>Cancelar</Button>
                     </Stack>
                 </Stack>
             )}
 
             {issued && (
-                <Stack spacing={2}>
-                    <EnrollmentCodeCard
-                        title="3. Respuesta para el dispositivo nuevo"
-                        description="Escanea o pega este código en el dispositivo nuevo para instalar su certificado."
-                        code={issued.code}
-                        expiresAt={issued.expiresAt}
-                    />
-                    <Alert color="success" variant="soft" size="sm">
-                        Certificado emitido para {issued.deviceId.slice(0, 16)}…
+                <Stack spacing={1.5}>
+                    <Alert color="success" variant="soft" size="sm" startDecorator={<VerifiedIcon />}>
+                        Dispositivo añadido a tu cuenta ({issued.deviceId.slice(0, 16)}…)
                     </Alert>
                     <Box>
                         <Button variant="outlined" onClick={reset}>Terminar</Button>

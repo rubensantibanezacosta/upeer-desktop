@@ -22,6 +22,7 @@ import {
     createAuthorizerEnrollmentInvite,
 } from '../../../src/main_process/security/enrollmentAuthorizer.js';
 import { clearEnrollmentInvites, getEnrollmentInvite } from '../../../src/main_process/security/enrollmentInvites.js';
+import { handleInBandEnrollment } from '../../../src/main_process/network/enrollmentChannel.js';
 import {
     appendAccountRegistryRevocation,
     loadAccountRegistryState,
@@ -379,5 +380,83 @@ describe('persistencia y registro de dispositivos', () => {
 
         expect(registry.devices.map(item => item.deviceId)).not.toContain(issued.certificate.deviceId);
         expect(verifyDeviceAdmission(issued.certificate, registry, now)).toBe(false);
+    });
+});
+
+describe('enrolamiento en banda por la red', () => {
+    const senderAddress = '200:7bba:1d01:9bb7:78bc:beae:f64a:6d59';
+
+    it('la invitación viaja con la dirección del dispositivo que autoriza', () => {
+        const account = accountIdentity();
+        const invite = required(createEnrollmentInvite({
+            accountUpeerId: account.upeerId,
+            accountPublicKey: account.publicKey.toString('hex'),
+            authorizerDeviceId: 'ab'.repeat(32),
+            authorizerAddress: senderAddress,
+            now,
+        }));
+
+        expect(invite.offer.authorizerAddress).toBe(senderAddress);
+        expect(required(parseEnrollmentCode(invite.code, now)).offer.authorizerAddress).toBe(senderAddress);
+    });
+
+    it('rechaza una dirección que no es un literal de Yggdrasil', () => {
+        const account = accountIdentity();
+
+        expect(createEnrollmentInvite({
+            accountUpeerId: account.upeerId,
+            accountPublicKey: account.publicKey.toString('hex'),
+            authorizerDeviceId: 'ab'.repeat(32),
+            authorizerAddress: 'evil.example.com',
+            now,
+        })).toBeNull();
+    });
+
+    it('emite el certificado y responde al dispositivo que lo pidió', () => {
+        const account = startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+        const device = keypair();
+        const sealed = sealedRequestFor(invite, device);
+        const replies: Array<{ address: string; payload: Record<string, unknown> }> = [];
+
+        const handled = handleInBandEnrollment(
+            { sealed, senderAddress },
+            (address, payload) => replies.push({ address, payload }),
+            now,
+        );
+
+        expect(handled).toBe(true);
+        expect(replies).toHaveLength(1);
+        expect(replies[0].address).toBe(senderAddress);
+        expect(replies[0].payload.type).toBe('ENROLL_RES');
+        expect(replies[0].payload.ok).toBe(true);
+        const response = required(replies[0].payload.sealed) as Parameters<typeof openEnrollmentCertificate>[1];
+        const certificate = required(openEnrollmentCertificate(invite.secret, response, account.upeerId, now));
+        expect(certificate.deviceId).toBe(deriveDeviceId(device.publicKey.toString('hex')));
+    });
+
+    it('responde con error cuando la invitación ya se consumió', () => {
+        startRootSession();
+        const invite = required(createAuthorizerEnrollmentInvite(now));
+        const sealed = sealedRequestFor(invite, keypair());
+        handleInBandEnrollment({ sealed, senderAddress }, () => undefined, now);
+        const replies: Array<Record<string, unknown>> = [];
+
+        handleInBandEnrollment({ sealed, senderAddress }, (_address, payload) => replies.push(payload), now);
+
+        expect(replies).toHaveLength(1);
+        expect(replies[0].ok).toBe(false);
+    });
+
+    it('descarta la petición si el dispositivo no anuncia dirección', () => {
+        const replies: Array<Record<string, unknown>> = [];
+
+        const handled = handleInBandEnrollment(
+            { sealed: { inviteId: 'aa'.repeat(32), nonce: '00'.repeat(24), ciphertext: '00'.repeat(48) } },
+            (_address, payload) => replies.push(payload),
+        );
+
+        expect(handled).toBe(false);
+        expect(replies).toHaveLength(0);
     });
 });

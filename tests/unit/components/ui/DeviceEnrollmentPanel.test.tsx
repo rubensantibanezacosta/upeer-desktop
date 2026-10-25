@@ -11,19 +11,37 @@ vi.mock('qrcode.react', () => ({
 }));
 
 const expiresAt = Date.now() + 300_000;
+const newDeviceId = 'b'.repeat(64);
 
 interface UpeerStub {
     createEnrollmentInvite: ReturnType<typeof vi.fn>;
     completeEnrollment: ReturnType<typeof vi.fn>;
+    getAuthorizedDevices: ReturnType<typeof vi.fn>;
     writeClipboardText: ReturnType<typeof vi.fn>;
 }
 
 const bridge = window as unknown as { upeer?: UpeerStub };
 
+const emptyDevices = { success: true, devices: [], epoch: 1 };
+const devicesWithNewOne = {
+    success: true,
+    epoch: 2,
+    devices: [{
+        deviceId: newDeviceId,
+        devicePublicKey: 'c'.repeat(64),
+        platform: 'android',
+        capabilities: ['dht'],
+        authorizedAt: Date.now(),
+        expiresAt,
+        epoch: 2,
+    }],
+};
+
 function stubBridge(overrides: Partial<UpeerStub> = {}): UpeerStub {
     const stub: UpeerStub = {
         createEnrollmentInvite: vi.fn(async () => ({ success: true, code: 'invite-code', inviteId: 'a'.repeat(64), expiresAt })),
-        completeEnrollment: vi.fn(async () => ({ success: true, code: 'response-code', deviceId: 'b'.repeat(64), expiresAt })),
+        completeEnrollment: vi.fn(async () => ({ success: true, code: 'response-code', deviceId: newDeviceId, expiresAt })),
+        getAuthorizedDevices: vi.fn(async () => emptyDevices),
         writeClipboardText: vi.fn(async () => ({ success: true })),
         ...overrides,
     };
@@ -52,6 +70,22 @@ describe('DeviceEnrollmentPanel', () => {
 
         await waitFor(() => expect(screen.getByText('invite-code')).toBeDefined());
         expect(screen.getByTestId('qr').getAttribute('data-value')).toBe('invite-code');
+        expect(screen.getByText(/esperando a que el dispositivo nuevo/i)).toBeDefined();
+    });
+
+    it('detecta el dispositivo nuevo y avisa al panel padre', async () => {
+        const onEnrolled = vi.fn();
+        stubBridge({
+            getAuthorizedDevices: vi.fn()
+                .mockResolvedValueOnce(emptyDevices)
+                .mockResolvedValue(devicesWithNewOne),
+        });
+        render(<DeviceEnrollmentPanel onEnrolled={onEnrolled} />);
+        fireEvent.click(screen.getByRole('button', { name: /generar invitación/i }));
+
+        await waitFor(() => expect(screen.getByText(/dispositivo añadido a tu cuenta/i)).toBeDefined(), { timeout: 5000 });
+        expect(onEnrolled).toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /terminar/i })).toBeDefined();
     });
 
     it('informa del error al crear la invitación', async () => {
@@ -62,28 +96,29 @@ describe('DeviceEnrollmentPanel', () => {
         await waitFor(() => expect(screen.getByText('sin raíz')).toBeDefined());
     });
 
-    it('autoriza la solicitud y muestra la respuesta', async () => {
+    it('autoriza con los códigos manuales y muestra la respuesta', async () => {
         const stub = stubBridge();
         render(<DeviceEnrollmentPanel />);
         fireEvent.click(screen.getByRole('button', { name: /generar invitación/i }));
         await waitFor(() => expect(screen.getByText('invite-code')).toBeDefined());
+        fireEvent.click(screen.getByRole('button', { name: /usar códigos manuales/i }));
 
-        const textarea = screen.getByPlaceholderText('Pega el código de solicitud');
-        fireEvent.change(textarea, { target: { value: 'request-code' } });
-        fireEvent.click(screen.getByRole('button', { name: /autorizar dispositivo/i }));
+        fireEvent.change(screen.getByPlaceholderText(/pega el código de solicitud/i), { target: { value: 'request-code' } });
+        fireEvent.click(screen.getByRole('button', { name: /autorizar con el código/i }));
 
         await waitFor(() => expect(screen.getByText('response-code')).toBeDefined());
         expect(stub.completeEnrollment).toHaveBeenCalledWith('request-code');
     });
 
-    it('muestra el error cuando la solicitud no se puede autorizar', async () => {
+    it('muestra el error cuando la solicitud manual no se puede autorizar', async () => {
         stubBridge({ completeEnrollment: vi.fn(async () => ({ success: false, error: 'invitación caducada' })) });
         render(<DeviceEnrollmentPanel />);
         fireEvent.click(screen.getByRole('button', { name: /generar invitación/i }));
         await waitFor(() => expect(screen.getByText('invite-code')).toBeDefined());
+        fireEvent.click(screen.getByRole('button', { name: /usar códigos manuales/i }));
 
-        fireEvent.change(screen.getByPlaceholderText('Pega el código de solicitud'), { target: { value: 'bad' } });
-        fireEvent.click(screen.getByRole('button', { name: /autorizar dispositivo/i }));
+        fireEvent.change(screen.getByPlaceholderText(/pega el código de solicitud/i), { target: { value: 'bad' } });
+        fireEvent.click(screen.getByRole('button', { name: /autorizar con el código/i }));
 
         await waitFor(() => expect(screen.getByText('invitación caducada')).toBeDefined());
     });
