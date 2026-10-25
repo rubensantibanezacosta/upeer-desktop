@@ -8,13 +8,20 @@ _Última actualización: 23 Octubre 2026_
 
 ## 🔗 Coordinación con móvil (B6/B7)
 
-**Orden acordado el 25/10/2026, decidido por bloqueos y no por cercanía del código.** El reparto completo y su justificación están en [`../ROADMAP.md`](../ROADMAP.md) → «Orden de ejecución de la paridad móvil»; aquí queda lo que toca a este repositorio:
+**Orden acordado el 25/10/2026 y reordenado el 28/10/2026, decidido por bloqueos y no por cercanía del código.** El reparto completo y su justificación están en [`../ROADMAP.md`](../ROADMAP.md) → «Orden de ejecución de la paridad móvil»; aquí queda lo que toca a este repositorio:
 
 1. **Runtime en modo dispositivo en Android** — Desktop ya lo tiene; es el único bloqueo duro abierto y frena el cierre de B10.
 2. **`VAULT_*` en Android** — Desktop ya tiene buzón por dispositivo, puntero y ACK. El port móvil **no depende de `SYNC_*`**: el vault usa Kademlia, contactos, reputación y `sendSecurePacket`. Ojo con `getDynamicReplicationFactor`: el móvil no tiene vouch score, así que necesita un sustituto determinista o el valor de emergencia `8`.
 3. **`SYNC_*` en Android** — cierra B10. Su condición de cierre es el paso 1, no este.
+4. **Grupos en Android, antes de dar B10 por cerrado (28/10/2026).** El bloqueo más barato: los mensajes con `chatUpeerId` `grp-…` ya viajan en el histórico y en `SYNC_ENVELOPE`, y el móvil los descarta en el filtro de `upeerId` de 64 hex de `SyncHistoryPayload.local`. Falta modelo de grupo, proyección de `GROUP_UPSERT`/`GROUP_DELETE` y pantalla. **No necesita claves nuevas, ni `FILE_*`, ni `GROUP_*`.**
+5. **Adjuntos en Android (28/10/2026).** La presentación ya está hecha: el móvil reconoce el sobre `{"type":"file",…}` que emite `saveFileMessage` y muestra `Documento: informe.pdf` con su tamaño en vez del JSON en crudo. Abrir el archivo exige `FILE_*`, que aquí ya existe y hay que portar.
+6. **`GROUP_*` propio, `CALL_*` y cierre de UI**, en ese orden. Las llamadas son el último bloque: es el único con hardware y red en tiempo real, y aquí ya está resuelto (señalización, pipeline de medios, codecs, historial). El transporte de sincronización ya funciona contra este cliente, pero la proyección es parcial: el móvil no tiene modelo de conversación de grupo y descarta los mensajes con `chatUpeerId` `grp-…`, y los adjuntos viajan como **texto JSON** (`saveFileMessage`), así que el móvil los pinta en crudo. Con eso, «sincronizado» no es cierto para ninguna cuenta con grupos o archivos. Orden: modelo y proyección de grupos → lectura y presentación de `{"type":"file"}` → `FILE_*` real → sender keys.
 
-Nada de esta lista exige cambios en Desktop salvo acompañar las pruebas cruzadas. El resto de la brecha —`FILE_*`, `GROUP_*`, `CALL_*` y cierre de UI— va después, en ese orden.
+La consecuencia para este repositorio es una sola: **el histórico de sincronización que emite Desktop no puede filtrar por tipo de chat sin dejar de ser completo**, porque `listSyncHistoryMessages` es un cursor global sobre `messages`. Si el móvil necesita un subconjunto, lo declara el receptor (`SyncApplier` distingue `APPLIED`/`UNSUPPORTED`/`REJECTED` y lo cuenta), no el emisor.
+
+Y una que **sí nos toca a nosotros y no es del port**: la sincronización en dos fases —masiva al abrir sesión bajo un indicador de progreso, en tiempo real después— es un requisito de producto **de los dos clientes**. El móvil ya lo tiene; Escritorio todavía expone solo `disabled`/`pending`/`synced` y confunde el histórico entrante con eventos sin ACK. Detalle, estado y trabajo pendiente en «Sincronización en dos fases: también aquí (28/10/2026)», más abajo.
+
+Nada de esta lista exige cambios en Desktop salvo acompañar las pruebas cruzadas y lo del punto 4 en la sincronización. La lista de pasos 4 a 6 ya está dentro de la brecha y en su orden: **grupos de solo lectura → adjuntos → `GROUP_*` propio → `CALL_*` → cierre de UI**.
 
 - [x] Emitir certificado de dispositivo firmado por la raíz y adjuntar `deviceCertificate` al `LocationBlock`.
 - [x] Publicar el registro de cuenta con `epoch`, certificado activo y revocaciones.
@@ -204,6 +211,29 @@ Bloqueos que también son nuestros y afectan a la paridad:
 - [ ] Ajustes de Privacidad sin lógica real: las confirmaciones de lectura no persistirán ni se enviarán, así que el futuro `READ` del móvil no tendrá contrapartida de preferencia.
 - [ ] Ajustes de Notificaciones sin lógica real: el móvil necesita el mismo contrato de preferencias.
 - [ ] Las anotaciones «Preview for phase 11» de `CHAT_REACTION`, `CHAT_DELETE` y `CHAT_UPDATE` en `network/types.ts` siguen ahí pese a estar implementados y probados: congelar el contrato antes de portarlos.
+
+### Sincronización en dos fases: también aquí (28/10/2026)
+
+Requisito de producto, **común a los dos clientes**, no una función del móvil: al abrir sesión hay una **sincronización masiva** que debe quedar tapada bajo un indicador de progreso, y solo después el canal pasa a **tiempo real**. El móvil ya lo implementa (`SyncStatusReport` → `syncStatusJSON()` → `useSyncStatus` → `SyncProgressBanner` en Chats). **Escritorio aún no lo distingue, y por eso este requisito no se puede dar por cerrado desde el otro lado.**
+
+Lo que hay hoy:
+
+- `getSyncStatus(upeerId)` (`storage/sync/status.ts`) devuelve `disabled` | `pending` | `synced`, más `pendingEvents`, `pendingEntityIds` y `peers` con `ackSequence` y `lastSeen`.
+- `statusView.ts` añade `devices` con `local`/`synced`/`pending`/`offline`, y `SyncStatusIndicator` lo pinta como icono con tooltip en el rail.
+- **No hay fase masiva ni fase en tiempo real.** `pending` mezcla dos cosas distintas: eventos salientes sin ACK y el histórico entrante que todavía se está descargando. Un usuario que acaba de enrolar el móvil ve «Sincronizando» sin saber si queda un segundo o dos minutos.
+- **`disabled` no es un estado real.** Se devuelve cuando `listSyncPeers()` está vacío, que es exactamente «no hay otros dispositivos», no «la sincronización está apagada».
+- `sync_peers.historyCompleted` **ya existe** y `updateSyncPeerHistory` lo escribe al responder el histórico. La materia prima para medir la fase masiva está en la tabla, sin migración.
+
+Lo que falta, en el orden en que conviene hacerlo:
+
+- [ ] Exponer fase y progreso: `phase` (`idle`/`syncing`/`live`), `devicesTotal`, `devicesDone` (peers con `historyCompleted`) y frescura del último contacto, con los mismos nombres y semántica que el `SyncStatusReport` del móvil para que un cliente pueda leer el estado del otro sin traducción.
+- [ ] Renombrar `disabled` a `idle` en el contrato IPC, o documentar que significa «sin otros dispositivos». Hoy el nombre engaña.
+- [ ] No quedarse en `syncing` con el otro dispositivo apagado: si `lastSeen` del peer es viejo, la fase es `live` igual, como hace el móvil con su ventana de 45 s.
+- [ ] Mostrar la fase masiva bajo un indicador de progreso en la lista de Chats, con el mismo criterio visual que el banner del móvil, y quitarlo al pasar a `live`.
+- [ ] Emitir `sync-status` al cambiar de fase, no solo al registrar o confirmar eventos, para que la UI no dependa de un sondeo.
+- [ ] Cubrir con pruebas la transición `idle → syncing → live`, la salida por peer obsoleto y el caso de un solo dispositivo.
+
+Depende de que el histórico funcione, que ya funciona. **No bloquea B10 por sí solo**, pero sí la parte de B10 que el usuario ve: sin esto, el escritorio no puede decir si está sincronizando ni cuánto le queda.
 
 ### Contador de no leídos en la pestaña Chats del móvil
 

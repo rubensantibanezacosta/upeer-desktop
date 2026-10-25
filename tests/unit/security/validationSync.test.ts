@@ -5,7 +5,9 @@ import {
     validateSyncHello,
     validateSyncHistoryRequest,
     validateSyncHistoryResponse,
+    validateSyncReset,
 } from '../../../src/main_process/security/validationSync.js';
+import { validateMessage } from '../../../src/main_process/security/validation.js';
 
 const DEVICE_ID = 'a'.repeat(64);
 const DEVICE_PUBLIC_KEY = 'b'.repeat(64);
@@ -149,5 +151,27 @@ describe('Sync validation', () => {
             senderDeviceId: 'bad',
             senderDeviceCertificate: certificate,
         }).valid).toBe(false);
+    });
+
+    it('accepts a reset signed by a device of the account', () => {
+        expect(validateSyncReset({
+            senderDeviceId: DEVICE_ID,
+            senderDeviceCertificate: certificate,
+        }).valid).toBe(true);
+        expect(validateSyncReset({
+            senderDeviceId: 'bad',
+            senderDeviceCertificate: certificate,
+        }).valid).toBe(false);
+        expect(validateSyncReset({
+            senderDeviceId: DEVICE_ID,
+            senderDeviceCertificate: null,
+        }).valid).toBe(false);
+    });
+
+    it('routes the reset through the packet validator table', () => {
+        expect(validateMessage('SYNC_RESET', {
+            senderDeviceId: DEVICE_ID,
+            senderDeviceCertificate: certificate,
+        }).valid).toBe(true);
     });
 });

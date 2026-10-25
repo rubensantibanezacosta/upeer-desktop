@@ -44,6 +44,7 @@ vi.mock('../../../src/main_process/storage/sync/peers.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/storage/ratchet/operations.js', () => ({
+    deleteRatchetSession: vi.fn(),
     getRatchetSession: vi.fn(() => null),
 }));
 
@@ -85,6 +86,9 @@ vi.mock('../../../src/main_process/network/sync/replay.js', () => ({
 vi.mock('../../../src/main_process/network/sync/transport.js', () => ({
     sendSyncAck: vi.fn(),
     sendSyncHello: vi.fn(),
+    sendSyncProfiles: vi.fn(() => Promise.resolve(0)),
+    sendSyncRegistry: vi.fn(),
+    sendSyncReset: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/handlers/doubleRatchetDecrypt.js', () => ({

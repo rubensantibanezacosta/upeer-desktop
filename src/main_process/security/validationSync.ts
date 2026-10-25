@@ -142,6 +142,16 @@ export function validateSyncAck(data: Record<string, unknown>): ValidationResult
 }
 
 
+export function validateSyncReset(data: Record<string, unknown>): ValidationResult {
+    if (!isHex(data.senderDeviceId, 32)) {
+        return { valid: false, error: 'Invalid senderDeviceId' };
+    }
+    if (!isCertificate(data.senderDeviceCertificate)) {
+        return { valid: false, error: 'Invalid senderDeviceCertificate' };
+    }
+    return { valid: true };
+}
+
 export function validateEnrollRequest(data: Record<string, unknown>): ValidationResult {
     if (!isRecord(data.sealed)) {
         return { valid: false, error: 'Invalid sealed envelope' };

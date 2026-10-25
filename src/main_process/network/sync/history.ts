@@ -40,7 +40,7 @@ export async function respondSyncHistory(
     const page = listSyncHistoryMessages(cursor.timestamp, cursor.id, limit);
     const deviceId = getMySyncIdentity()?.deviceId ?? 'unknown-device';
     const entries = page.messages.map((message) => signSyncEventOrigin({
-        eventId: `history:${deviceId}:${message.id}`,
+        eventId: `history-${deviceId}-${message.id}`,
         kind: 'MESSAGE_UPSERT' as const,
         occurredAt: message.timestamp,
         sequence: message.timestamp,
@@ -51,7 +51,7 @@ export async function respondSyncHistory(
         const now = Date.now();
         for (const profile of listContactProfiles()) {
             entries.push(signSyncEventOrigin({
-                eventId: `profile:${deviceId}:${profile.upeerId}`,
+                eventId: `profile-${profile.upeerId}`,
                 kind: 'CONTACT_PROFILE' as const,
                 occurredAt: now,
                 sequence: now,

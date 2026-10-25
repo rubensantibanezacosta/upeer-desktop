@@ -10,6 +10,8 @@ import type { AccountRegistry } from '../accountRegistry.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { getMaxSyncSequence } from '../../storage/sync/events.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
+import { listContactProfiles } from '../../storage/contacts/operations.js';
+import { signSyncEventOrigin } from './origin.js';
 
 let sequence = 0;
 
@@ -125,6 +127,25 @@ export function broadcastSyncRegistry(): number {
     let sent = 0;
     for (const peer of listSyncPeers(myId)) {
         if (sendSyncRegistry(peer, registry)) sent += 1;
+    }
+    return sent;
+}
+
+export async function sendSyncProfiles(peer: SyncPeerRecord): Promise<number> {
+    const identity = getMySyncIdentity();
+    if (!identity || !peer.address) return 0;
+    let sent = 0;
+    for (const profile of listContactProfiles()) {
+        const occurredAt = Date.now();
+        const event = signSyncEventOrigin({
+            eventId: `profile-${profile.upeerId}`,
+            kind: 'CONTACT_PROFILE' as const,
+            occurredAt,
+            sequence: nextSyncSequence(),
+            originDeviceId: identity.deviceId,
+            payload: profile as unknown as Record<string, unknown>,
+        });
+        if (await sendSyncEnvelope(peer, event)) sent += 1;
     }
     return sent;
 }

@@ -2,7 +2,7 @@ import type { BrowserWindow } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { warn } from '../../security/secure-logger.js';
-import { getRatchetSession, deleteRatchetSession } from '../../storage/ratchet/operations.js';
+import { deleteRatchetSession } from '../../storage/ratchet/operations.js';
 import { recordSyncEvent } from '../../storage/sync/events.js';
 import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { isSyncRelayTarget, markSyncRelayAcked } from '../../storage/sync/relay.js';
@@ -22,10 +22,13 @@ import { verifySyncEventOrigin } from './origin.js';
 import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
 import { notifySyncStatus } from './statusNotify.js';
-import { sendSyncAck, sendSyncHello, sendSyncRegistry, sendSyncReset } from './transport.js';
+import { sendSyncAck, sendSyncHello, sendSyncProfiles, sendSyncRegistry, sendSyncReset } from './transport.js';
 import { SYNC_EVENT_KINDS, type SyncHelloPayload, type SyncPlainEvent } from './types.js';
 
 type SyncPacket = Record<string, unknown>;
+
+const HISTORY_REQUEST_COOLDOWN_MS = 30_000;
+const historyRequests = new Map<string, number>();
 
 export async function handleSyncHello(
     address: string,
@@ -57,11 +60,13 @@ export async function handleSyncHello(
     if (peer) {
         const registry = getMyAccountRegistry(now);
         if (registry) sendSyncRegistry(peer, registry);
+        sendSyncProfiles(peer).catch(err => warn('Sync profile push failed', err, 'sync'));
         replayPendingSyncEvents(peer).catch(err => warn('Sync replay failed', err, 'sync'));
         relayBacklogToPeer(peer).catch(err => warn('Sync relay backlog failed', err, 'sync'));
         const myDeviceId = getMySyncIdentity()?.deviceId ?? '';
-        const hasSession = Boolean(getRatchetSession(myId, `sync:${peer.deviceId}`));
-        if (myDeviceId <= peer.deviceId && (!peer.historyCompleted || !hasSession)) {
+        const lastRequest = historyRequests.get(peer.deviceId) ?? 0;
+        if (myDeviceId <= peer.deviceId && now - lastRequest > HISTORY_REQUEST_COOLDOWN_MS) {
+            historyRequests.set(peer.deviceId, now);
             requestSyncHistory(peer).catch(err => warn('Sync history request failed', err, 'sync'));
         }
     }
