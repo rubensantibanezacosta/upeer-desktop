@@ -1,26 +1,37 @@
 import React from 'react';
-import { Box, Tooltip, Typography } from '@mui/joy';
-import CloudDoneIcon from '@mui/icons-material/CloudDone';
-import CloudOffIcon from '@mui/icons-material/CloudOff';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { Badge, Box, Tooltip, Typography } from '@mui/joy';
+import DevicesIcon from '@mui/icons-material/Devices';
 import { useChatStore } from '../../store/useChatStore.js';
 
-const stateLabel = (state: UpeerSyncStatus['state']): string => (
-    state === 'synced' ? 'Sincronizado' : state === 'pending' ? 'Sincronizando' : 'Sin otros dispositivos'
+const deviceLabel = (device: UpeerSyncDevice): string => (
+    device.state === 'local' ? 'Este dispositivo'
+        : device.state === 'synced' ? 'Conectado'
+            : device.state === 'pending' ? 'Sincronizando'
+                : 'Sin conexión'
 );
 
-const peerLabel = (peer: UpeerSyncPeerState): string => (
-    `${peer.deviceId.slice(0, 8)} · ${peer.state === 'synced' ? 'sincronizado' : 'pendiente'}`
+const deviceColor = (device: UpeerSyncDevice): string => (
+    device.state === 'synced' || device.state === 'local'
+        ? 'success.500'
+        : device.state === 'pending' ? 'warning.500' : 'text.tertiary'
 );
 
-const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus }> = ({ status }) => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, maxWidth: 260 }}>
-        <Typography level="body-sm" sx={{ fontWeight: 600 }}>{stateLabel(status.state)}</Typography>
-        {status.peers.length === 0 && (
-            <Typography level="body-xs">Este es el único dispositivo de la cuenta.</Typography>
-        )}
-        {status.peers.map((peer) => (
-            <Typography key={peer.deviceId} level="body-xs">{peerLabel(peer)}</Typography>
+const platformLabel = (platform: string): string => (
+    platform === 'android' || platform === 'ios' ? 'Móvil' : 'Escritorio'
+);
+
+const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus; total: number }> = ({ status, total }) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, maxWidth: 300 }}>
+        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+            {total === 1 ? 'Este es el único dispositivo de tu cuenta' : `${total} dispositivos en tu cuenta`}
+        </Typography>
+        {(status.devices ?? []).map((device) => (
+            <Box key={device.deviceId} sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: deviceColor(device), flex: '0 0 auto' }} />
+                <Typography level="body-xs">
+                    {platformLabel(device.platform)} · {device.deviceId.slice(0, 8)} · {deviceLabel(device)}
+                </Typography>
+            </Box>
         ))}
         {status.pendingEvents > 0 && (
             <Typography level="body-xs">{status.pendingEvents} evento(s) sin confirmar</Typography>
@@ -31,21 +42,30 @@ const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus }> = ({ status }) =>
 
 export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ onOpenDevices }) => {
     const syncStatus = useChatStore((state) => state.syncStatus);
-    const Icon = syncStatus.state === 'synced'
-        ? CloudDoneIcon
-        : syncStatus.state === 'pending' ? CloudUploadIcon : CloudOffIcon;
-    const color = syncStatus.state === 'synced'
-        ? 'success.500'
-        : syncStatus.state === 'pending' ? 'warning.500' : 'text.tertiary';
+    const devices = syncStatus.devices ?? [];
+    const total = devices.length;
+    const online = devices.filter((device) => device.state === 'synced' || device.state === 'local').length;
+    const color = online > 1 ? 'success.500' : online === 1 ? 'warning.500' : 'text.tertiary';
+    const label = total === 0
+        ? 'Sin dispositivos en la cuenta'
+        : `${total} dispositivo${total === 1 ? '' : 's'} en tu cuenta, ${online} conectado${online === 1 ? '' : 's'}`;
     return (
-        <Tooltip placement="right" variant="soft" title={<SyncStatusTooltip status={syncStatus} />}>
+        <Tooltip placement="right" variant="soft" title={<SyncStatusTooltip status={syncStatus} total={total} />}>
             <Box
                 role="status"
-                aria-label={`Estado de sincronización: ${stateLabel(syncStatus.state)}`}
+                aria-label={label}
                 onClick={onOpenDevices}
-                sx={{ display: 'flex', justifyContent: 'center', color, cursor: onOpenDevices ? 'pointer' : 'default' }}
+                sx={{ display: 'flex', justifyContent: 'center', cursor: onOpenDevices ? 'pointer' : 'default' }}
             >
-                <Icon sx={{ fontSize: 20 }} />
+                <Badge
+                    badgeContent={total}
+                    invisible={total < 1}
+                    color={online > 1 ? 'success' : 'warning'}
+                    size="sm"
+                    sx={{ '& .MuiBadge-badge': { top: 2, right: 2, fontSize: '10px', minWidth: 16, height: 16, px: 0.4 } }}
+                >
+                    <DevicesIcon sx={{ fontSize: 20, color }} />
+                </Badge>
             </Box>
         </Tooltip>
     );

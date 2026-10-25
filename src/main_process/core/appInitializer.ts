@@ -6,6 +6,7 @@ import { startUDPServer } from '../network/server/tcpServer.js';
 import { startRenewalService } from '../network/dht/renewal.js';
 import { info, error as logError } from '../security/secure-logger.js';
 import { setMainWindow, getAllWindows } from './windowManager.js';
+import { onDeviceRegistryChanged } from './deviceRegistryEvents.js';
 import {
   configureProxy,
   createMainWindow,
@@ -65,6 +66,10 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
   const mainWindow = await createMainWindow(baseDir, MAIN_WINDOW_VITE_DEV_SERVER_URL, MAIN_WINDOW_VITE_NAME);
   setMainWindow(mainWindow);
+  onDeviceRegistryChanged(() => {
+    const win = getAllWindows()[0];
+    win?.webContents.send('authorized-devices-changed');
+  });
 
   if (!isSessionLocked()) {
     startUDPServer(mainWindow);

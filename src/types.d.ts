@@ -41,11 +41,19 @@ declare global {
         ackSequence: number;
         lastSeen: number;
     };
+    type UpeerSyncDeviceState = 'local' | 'synced' | 'pending' | 'offline';
+    type UpeerSyncDevice = {
+        deviceId: string;
+        platform: string;
+        state: UpeerSyncDeviceState;
+        lastSeen: number | null;
+    };
     type UpeerSyncStatus = {
         state: 'disabled' | 'pending' | 'synced';
         pendingEvents: number;
         pendingEntityIds: string[];
         peers: UpeerSyncPeerState[];
+        devices: UpeerSyncDevice[];
     };
 
     interface Window {
@@ -218,8 +226,10 @@ declare global {
                     epoch: number;
                 }>;
                 epoch: number | null;
+                localDeviceId: string | null;
             }>;
             revokeAuthorizedDevice: (deviceId: string) => Promise<{ success: boolean; epoch?: number; published?: boolean; error?: string }>;
+            onAuthorizedDevicesChanged: (callback: () => void) => UpeerUnsubscribe;
             /** Enrolamiento sin raíz por canal fuera de banda */
             createEnrollmentInvite: () => Promise<{ success: boolean; code?: string; inviteId?: string; expiresAt?: number; error?: string }>;
             listEnrollmentInvites: () => Promise<{ invites: Array<{ inviteId: string; authorizerDeviceId: string; expiresAt: number }> }>;

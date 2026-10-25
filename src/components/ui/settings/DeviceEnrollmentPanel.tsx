@@ -21,7 +21,6 @@ const POLL_TIMEOUT_MS = 180_000;
 export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ onEnrolled }) => {
     const [invite, setInvite] = useState<InviteState | null>(null);
     const [issued, setIssued] = useState<IssuedState | null>(null);
-    const [manual, setManual] = useState(false);
     const [requestCode, setRequestCode] = useState('');
     const [manualResponse, setManualResponse] = useState('');
     const [error, setError] = useState('');
@@ -36,7 +35,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
     }, []);
 
     useEffect(() => {
-        if (!invite || issued) return;
+        if (!invite || issued || manualResponse) return;
         let cancelled = false;
         const deadline = Date.now() + POLL_TIMEOUT_MS;
         const timer = setInterval(() => {
@@ -61,7 +60,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
             cancelled = true;
             clearInterval(timer);
         };
-    }, [invite, issued]);
+    }, [invite, issued, manualResponse]);
 
     const createInvite = async () => {
         setBusy(true);
@@ -76,7 +75,8 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
                 return;
             }
             setInvite({ code: result.code, inviteId: result.inviteId, expiresAt: result.expiresAt });
-            setManual(false);
+            setRequestCode('');
+            setManualResponse('');
         } catch {
             setError('No se pudo crear la invitación.');
         } finally {
@@ -106,7 +106,6 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
     const reset = () => {
         setInvite(null);
         setIssued(null);
-        setManual(false);
         setRequestCode('');
         setManualResponse('');
         setError('');
@@ -121,7 +120,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
                 </Typography>
             </Box>
             <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 1.5 }}>
-                Genera la invitación y escanéala en el dispositivo nuevo. El certificado se emite solo: no hay códigos que copiar de vuelta.
+                Genera la invitación y añade el dispositivo escaneando el QR o pegando el código en el otro equipo.
             </Typography>
 
             {!invite && !issued && (
@@ -132,59 +131,57 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
 
             {invite && !issued && (
                 <Stack spacing={2}>
+                    <Alert variant="soft" color="primary" size="sm">
+                        Dos formas, la que te resulte más cómoda: escanear el QR desde el otro equipo o copiar el código y pegarlo allí.
+                    </Alert>
                     <EnrollmentCodeCard
                         title="Invitación para el dispositivo nuevo"
-                        description="Escanea este código desde el dispositivo que quieres añadir. Caduca en pocos minutos y solo sirve una vez."
+                        description="Escanea el QR desde el móvil, o copia el código y pégalo en el otro equipo. Caduca en pocos minutos y solo sirve una vez."
                         code={invite.code}
                         expiresAt={invite.expiresAt}
                     />
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CircularProgress size="sm" />
-                        <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
-                            Esperando a que el dispositivo nuevo se presente…
-                        </Typography>
-                    </Box>
-                    {manual && (
-                        <Stack spacing={1.5}>
-                            <Alert color="warning" variant="soft" size="sm">
-                                Usa los códigos manuales solo si los dos dispositivos no se alcanzan en la red.
-                            </Alert>
-                            <Textarea
-                                minRows={3}
-                                maxRows={6}
-                                value={requestCode}
-                                placeholder="Pega el código de solicitud del dispositivo nuevo"
-                                onChange={(event) => setRequestCode(event.target.value)}
-                                sx={{ fontFamily: 'monospace', fontSize: '12px' }}
-                            />
-                            <Box>
-                                <Button
-                                    startDecorator={<VerifiedIcon />}
-                                    loading={busy}
-                                    disabled={requestCode.trim().length === 0}
-                                    onClick={() => void authorizeManually()}
-                                >
-                                    Autorizar con el código
-                                </Button>
-                            </Box>
-                            {manualResponse && (
-                                <EnrollmentCodeCard
-                                    title="Respuesta para el dispositivo nuevo"
-                                    description="Pega este código en el dispositivo nuevo para instalar su certificado."
-                                    code={manualResponse}
-                                    expiresAt={invite.expiresAt}
-                                />
-                            )}
-                        </Stack>
+                    {!manualResponse && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress size="sm" />
+                            <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+                                Esperando a que el dispositivo nuevo se presente…
+                            </Typography>
+                        </Box>
                     )}
-                    <Stack direction="row" spacing={1}>
-                        {!manual && (
-                            <Button variant="plain" color="neutral" onClick={() => setManual(true)}>
-                                Usar códigos manuales
+                    <Stack spacing={1.5}>
+                        <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+                            ¿El otro equipo no puede escanear? Pega aquí el código de solicitud que te muestre y pulsa autorizar.
+                        </Typography>
+                        <Textarea
+                            minRows={3}
+                            maxRows={6}
+                            value={requestCode}
+                            placeholder="Código de solicitud del dispositivo nuevo"
+                            onChange={(event) => setRequestCode(event.target.value)}
+                            sx={{ fontFamily: 'monospace', fontSize: '12px' }}
+                        />
+                        <Box>
+                            <Button
+                                startDecorator={<VerifiedIcon />}
+                                loading={busy}
+                                disabled={requestCode.trim().length === 0}
+                                onClick={() => void authorizeManually()}
+                            >
+                                Autorizar con este código
                             </Button>
+                        </Box>
+                        {manualResponse && (
+                            <EnrollmentCodeCard
+                                title="Código de respuesta"
+                                description="Cópialo y pégalo en el otro equipo para instalar su certificado."
+                                code={manualResponse}
+                                expiresAt={invite.expiresAt}
+                            />
                         )}
-                        <Button variant="plain" color="neutral" onClick={reset}>Cancelar</Button>
                     </Stack>
+                    <Box>
+                        <Button variant="plain" color="neutral" onClick={reset}>Cancelar</Button>
+                    </Box>
                 </Stack>
             )}
 

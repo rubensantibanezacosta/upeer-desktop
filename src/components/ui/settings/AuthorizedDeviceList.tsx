@@ -13,11 +13,10 @@ export interface AuthorizedDevice {
     epoch: number;
 }
 
-const formatDate = (value: number) => new Date(value).toLocaleDateString();
-
 export const AuthorizedDeviceList: React.FC = () => {
     const [devices, setDevices] = useState<AuthorizedDevice[]>([]);
     const [epoch, setEpoch] = useState<number | null>(null);
+    const [localDeviceId, setLocalDeviceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState('');
@@ -25,8 +24,9 @@ export const AuthorizedDeviceList: React.FC = () => {
     const load = useCallback(async () => {
         try {
             const result = await window.upeer.getAuthorizedDevices();
-            setDevices(result.devices);
+            setDevices(orderDevices(result.devices, result.localDeviceId ?? null));
             setEpoch(result.epoch);
+            setLocalDeviceId(result.localDeviceId ?? null);
             setError('');
         } catch {
             setError('No se pudo leer el registro de dispositivos autorizados.');
@@ -37,6 +37,9 @@ export const AuthorizedDeviceList: React.FC = () => {
 
     useEffect(() => {
         void load();
+        return window.upeer.onAuthorizedDevicesChanged(() => {
+            void load();
+        });
     }, [load]);
 
     const revoke = async (deviceId: string) => {
@@ -56,56 +59,87 @@ export const AuthorizedDeviceList: React.FC = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress size="sm" />
-            </Box>
-        );
-    }
-
     return (
-        <Stack spacing={1.5} sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={1.25} sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <VerifiedUserIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                 <Typography level="body-xs" sx={{ flexGrow: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
-                    Dispositivos autorizados
+                    Autorizados en esta cuenta
                 </Typography>
                 {epoch !== null && <Chip size="sm" variant="soft">epoch {epoch}</Chip>}
             </Stack>
             <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-                Cada dispositivo enrolado recibe un certificado firmado por la cuenta. Revocar uno lo expulsa del registro aunque conserve su certificado antiguo.
+                Pueden usar tu cuenta sin tu frase semilla. Revocar uno le quita el acceso sin tocar el resto.
             </Typography>
 
-            {devices.length === 0 && (
+            {loading && devices.length === 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                    <CircularProgress size="sm" />
+                </Box>
+            )}
+
+            {!loading && devices.length === 0 && (
                 <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-                    Todavía no hay dispositivos enrolados sin la frase semilla.
+                    Todavía no hay dispositivos autorizados en esta cuenta.
                 </Typography>
             )}
 
-            {devices.map(device => (
-                <Stack key={device.deviceId} direction="row" spacing={1.5} alignItems="center">
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                        <Typography level="body-sm" sx={{ fontFamily: 'monospace' }}>
-                            {device.deviceId.slice(0, 16)}…
-                        </Typography>
-                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
-                            {device.platform || 'plataforma desconocida'} · autorizado {formatDate(device.authorizedAt)} · caduca {formatDate(device.expiresAt)}
-                        </Typography>
+            {devices.map((device) => {
+                const current = device.deviceId === localDeviceId;
+                return (
+                    <Box
+                        key={device.deviceId}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.25,
+                            px: 1.5,
+                            py: 1.5,
+                            borderRadius: '12px',
+                            border: '1px solid',
+                            borderColor: current ? 'primary.400' : 'divider',
+                            backgroundColor: 'background.level1',
+                        }}
+                    >
+                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
+                                <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                                    {platformLabel(device.platform)}
+                                </Typography>
+                                {current && (
+                                    <Chip size="sm" variant="soft" color="primary" sx={{ fontSize: '10px', fontWeight: 700, height: 18 }}>
+                                        ESTE DISPOSITIVO
+                                    </Chip>
+                                )}
+                            </Stack>
+                            <Typography level="body-xs" sx={{ fontFamily: 'monospace', color: 'text.tertiary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {device.deviceId}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                            <Typography level="body-xs" sx={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.06em', opacity: 0.5 }}>
+                                VINCULADO
+                            </Typography>
+                            <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+                                {authorizedLabel(device.authorizedAt)}
+                            </Typography>
+                        </Box>
+                        {current ? null : (
+                            <Tooltip title="Revocar dispositivo" variant="soft" size="sm">
+                                <IconButton
+                                    size="sm"
+                                    color="danger"
+                                    variant="plain"
+                                    loading={busy === device.deviceId}
+                                    onClick={() => void revoke(device.deviceId)}
+                                >
+                                    <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                     </Box>
-                    <Tooltip title="Revocar dispositivo" variant="soft" size="sm">
-                        <IconButton
-                            size="sm"
-                            color="danger"
-                            variant="plain"
-                            loading={busy === device.deviceId}
-                            onClick={() => void revoke(device.deviceId)}
-                        >
-                            <DeleteIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
-            ))}
+                );
+            })}
 
             {error && <Alert color="warning" variant="soft" size="sm">{error}</Alert>}
             <Box>
@@ -114,3 +148,29 @@ export const AuthorizedDeviceList: React.FC = () => {
         </Stack>
     );
 };
+
+function orderDevices(devices: AuthorizedDevice[], localDeviceId: string | null): AuthorizedDevice[] {
+    return [...devices].sort((left, right) => {
+        if (left.deviceId === localDeviceId) return -1;
+        if (right.deviceId === localDeviceId) return 1;
+        return left.authorizedAt - right.authorizedAt;
+    });
+}
+
+function authorizedLabel(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return '';
+    const date = new Date(value);
+    const sameYear = date.getFullYear() === new Date().getFullYear();
+    return date.toLocaleDateString('es-ES', sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function platformLabel(platform?: string): string {
+    if (!platform) return 'Dispositivo';
+    const normalized = platform.toLowerCase();
+    if (normalized.includes('android')) return 'Android';
+    if (normalized.includes('ios')) return 'iOS';
+    if (normalized.includes('linux')) return 'Linux';
+    if (normalized.includes('darwin') || normalized.includes('mac')) return 'macOS';
+    if (normalized.includes('win')) return 'Windows';
+    return platform;
+}

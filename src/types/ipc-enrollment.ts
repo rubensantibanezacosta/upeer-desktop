@@ -78,6 +78,7 @@ export interface AuthorizedDeviceView {
 export interface AuthorizedDevicesResponse {
     devices: AuthorizedDeviceView[];
     epoch: number | null;
+    localDeviceId: string | null;
 }
 
 export interface RevokeAuthorizedDeviceRequest {

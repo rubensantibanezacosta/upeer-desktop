@@ -8,7 +8,7 @@ const initialSyncStatus = useChatStore.getState().syncStatus;
 
 const setPendingEntities = (pendingEntityIds: string[]) => {
     useChatStore.setState({
-        syncStatus: { state: 'pending', pendingEvents: pendingEntityIds.length, pendingEntityIds, peers: [] },
+        syncStatus: { state: 'pending', pendingEvents: pendingEntityIds.length, pendingEntityIds, peers: [], devices: [] },
     });
 };
 

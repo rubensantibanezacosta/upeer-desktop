@@ -128,6 +128,9 @@ export async function handleSyncHistoryRequest(
         cursor: request.cursor as string | null,
         limit: request.limit,
     });
+    if (!peer.historyCompleted) {
+        requestSyncHistory(peer).catch(err => warn('Sync history request failed', err, 'sync'));
+    }
     await replayPendingSyncEvents(peer);
     await relayBacklogToPeer(peer);
 }

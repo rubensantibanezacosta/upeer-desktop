@@ -161,6 +161,7 @@ const deviceApi = {
     getMyDevices: () => ipcRenderer.invoke('get-my-devices'),
     getAuthorizedDevices: () => ipcRenderer.invoke('get-authorized-devices'),
     revokeAuthorizedDevice: (deviceId: string) => ipcRenderer.invoke('revoke-authorized-device', { deviceId }),
+    onAuthorizedDevicesChanged: (callback: () => void) => subscribe('authorized-devices-changed', () => callback()),
 };
 
 const enrollmentApi = {

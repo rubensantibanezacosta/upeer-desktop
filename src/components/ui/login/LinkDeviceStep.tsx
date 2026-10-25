@@ -67,7 +67,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
                 <Button size="sm" variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={() => void cancel()}>
                     Volver
                 </Button>
-                <Typography level="title-lg">Entrar en mi cuenta con un QR</Typography>
+                <Typography level="title-lg">Entrar en mi cuenta con una invitación</Typography>
             </Stack>
 
             {phase === 'invite' && (
@@ -78,7 +78,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
                     <Box>
                         <Typography level="title-sm" sx={{ mb: 0.5 }}>Código de invitación</Typography>
                         <Typography level="body-sm" sx={{ color: 'text.secondary', mb: 1 }}>
-                            Escanéalo desde el dispositivo que ya tiene la cuenta o pega el código aquí.
+                            Escanéalo desde el dispositivo que ya tiene la cuenta o pega aquí el código que te dé. Sirve igual el QR que el texto.
                         </Typography>
                         <Textarea
                             minRows={3}
@@ -104,7 +104,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
                 <Stack spacing={2}>
                     <EnrollmentCodeCard
                         title="1. Envía esta solicitud al dispositivo autorizador"
-                        description="Muéstrala o cópiala en el dispositivo que tiene la cuenta para que emita tu certificado."
+                        description="Cópiala y pégala en el dispositivo que tiene la cuenta, o escanéala desde él, para que emita tu certificado."
                         code={requestCode}
                         expiresAt={expiresAt}
                     />

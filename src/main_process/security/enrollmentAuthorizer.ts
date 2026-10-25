@@ -15,6 +15,7 @@ import { requireRootIdentity } from './identityMode.js';
 import { getYggstackAddress } from '../sidecars/yggstack.js';
 import { identityState } from './identityState.js';
 import { publishMyAccountRegistry } from '../network/accountRegistry.js';
+import { notifyDeviceRegistryChanged } from '../core/deviceRegistryEvents.js';
 import { warn } from './secure-logger.js';
 
 export interface IssuedEnrollment {
@@ -86,7 +87,9 @@ function recordAuthorizedDevice(certificate: AccountDeviceCertificate, now: numb
         const next = appendAuthorizedDevice(state, certificate.accountUpeerId, certificate);
         if (!saveAccountRegistryState(next, now)) {
             warn('No se pudo persistir el dispositivo autorizado', { deviceId: certificate.deviceId }, 'identity');
+            return;
         }
+        notifyDeviceRegistryChanged();
     } catch (err) {
         warn('No se pudo registrar el dispositivo autorizado', {
             deviceId: certificate.deviceId,

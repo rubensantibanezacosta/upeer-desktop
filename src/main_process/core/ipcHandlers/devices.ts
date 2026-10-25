@@ -1,10 +1,16 @@
 import { ipcMain } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getDevicesByUPeerId, setDeviceTrust, deleteDevice } from '../../storage/devices-operations.js';
-import { publishMyAccountRegistry } from '../../network/accountRegistry.js';
+import { getMyAccountRegistry, publishMyAccountRegistry } from '../../network/accountRegistry.js';
 import { revokeMyAccountDevice } from '../../network/accountRegistryRevocation.js';
 import { loadAccountRegistryState } from '../../security/accountRegistryState.js';
+import { getDeviceIdentity } from '../../security/deviceIdentity.js';
+import { notifyDeviceRegistryChanged } from '../deviceRegistryEvents.js';
 import { warn } from '../../security/secure-logger.js';
+
+function readLocalDeviceId(): string | null {
+    return getDeviceIdentity()?.deviceId ?? null;
+}
 
 /**
  * Registra los manejadores IPC para la gestión de múltiples dispositivos
@@ -37,15 +43,19 @@ export function registerDeviceHandlers(): void {
         if (!myId) throw new Error('Identity not loaded');
         const registry = revokeMyAccountDevice(deviceId, 'device removed by the account owner');
         await deleteDevice(myId, deviceId);
+        notifyDeviceRegistryChanged();
         const published = await publishMyAccountRegistry();
         return { success: true, epoch: registry.epoch, published };
     });
 
     ipcMain.handle('get-authorized-devices', () => {
+        const localDeviceId = readLocalDeviceId();
+        const registry = getMyAccountRegistry();
         const state = loadAccountRegistryState();
-        if (!state) return { devices: [], epoch: null };
+        const devices = registry?.devices ?? state?.devices ?? [];
+        if (devices.length === 0) return { devices: [], epoch: registry?.epoch ?? state?.epoch ?? null, localDeviceId };
         return {
-            devices: state.devices.map(device => ({
+            devices: devices.map(device => ({
                 deviceId: device.deviceId,
                 devicePublicKey: device.devicePublicKey,
                 platform: device.platform,
@@ -54,7 +64,8 @@ export function registerDeviceHandlers(): void {
                 expiresAt: device.expiresAt,
                 epoch: device.epoch,
             })),
-            epoch: state.epoch,
+            epoch: registry?.epoch ?? state?.epoch ?? null,
+            localDeviceId,
         };
     });
 
@@ -63,6 +74,7 @@ export function registerDeviceHandlers(): void {
             const registry = revokeMyAccountDevice(deviceId, 'device revoked by the account owner');
             const myId = getMyUPeerId();
             if (myId) await deleteDevice(myId, deviceId);
+            notifyDeviceRegistryChanged();
             const published = await publishMyAccountRegistry();
             return { success: true, epoch: registry.epoch, published };
         } catch (err) {

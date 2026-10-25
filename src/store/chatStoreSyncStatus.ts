@@ -5,6 +5,7 @@ const DISABLED_SYNC_STATUS: UpeerSyncStatus = {
     pendingEvents: 0,
     pendingEntityIds: [],
     peers: [],
+    devices: [],
 };
 
 export const createSyncStatusActions = (set: ChatSet) => ({
