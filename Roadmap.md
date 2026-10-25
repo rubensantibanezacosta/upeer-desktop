@@ -229,11 +229,21 @@ Lo que falta, en el orden en que conviene hacerlo:
 - [ ] Exponer fase y progreso: `phase` (`idle`/`syncing`/`live`), `devicesTotal`, `devicesDone` (peers con `historyCompleted`) y frescura del último contacto, con los mismos nombres y semántica que el `SyncStatusReport` del móvil para que un cliente pueda leer el estado del otro sin traducción.
 - [ ] Renombrar `disabled` a `idle` en el contrato IPC, o documentar que significa «sin otros dispositivos». Hoy el nombre engaña.
 - [ ] No quedarse en `syncing` con el otro dispositivo apagado: si `lastSeen` del peer es viejo, la fase es `live` igual, como hace el móvil con su ventana de 45 s.
-- [ ] Mostrar la fase masiva bajo un indicador de progreso en la lista de Chats, con el mismo criterio visual que el banner del móvil, y quitarlo al pasar a `live`.
+- [ ] Mostrar la fase masiva bajo un indicador de progreso **bloqueante a pantalla completa** en la lista de Chats, con el mismo criterio que el overlay `SyncBlockingOverlay` del móvil, y retirarlo al pasar a `live`.
 - [ ] Emitir `sync-status` al cambiar de fase, no solo al registrar o confirmar eventos, para que la UI no dependa de un sondeo.
 - [ ] Cubrir con pruebas la transición `idle → syncing → live`, la salida por peer obsoleto y el caso de un solo dispositivo.
 
 Depende de que el histórico funcione, que ya funciona. **No bloquea B10 por sí solo**, pero sí la parte de B10 que el usuario ve: sin esto, el escritorio no puede decir si está sincronizando ni cuánto le queda.
+
+### Mientras carga no hay vacío (28/10/2026)
+
+Regla común a los dos clientes: **ninguna pantalla puede anunciar «no hay nada» mientras los datos aún están llegando.** El móvil ya distingue `loading` / `empty` / `error` (`useFirstLoad` + `LoadingState` en Chats, Contactos, hilo y `ContactPicker`). En escritorio falta lo mismo, y es justo lo que hace que la sincronización parezca pérdida de datos:
+
+- [ ] `SidebarListPanel` pinta «Sin conversaciones» con `groups.length === 0 && contacts.length === 0`, **sin bandera de carga**. Es el caso que se ve al abrir la app con la sincronización masiva en marcha.
+- [ ] `EmptyChat` («Aún no hay mensajes aquí») se pinta igual mientras el histórico llega por el relay.
+- [ ] La lista de mensajes de un grupo no distingue «grupo vacío» de «histórico en curso».
+- [ ] Exponer `loading` por conversación y por contacto en el store de chat, y tratar `sync_peers.state = 'pending'` como **carga**, no como vacío.
+- [ ] El overlay de arranque (`isStartupRecoveryOpen`, «Recuperando conversaciones…», «Sincronizando grupos…») cubre solo el primer arranque: no cubre cambio de cuenta, reconexión ni la fase masiva posterior.
 
 ### Contador de no leídos en la pestaña Chats del móvil
 
