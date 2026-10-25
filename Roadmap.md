@@ -116,7 +116,7 @@ El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](.
 - [x] Número de seguridad — fingerprint SHA-256 de claves ordenadas
 - [x] Pantalla de solicitud entrante — con score de reputación y aviso de nodo sospechoso
 - [x] Mapa de red en tiempo real — nodos, latencias, líneas de conexión
-- [x] Splash/overlay de arranque — fases de warmup de Yggdrasil
+- [x] Splash/overlay de arranque — fases de warmup de Yggdrasil. Corregido el 26/10/2026: el root de `LinearProgress` de Joy trae `flex: 1`, así que dentro del overlay en columna crecía hasta llenar el alto restante y empujaba icono y título fuera del centro; se fija `flex: 'none'`
 - [x] Banner no bloqueante de reconexión
 - [x] Configuración: Perfil, Red, Apariencia, Notificaciones, Privacidad, Almacenamiento, Bloqueados, Seguridad
 - [x] QR de dirección de contacto para compartir
@@ -203,7 +203,7 @@ Decisión de producto, común a los dos clientes y fijada el 26/10/2026: **«En 
 - Se separan dos datos: `lastSeen` (transporte, diagnóstico y reachability del outbox) y `lastActive` (actividad humana: abrir la app, volver a primer plano, abrir conversación, escribir, enviar, leer, reaccionar). El ping, los ACK y los `DR_RESET` **no** mueven `lastActive`.
 - La etiqueta del usuario pasa a salir de `lastActive` con la misma ventana de antes (`ONLINE_WINDOW_MS`): dentro de 65 s, «En línea»; después, «Última vez …» con la hora de la última acción real. Aquí eso toca `topHeaderSupport` y la tarjeta «Última Actividad» de `ContactsPanelDetails`, que hoy dan «Ahora mismo» con el contacto simplemente alcanzable.
 - No se expone «nodo conectado», «servicio activo» ni equivalentes en lista, cabecera ni ficha: el estado de red y DHT se queda en Diagnóstico.
-- Pendiente: campo `lastActive` en el estado local y en el payload de presencia, emisión de la actividad propia desde el renderer y pruebas de que el `PING` no cuenta como presencia humana.
+- Implementado el 26/10/2026: migración `0015_contact_last_active.sql` con la columna `lastActive`; `network/messaging/activity.ts` con `markLocalActive`/`localActiveAt` y ventana de 5 min; el `PING` del heartbeat transporta `activeAt` y `network/handlers.ts` persiste el `lastActive` entrante y lo emite en `contact-presence`; IPC `mark-user-active` consumido por `useActivitySignal.ts` (focus, `pointerdown`, `keydown`, `visibilitychange`, throttle 15 s). Todos los puntos que decidían presencia leen ya `lastActive`: `ContactItem`, `ContactsPanel`, `ContactsPanelDetails`, `ContactInfoPanel`, `MainLayoutContent` y `chatStoreListeners`. Prueba en `tests/unit/network/activity.test.ts`.
 
 ### Posición de la píldora de reacciones
 
