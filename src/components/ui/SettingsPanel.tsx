@@ -35,7 +35,7 @@ import { SectionDispositivos } from './settings/SectionDispositivos.js';
 
 const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.ReactNode }[] = [
     { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <AccountCircleIcon /> },
-    { id: 'dispositivos', label: 'Dispositivos', desc: 'Vincular y revisar los de tu cuenta', icon: <DevicesIcon /> },
+    { id: 'dispositivos', label: 'Dispositivos', desc: 'Añadir y revisar los de tu cuenta', icon: <DevicesIcon /> },
     { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <LockIcon /> },
     { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <ShieldIcon /> },
     { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <NotificationsIcon /> },

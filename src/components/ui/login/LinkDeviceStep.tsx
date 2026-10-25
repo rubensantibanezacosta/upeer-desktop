@@ -67,7 +67,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
                 <Button size="sm" variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={() => void cancel()}>
                     Volver
                 </Button>
-                <Typography level="title-lg">Vincular este dispositivo</Typography>
+                <Typography level="title-lg">Entrar en mi cuenta con un QR</Typography>
             </Stack>
 
             {phase === 'invite' && (

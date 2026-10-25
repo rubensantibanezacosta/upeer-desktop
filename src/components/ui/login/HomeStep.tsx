@@ -28,7 +28,7 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
                     Entrar a mi cuenta
                 </Button>
                 <Button fullWidth size="lg" variant="outlined" color="primary" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
-                    Vincular este dispositivo
+                    Entrar con un QR de otro dispositivo
                 </Button>
                 <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<AddIcon />} onClick={onSwitchAccount} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Crear cuenta nueva
@@ -60,10 +60,10 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
                 Crear cuenta nueva
             </Button>
             <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<DownloadIcon />} onClick={onImport} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
-                Ya tengo una cuenta
+                Entrar con la frase de mi cuenta
             </Button>
             <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
-                Vincular un dispositivo a mi cuenta
+                Entrar con un QR de otro dispositivo
             </Button>
         </Stack>
     );

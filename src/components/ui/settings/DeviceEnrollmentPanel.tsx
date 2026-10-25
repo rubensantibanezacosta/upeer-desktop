@@ -73,11 +73,11 @@ export const DeviceEnrollmentPanel: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                 <AddLinkIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                 <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
-                    Vincular un dispositivo nuevo
+                    Añadir otro dispositivo a mi cuenta
                 </Typography>
             </Box>
             <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 1.5 }}>
-                El dispositivo nuevo entra en la cuenta sin recibir la frase semilla: solo obtiene un certificado firmado por esta cuenta.
+                El dispositivo nuevo solo obtiene un certificado firmado por esta cuenta.
             </Typography>
 
             {!invite && (
@@ -96,7 +96,7 @@ export const DeviceEnrollmentPanel: React.FC = () => {
                 <Stack spacing={2}>
                     <EnrollmentCodeCard
                         title="1. Invitación para el dispositivo nuevo"
-                        description="Escanea este código en el dispositivo que quieres vincular. Caduca en pocos minutos y solo se puede usar una vez."
+                        description="Escanea este código en el dispositivo que quieres añadir a tu cuenta. Caduca en pocos minutos y solo se puede usar una vez."
                         code={invite.code}
                         expiresAt={invite.expiresAt}
                     />

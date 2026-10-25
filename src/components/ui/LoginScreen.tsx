@@ -49,8 +49,8 @@ const getShellCopy = (screen: Screen, isLocked: boolean) => {
 
     if (screen === 'link-device') {
         return {
-            stepLabel: 'Dispositivo vinculado',
-            title: 'Vincula este dispositivo a tu cuenta',
+            stepLabel: 'Cuenta en este dispositivo',
+            title: 'Entra en tu cuenta con un QR',
             description: 'El dispositivo recibe un certificado firmado por la cuenta y nunca guarda la frase semilla.'
         };
     }
