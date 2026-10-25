@@ -40,10 +40,15 @@ export const DeviceSessionList: React.FC = () => {
 
     return (
         <Box>
-            <Box sx={{ px: 1.5, py: 1, mt: 1 }}>
-                <Typography level="title-sm" sx={{ mb: 0.5 }}>Sesiones y Dispositivos</Typography>
-                <Typography level="body-xs" sx={{ color: "text.secondary", mb: 1.5 }}>
-                    Dispositivos vinculados a tu identidad que pueden recibir y enviar mensajes.
+            <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+                    <VerifiedIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
+                    <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
+                        Confianza local entre nodos
+                    </Typography>
+                </Box>
+                <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                    Nodos que este equipo ha visto en la red y si confías en ellos. Es una lista local: no forma parte del registro firmado de la cuenta.
                 </Typography>
             </Box>
 

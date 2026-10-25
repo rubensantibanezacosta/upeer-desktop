@@ -65,13 +65,15 @@ export const AuthorizedDeviceList: React.FC = () => {
     }
 
     return (
-        <Stack spacing={1.5} sx={{ p: 2, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={1.5} sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Stack direction="row" spacing={1} alignItems="center">
-                <VerifiedUserIcon sx={{ fontSize: 18, color: 'success.500' }} />
-                <Typography level="title-sm" sx={{ flexGrow: 1 }}>Dispositivos autorizados</Typography>
+                <VerifiedUserIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
+                <Typography level="body-xs" sx={{ flexGrow: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
+                    Dispositivos autorizados
+                </Typography>
                 {epoch !== null && <Chip size="sm" variant="soft">epoch {epoch}</Chip>}
             </Stack>
-            <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+            <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
                 Cada dispositivo enrolado recibe un certificado firmado por la cuenta. Revocar uno lo expulsa del registro aunque conserve su certificado antiguo.
             </Typography>
 

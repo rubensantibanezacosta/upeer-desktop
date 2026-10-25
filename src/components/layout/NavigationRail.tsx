@@ -18,6 +18,7 @@ interface NavigationRailProps {
     onOpenCalls?: () => void;
     onOpenSettings?: () => void;
     onOpenIdentity?: () => void;
+    onOpenDevices?: () => void;
     activeView?: 'chat' | 'contacts' | 'calls' | 'settings';
     activeCallKind?: 'audio' | 'video';
     unreadChatCount?: number;
@@ -32,6 +33,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     onOpenCalls,
     onOpenSettings,
     onOpenIdentity,
+    onOpenDevices,
     activeView = 'chat',
     activeCallKind,
     unreadChatCount = 0,
@@ -111,7 +113,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <SyncStatusIndicator />
+            <SyncStatusIndicator onOpenDevices={onOpenDevices} />
             <Tooltip title="Ajustes" placement="right">
                 <IconButton
                     aria-label="Ajustes"

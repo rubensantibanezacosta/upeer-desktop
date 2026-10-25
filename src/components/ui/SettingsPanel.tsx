@@ -17,6 +17,7 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import StorageIcon from '@mui/icons-material/Storage';
 import InfoIcon from '@mui/icons-material/Info';
 import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+import DevicesIcon from '@mui/icons-material/Devices';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { SettingsPanelProps, SettingsSection } from './settings/types.js';
@@ -28,11 +29,13 @@ import { SectionApariencia } from './settings/SectionApariencia.js';
 import { SectionAlmacenamiento } from './settings/SectionAlmacenamiento.js';
 import { SectionRed } from './settings/SectionRed.js';
 import { SectionAcerca } from './settings/SectionAcerca.js';
+import { SectionDispositivos } from './settings/SectionDispositivos.js';
 
 // ─── Definicion de secciones ─────────────────────────────────────────────────
 
 const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.ReactNode }[] = [
     { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <AccountCircleIcon /> },
+    { id: 'dispositivos', label: 'Dispositivos', desc: 'Vincular y revisar los de tu cuenta', icon: <DevicesIcon /> },
     { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <LockIcon /> },
     { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <ShieldIcon /> },
     { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <NotificationsIcon /> },
@@ -60,6 +63,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const renderSection = () => {
         switch (active) {
             case 'perfil': return <SectionPerfil identity={identity} networkAddress={networkAddress} onIdentityUpdate={onIdentityUpdate} />;
+            case 'dispositivos': return <SectionDispositivos />;
             case 'privacidad': return <SectionPrivacidad />;
             case 'seguridad': return <SectionSeguridad />;
             case 'notificaciones': return <SectionNotificaciones />;

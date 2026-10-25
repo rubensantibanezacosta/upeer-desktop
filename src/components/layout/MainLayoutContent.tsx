@@ -161,6 +161,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 onOpenCalls={() => navigation.goToCalls()}
                 onOpenSettings={() => navigation.toggleSettings()}
                 onOpenIdentity={() => navigation.goToSettings('perfil')}
+                onOpenDevices={() => navigation.goToSettings('dispositivos')}
             />
 
             {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (

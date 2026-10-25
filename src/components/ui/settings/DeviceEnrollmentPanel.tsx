@@ -69,13 +69,16 @@ export const DeviceEnrollmentPanel: React.FC = () => {
     };
 
     return (
-        <Stack spacing={2} sx={{ p: 2, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
-            <Box>
-                <Typography level="title-sm">Vincular un dispositivo nuevo</Typography>
-                <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-                    El dispositivo nuevo entra en la cuenta sin recibir la frase semilla: solo obtiene un certificado firmado por esta cuenta.
+        <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+                <AddLinkIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
+                <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
+                    Vincular un dispositivo nuevo
                 </Typography>
             </Box>
+            <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 1.5 }}>
+                El dispositivo nuevo entra en la cuenta sin recibir la frase semilla: solo obtiene un certificado firmado por esta cuenta.
+            </Typography>
 
             {!invite && (
                 <Box>
@@ -143,6 +146,6 @@ export const DeviceEnrollmentPanel: React.FC = () => {
             )}
 
             {error && <Alert color="danger" variant="soft" size="sm">{error}</Alert>}
-        </Stack>
+        </Box>
     );
 };

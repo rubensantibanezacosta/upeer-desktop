@@ -25,10 +25,11 @@ const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus }> = ({ status }) =>
         {status.pendingEvents > 0 && (
             <Typography level="body-xs">{status.pendingEvents} evento(s) sin confirmar</Typography>
         )}
+        <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>Pulsa para gestionar los dispositivos</Typography>
     </Box>
 );
 
-export const SyncStatusIndicator: React.FC = () => {
+export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ onOpenDevices }) => {
     const syncStatus = useChatStore((state) => state.syncStatus);
     const Icon = syncStatus.state === 'synced'
         ? CloudDoneIcon
@@ -41,7 +42,8 @@ export const SyncStatusIndicator: React.FC = () => {
             <Box
                 role="status"
                 aria-label={`Estado de sincronización: ${stateLabel(syncStatus.state)}`}
-                sx={{ display: 'flex', justifyContent: 'center', color, cursor: 'default' }}
+                onClick={onOpenDevices}
+                sx={{ display: 'flex', justifyContent: 'center', color, cursor: onOpenDevices ? 'pointer' : 'default' }}
             >
                 <Icon sx={{ fontSize: 20 }} />
             </Box>
