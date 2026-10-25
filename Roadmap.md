@@ -162,6 +162,8 @@ El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](.
 
 ### Próximas funcionalidades
 
+> **⛔ B11 (transporte local sin internet: Bluetooth y LAN) está bloqueada a propósito.** No se implementa ni se prepara nada en escritorio —ni permisos, ni sockets locales, ni cambios en la firma— sin discutir antes el diseño con el usuario. El escritorio, además, no tiene radio Bluetooth: su parte sería LAN en la misma subred y solo después de esa conversación. Los cinco puntos a acordar están en [`../ROADMAP.md`](../ROADMAP.md) → «B11».
+
 - [ ] Vídeo streaming — reproducción mientras se transfiere _(pendiente; requiere streaming de media en el renderer, no verificable headless)_
 - [x] Compresión de mensajes — reducir overhead para mensajes largos (`compressMessage`/`decompressMessage` con auto-detección por prefijo, gzip; aplicada en el envío online, descompresión en recepción; probada multiproceso con mensaje largo)
 - [x] Recovery multimedia vaulteado — fix: `handleMessage` de `FILE_PROPOSAL` reconstruía el paquete perdiendo `type`/`useRecipientEphemeral` y forzando `isVoiceNote:false`, rompiendo la verificación de firma del proposal vaulteado y bloqueando la reconstrucción del archivo al reconectar. Se preservan los campos tal como el emisor los firmó. Añadido test e2e multiproceso `adjunto offline->online: recovery del multimedia vaulteado tras reconexión` (modo offline simulado en `peer-worker.js` con `setVaultOffline`).
