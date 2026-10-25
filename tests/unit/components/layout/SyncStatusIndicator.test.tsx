@@ -6,27 +6,36 @@ import { useChatStore } from '../../../../src/store/useChatStore.js';
 
 const initialSyncStatus = useChatStore.getState().syncStatus;
 
-const setSyncStatus = (status: UpeerSyncStatus) => {
-    useChatStore.setState({ syncStatus: status });
+const baseStatus: UpeerSyncStatus = {
+    state: 'disabled',
+    phase: 'idle',
+    devicesTotal: 0,
+    devicesDone: 0,
+    lastPeerAt: 0,
+    ageMillis: 0,
+    pendingEvents: 0,
+    pendingEntityIds: [],
+    peers: [],
+    devices: [],
+};
+
+const setSyncStatus = (status: Partial<UpeerSyncStatus>) => {
+    useChatStore.setState({ syncStatus: { ...baseStatus, ...status } });
 };
 
 describe('SyncStatusIndicator', () => {
     afterEach(() => {
-        setSyncStatus(initialSyncStatus);
+        useChatStore.setState({ syncStatus: initialSyncStatus });
     });
 
     it('reports no devices when the account registry is empty', () => {
-        setSyncStatus({ state: 'disabled', pendingEvents: 0, pendingEntityIds: [], peers: [], devices: [] });
+        setSyncStatus({});
         render(<SyncStatusIndicator />);
         expect(screen.getByLabelText('Sin dispositivos en la cuenta')).toBeTruthy();
     });
 
     it('counts this device when it is the only one in the account', () => {
         setSyncStatus({
-            state: 'disabled',
-            pendingEvents: 0,
-            pendingEntityIds: [],
-            peers: [],
             devices: [{ deviceId: 'a'.repeat(64), platform: 'desktop', state: 'local', lastSeen: null }],
         });
         render(<SyncStatusIndicator />);
@@ -37,9 +46,10 @@ describe('SyncStatusIndicator', () => {
     it('counts every device of the account, local included', () => {
         setSyncStatus({
             state: 'synced',
-            pendingEvents: 0,
-            pendingEntityIds: [],
-            peers: [{ deviceId: 'b'.repeat(64), state: 'synced', ackSequence: 9, lastSeen: 1 }],
+            phase: 'live',
+            devicesTotal: 1,
+            devicesDone: 1,
+            peers: [{ deviceId: 'b'.repeat(64), state: 'synced', ackSequence: 9, lastSeen: 1, historyCompleted: true }],
             devices: [
                 { deviceId: 'a'.repeat(64), platform: 'desktop', state: 'local', lastSeen: null },
                 { deviceId: 'b'.repeat(64), platform: 'android', state: 'synced', lastSeen: 1 },
@@ -53,9 +63,12 @@ describe('SyncStatusIndicator', () => {
     it('keeps offline devices in the total count', () => {
         setSyncStatus({
             state: 'pending',
+            phase: 'live',
+            devicesTotal: 1,
+            devicesDone: 0,
             pendingEvents: 2,
             pendingEntityIds: ['m1'],
-            peers: [{ deviceId: 'b'.repeat(64), state: 'pending', ackSequence: 3, lastSeen: 1 }],
+            peers: [{ deviceId: 'b'.repeat(64), state: 'pending', ackSequence: 3, lastSeen: 1, historyCompleted: false }],
             devices: [
                 { deviceId: 'a'.repeat(64), platform: 'desktop', state: 'local', lastSeen: null },
                 { deviceId: 'b'.repeat(64), platform: 'android', state: 'pending', lastSeen: 1 },

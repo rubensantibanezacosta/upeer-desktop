@@ -63,7 +63,7 @@ describe('getSyncStatusView', () => {
             state: 'synced',
             pendingEvents: 0,
             pendingEntityIds: [],
-            peers: [{ deviceId: 'remote-device', state: 'synced', ackSequence: 5, lastSeen: 42 }],
+            peers: [{ deviceId: 'remote-device', state: 'synced', ackSequence: 5, lastSeen: 42, historyCompleted: true }],
         });
         const view = getSyncStatusView();
         expect(view.devices).toEqual([

@@ -56,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         backToList,
     } = useNavigationStore();
 
-    const { handleSearchGlobal, searchResults } = useChatStore();
+    const { handleSearchGlobal, searchResults, isHydrating } = useChatStore();
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -185,6 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onSelectMessage={handleSelectMessage}
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                     searchFocusToken={sidebarSearchFocusToken}
+                    loading={isHydrating}
                 />
             </Box>
 

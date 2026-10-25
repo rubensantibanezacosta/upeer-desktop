@@ -21,6 +21,8 @@ export interface ChatState {
     keyChangeAlerts: Record<string, KeyChangeAlert>;
     pendingFiles: PendingFile[];
     isDragging: boolean;
+    isHydrating: boolean;
+    historyLoading: boolean;
     syncStatus: UpeerSyncStatus;
 }
 
@@ -32,6 +34,7 @@ export interface ChatActions {
     setMessage: (id: string, val: string) => void;
     setReplyToMessage: (id: string, val: ChatMessage | null) => void;
     setChatHistory: (history: ChatMessage[]) => void;
+    setHistoryLoading: (loading: boolean) => void;
     setGroupChatHistory: (history: ChatMessage[]) => void;
     handleSearchGlobal: (query: string) => Promise<void>;
     loadHistoryAround: (targetMsgId: string) => Promise<void>;

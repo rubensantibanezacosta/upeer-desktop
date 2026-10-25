@@ -82,8 +82,8 @@ describe('Sync status', () => {
         expect(status.pendingEvents).toBe(3);
         expect(status.pendingEntityIds).toEqual(['message-1']);
         expect(status.peers).toEqual([
-            { deviceId: 'd1', state: 'pending', ackSequence: 5, lastSeen: 1 },
-            { deviceId: 'd2', state: 'pending', ackSequence: 0, lastSeen: 7 },
+            { deviceId: 'd1', state: 'pending', ackSequence: 5, lastSeen: 1, historyCompleted: false },
+            { deviceId: 'd2', state: 'pending', ackSequence: 0, lastSeen: 7, historyCompleted: false },
         ]);
     });
 

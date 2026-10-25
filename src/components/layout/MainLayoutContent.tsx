@@ -265,6 +265,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     onMediaClick={handleMediaClick}
                                                     activeTransfers={fileTransfer.allTransfers.filter((transfer: FileTransfer) => activeGroupId ? transfer.chatUpeerId === activeGroupId : transfer.upeerId === targetUpeerId)}
                                                     onTransferStateChange={chatStore.updateFileTransferMessage}
+                                                    loading={chatStore.historyLoading}
                                                 />
                                             </Box>
                                             <InputArea

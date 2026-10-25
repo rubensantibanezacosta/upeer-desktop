@@ -26,6 +26,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     keyChangeAlerts: {},
     pendingFiles: [],
     isDragging: false,
+    isHydrating: true,
+    historyLoading: false,
     setMyIdentity: (identity) => set({ myIdentity: identity }),
     setNetworkAddress: (networkAddress) => set({ networkAddress }),
     ...createSyncStatusActions(set),

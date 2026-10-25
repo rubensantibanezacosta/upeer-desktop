@@ -32,9 +32,10 @@ interface ChatAreaProps {
     onMediaClick?: (media: MediaClickPayload) => void;
     isGroup?: boolean;
     onTransferStateChange?: (fileId: string, updates: TransferMessageUpdates) => void;
+    loading?: boolean;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, loading = false }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
@@ -138,7 +139,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 display: 'flex',
                 flexDirection: 'column'
             }}>
-                <EmptyChat />
+                <EmptyChat loading={loading} />
             </Box>
         );
     }

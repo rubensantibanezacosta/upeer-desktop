@@ -13,6 +13,7 @@ import { parseMessage } from './features/chat/message/messageItemSupport.js';
 import { MainLayout } from './components/layout/MainLayout.js';
 import { CallHost } from './features/call/CallHost.js';
 import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
+import { SyncBlockingOverlay } from './components/layout/SyncBlockingOverlay.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
 import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
@@ -319,6 +320,7 @@ export default function App() {
                     setEditingMessage={setEditingMessage}
                 />
                     <StartupRecoveryOverlay open={!isAppLocked && appStore.isAuthenticated === true && isStartupRecoveryOpen} message={startupRecoveryMessage} />
+                    <SyncBlockingOverlay enabled={!isAppLocked && appStore.isAuthenticated === true && !isStartupRecoveryOpen} />
                     <CallHost
                         appView={navigation.appView}
                         contacts={chatStore.contacts}

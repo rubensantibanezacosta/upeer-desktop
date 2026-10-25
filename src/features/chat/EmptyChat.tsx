@@ -1,39 +1,50 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
 import ShieldIcon from '@mui/icons-material/Shield';
+import { LoadingState } from '../../components/layout/sidebar/LoadingState.js';
 
-export const EmptyChat: React.FC = () => (
-    <Box sx={{
-        flexGrow: 1,
-        width: '100%',
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        opacity: 0.8,
-        textAlign: 'center',
-        p: 4
-    }}>
+export const EmptyChat: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
+    if (loading) {
+        return (
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: 'background.body' }}>
+                <LoadingState label="Cargando mensajes…" />
+            </Box>
+        );
+    }
+
+    return (
         <Box sx={{
-            width: 100,
-            height: 100,
-            backgroundColor: 'background.level1',
-            borderRadius: 'xl',
+            flexGrow: 1,
+            width: '100%',
+            boxSizing: 'border-box',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             justifyContent: 'center',
-            mb: 3,
-            border: '1px solid',
-            borderColor: 'divider'
+            alignItems: 'center',
+            opacity: 0.8,
+            textAlign: 'center',
+            p: 4
         }}>
-            <ShieldIcon sx={{ fontSize: '48px', color: 'primary.500' }} />
+            <Box sx={{
+                width: 100,
+                height: 100,
+                backgroundColor: 'background.level1',
+                borderRadius: 'xl',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                border: '1px solid',
+                borderColor: 'divider'
+            }}>
+                <ShieldIcon sx={{ fontSize: '48px', color: 'primary.500' }} />
+            </Box>
+            <Typography level="h4" sx={{ fontWeight: 600, mb: 1 }}>
+                Conversación Segura Activada
+            </Typography>
+            <Typography level="body-md" sx={{ maxWidth: 320, color: 'text.secondary', lineHeight: 1.6 }}>
+                Aún no hay mensajes aquí. Envía el primero para comenzar esta conversación cifrada de extremo a extremo.
+            </Typography>
         </Box>
-        <Typography level="h4" sx={{ fontWeight: 600, mb: 1 }}>
-            Conversación Segura Activada
-        </Typography>
-        <Typography level="body-md" sx={{ maxWidth: 320, color: 'text.secondary', lineHeight: 1.6 }}>
-            Aún no hay mensajes aquí. Envía el primero para comenzar esta conversación cifrada de extremo a extremo.
-        </Typography>
-    </Box>
-);
+    );
+};

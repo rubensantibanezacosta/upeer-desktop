@@ -7,7 +7,7 @@ let navGeneration = 0;
 
 export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     setTargetUpeerId: (id: string) => {
-        set({ targetUpeerId: id, activeGroupId: '', isWindowedHistory: false });
+        set({ targetUpeerId: id, activeGroupId: '', isWindowedHistory: false, historyLoading: Boolean(id) });
         if (!id) {
             return;
         }
@@ -33,12 +33,16 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             set({
                 chatHistory: history.map(mapContactMessage),
                 isWindowedHistory: !!pendingScrollMsgId,
+                historyLoading: false,
             });
+        }).catch(() => {
+            if (navGeneration !== generation) return;
+            set({ historyLoading: false });
         });
     },
 
     setActiveGroupId: (id: string) => {
-        set({ activeGroupId: id, targetUpeerId: '', isWindowedHistory: false });
+        set({ activeGroupId: id, targetUpeerId: '', isWindowedHistory: false, historyLoading: Boolean(id) });
         if (!id) {
             return;
         }
@@ -49,7 +53,7 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             window.upeer.getMessages(id).then((messages: RawChatMessage[]) => {
                 if (navGeneration !== generation) return;
                 const { contacts, myIdentity } = get();
-                set({ groupChatHistory: messages.reverse().map((message) => mapGroupMessage(id, message, contacts, myIdentity)), isWindowedHistory: false });
+                set({ groupChatHistory: messages.reverse().map((message) => mapGroupMessage(id, message, contacts, myIdentity)), isWindowedHistory: false, historyLoading: false });
             });
             return;
         }
@@ -87,6 +91,7 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     })),
 
     setChatHistory: (history: ChatMessage[]) => set({ chatHistory: history }),
+    setHistoryLoading: (loading: boolean) => set({ historyLoading: loading }),
     setGroupChatHistory: (history: ChatMessage[]) => set({ groupChatHistory: history }),
 
     handleSearchGlobal: async (query: string) => {
@@ -191,19 +196,26 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     },
 
     refreshData: async () => {
-        const networkAddress = await window.upeer.getMyNetworkAddress();
-        const identity = await window.upeer.getMyIdentity();
-        set({
-            networkAddress,
-            myIdentity: identity,
-            targetUpeerId: '',
-            activeGroupId: '',
-            chatHistory: [],
-            groupChatHistory: [],
-            incomingRequests: {},
-        });
-        get().refreshContacts();
-        get().refreshGroups();
-        get().refreshSyncStatus();
+        set({ isHydrating: true });
+        try {
+            const networkAddress = await window.upeer.getMyNetworkAddress();
+            const identity = await window.upeer.getMyIdentity();
+            set({
+                networkAddress,
+                myIdentity: identity,
+                targetUpeerId: '',
+                activeGroupId: '',
+                chatHistory: [],
+                groupChatHistory: [],
+                incomingRequests: {},
+            });
+            await Promise.all([
+                get().refreshContacts(),
+                get().refreshGroups(),
+                get().refreshSyncStatus(),
+            ]);
+        } finally {
+            set({ isHydrating: false });
+        }
     },
 });

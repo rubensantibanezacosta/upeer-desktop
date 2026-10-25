@@ -21,6 +21,8 @@ export function resetAccountStores(): void {
         keyChangeAlerts: {},
         pendingFiles: [],
         isDragging: false,
+        isHydrating: true,
+        historyLoading: false,
     });
     useChatActionsStore.setState({ contactPrefs: {}, groupPrefs: {}, messagePrefs: {} });
     localStorage.removeItem('chat-actions-prefs');

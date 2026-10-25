@@ -171,10 +171,18 @@ export interface SyncPeerStateEvent {
     state: 'pending' | 'synced';
     ackSequence: number;
     lastSeen: number;
+    historyCompleted: boolean;
 }
+
+export type SyncPhaseEvent = 'idle' | 'syncing' | 'live';
 
 export interface SyncStatusEvent {
     state: 'disabled' | 'pending' | 'synced';
+    phase: SyncPhaseEvent;
+    devicesTotal: number;
+    devicesDone: number;
+    lastPeerAt: number;
+    ageMillis: number;
     pendingEvents: number;
     pendingEntityIds: string[];
     peers: SyncPeerStateEvent[];

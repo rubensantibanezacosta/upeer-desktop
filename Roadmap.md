@@ -15,11 +15,11 @@ _Última actualización: 23 Octubre 2026_
 3. **`SYNC_*` en Android** — cierra B10. Su condición de cierre es el paso 1, no este.
 4. **Grupos en Android, antes de dar B10 por cerrado (28/10/2026).** El bloqueo más barato: los mensajes con `chatUpeerId` `grp-…` ya viajan en el histórico y en `SYNC_ENVELOPE`, y el móvil los descarta en el filtro de `upeerId` de 64 hex de `SyncHistoryPayload.local`. Falta modelo de grupo, proyección de `GROUP_UPSERT`/`GROUP_DELETE` y pantalla. **No necesita claves nuevas, ni `FILE_*`, ni `GROUP_*`.**
 5. **Adjuntos en Android (28/10/2026).** La presentación ya está hecha: el móvil reconoce el sobre `{"type":"file",…}` que emite `saveFileMessage` y muestra `Documento: informe.pdf` con su tamaño en vez del JSON en crudo. Abrir el archivo exige `FILE_*`, que aquí ya existe y hay que portar.
-6. **`GROUP_*` propio, `CALL_*` y cierre de UI**, en ese orden. Las llamadas son el último bloque: es el único con hardware y red en tiempo real, y aquí ya está resuelto (señalización, pipeline de medios, codecs, historial). El transporte de sincronización ya funciona contra este cliente, pero la proyección es parcial: el móvil no tiene modelo de conversación de grupo y descarta los mensajes con `chatUpeerId` `grp-…`, y los adjuntos viajan como **texto JSON** (`saveFileMessage`), así que el móvil los pinta en crudo. Con eso, «sincronizado» no es cierto para ninguna cuenta con grupos o archivos. Orden: modelo y proyección de grupos → lectura y presentación de `{"type":"file"}` → `FILE_*` real → sender keys.
+6. **`GROUP_*` propio, `CALL_*` y cierre de UI**, en ese orden. Las llamadas son el último bloque: es el único con hardware y red en tiempo real, y aquí ya está resuelto (señalización, pipeline de medios, codecs, historial). El transporte de sincronización funciona contra este cliente y el móvil **ya proyecta grupos** (`GROUP_UPSERT`/`GROUP_DELETE`, mensajes `grp-…`) y **ya presenta** los adjuntos (`{"type":"file"}`, nota de voz incluida) replicando el renderizado de escritorio; lo que falta es el contenido descargable, que depende de `FILE_*` y del vault. Orden: `FILE_*` real → sender keys.
 
 La consecuencia para este repositorio es una sola: **el histórico de sincronización que emite Desktop no puede filtrar por tipo de chat sin dejar de ser completo**, porque `listSyncHistoryMessages` es un cursor global sobre `messages`. Si el móvil necesita un subconjunto, lo declara el receptor (`SyncApplier` distingue `APPLIED`/`UNSUPPORTED`/`REJECTED` y lo cuenta), no el emisor.
 
-Y una que **sí nos toca a nosotros y no es del port**: la sincronización en dos fases —masiva al abrir sesión bajo un indicador de progreso, en tiempo real después— es un requisito de producto **de los dos clientes**. El móvil ya lo tiene; Escritorio todavía expone solo `disabled`/`pending`/`synced` y confunde el histórico entrante con eventos sin ACK. Detalle, estado y trabajo pendiente en «Sincronización en dos fases: también aquí (28/10/2026)», más abajo.
+Y una que **sí nos tocaba a nosotros y no era del port**: la sincronización en dos fases —masiva al abrir sesión bajo un indicador de progreso, en tiempo real después— es un requisito de producto **de los dos clientes**. **Ya está hecha en ambos**: Escritorio expone `phase` (`idle`/`syncing`/`live`) con la misma semántica que el móvil y tapa la fase masiva con `SyncBlockingOverlay`. Detalle en «Sincronización en dos fases: también aquí (28/10/2026)», más abajo.
 
 Nada de esta lista exige cambios en Desktop salvo acompañar las pruebas cruzadas y lo del punto 4 en la sincronización. La lista de pasos 4 a 6 ya está dentro de la brecha y en su orden: **grupos de solo lectura → adjuntos → `GROUP_*` propio → `CALL_*` → cierre de UI**.
 
@@ -212,38 +212,37 @@ Bloqueos que también son nuestros y afectan a la paridad:
 - [ ] Ajustes de Notificaciones sin lógica real: el móvil necesita el mismo contrato de preferencias.
 - [ ] Las anotaciones «Preview for phase 11» de `CHAT_REACTION`, `CHAT_DELETE` y `CHAT_UPDATE` en `network/types.ts` siguen ahí pese a estar implementados y probados: congelar el contrato antes de portarlos.
 
-### Sincronización en dos fases: también aquí (28/10/2026)
+### Sincronización en dos fases: también aquí (28/10/2026) — **hecho**
 
-Requisito de producto, **común a los dos clientes**, no una función del móvil: al abrir sesión hay una **sincronización masiva** que debe quedar tapada bajo un indicador de progreso, y solo después el canal pasa a **tiempo real**. El móvil ya lo implementa (`SyncStatusReport` → `syncStatusJSON()` → `useSyncStatus` → `SyncProgressBanner` en Chats). **Escritorio aún no lo distingue, y por eso este requisito no se puede dar por cerrado desde el otro lado.**
+Requisito de producto, **común a los dos clientes**, no una función del móvil: al abrir sesión hay una **sincronización masiva** que debe quedar tapada bajo un indicador de progreso, y solo después el canal pasa a **tiempo real**. El móvil lo implementa con `SyncStatusReport` → `syncStatusJSON()` → `useSyncStatus` → `SyncBlockingOverlay`. El escritorio ya usa **el mismo contrato y la misma semántica**, para que un cliente pueda leer el estado del otro sin traducción.
 
-Lo que hay hoy:
+Lo que hay:
 
-- `getSyncStatus(upeerId)` (`storage/sync/status.ts`) devuelve `disabled` | `pending` | `synced`, más `pendingEvents`, `pendingEntityIds` y `peers` con `ackSequence` y `lastSeen`.
-- `statusView.ts` añade `devices` con `local`/`synced`/`pending`/`offline`, y `SyncStatusIndicator` lo pinta como icono con tooltip en el rail.
-- **No hay fase masiva ni fase en tiempo real.** `pending` mezcla dos cosas distintas: eventos salientes sin ACK y el histórico entrante que todavía se está descargando. Un usuario que acaba de enrolar el móvil ve «Sincronizando» sin saber si queda un segundo o dos minutos.
-- **`disabled` no es un estado real.** Se devuelve cuando `listSyncPeers()` está vacío, que es exactamente «no hay otros dispositivos», no «la sincronización está apagada».
-- `sync_peers.historyCompleted` **ya existe** y `updateSyncPeerHistory` lo escribe al responder el histórico. La materia prima para medir la fase masiva está en la tabla, sin migración.
+- `network/sync/phase.ts` (`computeSyncPhase`) es la función pura, con 6 casos de prueba en `tests/unit/network/sync-phase.test.ts`: `idle` sin peers, `syncing` mientras quede histórico y el par esté vivo, `live` cuando todos completaron, salida por par obsoleto a los **45 s** (misma ventana que el móvil) y par sin `lastSeen`.
+- `getSyncStatusView()` devuelve `phase`, `devicesTotal`, `devicesDone`, `lastPeerAt` y `ageMillis` junto al `state` de siempre. `SyncPeerState` gana `historyCompleted`, que ya estaba en `sync_peers` y solo faltaba exponer.
+- `components/layout/SyncBlockingOverlay.tsx` tapa la pantalla (`zIndex` 9998, por encima del shell y por debajo del overlay de arranque), con anillo, barra determinada, «Sincronizando tus dispositivos…» y la confirmación «¡Al día!» antes del fundido. 5 casos de prueba en `tests/unit/components/layout/SyncBlockingOverlay.test.tsx`, incluido que no se muestra con la app bloqueada y que se retira solo.
+- `statusNotify.ts` ya no emite en cada evento a ciegas: compara el payload y solo envía cuando cambia, y un **latido de 5 s** (`startSyncStatusTicker`) refresca la frescura del peer. Sin el latido, un par que se apaga a mitad de la fase masiva dejaría el estado congelado en `syncing`. El latido arranca siempre, también con la sesión bloqueada, porque es la única forma de que el desbloqueo no deje la UI sin fase.
 
-Lo que falta, en el orden en que conviene hacerlo:
+Lo que sigue abierto, y no es de esta fase:
 
-- [ ] Exponer fase y progreso: `phase` (`idle`/`syncing`/`live`), `devicesTotal`, `devicesDone` (peers con `historyCompleted`) y frescura del último contacto, con los mismos nombres y semántica que el `SyncStatusReport` del móvil para que un cliente pueda leer el estado del otro sin traducción.
-- [ ] Renombrar `disabled` a `idle` en el contrato IPC, o documentar que significa «sin otros dispositivos». Hoy el nombre engaña.
-- [ ] No quedarse en `syncing` con el otro dispositivo apagado: si `lastSeen` del peer es viejo, la fase es `live` igual, como hace el móvil con su ventana de 45 s.
-- [ ] Mostrar la fase masiva bajo un indicador de progreso **bloqueante a pantalla completa** en la lista de Chats, con el mismo criterio que el overlay `SyncBlockingOverlay` del móvil, y retirarlo al pasar a `live`.
-- [ ] Emitir `sync-status` al cambiar de fase, no solo al registrar o confirmar eventos, para que la UI no dependa de un sondeo.
-- [ ] Cubrir con pruebas la transición `idle → syncing → live`, la salida por peer obsoleto y el caso de un solo dispositivo.
+- [ ] Renombrar `disabled` a `idle` en el contrato IPC. Hoy `state: 'disabled'` significa «no hay otros dispositivos», no «la sincronización está apagada», y el nombre sigue engañando aunque `phase` ya lo desambigüe.
+- [ ] `disabled` mezcla todavía eventos salientes sin ACK y histórico entrante; la fase ya los separa para la UI, pero el contrato no.
 
-Depende de que el histórico funcione, que ya funciona. **No bloquea B10 por sí solo**, pero sí la parte de B10 que el usuario ve: sin esto, el escritorio no puede decir si está sincronizando ni cuánto le queda.
+Depende de que el histórico funcione, que ya funciona. **No bloquea B10 por sí solo**, pero sí la parte de B10 que el usuario ve.
 
 ### Mientras carga no hay vacío (28/10/2026)
 
-Regla común a los dos clientes: **ninguna pantalla puede anunciar «no hay nada» mientras los datos aún están llegando.** El móvil ya distingue `loading` / `empty` / `error` (`useFirstLoad` + `LoadingState` en Chats, Contactos, hilo y `ContactPicker`). En escritorio falta lo mismo, y es justo lo que hace que la sincronización parezca pérdida de datos:
+Regla común a los dos clientes: **ninguna pantalla puede anunciar «no hay nada» mientras los datos aún están llegando.** El móvil distingue `loading` / `empty` / `error` (`useFirstLoad` + `LoadingState` en Chats, Contactos, hilo y `ContactPicker`). El escritorio ya hace lo mismo:
 
-- [ ] `SidebarListPanel` pinta «Sin conversaciones» con `groups.length === 0 && contacts.length === 0`, **sin bandera de carga**. Es el caso que se ve al abrir la app con la sincronización masiva en marcha.
-- [ ] `EmptyChat` («Aún no hay mensajes aquí») se pinta igual mientras el histórico llega por el relay.
-- [ ] La lista de mensajes de un grupo no distingue «grupo vacío» de «histórico en curso».
-- [ ] Exponer `loading` por conversación y por contacto en el store de chat, y tratar `sync_peers.state = 'pending'` como **carga**, no como vacío.
-- [ ] El overlay de arranque (`isStartupRecoveryOpen`, «Recuperando conversaciones…», «Sincronizando grupos…») cubre solo el primer arranque: no cubre cambio de cuenta, reconexión ni la fase masiva posterior.
+- `store` expone `isHydrating` (lo pone `refreshData`, que ahora espera a contactos, grupos y estado de sincronización antes de bajar la bandera) y `historyLoading` (lo pone `setTargetUpeerId` / `setActiveGroupId` y lo baja la carga del histórico, también en su rama de error).
+- `SidebarListPanel` recibe `loading` y pinta «Cargando conversaciones…» en vez de «Sin conversaciones».
+- `EmptyChat` recibe `loading` y pinta «Cargando mensajes…» en vez de «Aún no hay mensajes aquí»; `ChatArea` lo propaga desde `MainLayoutContent`.
+- `LoadingState` (`components/layout/sidebar/LoadingState.tsx`) es el indicador único, con variante `compact` para el rail.
+
+Queda abierto, porque necesita otro dato que hoy no existe:
+
+- [ ] Tratar `sync_peers.state = 'pending'` como **carga** en la lista: hoy un grupo recién creado en el otro dispositivo y con histórico en curso se ve como grupo vacío hasta que llega el primer mensaje, porque `phase` es global y no por conversación.
+- [ ] El overlay de arranque (`isStartupRecoveryOpen`) cubre el primer arranque; cambio de cuenta y reconexión ya pasan por `isHydrating`, pero no hay bandera de carga por conversación individual.
 
 ### Contador de no leídos en la pestaña Chats del móvil
 

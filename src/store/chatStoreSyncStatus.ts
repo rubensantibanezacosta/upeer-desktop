@@ -2,6 +2,11 @@ import type { ChatSet } from './chatStoreTypes.js';
 
 const DISABLED_SYNC_STATUS: UpeerSyncStatus = {
     state: 'disabled',
+    phase: 'idle',
+    devicesTotal: 0,
+    devicesDone: 0,
+    lastPeerAt: 0,
+    ageMillis: 0,
     pendingEvents: 0,
     pendingEntityIds: [],
     peers: [],

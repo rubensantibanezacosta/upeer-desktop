@@ -40,6 +40,7 @@ declare global {
         state: 'pending' | 'synced';
         ackSequence: number;
         lastSeen: number;
+        historyCompleted: boolean;
     };
     type UpeerSyncDeviceState = 'local' | 'synced' | 'pending' | 'offline';
     type UpeerSyncDevice = {
@@ -48,8 +49,14 @@ declare global {
         state: UpeerSyncDeviceState;
         lastSeen: number | null;
     };
+    type UpeerSyncPhase = 'idle' | 'syncing' | 'live';
     type UpeerSyncStatus = {
         state: 'disabled' | 'pending' | 'synced';
+        phase: UpeerSyncPhase;
+        devicesTotal: number;
+        devicesDone: number;
+        lastPeerAt: number;
+        ageMillis: number;
         pendingEvents: number;
         pendingEntityIds: string[];
         peers: UpeerSyncPeerState[];

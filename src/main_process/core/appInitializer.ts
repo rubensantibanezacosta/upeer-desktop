@@ -71,6 +71,9 @@ export async function initializeApp(baseDir: string): Promise<void> {
     win?.webContents.send('authorized-devices-changed');
   });
 
+  const { startSyncStatusTicker } = await import('../network/sync/statusNotify.js');
+  startSyncStatusTicker();
+
   if (!isSessionLocked()) {
     startUDPServer(mainWindow);
     const { startSyncDiscovery } = await import('../network/sync/pipeline.js');

@@ -10,6 +10,7 @@ import { ContactItem } from '../ContactItem.js';
 import { GroupItem } from '../GroupItem.js';
 import { highlightText } from '../../../utils/highlightText.js';
 import { EmptyState } from './EmptyState.js';
+import { LoadingState } from './LoadingState.js';
 import type { ChatMessage, Contact, Group } from '../../../types/chat.js';
 import type { SidebarFilter } from '../../../store/useNavigationStore.js';
 
@@ -41,6 +42,7 @@ interface SidebarListPanelProps {
     onSelectMessage: (msg: ChatMessage) => void;
     onOpenCreateGroup?: () => void;
     searchFocusToken?: number;
+    loading?: boolean;
 }
 
 export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
@@ -67,6 +69,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
     onSelectMessage,
     onOpenCreateGroup,
     searchFocusToken,
+    loading = false,
 }) => (
     <>
         <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} />
@@ -75,12 +78,14 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
             {(sidebarFilter === 'all' || sidebarFilter === 'favorites') && (
                 <>
                     {groups.length === 0 && contacts.length === 0 ? (
-                        <EmptyState
-                            icon={<ChatBubbleOutlineIcon sx={{ fontSize: 'inherit' }} />}
-                            title="Sin conversaciones"
-                            subtitle="Añade un contacto para empezar a chatear de forma segura."
-                            action={{ label: 'Nueva conversación', onClick: onOpenNew }}
-                        />
+                        loading
+                            ? <LoadingState compact label="Cargando conversaciones…" />
+                            : <EmptyState
+                                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 'inherit' }} />}
+                                title="Sin conversaciones"
+                                subtitle="Añade un contacto para empezar a chatear de forma segura."
+                                action={{ label: 'Nueva conversación', onClick: onOpenNew }}
+                            />
                     ) : (
                         <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
                             {sidebarSearch && (

@@ -10,6 +10,7 @@ export type SyncPeerState = {
     state: SyncEntityState;
     ackSequence: number;
     lastSeen: number;
+    historyCompleted: boolean;
 };
 
 export type SyncStatus = {
@@ -45,7 +46,7 @@ export function getSyncStatus(upeerId: string): SyncStatus {
 }
 
 function toPeerState(
-    peer: { deviceId: string; ackSequence: number; lastSeen: number },
+    peer: { deviceId: string; ackSequence: number; lastSeen: number; historyCompleted: boolean },
     maxSequence: number,
 ): SyncPeerState {
     return {
@@ -53,6 +54,7 @@ function toPeerState(
         state: maxSequence > peer.ackSequence ? 'pending' : 'synced',
         ackSequence: peer.ackSequence,
         lastSeen: peer.lastSeen,
+        historyCompleted: peer.historyCompleted === true,
     };
 }
 

@@ -2,6 +2,7 @@ import { getMyUPeerId } from '../../security/identity.js';
 import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { getMyAccountRegistry } from '../accountRegistry.js';
 import { getSyncStatus, type SyncStatus } from '../../storage/sync/status.js';
+import { computeSyncPhase, type SyncPhase } from './phase.js';
 
 export type SyncDeviceState = 'local' | 'synced' | 'pending' | 'offline';
 
@@ -13,11 +14,21 @@ export type SyncDeviceView = {
 };
 
 export type SyncStatusView = SyncStatus & {
+    phase: SyncPhase;
+    devicesTotal: number;
+    devicesDone: number;
+    lastPeerAt: number;
+    ageMillis: number;
     devices: SyncDeviceView[];
 };
 
 const EMPTY: SyncStatusView = {
     state: 'disabled',
+    phase: 'idle',
+    devicesTotal: 0,
+    devicesDone: 0,
+    lastPeerAt: 0,
+    ageMillis: 0,
     pendingEvents: 0,
     pendingEntityIds: [],
     peers: [],
@@ -28,7 +39,12 @@ export function getSyncStatusView(): SyncStatusView {
     const myId = getMyUPeerId();
     if (!myId) return EMPTY;
     const status = getSyncStatus(myId);
-    return { ...status, devices: buildDevices(status) };
+    const phase = computeSyncPhase(status.peers.map((peer) => toPhasePeer(peer)), Date.now());
+    return { ...status, ...phase, devices: buildDevices(status) };
+}
+
+function toPhasePeer(peer: SyncStatus['peers'][number]): { historyCompleted: boolean; lastSeen: number } {
+    return { historyCompleted: peer.historyCompleted === true, lastSeen: peer.lastSeen };
 }
 
 function buildDevices(status: SyncStatus): SyncDeviceView[] {
