@@ -4,6 +4,7 @@ import type { BrowserWindow } from 'electron';
 import { recordSyncEvent } from '../../storage/sync/events.js';
 import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
+import { listContactProfiles } from '../../storage/contacts/operations.js';
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { applySyncEvent } from './apply.js';
 import { getMySyncIdentity } from './auth.js';
@@ -46,6 +47,19 @@ export async function respondSyncHistory(
         originDeviceId: deviceId,
         payload: message as unknown as Record<string, unknown>,
     }));
+    if (!request.cursor) {
+        const now = Date.now();
+        for (const profile of listContactProfiles()) {
+            entries.push(signSyncEventOrigin({
+                eventId: `profile:${deviceId}:${profile.upeerId}`,
+                kind: 'CONTACT_PROFILE' as const,
+                occurredAt: now,
+                sequence: now,
+                originDeviceId: deviceId,
+                payload: profile as unknown as Record<string, unknown>,
+            }));
+        }
+    }
     await sendEncryptedSync(peer, 'SYNC_HISTORY_RES', {
         requestId: request.requestId,
         entries,

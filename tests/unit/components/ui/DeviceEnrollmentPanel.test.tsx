@@ -96,29 +96,27 @@ describe('DeviceEnrollmentPanel', () => {
         await waitFor(() => expect(screen.getByText('sin raíz')).toBeDefined());
     });
 
-    it('autoriza con los códigos manuales y muestra la respuesta', async () => {
+    it('autoriza con el código de solicitud pegado y muestra la respuesta', async () => {
         const stub = stubBridge();
         render(<DeviceEnrollmentPanel />);
         fireEvent.click(screen.getByRole('button', { name: /generar invitación/i }));
         await waitFor(() => expect(screen.getByText('invite-code')).toBeDefined());
-        fireEvent.click(screen.getByRole('button', { name: /usar códigos manuales/i }));
 
-        fireEvent.change(screen.getByPlaceholderText(/pega el código de solicitud/i), { target: { value: 'request-code' } });
-        fireEvent.click(screen.getByRole('button', { name: /autorizar con el código/i }));
+        fireEvent.change(screen.getByPlaceholderText(/código de solicitud del dispositivo nuevo/i), { target: { value: 'request-code' } });
+        fireEvent.click(screen.getByRole('button', { name: /autorizar con este código/i }));
 
         await waitFor(() => expect(screen.getByText('response-code')).toBeDefined());
         expect(stub.completeEnrollment).toHaveBeenCalledWith('request-code');
     });
 
-    it('muestra el error cuando la solicitud manual no se puede autorizar', async () => {
+    it('muestra el error cuando la solicitud no se puede autorizar', async () => {
         stubBridge({ completeEnrollment: vi.fn(async () => ({ success: false, error: 'invitación caducada' })) });
         render(<DeviceEnrollmentPanel />);
         fireEvent.click(screen.getByRole('button', { name: /generar invitación/i }));
         await waitFor(() => expect(screen.getByText('invite-code')).toBeDefined());
-        fireEvent.click(screen.getByRole('button', { name: /usar códigos manuales/i }));
 
-        fireEvent.change(screen.getByPlaceholderText(/pega el código de solicitud/i), { target: { value: 'bad' } });
-        fireEvent.click(screen.getByRole('button', { name: /autorizar con el código/i }));
+        fireEvent.change(screen.getByPlaceholderText(/código de solicitud del dispositivo nuevo/i), { target: { value: 'bad' } });
+        fireEvent.click(screen.getByRole('button', { name: /autorizar con este código/i }));
 
         await waitFor(() => expect(screen.getByText('invitación caducada')).toBeDefined());
     });

@@ -55,6 +55,25 @@ export function getContactByAddress(address: string) {
         .get() as StoredContact | undefined;
 }
 
+export function listContactProfiles(): { upeerId: string; name: string; avatar: string | null; isFavorite: boolean }[] {
+    const db = getDb();
+    const schema = getSchema();
+
+    const rows = db.select().from(schema.contacts).all() as StoredContact[];
+    const profiles: { upeerId: string; name: string; avatar: string | null; isFavorite: boolean }[] = [];
+    for (const row of rows) {
+        const upeerId = (row.upeerId ?? '').toLowerCase();
+        if (!/^[0-9a-f]{64}$/.test(upeerId)) continue;
+        profiles.push({
+            upeerId,
+            name: row.name ?? '',
+            avatar: row.avatar ?? null,
+            isFavorite: row.isFavorite === true,
+        });
+    }
+    return profiles;
+}
+
 export function getContacts() {
     const db = getDb();
     const schema = getSchema();

@@ -6,6 +6,7 @@ import { revokeMyAccountDevice } from '../../network/accountRegistryRevocation.j
 import { loadAccountRegistryState } from '../../security/accountRegistryState.js';
 import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { notifyDeviceRegistryChanged } from '../deviceRegistryEvents.js';
+import { broadcastSyncRegistry } from '../../network/sync/transport.js';
 import { warn } from '../../security/secure-logger.js';
 
 function readLocalDeviceId(): string | null {
@@ -76,7 +77,8 @@ export function registerDeviceHandlers(): void {
             if (myId) await deleteDevice(myId, deviceId);
             notifyDeviceRegistryChanged();
             const published = await publishMyAccountRegistry();
-            return { success: true, epoch: registry.epoch, published };
+            const notified = broadcastSyncRegistry();
+            return { success: true, epoch: registry.epoch, published, notified };
         } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
             warn('No se pudo revocar el dispositivo autorizado', { deviceId, error: detail }, 'security');

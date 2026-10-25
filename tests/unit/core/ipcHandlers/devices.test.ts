@@ -35,8 +35,17 @@ vi.mock('../../../../src/main_process/security/accountRegistryState.js', () => (
     loadAccountRegistryState: vi.fn(),
 }));
 
+vi.mock('../../../../src/main_process/security/deviceIdentity.js', () => ({
+    getDeviceIdentity: vi.fn(() => ({ deviceId: 'my-device-id' })),
+}));
+
 vi.mock('../../../../src/main_process/network/accountRegistry.js', () => ({
+    getMyAccountRegistry: vi.fn(() => null),
     publishMyAccountRegistry: vi.fn(async () => true),
+}));
+
+vi.mock('../../../../src/main_process/network/sync/transport.js', () => ({
+    broadcastSyncRegistry: vi.fn(() => 1),
 }));
 
 vi.mock('../../../../src/main_process/network/accountRegistryRevocation.js', () => ({
@@ -103,13 +112,14 @@ describe('Devices IPC Handlers', () => {
                 epoch: 4,
             }],
             epoch: 4,
+            localDeviceId: 'my-device-id',
         });
     });
 
     it('get-authorized-devices responde vacío sin registro', () => {
         vi.mocked(loadAccountRegistryState).mockReturnValue(null);
         const handler = getRegisteredHandler('get-authorized-devices');
-        expect(handler()).toEqual({ devices: [], epoch: null });
+        expect(handler()).toEqual({ devices: [], epoch: null, localDeviceId: 'my-device-id' });
     });
 
     it('revoke-authorized-device revoca, borra y republica', async () => {
@@ -121,7 +131,7 @@ describe('Devices IPC Handlers', () => {
         expect(revokeMyAccountDevice).toHaveBeenCalledWith('bb'.repeat(32), expect.any(String));
         expect(deviceOps.deleteDevice).toHaveBeenCalledWith('my-upeer-id', 'bb'.repeat(32));
         expect(publishMyAccountRegistry).toHaveBeenCalled();
-        expect(result).toEqual({ success: true, epoch: 7, published: true });
+        expect(result).toEqual({ success: true, epoch: 7, published: true, notified: 1 });
     });
 
     it('revoke-authorized-device informa del fallo', async () => {

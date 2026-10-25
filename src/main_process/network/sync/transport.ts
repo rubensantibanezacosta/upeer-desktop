@@ -4,6 +4,9 @@ import { sendSecurePacket } from '../server/transport.js';
 import { buildHelloPayload, getMySyncIdentity } from './auth.js';
 import type { SyncDeviceBinding, SyncPlainEvent } from './types.js';
 import type { SyncPeerRecord } from '../../storage/sync/peers.js';
+import { listSyncPeers } from '../../storage/sync/peers.js';
+import { getMyAccountRegistry } from '../accountRegistry.js';
+import type { AccountRegistry } from '../accountRegistry.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { getMaxSyncSequence } from '../../storage/sync/events.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
@@ -87,6 +90,43 @@ export function sendSyncAck(peer: SyncPeerRecord, eventId: string, eventSequence
         senderDeviceCertificate: identity.certificate,
     });
     return true;
+}
+
+export function sendSyncReset(peer: SyncPeerRecord): boolean {
+    if (!peer.address) return false;
+    const identity = getMySyncIdentity();
+    if (!identity) return false;
+    sendSecurePacket(peer.address, {
+        type: 'SYNC_RESET',
+        senderDeviceId: identity.deviceId,
+        senderDeviceCertificate: identity.certificate,
+    });
+    return true;
+}
+
+export function sendSyncRegistry(peer: SyncPeerRecord, registry: AccountRegistry): boolean {
+    if (!peer.address) return false;
+    const identity = getMySyncIdentity();
+    if (!identity) return false;
+    sendSecurePacket(peer.address, {
+        type: 'SYNC_REGISTRY',
+        senderDeviceId: identity.deviceId,
+        senderDeviceCertificate: identity.certificate,
+        accountUpeerId: registry.accountUpeerId,
+        registry,
+    });
+    return true;
+}
+
+export function broadcastSyncRegistry(): number {
+    const myId = getMyUPeerId();
+    const registry = getMyAccountRegistry();
+    if (!myId || !registry) return 0;
+    let sent = 0;
+    for (const peer of listSyncPeers(myId)) {
+        if (sendSyncRegistry(peer, registry)) sent += 1;
+    }
+    return sent;
 }
 
 function peerContact(peer: SyncPeerRecord): {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/joy';
+import { Alert, Box, Button, Chip, CircularProgress, DialogActions, DialogContent, DialogTitle, IconButton, Modal, ModalDialog, Stack, Tooltip, Typography } from '@mui/joy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 
@@ -19,6 +19,7 @@ export const AuthorizedDeviceList: React.FC = () => {
     const [localDeviceId, setLocalDeviceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState<string | null>(null);
+    const [pending, setPending] = useState<AuthorizedDevice | null>(null);
     const [error, setError] = useState('');
 
     const load = useCallback(async () => {
@@ -51,12 +52,19 @@ export const AuthorizedDeviceList: React.FC = () => {
                 return;
             }
             setError(result.published === false ? 'Dispositivo revocado; el registro no se pudo publicar en la red.' : '');
+            setPending(null);
             await load();
         } catch {
             setError('No se pudo revocar el dispositivo.');
         } finally {
             setBusy(null);
         }
+    };
+
+    const confirm = async () => {
+        const device = pending;
+        if (!device) return;
+        await revoke(device.deviceId);
     };
 
     return (
@@ -131,7 +139,7 @@ export const AuthorizedDeviceList: React.FC = () => {
                                     color="danger"
                                     variant="plain"
                                     loading={busy === device.deviceId}
-                                    onClick={() => void revoke(device.deviceId)}
+                                    onClick={() => setPending(device)}
                                 >
                                     <DeleteIcon sx={{ fontSize: 18 }} />
                                 </IconButton>
@@ -145,6 +153,29 @@ export const AuthorizedDeviceList: React.FC = () => {
             <Box>
                 <Button size="sm" variant="plain" color="neutral" onClick={() => void load()}>Actualizar</Button>
             </Box>
+
+            <Modal open={pending !== null} onClose={() => (busy ? undefined : setPending(null))}>
+                <ModalDialog size="sm" sx={{ maxWidth: 420 }}>
+                    <DialogTitle>Revocar dispositivo</DialogTitle>
+                    <DialogContent>
+                        <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                            {pending ? platformLabel(pending.platform) : ''} dejará de poder usar tu cuenta y perderá el acceso a tus
+                            conversaciones en cuanto se conecte.
+                        </Typography>
+                        <Typography level="body-xs" sx={{ mt: 1, fontFamily: 'monospace', color: 'text.tertiary', wordBreak: 'break-all' }}>
+                            {pending?.deviceId ?? ''}
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button variant="plain" color="neutral" disabled={busy !== null} onClick={() => setPending(null)}>
+                            Cancelar
+                        </Button>
+                        <Button color="danger" loading={busy !== null} onClick={() => void confirm()}>
+                            Revocar acceso
+                        </Button>
+                    </DialogActions>
+                </ModalDialog>
+            </Modal>
         </Stack>
     );
 };

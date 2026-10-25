@@ -2,7 +2,7 @@ import type { BrowserWindow } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { warn } from '../../security/secure-logger.js';
-import { getRatchetSession } from '../../storage/ratchet/operations.js';
+import { getRatchetSession, deleteRatchetSession } from '../../storage/ratchet/operations.js';
 import { recordSyncEvent } from '../../storage/sync/events.js';
 import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { isSyncRelayTarget, markSyncRelayAcked } from '../../storage/sync/relay.js';
@@ -14,6 +14,7 @@ import {
     type SyncPeerRecord,
 } from '../../storage/sync/peers.js';
 import { decryptDoubleRatchetPayload } from '../handlers/doubleRatchetDecrypt.js';
+import { getMyAccountRegistry } from '../accountRegistry.js';
 import { applySyncEvent } from './apply.js';
 import { certificateFromPacket, getMySyncIdentity, verifySyncHelloBinding } from './auth.js';
 import { applySyncHistoryResponse, requestSyncHistory, respondSyncHistory } from './history.js';
@@ -21,7 +22,7 @@ import { verifySyncEventOrigin } from './origin.js';
 import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
 import { notifySyncStatus } from './statusNotify.js';
-import { sendSyncAck, sendSyncHello } from './transport.js';
+import { sendSyncAck, sendSyncHello, sendSyncRegistry, sendSyncReset } from './transport.js';
 import { SYNC_EVENT_KINDS, type SyncHelloPayload, type SyncPlainEvent } from './types.js';
 
 type SyncPacket = Record<string, unknown>;
@@ -54,6 +55,8 @@ export async function handleSyncHello(
     }
     const peer = getSyncPeer(binding.deviceId);
     if (peer) {
+        const registry = getMyAccountRegistry(now);
+        if (registry) sendSyncRegistry(peer, registry);
         replayPendingSyncEvents(peer).catch(err => warn('Sync replay failed', err, 'sync'));
         relayBacklogToPeer(peer).catch(err => warn('Sync relay backlog failed', err, 'sync'));
         const myDeviceId = getMySyncIdentity()?.deviceId ?? '';
@@ -171,6 +174,11 @@ export function handleSyncAck(senderDeviceId: string, data: SyncPacket): void {
     void replayAfterAck(senderDeviceId);
 }
 
+export function resetSyncSession(senderDeviceId: string): void {
+    deleteRatchetSession(getMyUPeerId(), `sync:${senderDeviceId}`);
+    warn('Sync session reset by peer', { deviceId: senderDeviceId }, 'sync');
+}
+
 export async function routeSyncPacket(
     data: SyncPacket,
     address: string,
@@ -200,6 +208,9 @@ export async function routeSyncPacket(
             handleSyncAck(senderDeviceId, data);
             notifySyncStatus(win);
             break;
+        case 'SYNC_RESET':
+            resetSyncSession(senderDeviceId);
+            break;
         default:
             break;
     }
@@ -226,7 +237,12 @@ async function decryptPayload(peer: SyncPeerRecord, data: SyncPacket, expectedTy
         undefined,
         `sync:${peer.deviceId}`,
     );
-    if (!plaintext) return null;
+    if (!plaintext) {
+        warn('Sync payload could not be decrypted; requesting a session reset', { deviceId: peer.deviceId, type: expectedType }, 'sync');
+        resetSyncSession(peer.deviceId);
+        sendSyncReset(peer);
+        return null;
+    }
     try {
         const parsed = JSON.parse(plaintext) as unknown;
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
