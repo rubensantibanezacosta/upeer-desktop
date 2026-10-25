@@ -10,6 +10,18 @@ export function updateContactStatus(upeerId: string, status: 'pending' | 'incomi
         .run();
 }
 
+export function updateLastActive(upeerId: string, activeAt: number) {
+    if (!Number.isFinite(activeAt) || activeAt <= 0) return Promise.resolve();
+    const db = getDb();
+    const schema = getSchema();
+    const iso = new Date(Math.min(activeAt, Date.now())).toISOString();
+
+    return db.update(schema.contacts)
+        .set({ lastActive: iso })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+}
+
 export function updateLastSeen(upeerId: string) {
     const db = getDb();
     const schema = getSchema();

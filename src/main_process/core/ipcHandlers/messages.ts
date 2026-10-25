@@ -9,6 +9,7 @@ import {
   sendChatUpdate,
   sendChatDelete
 } from '../../network/messaging/chat.js';
+import { markLocalActive } from '../../network/messaging/activity.js';
 
 /**
  * Registra los manejadores IPC relacionados con mensajes y chat
@@ -26,6 +27,7 @@ export function registerMessageHandlers(): void {
   );
 
   ipcMain.handle('send-typing-indicator', (_event, { upeerId }) => sendTypingIndicator(upeerId));
+  ipcMain.handle('mark-user-active', () => markLocalActive());
 
   ipcMain.handle('send-read-receipt', (_event, { upeerId, id }) => sendReadReceipt(upeerId, id));
 

@@ -69,6 +69,7 @@ declare global {
             getContactSecurity: (upeerId: string) => Promise<{ hasSession: boolean; hasContactKey: boolean; safetyNumber: string }>;
             sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null, messageId?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
             sendTypingIndicator: (upeerId: string) => Promise<void>;
+            markUserActive: () => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: { name: string; address: string; upeerId?: string; publicKey?: string; avatar?: string }) => Promise<string>;
             sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
@@ -111,7 +112,7 @@ declare global {
             onMessageUpdated: (callback: (data: { id: string, upeerId: string, chatUpeerId: string, content: string }) => void) => UpeerUnsubscribe;
             onMessageDeleted: (callback: (data: { id: string, upeerId: string, chatUpeerId: string }) => void) => UpeerUnsubscribe;
             onMessageStatusUpdated: (callback: (data: { id: string, status: string }) => void) => UpeerUnsubscribe;
-            onPresence: (callback: (data: { upeerId: string, lastSeen: string }) => void) => UpeerUnsubscribe;
+            onPresence: (callback: (data: { upeerId: string, lastSeen: string, lastActive?: string }) => void) => UpeerUnsubscribe;
             onContactRequest: (callback: (data: import('./types/chat.js').IncomingContactRequestEvent) => void) => UpeerUnsubscribe;
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => UpeerUnsubscribe;

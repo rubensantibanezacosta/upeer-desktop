@@ -149,13 +149,13 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                         </Box>
 
                         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 2, mb: 4 }}>
-                            {activeContact.lastSeen && activeContact.status !== 'blocked' && (
+                            {(activeContact.lastActive || activeContact.lastSeen) && activeContact.status !== 'blocked' && (
                                 <Box sx={{ p: 2.5, borderRadius: 'xl', backgroundColor: 'background.surface', border: '1px solid', borderColor: 'divider' }}>
                                     <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6, mb: 1.5 }}>
                                         Última Actividad
                                     </Typography>
                                     <Typography level="body-sm" sx={{ fontWeight: 600, fontSize: '14px' }}>
-                                        {isOnline ? 'Ahora mismo' : formatRelativeDate(activeContact.lastSeen)}
+                                        {isOnline ? 'Ahora mismo' : formatRelativeDate(activeContact.lastActive ?? activeContact.lastSeen)}
                                     </Typography>
                                 </Box>
                             )}

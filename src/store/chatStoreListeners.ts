@@ -85,7 +85,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             }
         });
 
-        window.upeer.onPresence((data: { upeerId: string; lastSeen?: string; alias?: string; avatar?: string }) => {
+        window.upeer.onPresence((data: { upeerId: string; lastSeen?: string; lastActive?: string; alias?: string; avatar?: string }) => {
             if (!data?.upeerId) {
                 return;
             }
@@ -97,6 +97,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     return {
                         ...contact,
                         ...(data.lastSeen !== undefined ? { lastSeen: data.lastSeen } : {}),
+                        ...(data.lastActive !== undefined ? { lastActive: data.lastActive } : {}),
                         ...(data.alias !== undefined ? { alias: data.alias } : {}),
                         ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
                     };

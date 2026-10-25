@@ -99,6 +99,13 @@
       "when": 1792749845695,
       "tag": "0014_sync_entity_id",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792930000000,
+      "tag": "0015_contact_last_active",
+      "breakpoints": true
     }
   ]
 }

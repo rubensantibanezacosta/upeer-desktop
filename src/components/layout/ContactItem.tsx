@@ -26,7 +26,7 @@ interface ContactItemProps {
 
 export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '' }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
-    const isOnline = useIsOnline(c.lastSeen);
+    const isOnline = useIsOnline(c.lastActive);
     const isPending = c.status === 'pending' || c.status === 'incoming';
 
     const timeStr = isPending && c.status === 'incoming' ? formatContactTime(c.lastSeen) : formatContactTime(c.lastMessageTime);

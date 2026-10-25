@@ -18,6 +18,7 @@ import {
 } from '../storage/contacts/location.js';
 import {
     updateContactStatus,
+    updateLastActive,
     updateLastSeen
 } from '../storage/contacts/status.js';
 
@@ -266,9 +267,15 @@ export async function handlePacket(
                 queryOwnVaultsOnReconnect(upeerId);
             }
             updateLastSeen(upeerId);
+            const activeAt = Number(data.activeAt);
+            const lastActiveIso = Number.isFinite(activeAt) && activeAt > 0
+                ? new Date(Math.min(activeAt, Date.now())).toISOString()
+                : undefined;
+            if (lastActiveIso) await updateLastActive(upeerId, activeAt);
             win?.webContents.send('contact-presence', {
                 upeerId,
                 lastSeen: nowIso,
+                lastActive: lastActiveIso,
                 alias: data.alias as string | undefined,
                 avatar: data.avatar as string | undefined,
             });

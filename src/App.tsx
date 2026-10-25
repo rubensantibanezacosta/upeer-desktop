@@ -6,6 +6,7 @@ import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
+import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
 import type { YggNetworkStatus } from './components/ui/YggstackSplash.js';
 import { parseMessage } from './features/chat/message/messageItemSupport.js';
@@ -76,6 +77,7 @@ export default function App() {
         reloadLatestHistory,
         targetUpeerId,
     } = chatStore;
+    useActivitySignal();
     const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
     const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
     const [isStartupRecoveryOpen, setIsStartupRecoveryOpen] = useState(false);

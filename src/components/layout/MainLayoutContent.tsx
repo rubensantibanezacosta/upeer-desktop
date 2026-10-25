@@ -207,10 +207,10 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         <TopHeader
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
-                                            isOnline={activeContact?.lastSeen ? (new Date().getTime() - new Date(activeContact.lastSeen).getTime()) < 65000 : undefined}
+                                            isOnline={activeContact?.lastActive ? (new Date().getTime() - new Date(activeContact.lastActive).getTime()) < 65000 : undefined}
                                             isTyping={!!chatStore.typingStatus[targetUpeerId]}
                                             status={activeContact?.status}
-                                            lastSeen={activeContact?.lastSeen}
+                                            lastSeen={activeContact?.lastActive ?? activeContact?.lastSeen}
                                             vouchScore={effectiveVouchScore}
                                             isSelfChat={targetUpeerId === chatStore.myIdentity?.upeerId}
                                             onDelete={() => handleClearChat(targetUpeerId)}

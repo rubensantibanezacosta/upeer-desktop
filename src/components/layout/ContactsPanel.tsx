@@ -57,9 +57,10 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
 
     const activeContact = visibleContacts.find(contact => contact.upeerId === selectedContactId) || null;
 
-    const isOnline = useIsOnline(activeContact?.lastSeen);
-    const lastSeenText = activeContact && activeContact.lastSeen && !isOnline ?
-        new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(activeContact.lastSeen))
+    const isOnline = useIsOnline(activeContact?.lastActive);
+    const presenceAt = activeContact?.lastActive ?? activeContact?.lastSeen;
+    const lastSeenText = activeContact && presenceAt && !isOnline ?
+        new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(presenceAt))
         : null;
 
     const commonGroups = useMemo(() => {

@@ -141,6 +141,7 @@ const contactApi = {
 const messagingApi = {
     sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: LinkPreview | null, messageId?: string) => ipcRenderer.invoke('send-p2p-message', { upeerId, message, replyTo, linkPreview, messageId }),
     sendTypingIndicator: (upeerId: string) => ipcRenderer.invoke('send-typing-indicator', { upeerId }),
+    markUserActive: () => ipcRenderer.invoke('mark-user-active'),
     sendReadReceipt: (upeerId: string, id: string) => ipcRenderer.invoke('send-read-receipt', { upeerId, id }),
     sendContactCard: (targetUpeerId: string, contact: ContactCardPayload) => ipcRenderer.invoke('send-contact-card', { targetUpeerId, contact }),
     sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => ipcRenderer.invoke('send-chat-reaction', { upeerId, msgId, emoji, remove }),

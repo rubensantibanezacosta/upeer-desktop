@@ -80,6 +80,7 @@ export const contacts = sqliteTable('contacts', {
     status: text('status').notNull().default('connected'), // 'pending'|'incoming'|'connected'|'offline'|'blocked'
     blockedAt: text('blocked_at'), // ISO timestamp cuando fue bloqueado
     lastSeen: text('last_seen').default(sql`CURRENT_TIMESTAMP`),
+    lastActive: text('last_active'), // ISO: última actividad humana del par (no alcanzabilidad)
     // ── Resiliencia de vaciado de chat (Anti-Zombi) ─────────────────────────
     // Registra el timestamp del último vaciado total del chat para ignorar 
     // mensajes antiguos que lleguen vía sincronización/vaults.

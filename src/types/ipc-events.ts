@@ -1,6 +1,7 @@
 export interface ContactPresenceEvent {
     upeerId: string;
     lastSeen: string;
+    lastActive?: string;
     alias?: string;
     avatar?: string;
 }

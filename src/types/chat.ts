@@ -138,6 +138,7 @@ export interface Contact {
     publicKey?: string;
     avatar?: string;
     lastSeen?: string;
+    lastActive?: string;
     lastMessage?: string;
     lastMessageTime?: string;
     lastMessageIsMine?: boolean;

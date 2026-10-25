@@ -12,6 +12,7 @@ import { sendSecurePacket } from '../server/transport.js';
 import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '../dht/core.js';
 import { isIPBlocked } from '../server/circuitBreaker.js';
 import { sendContactRequest } from './contacts.js';
+import { localActiveAt } from './activity.js';
 
 type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
 
@@ -104,6 +105,7 @@ export function checkHeartbeat(contacts: HeartbeatContact[]) {
                     alias: getMyAlias() || undefined,
                     avatar: getMyAvatar() || undefined,
                     signedPreKey: getMySignedPreKeyBundle(),
+                    activeAt: localActiveAt(),
                 }, contact.publicKey);
             }
             sendDhtExchange(contact.upeerId, sendSecurePacket);

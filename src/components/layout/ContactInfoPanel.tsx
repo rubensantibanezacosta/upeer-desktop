@@ -73,7 +73,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         return () => clearInterval(t);
     }, []);
 
-    const isOnline = !!contact.lastSeen && (now - new Date(contact.lastSeen).getTime()) < 65000;
+    const isOnline = !!contact.lastActive && (now - new Date(contact.lastActive).getTime()) < 65000;
     const lastSeenText = formatSeen(contact.lastSeen);
     const trust = getTrustMeta(contact.vouchScore);
     const sharedMedia = useSharedMediaItems(chatHistory, activeTransfers);
