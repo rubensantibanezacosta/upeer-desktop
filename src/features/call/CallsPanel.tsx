@@ -115,9 +115,9 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                             const timeLabel = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             return <ListItem key={call.id} sx={listRowListItemSx}>
                                 <Box sx={{ ...listRowButtonSx, display: 'flex', alignItems: 'center', width: '100%' }}>
-                                    <Box sx={{ ...listRowDecoratorSx, position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                                    <Box sx={{ ...listRowDecoratorSx, mr: 1.25, position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                                         <Avatar size="lg" src={group?.avatar || contact?.avatar} sx={listRowAvatarSx}>{name.charAt(0).toUpperCase()}</Avatar>
-                                        <Box sx={{ position: 'absolute', right: 0, bottom: 0, display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.body' }}>
+                                        <Box sx={{ position: 'absolute', right: 0, bottom: 0, display: 'grid', placeItems: 'center', width: 24, height: 24, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.body' }}>
                                             <CallKindIcon style={{ fontSize: 13 }} />
                                         </Box>
                                     </Box>
@@ -131,7 +131,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                                 <Typography level="body-sm" noWrap sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
                                                 {group && <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>· {participants}</Typography>}
                                             </Box>
-                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <Clock /> : undefined}>
+                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <Clock style={{ fontSize: 14 }} /> : undefined}>
                                                 {call.duration ? call.duration : call.rejected ? 'Rechazada' : 'Perdida'}
                                             </Chip>
                                         </Box>
@@ -141,13 +141,13 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                             <span><IconButton size="sm" variant="soft" color="success" aria-label={`Llamada de voz a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
                                                 if (group) void startCall(group.groupId, 'audio', true, groupMembers, group.groupId);
                                                 else if (contact) void startCall(contact.upeerId, 'audio');
-                                            }}><Phone /></IconButton></span>
+                                            }}><Phone style={{ fontSize: 16 }} /></IconButton></span>
                                         </Tooltip>
                                         <Tooltip title="Volver a llamar por vídeo">
                                             <span><IconButton size="sm" variant="soft" color="primary" aria-label={`Videollamada a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
                                                 if (group) void startCall(group.groupId, 'video', true, groupMembers, group.groupId);
                                                 else if (contact) void startCall(contact.upeerId, 'video');
-                                            }}><Video /></IconButton></span>
+                                            }}><Video style={{ fontSize: 16 }} /></IconButton></span>
                                         </Tooltip>
                                     </Stack>
                                 </Box>
