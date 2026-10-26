@@ -1,43 +1,7 @@
 import React from 'react';
-import { Alert, Box, Button, Divider, Input, Modal, ModalDialog, Stack, Typography } from '@mui/joy';
-import { Shield, KeyRound, Trash2, TriangleAlert } from 'lucide-react';
-
-interface PinCodeInputsProps {
-    digits: string[];
-    refs: React.MutableRefObject<(HTMLInputElement | null)[]>;
-    color: 'danger' | 'primary';
-    onChange: (value: string, index: number) => void;
-}
-
-const PinCodeInputs: React.FC<PinCodeInputsProps> = ({ digits, refs, color, onChange }) => (
-    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', my: 1 }}>
-        {digits.map((digit, index) => (
-            <Input
-                key={index}
-                slotProps={{
-                    input: {
-                        ref: (element: HTMLInputElement | null) => {
-                            refs.current[index] = element;
-                        },
-                        style: { textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' },
-                    },
-                }}
-                type="password"
-                variant="outlined"
-                color={color}
-                sx={{ width: 56, height: 64, borderRadius: 'md' }}
-                value={digit}
-                onChange={(event) => onChange(event.target.value, index)}
-                onKeyDown={(event) => {
-                    if (event.key === 'Backspace' && !digits[index] && index > 0) {
-                        refs.current[index - 1]?.focus();
-                    }
-                }}
-                autoComplete="off"
-            />
-        ))}
-    </Box>
-);
+import { Alert, Box, Button, Divider, Modal, ModalDialog, Stack, Typography } from '@mui/joy';
+import { Shield, KeyRound, LogOut, TriangleAlert } from 'lucide-react';
+import { PinCodeInputs } from './pinCodeInputs.js';
 
 interface SecurityPinModalProps {
     open: boolean;
@@ -156,40 +120,52 @@ export const RevealMnemonicModal: React.FC<RevealMnemonicModalProps> = ({
     </Modal>
 );
 
-interface DeleteAccountModalProps {
+interface SignOutDialogProps {
     open: boolean;
+    pinEnabled: boolean;
     digits: string[];
     errorMsg: string;
     refs: React.MutableRefObject<(HTMLInputElement | null)[]>;
+    loading: boolean;
     onClose: () => void;
     onChange: (value: string, index: number) => void;
     onSubmit: () => void;
 }
 
-export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
+export const SignOutDialog: React.FC<SignOutDialogProps> = ({
     open,
+    pinEnabled,
     digits,
     errorMsg,
     refs,
+    loading,
     onClose,
     onChange,
     onSubmit,
 }) => (
     <Modal open={open} onClose={onClose}>
-        <ModalDialog variant="outlined" sx={{ maxWidth: 400, borderRadius: 'md', p: 3 }}>
-            <Typography level="title-lg" startDecorator={<Trash2 style={{ fontSize: 20, color: 'var(--joy-palette-danger-500)' }} />}>
-                Confirmar eliminación
+        <ModalDialog variant="outlined" sx={{ maxWidth: 430, borderRadius: 'md', p: 3 }}>
+            <Typography level="title-lg" startDecorator={<LogOut style={{ fontSize: 20, color: 'var(--joy-palette-danger-500)' }} />}>
+                Cerrar sesión en este equipo
             </Typography>
             <Divider sx={{ my: 1.5 }} />
             <Stack spacing={2}>
                 <Alert color="danger" variant="soft" startDecorator={<TriangleAlert style={{ fontSize: 20 }} />}>
-                    Introduce tu PIN para confirmar que quieres BORRAR TODA LA INFORMACIÓN de este dispositivo.
+                    Al cerrar sesión se borran definitivamente de este dispositivo tus mensajes, contactos, archivos y llaves privadas.
+                    Solo podrás recuperar tu cuenta con las 12 palabras de recuperación.
                 </Alert>
-                <PinCodeInputs digits={digits} refs={refs} color={errorMsg ? 'danger' : 'primary'} onChange={onChange} />
+                {pinEnabled && (
+                    <>
+                        <Typography level="body-sm" color="neutral">
+                            Introduce tu PIN para confirmar que quieres borrar los datos locales.
+                        </Typography>
+                        <PinCodeInputs digits={digits} refs={refs} color={errorMsg ? 'danger' : 'primary'} onChange={onChange} />
+                    </>
+                )}
                 {errorMsg && <Typography level="body-xs" color="danger" textAlign="center" sx={{ fontWeight: 600 }}>{errorMsg}</Typography>}
                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
-                    <Button variant="plain" color="neutral" onClick={onClose}>Cancelar</Button>
-                    <Button color="danger" onClick={onSubmit}>Eliminar TODO</Button>
+                    <Button variant="plain" color="neutral" onClick={onClose} disabled={loading}>Cancelar</Button>
+                    <Button color="danger" loading={loading} onClick={onSubmit}>Borrar los datos y cerrar sesión</Button>
                 </Box>
             </Stack>
         </ModalDialog>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Button, Chip, Typography } from '@mui/joy';
-import { Shield, KeyRound, Trash2, TriangleAlert, BadgeCheck } from 'lucide-react';
+import { Shield, KeyRound, TriangleAlert, BadgeCheck } from 'lucide-react';
 import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 interface SecurityStatusCardProps {
@@ -81,32 +81,3 @@ export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }
     </Box>
 );
 
-interface DangerZoneSectionProps {
-    onDeleteClick: () => void;
-}
-
-export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({ onDeleteClick }) => (
-    <Box sx={{ backgroundColor: 'danger.softBg', borderRadius: '12px', my: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, pt: 1.75 }}>
-            <Trash2 style={{ fontSize: 15, color: 'var(--joy-palette-danger-300)' }} />
-            <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'danger.300' }}>
-                Zona de peligro
-            </Typography>
-        </Box>
-        <Box sx={{ px: 2, py: 1.25 }}>
-            <Typography level="body-sm" sx={{ color: 'text.secondary', mb: 1.75, lineHeight: 1.5 }}>
-                Elimina todos tus mensajes, contactos e identidad de este equipo de forma permanente.
-            </Typography>
-            <Button
-                size="sm"
-                color="danger"
-                variant="soft"
-                startDecorator={<Trash2 style={{ fontSize: 16 }} />}
-                sx={{ fontWeight: 600 }}
-                onClick={onDeleteClick}
-            >
-                Eliminar cuenta y datos locales
-            </Button>
-        </Box>
-    </Box>
-);

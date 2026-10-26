@@ -4,9 +4,8 @@ import { Shield, KeyRound } from 'lucide-react';
 
 import { ToggleRow } from './shared.js';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
-import { DeleteAccountModal, RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
-import { DangerZoneSection, RecoverySection, SecurityStatusCard } from './securitySections.js';
-import { resetAccountStores } from '../../../store/resetAccountStores.js';
+import { RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
+import { RecoverySection, SecurityStatusCard } from './securitySections.js';
 
 export const SectionSeguridad: React.FC = () => {
     const [pinEnabled, setPinEnabled] = useState(false);
@@ -15,10 +14,6 @@ export const SectionSeguridad: React.FC = () => {
     const [pinDigits, setPinDigits] = useState(['', '', '', '']);
     const [errorMsg, setErrorMsg] = useState('');
 
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [deleteDigits, setDeleteDigits] = useState(['', '', '', '']);
-    const [deleteError, setDeleteError] = useState('');
-
     const [revealModalOpen, setRevealModalOpen] = useState(false);
     const [revealDigits, setRevealDigits] = useState(['', '', '', '']);
     const [revealError, setRevealError] = useState('');
@@ -26,7 +21,6 @@ export const SectionSeguridad: React.FC = () => {
 
     const pinRefs = React.useRef<(HTMLInputElement | null)[]>([]);
     const revealRefs = React.useRef<(HTMLInputElement | null)[]>([]);
-    const deleteRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
         const checkPin = async () => {
@@ -117,60 +111,6 @@ export const SectionSeguridad: React.FC = () => {
         }
     };
 
-    const handleDeleteClick = async () => {
-        const isEnabled = await window.upeer.isPinEnabled();
-        if (!isEnabled) {
-            if (confirm('¿Estás SEGURO de que quieres eliminar todos tus datos? Esta acción es irreversible.')) {
-                const result = await window.upeer.deleteIdentity();
-                if (!result.success) {
-                    setDeleteError(result.error || 'No se pudieron eliminar los datos locales.');
-                    return;
-                }
-                resetAccountStores();
-                window.location.reload();
-            }
-            return;
-        }
-        setDeleteModalOpen(true);
-        setDeleteDigits(['', '', '', '']);
-        setDeleteError('');
-        setTimeout(() => deleteRefs.current[0]?.focus(), 100);
-    };
-
-    const handleConfirmDelete = async (currentPin: string) => {
-        const isValid = await window.upeer.verifyPin({ pin: currentPin });
-        if (isValid) {
-            if (confirm('ÚLTIMO AVISO: Se borrarán todos los mensajes, contactos y llaves privadas. ¿Continuar?')) {
-                const result = await window.upeer.deleteIdentity();
-                if (!result.success) {
-                    setDeleteError(result.error || 'No se pudieron eliminar los datos locales.');
-                    return;
-                }
-                resetAccountStores();
-                window.location.reload();
-            } else {
-                setDeleteModalOpen(false);
-            }
-        } else {
-            setDeleteError('PIN incorrecto');
-        }
-    };
-
-    const handleDeleteChange = (val: string, index: number) => {
-        const digit = val.replace(/\D/g, '').slice(-1);
-        const newDigits = [...deleteDigits];
-        newDigits[index] = digit;
-        setDeleteDigits(newDigits);
-
-        if (digit && index < 3) {
-            deleteRefs.current[index + 1]?.focus();
-        }
-
-        if (newDigits.every(d => d !== '')) {
-            handleConfirmDelete(newDigits.join(''));
-        }
-    };
-
     if (loading) return null;
 
     return (
@@ -224,18 +164,6 @@ export const SectionSeguridad: React.FC = () => {
                     setRevealModalOpen(false);
                     setMnemonic(null);
                 }}
-            />
-
-            <DangerZoneSection onDeleteClick={handleDeleteClick} />
-
-            <DeleteAccountModal
-                open={deleteModalOpen}
-                digits={deleteDigits}
-                errorMsg={deleteError}
-                refs={deleteRefs}
-                onClose={() => setDeleteModalOpen(false)}
-                onChange={handleDeleteChange}
-                onSubmit={() => handleConfirmDelete(deleteDigits.join(''))}
             />
         </SettingsSection>
     );

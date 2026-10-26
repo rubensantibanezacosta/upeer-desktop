@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Typography,
@@ -22,6 +22,7 @@ import { SectionAlmacenamiento } from './settings/SectionAlmacenamiento.js';
 import { SectionRed } from './settings/SectionRed.js';
 import { SectionAcerca } from './settings/SectionAcerca.js';
 import { SectionDispositivos } from './settings/SectionDispositivos.js';
+import { SignOutFlow } from './settings/SignOutFlow.js';
 
 // ─── Definicion de secciones ─────────────────────────────────────────────────
 
@@ -46,11 +47,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     activeSection,
     onSectionChange,
     onClose: _onClose,
-    onLockSession,
     onIdentityUpdate,
 }) => {
     const active = activeSection;
     const setActive = onSectionChange;
+    const [signOutOpen, setSignOutOpen] = useState(false);
 
     const renderSection = () => {
         switch (active) {
@@ -128,10 +129,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                     {/* Cerrar sesión */}
                                     <ListItem sx={listRowListItemSx}>
                                         <ListItemButton
-                                            onClick={async () => {
-                                                await window.upeer.lockSession();
-                                                onLockSession?.();
-                                            }}
+                                            onClick={() => setSignOutOpen(true)}
                                             sx={listRowButtonSx}
                                         >
                                             <ListItemDecorator sx={listRowDecoratorSx}>
@@ -145,7 +143,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                             </ListItemDecorator>
                                             <Box>
                                                 <Typography level="body-md" sx={{ fontWeight: 500, color: 'danger.500' }}>Cerrar sesión</Typography>
-                                                <Typography level="body-sm" color="neutral">Salir de tu cuenta en este dispositivo</Typography>
+                                                <Typography level="body-sm" color="neutral">Borra tus datos de este dispositivo</Typography>
                                             </Box>
                                         </ListItemButton>
                                     </ListItem>
@@ -171,6 +169,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </Box>
                 )}
             </Box>
+
+            <SignOutFlow open={signOutOpen} onClose={() => setSignOutOpen(false)} />
         </Box>
     );
 };
