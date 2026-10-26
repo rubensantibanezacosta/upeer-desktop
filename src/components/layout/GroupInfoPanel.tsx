@@ -1,22 +1,11 @@
 import React, { useState } from 'react';
-import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItem, ListItemButton, ListItemContent, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import GroupsIcon from '@mui/icons-material/Groups';
-import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import ExitToAppIcon from '@mui/icons-material/ExitToApp';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
-import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import SearchIcon from '@mui/icons-material/Search';
+import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, IconButton, List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
+import { X, Users, UserPlus, BellOff, Heart, Eraser, LogOut, ShieldCheck, UserMinus, Phone, Video, Search } from 'lucide-react';
 import { Contact, Group } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
+import { SectionSeparator, actionButtonSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 
 interface GroupMediaClickPayload {
     url: string;
@@ -59,54 +48,58 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
 
     return (
         <Box sx={{ width: { xs: '100%', sm: 380, lg: 480 }, minWidth: 0, maxWidth: 480, flexShrink: 0, borderLeft: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            <Box sx={{ height: 60, px: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <IconButton aria-label="Cerrar info del grupo" size="sm" variant="plain" color="neutral" onClick={onClose}><CloseIcon /></IconButton>
-                    <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del grupo</Typography>
-                </Box>
+            <Box sx={{ height: 60, px: 2, display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                <IconButton aria-label="Cerrar info del grupo" size="sm" variant="plain" color="neutral" onClick={onClose}>
+                    <X style={{ fontSize: 20 }} />
+                </IconButton>
+                <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del grupo</Typography>
             </Box>
             {currentView === 'media' ? (
                 <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
                     <ContactMediaExplorer items={sharedMedia} onBack={() => setCurrentView('main')} onOpenMedia={onOpenMedia ?? (() => undefined)} />
                 </Box>
             ) : <Box sx={{ flexGrow: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-                <Box sx={{ pt: 4, pb: 3, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1 }}>
+                <Box sx={{ pt: 4, pb: 2, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 0.75 }}>
                     <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, mb: 1 }}>
-                        {!group.avatar && <GroupsIcon sx={{ fontSize: 40 }} />}
+                        {!group.avatar && <Users style={{ fontSize: 40 }} />}
                     </Avatar>
                     <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
-                    <Typography level="body-sm" color="neutral">Grupo · {group.members.length} miembro{group.members.length === 1 ? '' : 's'}</Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, pt: 1 }}>
-                        <Button aria-label="Llamar al grupo" disabled={callsUnavailable} onClick={onCallAudio} startDecorator={<LocalPhoneIcon />}>Llamar</Button>
-                        <Button aria-label="Videollamar al grupo" disabled={callsUnavailable} onClick={onCallVideo} startDecorator={<VideocamIcon />}>Vídeo</Button>
-                        <Button aria-label="Buscar en el chat" onClick={onSearch} startDecorator={<SearchIcon />}>Buscar</Button>
-                    </Box>
+                    <Typography level="body-xs" color="neutral">Grupo · {group.members.length} miembro{group.members.length === 1 ? '' : 's'}</Typography>
                 </Box>
-                <Divider />
-                <Box sx={{ px: 2, pt: 2, pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', gap: 0.5, px: 2, pb: 1 }}>
+                    <Button aria-label="Llamar al grupo" size="sm" variant="plain" disabled={callsUnavailable} onClick={onCallAudio} startDecorator={<Phone style={{ fontSize: 18 }} />} sx={actionButtonSx}>Llamar</Button>
+                    <Button aria-label="Videollamar al grupo" size="sm" variant="plain" disabled={callsUnavailable} onClick={onCallVideo} startDecorator={<Video style={{ fontSize: 18 }} />} sx={actionButtonSx}>Vídeo</Button>
+                    <Button aria-label="Buscar en el chat" size="sm" variant="plain" onClick={onSearch} startDecorator={<Search style={{ fontSize: 18 }} />} sx={actionButtonSx}>Buscar</Button>
+                </Box>
+                <SectionSeparator />
+                <Box sx={{ px: 2, pt: 1, pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography level="title-sm">Miembros</Typography>
-                    {isAdmin && <Button size="sm" variant="plain" startDecorator={<PersonAddAlt1Icon />} onClick={onInviteMembers}>Añadir</Button>}
+                    {isAdmin && <Button size="sm" variant="plain" startDecorator={<UserPlus style={{ fontSize: 18 }} />} onClick={onInviteMembers} sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>Añadir</Button>}
                 </Box>
                 {members.length ? (
-                    <List sx={{ px: 1, py: 0 }}>
+                    <List sx={rowsSx}>
                         {members.map(({ id, contact, isAdmin: memberIsAdmin, isCurrentUser }) => {
                             const name = isCurrentUser ? 'Tú' : contact?.name || `${id.slice(0, 12)}…`;
                             return (
-                                <ListItem key={id} sx={{ gap: 1.5, py: 1 }}>
-                                    <Avatar src={contact?.avatar || undefined} size="md">{name.charAt(0).toUpperCase()}</Avatar>
-                                    <ListItemContent>
-                                        <Typography level="body-sm">{name}</Typography>
-                                        {contact?.alias && contact.alias !== contact.name && <Typography level="body-xs" color="neutral">{contact.alias}</Typography>}
-                                    </ListItemContent>
-                                    {memberIsAdmin && <Chip size="sm" variant="soft" color="success">Admin. del grupo</Chip>}
-                                    {isAdmin && !isCurrentUser && !memberIsAdmin && <>
-                                        <Tooltip title={`Hacer administrador a ${name}`} variant="soft">
-                                            <IconButton aria-label={`Hacer admin a ${name}`} size="sm" variant="plain" onClick={() => setConfirmAction({ type: 'transfer', memberId: id })}><AdminPanelSettingsIcon /></IconButton>
-                                        </Tooltip>
-                                        <Tooltip title={`Expulsar a ${name}`} variant="soft">
-                                            <IconButton aria-label={`Expulsar a ${name}`} size="sm" variant="plain" color="danger" onClick={() => setConfirmAction({ type: 'remove', memberId: id })}><PersonRemoveIcon /></IconButton>
-                                        </Tooltip>
-                                    </>}
+                                <ListItem key={id} sx={{ p: 0 }}>
+                                    <ListItemButton sx={{ ...rowButtonSx, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                                        <ListItemDecorator sx={{ color: 'inherit' }}>
+                                            <Avatar src={contact?.avatar || undefined} size="sm" sx={{ width: 32, height: 32 }}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        </ListItemDecorator>
+                                        <ListItemContent>
+                                            <Typography level="body-sm">{name}</Typography>
+                                            {contact?.alias && contact.alias !== contact.name && <Typography level="body-xs" color="neutral">{contact.alias}</Typography>}
+                                        </ListItemContent>
+                                        {memberIsAdmin && <Chip size="sm" variant="soft" color="success">Admin. del grupo</Chip>}
+                                        {isAdmin && !isCurrentUser && !memberIsAdmin && <>
+                                            <Tooltip title={`Hacer administrador a ${name}`} variant="soft">
+                                                <IconButton aria-label={`Hacer admin a ${name}`} size="sm" variant="plain" onClick={() => setConfirmAction({ type: 'transfer', memberId: id })}><ShieldCheck style={{ fontSize: 18 }} /></IconButton>
+                                            </Tooltip>
+                                            <Tooltip title={`Expulsar a ${name}`} variant="soft">
+                                                <IconButton aria-label={`Expulsar a ${name}`} size="sm" variant="plain" color="danger" onClick={() => setConfirmAction({ type: 'remove', memberId: id })}><UserMinus style={{ fontSize: 18 }} /></IconButton>
+                                            </Tooltip>
+                                        </>}
+                                    </ListItemButton>
                                 </ListItem>
                             );
                         })}
@@ -114,31 +107,43 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                 ) : (
                     <Typography level="body-sm" color="neutral" sx={{ px: 3, py: 2 }}>No hay miembros disponibles.</Typography>
                 )}
+                <SectionSeparator />
                 <ContactMediaStrip items={sharedMedia} onOpenMedia={onOpenMedia ?? (() => undefined)} onViewAll={() => setCurrentView('media')} />
-                <List sx={{ '--ListItemDecorator-size': '44px', px: 1, py: 0.5 }}>
+                <SectionSeparator />
+                <List sx={rowsSx}>
                     <ListItem sx={{ p: 0 }}>
-                        <ListItemButton onClick={() => toggleGroup(group.groupId, 'muted')} sx={{ borderRadius: 'md', py: 1.5 }}>
+                        <ListItemButton onClick={() => toggleGroup(group.groupId, 'muted')} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}>
+                                <Box sx={rowIconSx}><BellOff style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
                             <ListItemContent><Typography level="body-sm">{groupPrefs?.muted ? 'Reactivar notificaciones' : 'Silenciar notificaciones'}</Typography></ListItemContent>
-                            <NotificationsOffIcon sx={{ fontSize: 22 }} />
                         </ListItemButton>
                     </ListItem>
                     <ListItem sx={{ p: 0 }}>
-                        <ListItemButton onClick={onFavorite} disabled={!onFavorite} sx={{ borderRadius: 'md', py: 1.5 }}>
+                        <ListItemButton onClick={onFavorite} disabled={!onFavorite} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}>
+                                <Box sx={rowIconSx}><Heart style={{ fontSize: 20 }} fill={group.isFavorite ? 'currentColor' : 'none'} /></Box>
+                            </ListItemDecorator>
                             <ListItemContent><Typography level="body-sm">{group.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}</Typography></ListItemContent>
-                            {group.isFavorite ? <FavoriteIcon sx={{ fontSize: 22 }} /> : <FavoriteBorderIcon sx={{ fontSize: 22 }} />}
                         </ListItemButton>
                     </ListItem>
                 </List>
-                <Divider />
-                <List sx={{ px: 1, py: 0.5 }}>
+                <SectionSeparator />
+                <List sx={rowsSx}>
                     <ListItem sx={{ p: 0 }}>
-                        <ListItemButton color="warning" disabled={!onClearChat} onClick={() => setConfirmAction({ type: 'clear' })} sx={{ borderRadius: 'md', py: 1.5 }}>
-                            <DeleteSweepIcon sx={{ mr: 2 }} /><Typography level="body-sm">Vaciar chat</Typography>
+                        <ListItemButton disabled={!onClearChat} onClick={() => setConfirmAction({ type: 'clear' })} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'warning.500' }}>
+                                <Box sx={{ ...rowIconSx, color: 'warning.500' }}><Eraser style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
+                            <ListItemContent><Typography level="body-sm" sx={{ color: 'warning.500' }}>Vaciar chat</Typography></ListItemContent>
                         </ListItemButton>
                     </ListItem>
                     <ListItem sx={{ p: 0 }}>
-                        <ListItemButton color="danger" disabled={!onLeaveGroup} onClick={() => setConfirmAction({ type: 'leave' })} sx={{ borderRadius: 'md', py: 1.5 }}>
-                            <ExitToAppIcon sx={{ mr: 2 }} /><Typography level="body-sm">Salir del grupo</Typography>
+                        <ListItemButton disabled={!onLeaveGroup} onClick={() => setConfirmAction({ type: 'leave' })} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'danger.500' }}>
+                                <Box sx={{ ...rowIconSx, color: 'danger.500' }}><LogOut style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
+                            <ListItemContent><Typography level="body-sm" sx={{ color: 'danger.500' }}>Salir del grupo</Typography></ListItemContent>
                         </ListItemButton>
                     </ListItem>
                 </List>

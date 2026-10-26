@@ -2,7 +2,6 @@ import React from 'react';
 import {
     Box,
     Button,
-    Divider,
     IconButton,
     List,
     ListItem,
@@ -11,16 +10,12 @@ import {
     ListItemDecorator,
     Typography,
 } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import LockIcon from '@mui/icons-material/Lock';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import SearchIcon from '@mui/icons-material/Search';
+import { X, Lock, ChevronRight, Phone, Video, Search } from 'lucide-react';
 import { Contact } from '../../types/chat.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { ContactInfoHero } from './ContactInfoHero.js';
 import { ContactInfoDangerAction, ContactInfoUtilityAction } from './contactInfoPanelSupport.js';
+import { SectionSeparator, actionButtonSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 
 interface ContactInfoPanelMainViewProps {
     contact: Contact;
@@ -56,79 +51,101 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
     onCallVideo,
     onSearch,
     callsUnavailable,
-}) => (
-    <>
-        <Box
-            sx={{
-                height: '60px',
-                px: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                flexShrink: 0,
-            }}
-        >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+}) => {
+    const callsDisabled = callsUnavailable
+        || contact.status === 'blocked'
+        || contact.status === 'pending'
+        || contact.status === 'incoming';
+
+    return (
+        <>
+            <Box
+                sx={{
+                    height: '60px',
+                    px: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    flexShrink: 0,
+                }}
+            >
                 <IconButton aria-label="Cerrar info del contacto" size="sm" variant="plain" color="neutral" onClick={onClose}>
-                    <CloseIcon />
+                    <X style={{ fontSize: 20 }} />
                 </IconButton>
                 <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del contacto</Typography>
             </Box>
-        </Box>
 
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-            <ContactInfoHero
-                avatar={contact.avatar}
-                contactName={contact.name}
-                contactId={contact.upeerId}
-                isOnline={isOnline}
-                status={contact.status}
-                lastSeenText={lastSeenText}
-                trust={trust}
-            />
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+                <ContactInfoHero
+                    avatar={contact.avatar}
+                    contactName={contact.name}
+                    contactId={contact.upeerId}
+                    isOnline={isOnline}
+                    status={contact.status}
+                    lastSeenText={lastSeenText}
+                    trust={trust}
+                />
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, pb: 2 }}>
-                <Button aria-label="Llamar" disabled={callsUnavailable || contact.status === 'blocked' || contact.status === 'pending' || contact.status === 'incoming'} onClick={onCallAudio} startDecorator={<LocalPhoneIcon />}>Llamar</Button>
-                <Button aria-label="Videollamar" disabled={callsUnavailable || contact.status === 'blocked' || contact.status === 'pending' || contact.status === 'incoming'} onClick={onCallVideo} startDecorator={<VideocamIcon />}>Vídeo</Button>
-                <Button aria-label="Buscar en el chat" onClick={onSearch} startDecorator={<SearchIcon />}>Buscar</Button>
-            </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, px: 2, pb: 1 }}>
+                    <Button aria-label="Llamar" size="sm" variant="plain" disabled={callsDisabled} onClick={onCallAudio} startDecorator={<Phone style={{ fontSize: 18 }} />} sx={actionButtonSx}>
+                        Llamar
+                    </Button>
+                    <Button aria-label="Videollamar" size="sm" variant="plain" disabled={callsDisabled} onClick={onCallVideo} startDecorator={<Video style={{ fontSize: 18 }} />} sx={actionButtonSx}>
+                        Vídeo
+                    </Button>
+                    <Button aria-label="Buscar en el chat" size="sm" variant="plain" onClick={onSearch} startDecorator={<Search style={{ fontSize: 18 }} />} sx={actionButtonSx}>
+                        Buscar
+                    </Button>
+                </Box>
 
-            <ContactMediaStrip items={sharedMedia} onOpenMedia={onOpenMedia} onViewAll={onViewAllMedia} />
+                <SectionSeparator />
 
-            <List sx={{ '--ListItemDecorator-size': '44px', px: 1, py: 0.5 }}>
-                {utilityActions.map((action) => (
-                    <ListItem key={action.key} sx={{ p: 0 }}>
-                        <ListItemButton disabled={action.disabled} onClick={action.onClick} sx={{ borderRadius: 'md', py: 1.5 }}>
-                            <ListItemDecorator sx={{ color: 'inherit' }}>{action.icon}</ListItemDecorator>
-                            <ListItemContent><Typography level="body-sm">{action.label}</Typography></ListItemContent>
-                        </ListItemButton>
-                    </ListItem>
-                ))}
-                <ListItem sx={{ p: 0 }}>
-                    <ListItemButton aria-label="Abrir detalles de cifrado" onClick={onOpenCipher} sx={{ borderRadius: 'md', py: 1.5 }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><LockIcon sx={{ fontSize: 22 }} /></ListItemDecorator>
-                        <ListItemContent><Typography level="body-sm">Cifrado</Typography></ListItemContent>
-                        <ChevronRightIcon sx={{ fontSize: 18, color: 'text.tertiary' }} />
-                    </ListItemButton>
-                </ListItem>
-            </List>
+                <ContactMediaStrip items={sharedMedia} onOpenMedia={onOpenMedia} onViewAll={onViewAllMedia} />
 
-            <Divider />
+                <SectionSeparator />
 
-            <List sx={{ '--ListItemDecorator-size': '44px', px: 1, py: 0.5 }}>
-                {dangerActions.map((action) => (
-                    <ListItem key={action.key} sx={{ p: 0 }}>
-                        <ListItemButton onClick={action.onClick} sx={{ borderRadius: 'md', py: 1.5 }}>
-                            <ListItemDecorator sx={{ color: action.color }}>{action.icon}</ListItemDecorator>
+                <List sx={rowsSx}>
+                    {utilityActions.map((action) => (
+                        <ListItem key={action.key} sx={{ p: 0 }}>
+                            <ListItemButton disabled={action.disabled} onClick={action.onClick} sx={rowButtonSx}>
+                                <ListItemDecorator sx={{ color: 'inherit' }}>
+                                    <Box sx={rowIconSx}>{action.icon}</Box>
+                                </ListItemDecorator>
+                                <ListItemContent><Typography level="body-sm">{action.label}</Typography></ListItemContent>
+                            </ListItemButton>
+                        </ListItem>
+                    ))}
+                    <ListItem sx={{ p: 0 }}>
+                        <ListItemButton aria-label="Abrir detalles de cifrado" onClick={onOpenCipher} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}>
+                                <Box sx={rowIconSx}><Lock style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
                             <ListItemContent>
-                                <Typography level="body-sm" sx={{ color: action.color }}>{action.label}</Typography>
+                                <Typography level="body-sm">Cifrado</Typography>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Número de seguridad y sesión</Typography>
                             </ListItemContent>
+                            <ChevronRight style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)' }} />
                         </ListItemButton>
                     </ListItem>
-                ))}
-            </List>
-        </Box>
-    </>
-);
+                </List>
+
+                <SectionSeparator />
+
+                <List sx={rowsSx}>
+                    {dangerActions.map((action) => (
+                        <ListItem key={action.key} sx={{ p: 0 }}>
+                            <ListItemButton onClick={action.onClick} sx={{ ...rowButtonSx, '&:hover': { backgroundColor: 'background.level1' } }}>
+                                <ListItemDecorator sx={{ color: action.color }}>
+                                    <Box sx={{ ...rowIconSx, color: action.color }}>{action.icon}</Box>
+                                </ListItemDecorator>
+                                <ListItemContent>
+                                    <Typography level="body-sm" sx={{ color: action.color }}>{action.label}</Typography>
+                                </ListItemContent>
+                            </ListItemButton>
+                        </ListItem>
+                    ))}
+                </List>
+            </Box>
+        </>
+    );
+};

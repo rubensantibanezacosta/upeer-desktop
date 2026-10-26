@@ -1,10 +1,9 @@
 import React from 'react';
-import { Box, ListItemButton, ListItemContent, ListItemDecorator, Sheet, Typography } from '@mui/joy';
-import PermMediaOutlinedIcon from '@mui/icons-material/PermMediaOutlined';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { Box, List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Sheet, Typography } from '@mui/joy';
+import { Images, ChevronRight, Play } from 'lucide-react';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { isVideoMediaFile } from './contactInfoHelpers.js';
+import { rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 
 export interface SharedMediaItem {
     fileId: string;
@@ -22,23 +21,23 @@ interface ContactMediaStripProps {
 
 export const ContactMediaStrip: React.FC<ContactMediaStripProps> = ({ items, onOpenMedia, onViewAll }) => {
     return (
-        <Box sx={{ borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>
-            <ListItemButton
-                aria-label="Abrir multimedia compartida"
-                sx={{ px: 2, py: 1.25, borderRadius: 0 }}
-                onClick={onViewAll}
-            >
-                <ListItemDecorator sx={{ color: 'inherit', minWidth: 40 }}>
-                    <PermMediaOutlinedIcon sx={{ fontSize: 20 }} />
-                </ListItemDecorator>
-                <ListItemContent>
-                    <Typography level="body-sm">Multimedia</Typography>
-                </ListItemContent>
-                {items.length > 0 && (
-                    <Typography level="body-xs" sx={{ mr: 0.5, color: 'text.tertiary' }}>{items.length}</Typography>
-                )}
-                <ChevronRightIcon sx={{ fontSize: 18, color: 'text.tertiary' }} />
-            </ListItemButton>
+        <Box>
+            <List sx={rowsSx}>
+                <ListItem sx={{ p: 0 }}>
+                    <ListItemButton aria-label="Abrir multimedia compartida" onClick={onViewAll} sx={rowButtonSx}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}>
+                            <Box sx={rowIconSx}><Images style={{ fontSize: 20 }} /></Box>
+                        </ListItemDecorator>
+                        <ListItemContent>
+                            <Typography level="body-sm">Multimedia</Typography>
+                        </ListItemContent>
+                        {items.length > 0 && (
+                            <Typography level="body-xs" sx={{ mr: 0.5, color: 'text.tertiary' }}>{items.length}</Typography>
+                        )}
+                        <ChevronRight style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)' }} />
+                    </ListItemButton>
+                </ListItem>
+            </List>
             {items.length > 0 && (
                 <Box sx={{
                     display: 'flex',
@@ -79,7 +78,7 @@ export const ContactMediaStrip: React.FC<ContactMediaStripProps> = ({ items, onO
                                             color: 'white', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 'sm',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24,
                                         }}>
-                                            <PlayArrowIcon sx={{ fontSize: 16 }} />
+                                            <Play style={{ fontSize: 16 }} />
                                         </Box>
                                     )}
                                 </Box>

@@ -1,8 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Typography, AspectRatio } from '@mui/joy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PermMediaOutlinedIcon from '@mui/icons-material/PermMediaOutlined';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { ArrowLeft, Images, Play } from 'lucide-react';
 import { SharedMediaItem } from './ContactMediaStrip.js';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { isVideoMediaFile } from './contactInfoHelpers.js';
@@ -21,13 +19,11 @@ export const ContactMediaExplorer: React.FC<ContactMediaExplorerProps> = ({ item
                 px: 2,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1.5,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
+                gap: 0.75,
                 flexShrink: 0,
             }}>
                 <IconButton aria-label="Volver desde multimedia" size="sm" variant="plain" color="neutral" onClick={onBack}>
-                    <ArrowBackIcon />
+                    <ArrowLeft style={{ fontSize: 20 }} />
                 </IconButton>
                 <Typography level="title-md" sx={{ fontWeight: 600 }}>Multimedia</Typography>
             </Box>
@@ -35,7 +31,7 @@ export const ContactMediaExplorer: React.FC<ContactMediaExplorerProps> = ({ item
             <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 1 }}>
                 {items.length === 0 ? (
                     <Box sx={{ textAlign: 'center', mt: 4 }}>
-                        <PermMediaOutlinedIcon sx={{ fontSize: 40, color: 'text.tertiary', mb: 1 }} />
+                        <Images style={{ fontSize: 40, color: 'var(--joy-palette-text-tertiary)' }} />
                         <Typography level="body-sm" color="neutral">No hay archivos multimedia</Typography>
                     </Box>
                 ) : (
@@ -67,7 +63,7 @@ export const ContactMediaExplorer: React.FC<ContactMediaExplorerProps> = ({ item
                                                 color: 'white', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 'sm',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28,
                                             }}>
-                                                <PlayArrowIcon sx={{ fontSize: 18 }} />
+                                                <Play style={{ fontSize: 18 }} />
                                             </Box>
                                         )}
                                     </Box>
