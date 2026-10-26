@@ -103,7 +103,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: isMe ? 'flex-end' : 'flex-start',
-                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 0.75 : 0,
+                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 1 : 0.5,
             }}
         >
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
