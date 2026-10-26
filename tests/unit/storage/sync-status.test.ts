@@ -14,7 +14,7 @@ const chain = {
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: () => ({ select: () => chain }),
-    getSchema: () => ({ syncEvents: { entityId: 'entityId', direction: 'direction', sequence: 'sequence' } }),
+    getSchema: () => ({ syncEvents: { entityId: 'entityId', direction: 'direction', sequence: 'sequence', kind: 'kind' } }),
 }));
 
 vi.mock('../../../src/main_process/storage/sync/peers.js', () => ({
@@ -57,6 +57,8 @@ describe('Sync status', () => {
         expect(getSyncStatus('a'.repeat(64))).toEqual({
             state: 'disabled',
             pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
             pendingEntityIds: [],
             peers: [],
         });
@@ -74,12 +76,18 @@ describe('Sync status', () => {
     it('reports pending events and entity ids when a device lags behind', () => {
         vi.mocked(listSyncPeers).mockReturnValue([peer('d1', 5), peer('d2', 0, 7)]);
         vi.mocked(getMaxSyncSequence).mockReturnValue(10);
-        mockAll.mockReturnValue([{ entityId: 'message-1', sequence: 10 }, { entityId: null, sequence: 10 }]);
-        mockGet.mockReturnValue({ total: 3 });
+        mockAll
+            .mockReturnValueOnce([
+                { kind: 'MESSAGE_UPSERT', total: 2 },
+                { kind: 'CONTACT_PROFILE', total: 1 },
+            ])
+            .mockReturnValueOnce([{ entityId: 'message-1', sequence: 10 }, { entityId: null, sequence: 10 }]);
 
         const status = getSyncStatus('a'.repeat(64));
         expect(status.state).toBe('pending');
         expect(status.pendingEvents).toBe(3);
+        expect(status.pendingMessages).toBe(2);
+        expect(status.pendingMetadata).toBe(1);
         expect(status.pendingEntityIds).toEqual(['message-1']);
         expect(status.peers).toEqual([
             { deviceId: 'd1', state: 'pending', ackSequence: 5, lastSeen: 1, historyCompleted: false },

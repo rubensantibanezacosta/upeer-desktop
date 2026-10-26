@@ -30,11 +30,9 @@ export const SyncBlockingOverlay: React.FC<{ enabled: boolean }> = ({ enabled })
 
     if (!visible) return null;
 
-    const total = Math.max(syncStatus.devicesTotal, syncStatus.devicesDone);
-    const detail = syncStatus.pendingEvents > 0
-        ? `${syncStatus.pendingEvents} evento(s) pendientes de aplicar`
-        : `${syncStatus.devicesDone} de ${total} dispositivo(s) al día`;
-    const ratio = done ? 100 : total > 0 ? Math.max(8, Math.round((syncStatus.devicesDone / total) * 100)) : 12;
+    const progress = syncStatus.progress;
+    const percent = done ? 100 : progress.percent;
+    const determinate = done || progress.determinate;
 
     return (
         <Box
@@ -68,16 +66,16 @@ export const SyncBlockingOverlay: React.FC<{ enabled: boolean }> = ({ enabled })
                     uPeer
                 </Typography>
                 <Typography level="body-sm" sx={{ color: done ? 'success.400' : 'text.secondary' }}>
-                    {done ? '¡Al día!' : 'Sincronizando tus dispositivos…'}
+                    {done ? '¡Al día!' : progress.headline}
                 </Typography>
             </Box>
             <LinearProgress
-                determinate
-                value={ratio}
+                determinate={determinate}
+                value={percent}
                 sx={{ width: 200, flex: 'none', borderRadius: 'sm', '--LinearProgress-radius': '4px' }}
             />
             <Typography level="body-xs" sx={{ color: 'text.tertiary', textAlign: 'center', maxWidth: 300 }}>
-                {done ? 'Los chats ya están disponibles.' : `${detail}. Los chats aparecerán en cuanto termine.`}
+                {done ? 'Los chats ya están disponibles.' : `${progress.detail}. Los chats aparecerán en cuanto termine.`}
             </Typography>
         </Box>
     );

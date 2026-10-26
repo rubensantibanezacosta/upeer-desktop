@@ -3,6 +3,8 @@ import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { getMyAccountRegistry } from '../accountRegistry.js';
 import { getSyncStatus, type SyncStatus } from '../../storage/sync/status.js';
 import { computeSyncPhase, type SyncPhase } from './phase.js';
+import { getHistoryWork } from './historyProgress.js';
+import { trackSyncProgress, type SyncProgressView } from './progress.js';
 
 export type SyncDeviceState = 'local' | 'synced' | 'pending' | 'offline';
 
@@ -20,6 +22,23 @@ export type SyncStatusView = SyncStatus & {
     lastPeerAt: number;
     ageMillis: number;
     devices: SyncDeviceView[];
+    progress: SyncProgressView;
+};
+
+export type SyncStatusExtras = {
+    activeFiles?: number;
+};
+
+const DISABLED_PROGRESS: SyncProgressView = {
+    determinate: false,
+    percent: 0,
+    historyDone: 0,
+    historyTotal: 0,
+    historyKnown: false,
+    pendingMessages: 0,
+    pendingFiles: 0,
+    headline: 'Sin dispositivos que sincronizar',
+    detail: 'Este equipo es el único de la cuenta',
 };
 
 const EMPTY: SyncStatusView = {
@@ -30,17 +49,29 @@ const EMPTY: SyncStatusView = {
     lastPeerAt: 0,
     ageMillis: 0,
     pendingEvents: 0,
+    pendingMessages: 0,
+    pendingMetadata: 0,
     pendingEntityIds: [],
     peers: [],
     devices: [],
+    progress: DISABLED_PROGRESS,
 };
 
-export function getSyncStatusView(): SyncStatusView {
+export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView {
     const myId = getMyUPeerId();
     if (!myId) return EMPTY;
     const status = getSyncStatus(myId);
     const phase = computeSyncPhase(status.peers.map((peer) => toPhasePeer(peer)), Date.now());
-    return { ...status, ...phase, devices: buildDevices(status) };
+    const history = getHistoryWork();
+    const progress = trackSyncProgress({
+        phase: phase.phase,
+        historyDone: history.done,
+        historyTotal: history.total,
+        historyKnown: history.known,
+        pendingMessages: status.pendingMessages ?? 0,
+        pendingFiles: Math.max(0, Math.trunc(extras.activeFiles ?? 0)),
+    });
+    return { ...status, ...phase, devices: buildDevices(status), progress };
 }
 
 function toPhasePeer(peer: SyncStatus['peers'][number]): { historyCompleted: boolean; lastSeen: number } {

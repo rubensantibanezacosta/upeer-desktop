@@ -16,9 +16,22 @@ const setPendingEntities = (pendingEntityIds: string[]) => {
             lastPeerAt: 0,
             ageMillis: 0,
             pendingEvents: pendingEntityIds.length,
+            pendingMessages: pendingEntityIds.length,
+            pendingMetadata: 0,
             pendingEntityIds,
             peers: [],
             devices: [],
+            progress: {
+                determinate: false,
+                percent: 0,
+                historyDone: 0,
+                historyTotal: 0,
+                historyKnown: false,
+                pendingMessages: pendingEntityIds.length,
+                pendingFiles: 0,
+                headline: 'Sincronizando tus dispositivos…',
+                detail: 'Conectando con tus dispositivos',
+            },
         },
     });
 };

@@ -164,6 +164,7 @@ export async function handleSyncHistoryResponse(
         entries: response.entries,
         nextCursor: response.nextCursor as string | null,
         done: response.done,
+        pending: response.pending,
     }, now, win);
     await replayPendingSyncEvents(peer);
 }

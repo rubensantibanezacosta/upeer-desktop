@@ -8,9 +8,22 @@ const DISABLED_SYNC_STATUS: UpeerSyncStatus = {
     lastPeerAt: 0,
     ageMillis: 0,
     pendingEvents: 0,
+    pendingMessages: 0,
+    pendingMetadata: 0,
     pendingEntityIds: [],
     peers: [],
     devices: [],
+    progress: {
+        determinate: false,
+        percent: 0,
+        historyDone: 0,
+        historyTotal: 0,
+        historyKnown: false,
+        pendingMessages: 0,
+        pendingFiles: 0,
+        headline: 'Sin dispositivos que sincronizar',
+        detail: 'Este equipo es el único de la cuenta',
+    },
 };
 
 export const createSyncStatusActions = (set: ChatSet) => ({

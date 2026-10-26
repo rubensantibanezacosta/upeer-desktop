@@ -85,6 +85,7 @@ export type SyncHistoryResponsePacket = SyncEncryptedPacket & {
     entries: SyncHistoryEntry[];
     nextCursor: string | null;
     done: boolean;
+    pending?: number;
 };
 
 export type SyncAckPacket = {

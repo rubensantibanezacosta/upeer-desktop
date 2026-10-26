@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, or } from 'drizzle-orm';
+import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { getDb, getSchema } from '../shared.js';
 import type { MessageDeliveryStatus } from '../messages/status.js';
 
@@ -127,6 +127,22 @@ export function listSyncHistoryMessages(afterTimestamp: number, afterId: string,
         nextCursor: last ? `${last.timestamp}:${last.id}` : null,
         done,
     };
+}
+
+export function countSyncHistoryAfter(afterTimestamp: number, afterId: string): number {
+    const db = getDb();
+    const schema = getSchema();
+    const cursorCondition = afterId
+        ? or(
+            gt(schema.messages.timestamp, afterTimestamp),
+            and(eq(schema.messages.timestamp, afterTimestamp), gt(schema.messages.id, afterId)),
+        )
+        : gt(schema.messages.timestamp, afterTimestamp);
+    const row = db.select({ total: sql<number>`count(*)` })
+        .from(schema.messages)
+        .where(cursorCondition)
+        .get() as { total: number } | undefined;
+    return Number(row?.total ?? 0);
 }
 
 export function parseSyncHistoryCursor(cursor: string | null | undefined): { timestamp: number; id: string } {

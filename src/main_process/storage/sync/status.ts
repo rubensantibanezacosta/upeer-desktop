@@ -16,16 +16,27 @@ export type SyncPeerState = {
 export type SyncStatus = {
     state: 'disabled' | SyncEntityState;
     pendingEvents: number;
+    pendingMessages: number;
+    pendingMetadata: number;
     pendingEntityIds: string[];
     peers: SyncPeerState[];
 };
 
 const MAX_PENDING_ENTITY_IDS = 1_000;
 
+const MESSAGE_KINDS = new Set([
+    'MESSAGE_UPSERT',
+    'MESSAGE_STATUS',
+    'MESSAGE_EDIT',
+    'MESSAGE_DELETE',
+    'CHAT_CLEAR',
+    'REACTION_SET',
+]);
+
 export function getSyncStatus(upeerId: string): SyncStatus {
     const peers = listSyncPeers(upeerId);
     if (peers.length === 0) {
-        return { state: 'disabled', pendingEvents: 0, pendingEntityIds: [], peers: [] };
+        return { state: 'disabled', pendingEvents: 0, pendingMessages: 0, pendingMetadata: 0, pendingEntityIds: [], peers: [] };
     }
     const maxSequence = getMaxSyncSequence();
     const minAck = peers.reduce((lowest, peer) => Math.min(lowest, peer.ackSequence), maxSequence);
@@ -33,13 +44,18 @@ export function getSyncStatus(upeerId: string): SyncStatus {
         return {
             state: 'synced',
             pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
             pendingEntityIds: [],
             peers: peers.map((peer) => toPeerState(peer, maxSequence)),
         };
     }
+    const pending = summarizeOutboundAfter(minAck);
     return {
         state: 'pending',
-        pendingEvents: countOutboundAfter(minAck),
+        pendingEvents: pending.messages + pending.metadata,
+        pendingMessages: pending.messages,
+        pendingMetadata: pending.metadata,
         pendingEntityIds: listPendingEntityIds(minAck),
         peers: peers.map((peer) => toPeerState(peer, maxSequence)),
     };
@@ -78,15 +94,25 @@ function listPendingEntityIds(minAck: number): string[] {
         .map((row) => row.entityId);
 }
 
-function countOutboundAfter(minAck: number): number {
+function summarizeOutboundAfter(minAck: number): { messages: number; metadata: number } {
     const db = getDb();
     const schema = getSchema();
-    const row = db.select({ total: sql<number>`count(*)` })
-        .from(schema.syncEvents)
+    const rows = db.select({
+        kind: schema.syncEvents.kind,
+        total: sql<number>`count(*)`,
+    }).from(schema.syncEvents)
         .where(and(
             eq(schema.syncEvents.direction, 'outbound'),
             gt(schema.syncEvents.sequence, minAck),
         ))
-        .get() as { total: number } | undefined;
-    return Number(row?.total ?? 0);
+        .groupBy(schema.syncEvents.kind)
+        .all() as Array<{ kind: string; total: number }>;
+    let messages = 0;
+    let metadata = 0;
+    for (const row of rows) {
+        const total = Number(row.total ?? 0);
+        if (MESSAGE_KINDS.has(row.kind)) messages += total;
+        else metadata += total;
+    }
+    return { messages, metadata };
 }

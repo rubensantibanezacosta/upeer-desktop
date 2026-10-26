@@ -37,6 +37,8 @@ describe('getSyncStatusView', () => {
         vi.mocked(getSyncStatus).mockReturnValue({
             state: 'disabled',
             pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
             pendingEntityIds: [],
             peers: [],
         });
@@ -62,6 +64,8 @@ describe('getSyncStatusView', () => {
         vi.mocked(getSyncStatus).mockReturnValue({
             state: 'synced',
             pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
             pendingEntityIds: [],
             peers: [{ deviceId: 'remote-device', state: 'synced', ackSequence: 5, lastSeen: 42, historyCompleted: true }],
         });

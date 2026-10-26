@@ -2,6 +2,7 @@ import type { BrowserWindow } from 'electron';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getMainWindow } from '../../core/windowManager.js';
 import { getSyncStatusView } from './statusView.js';
+import { countActiveFileTransfers } from '../file-transfer/activeFiles.js';
 
 const TICKER_MS = 5_000;
 
@@ -12,7 +13,7 @@ let ticker: ReturnType<typeof setInterval> | null = null;
 export function notifySyncStatus(win: BrowserWindow | null = getMainWindow()): void {
     const myId = getMyUPeerId();
     if (!win || !myId) return;
-    const view = getSyncStatusView();
+    const view = getSyncStatusView({ activeFiles: countActiveFileTransfers() });
     const payload = JSON.stringify(view);
     if (payload === lastPayload && win === lastWindow) return;
     lastPayload = payload;

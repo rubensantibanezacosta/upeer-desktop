@@ -228,9 +228,28 @@ Lo que hay:
 Lo que sigue abierto, y no es de esta fase:
 
 - [ ] Renombrar `disabled` a `idle` en el contrato IPC. Hoy `state: 'disabled'` significa «no hay otros dispositivos», no «la sincronización está apagada», y el nombre sigue engañando aunque `phase` ya lo desambigüe.
-- [ ] `disabled` mezcla todavía eventos salientes sin ACK y histórico entrante; la fase ya los separa para la UI, pero el contrato no.
+- [ ] `disabled` mezcla todavía eventos salientes sin ACK y histórico entrante; la fase ya los separa para la UI, pero el contrato no. `pendingMessages` / `pendingMetadata` ya dan el desglose por tipo, pero no distinguen dirección.
 
 Depende de que el histórico funcione, que ya funciona. **No bloquea B10 por sí solo**, pero sí la parte de B10 que el usuario ve.
+
+### El progreso cuenta mensajes pendientes, no dispositivos (29/10/2026) — **hecho**
+
+La barra anterior se movía con `devicesDone / devicesTotal`. Con un solo par eso son 0/1 casi todo el rato: la barra se quedaba clavada en el 8 % mientras el histórico avanzaba y parecía colgada. Ahora el porcentaje sale de **cuántos mensajes faltan de verdad**.
+
+Responsable de cada pieza:
+
+- `network/sync/historyProgress.ts` guarda, por dispositivo, `{ done, total, known }`. `total` es lo que el otro extremo anunció como pendiente; `done` suma los mensajes que ya llegaron. `known` solo pasa a `true` cuando el par envió un número utilizable, para no inventar precisión.
+- `storage/sync/messages.ts#countSyncHistoryAfter` replica el cursor del histórico (`timestamp`, `id`) y da el respaldo cuando el par no anuncia nada: se compara contra lo recibido, no contra el total.
+- `network/sync/progress.ts` convierte eso en `UpeerSyncProgress`: `determinate` solo cuando hay `total` conocido; `percent` = `done / total`; `detail` en español y pluralizado («12 de 40 mensajes»). `trackSyncProgress` mantiene un **máximo monótono** dentro de la misma fase —pedir página a página puede hacer bajar `done / total` y eso se vería como la barra retrocediendo— y el máximo se reinicia al cambiar de fase.
+- `network/sync/history.ts` responde `SYNC_HISTORY_RES` con `pending: nextRemaining(...)` y, al recibir, llama a `recordHistoryPage` + `recordHistoryComplete`. El campo es **opcional**: un par antiguo que no lo mande deja `known: false` y la barra cae en indeterminada, no en 0 %.
+- `network/file-transfer/activeFiles.ts#countActiveFileTransfers` cuenta transferencias en `pending`/`active` para que el overlay diga también «2 archivos en curso» cuando la barra va por mensajes.
+
+Lo que queda abierto:
+
+- [ ] La barra no mezcla unidades: los archivos se informan aparte, no como fracción del total. Mezclarlos exigiría un peso por archivo y hoy no hay base para elegirlo.
+- [ ] El `pending` del móvil es el que responde, así que un par que no sea nuestro cliente deja la barra indeterminada. Es el comportamiento buscado, pero conviene tenerlo escrito.
+
+En el móvil el anuncio vive en `SyncHistory.kt` (`pendingAfter`) y en `ProtocolMessageList.historyPending`, compartiendo el recorrido con `historyPage` para que el cursor no se pueda desincronizar.
 
 ### Mientras carga no hay vacío (28/10/2026)
 

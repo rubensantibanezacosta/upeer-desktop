@@ -6,6 +6,18 @@ import { useChatStore } from '../../../../src/store/useChatStore.js';
 
 const initialSyncStatus = useChatStore.getState().syncStatus;
 
+const baseProgress: UpeerSyncProgress = {
+    determinate: false,
+    percent: 0,
+    historyDone: 0,
+    historyTotal: 0,
+    historyKnown: false,
+    pendingMessages: 0,
+    pendingFiles: 0,
+    headline: 'Sincronizando tus dispositivos…',
+    detail: 'Conectando con tus dispositivos',
+};
+
 const baseStatus: UpeerSyncStatus = {
     state: 'synced',
     phase: 'live',
@@ -14,13 +26,18 @@ const baseStatus: UpeerSyncStatus = {
     lastPeerAt: 1,
     ageMillis: 1,
     pendingEvents: 0,
+    pendingMessages: 0,
+    pendingMetadata: 0,
     pendingEntityIds: [],
     peers: [],
     devices: [],
+    progress: baseProgress,
 };
 
-const setSyncStatus = (status: Partial<UpeerSyncStatus>) => {
-    useChatStore.setState({ syncStatus: { ...baseStatus, ...status } });
+const setSyncStatus = (status: Partial<UpeerSyncStatus>, progress: Partial<UpeerSyncProgress> = {}) => {
+    useChatStore.setState({
+        syncStatus: { ...baseStatus, ...status, progress: { ...baseProgress, ...progress } },
+    });
 };
 
 describe('SyncBlockingOverlay', () => {
@@ -41,12 +58,28 @@ describe('SyncBlockingOverlay', () => {
         expect(screen.queryByTestId('sync-blocking-overlay')).toBeNull();
     });
 
-    it('tapa la pantalla durante la fase masiva y muestra el progreso', () => {
-        setSyncStatus({ state: 'pending', phase: 'syncing', devicesTotal: 3, devicesDone: 1 });
+    it('muestra los mensajes que lleva contados cuando hay total conocido', () => {
+        setSyncStatus({ state: 'pending', phase: 'syncing' }, {
+            determinate: true,
+            percent: 25,
+            historyDone: 25,
+            historyTotal: 100,
+            historyKnown: true,
+            detail: '25 de 100 mensajes',
+        });
         render(<SyncBlockingOverlay enabled />);
         expect(screen.getByTestId('sync-blocking-overlay')).toBeTruthy();
         expect(screen.getByText('Sincronizando tus dispositivos…')).toBeTruthy();
-        expect(screen.getByText('1 de 3 dispositivo(s) al día. Los chats aparecerán en cuanto termine.')).toBeTruthy();
+        expect(screen.getByText('25 de 100 mensajes. Los chats aparecerán en cuanto termine.')).toBeTruthy();
+    });
+
+    it('no inventa porcentaje cuando el par aún no dice cuánto falta', () => {
+        setSyncStatus({ state: 'pending', phase: 'syncing' }, {
+            determinate: false,
+            detail: '12 mensajes sincronizados · 2 archivos en curso',
+        });
+        render(<SyncBlockingOverlay enabled />);
+        expect(screen.getByText('12 mensajes sincronizados · 2 archivos en curso. Los chats aparecerán en cuanto termine.')).toBeTruthy();
     });
 
     it('no se muestra mientras la app está bloqueada o arrancando', () => {

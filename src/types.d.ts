@@ -50,6 +50,17 @@ declare global {
         lastSeen: number | null;
     };
     type UpeerSyncPhase = 'idle' | 'syncing' | 'live';
+    type UpeerSyncProgress = {
+        determinate: boolean;
+        percent: number;
+        historyDone: number;
+        historyTotal: number;
+        historyKnown: boolean;
+        pendingMessages: number;
+        pendingFiles: number;
+        headline: string;
+        detail: string;
+    };
     type UpeerSyncStatus = {
         state: 'disabled' | 'pending' | 'synced';
         phase: UpeerSyncPhase;
@@ -58,9 +69,12 @@ declare global {
         lastPeerAt: number;
         ageMillis: number;
         pendingEvents: number;
+        pendingMessages: number;
+        pendingMetadata: number;
         pendingEntityIds: string[];
         peers: UpeerSyncPeerState[];
         devices: UpeerSyncDevice[];
+        progress: UpeerSyncProgress;
     };
 
     interface Window {
