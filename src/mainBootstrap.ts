@@ -25,10 +25,12 @@ export const configureLinuxMediaSupport = () => {
     if (process.platform !== 'linux') {
         return;
     }
+    // Sin aceleración por hardware (obligatorio en Linux) los decodificadores VAAPI
+    // no pueden activarse: declararlos deja al compositor sin frames y la ventana
+    // se queda en negro. No se añaden aquí.
     app.disableHardwareAcceleration();
     app.commandLine.appendSwitch('disable-gpu-rasterization');
     app.commandLine.appendSwitch('disable-software-rasterizer');
-    app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder');
     app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 };
 

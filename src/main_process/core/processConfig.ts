@@ -40,13 +40,17 @@ export function setupProcessHandlers(): void {
     terminateAfterFatalError('uncaught-exception', { message: err.message, stack: err.stack });
   });
 
-  // Fix for Wayland file explorer issues
-  const isWayland = process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY;
-  if (isWayland) {
-    // Ozone switches for native Wayland support
-    app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
-    app.commandLine.appendSwitch('ozone-platform', 'wayland');
-    // Para versiones modernas de Electron, esto ayuda a la autodetección
-    app.commandLine.appendSwitch('ozone-platform-hint', 'wayland');
+  // Forzar Ozone/Wayland rompe la ventana en Electron 40 sobre mutter: SIGSEGV al
+  // arrancar o ventana negra sin frames. X11 (XWayland) es el valor por defecto y el
+  // modo nativo se reactiva con UPEER_OZONE_PLATFORM=wayland|auto.
+  if (process.platform === 'linux') {
+    const ozonePlatform = process.env.UPEER_OZONE_PLATFORM ?? 'x11';
+    if (ozonePlatform !== 'auto') {
+      app.commandLine.appendSwitch('ozone-platform', ozonePlatform);
+      if (ozonePlatform === 'wayland') {
+        app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
+        app.commandLine.appendSwitch('ozone-platform-hint', 'wayland');
+      }
+    }
   }
 }
