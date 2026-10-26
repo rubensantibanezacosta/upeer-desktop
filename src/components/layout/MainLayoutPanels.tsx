@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box } from '@mui/joy';
-import { ContactsPanel } from './ContactsPanel.js';
 import { SettingsPanel } from '../ui/SettingsPanel.js';
 import { CallsPanel } from '../../features/call/CallsPanel.js';
 import type { MainLayoutProps } from './MainLayout.js';
@@ -24,27 +23,6 @@ export const MainLayoutPanels: React.FC<MainLayoutPanelsProps> = ({ navigation, 
                     onSectionChange={navigation.setSettingsSection}
                     onIdentityUpdate={chatStore.refreshData}
                     onLockSession={onLockSession}
-                />
-            </Box>
-        );
-    }
-
-    if (navigation.appView === 'contacts') {
-        return (
-            <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', overflow: 'hidden' }}>
-                <ContactsPanel
-                    contacts={chatStore.contacts}
-                    groups={chatStore.groups}
-                    selectedContactId={chatStore.targetUpeerId}
-                    selfUpeerId={chatStore.myIdentity?.upeerId}
-                    onSelectContact={chatStore.setTargetUpeerId}
-                    onOpenChat={(upeerId) => {
-                        chatStore.setTargetUpeerId(upeerId);
-                        navigation.goToChat();
-                    }}
-                    onDeleteContact={chatStore.handleDeleteContact}
-                    onBlockContact={(upeerId) => chatStore.handleBlockContact(upeerId)}
-                    onUnblockContact={chatStore.handleUnblockContact}
                 />
             </Box>
         );

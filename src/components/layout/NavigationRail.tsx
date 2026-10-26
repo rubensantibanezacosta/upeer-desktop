@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Avatar, Tooltip, Badge } from '@mui/joy';
 import ChatIcon from '@mui/icons-material/Chat';
-import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded';
 import DonutLargeIcon from '@mui/icons-material/DonutLarge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -14,12 +13,11 @@ interface NavigationRailProps {
     myAvatar?: string | null;
     myInitial?: string;
     onOpenChats?: () => void;
-    onOpenContacts?: () => void;
     onOpenCalls?: () => void;
     onOpenSettings?: () => void;
     onOpenIdentity?: () => void;
     onOpenDevices?: () => void;
-    activeView?: 'chat' | 'contacts' | 'calls' | 'settings';
+    activeView?: 'chat' | 'calls' | 'settings';
     activeCallKind?: 'audio' | 'video';
     unreadChatCount?: number;
 }
@@ -29,7 +27,6 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     myAvatar,
     myInitial,
     onOpenChats,
-    onOpenContacts,
     onOpenCalls,
     onOpenSettings,
     onOpenIdentity,
@@ -71,19 +68,6 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         >
                             <ChatIcon />
                         </Badge>
-                    </IconButton>
-                </Box>
-            </Tooltip>
-            <Tooltip title="Contactos" placement="right">
-                <Box>
-                    <IconButton
-                        aria-label="Contactos"
-                        variant={activeView === 'contacts' ? 'soft' : 'plain'}
-                        color={activeView === 'contacts' ? 'primary' : 'neutral'}
-                        onClick={onOpenContacts}
-                        sx={{ borderRadius: '50%' }}
-                    >
-                        <ContactsRoundedIcon />
                     </IconButton>
                 </Box>
             </Tooltip>

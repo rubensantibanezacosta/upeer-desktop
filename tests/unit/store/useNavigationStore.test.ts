@@ -25,12 +25,9 @@ describe('useNavigationStore', () => {
         });
     });
 
-    it('goToChat / goToContacts / goToSettings cambian la vista', () => {
+    it('goToChat / goToCalls / goToSettings cambian la vista', () => {
         store.getState().goToChat();
         expect(store.getState().appView).toBe('chat');
-
-        store.getState().goToContacts();
-        expect(store.getState().appView).toBe('contacts');
 
         store.getState().goToCalls();
         expect(store.getState().appView).toBe('calls');

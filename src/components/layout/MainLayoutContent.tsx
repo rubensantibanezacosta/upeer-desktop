@@ -154,14 +154,13 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 activeCallKind={activeCallKind}
                 unreadChatCount={unreadChatCount}
                 onOpenChats={() => navigation.goToChat()}
-                onOpenContacts={() => navigation.goToContacts()}
                 onOpenCalls={() => navigation.goToCalls()}
                 onOpenSettings={() => navigation.toggleSettings()}
                 onOpenIdentity={() => navigation.goToSettings('perfil')}
                 onOpenDevices={() => navigation.goToSettings('dispositivos')}
             />
 
-            {navigation.appView === 'settings' || navigation.appView === 'contacts' || navigation.appView === 'calls' ? (
+            {navigation.appView === 'settings' || navigation.appView === 'calls' ? (
                 <MainLayoutPanels navigation={navigation} appStore={appStore} chatStore={chatStore} onLockSession={onLockSession} />
             ) : (
                 <>
