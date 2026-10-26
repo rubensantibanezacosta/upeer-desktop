@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useLayoutEffect, useEffect } from 'react';
 import { Box } from '@mui/joy';
+import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 
 const DIM = 'opacity:0.4';
 const URL_STYLE = 'color:var(--joy-palette-primary-plainColor);text-decoration:underline';
@@ -83,9 +84,10 @@ interface RichInputProps {
     autoComplete?: string;
     autoFocus?: boolean;
     focusKey?: string;
+    embedded?: boolean;
 }
 
-export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown, placeholder, disabled, autoFocus = false, focusKey }) => {
+export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown, placeholder, disabled, autoFocus = false, focusKey, embedded = false }) => {
     const ref = useRef<HTMLDivElement>(null);
     const composing = useRef(false);
     const fromInput = useRef(false);
@@ -140,11 +142,23 @@ export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown
 
     return (
         <Box
-            sx={{ flexGrow: 1, position: 'relative', borderRadius: '8px', backgroundColor: 'background.level1', height: '40px', display: 'flex', alignItems: 'center', px: 2, cursor: 'text', overflow: 'hidden' }}
+            sx={{
+                flexGrow: 1,
+                minWidth: 0,
+                position: 'relative',
+                borderRadius: embedded ? 0 : INPUT_PILL_RADIUS,
+                backgroundColor: embedded ? 'transparent' : 'background.level1',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                px: embedded ? 0.5 : 2,
+                cursor: 'text',
+                overflow: 'hidden'
+            }}
             onClick={() => ref.current?.focus()}
         >
             {!value && (
-                <Box component="span" sx={{ position: 'absolute', pointerEvents: 'none', color: 'text.tertiary', fontSize: '0.875rem', userSelect: 'none', left: 16 }}>
+                <Box component="span" sx={{ position: 'absolute', pointerEvents: 'none', color: 'text.tertiary', fontSize: '0.875rem', userSelect: 'none', left: embedded ? 4 : 16 }}>
                     {placeholder}
                 </Box>
             )}

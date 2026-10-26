@@ -61,7 +61,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                 color="neutral"
                 disabled={disabled}
                 onClick={() => setIsOpen(!isOpen)}
-                sx={{ '&:hover': { backgroundColor: 'background.level1', color: 'primary.plainColor' } }}
+                sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
             >
                 <MoodIcon />
             </IconButton>

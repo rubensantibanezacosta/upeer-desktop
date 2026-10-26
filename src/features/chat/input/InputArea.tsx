@@ -13,6 +13,8 @@ import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
 import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
+import { CHAT_COMPOSER_BAR_HEIGHT } from './composerLayout.js';
+import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 import type { LinkPreview } from '../../../types/chat.js';
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al enviar la nota de voz';
@@ -75,7 +77,17 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const showPreviewBar = !isRecording && (linkPreview !== null || isLoadingPreview);
 
     return (
-        <Box sx={{ borderTop: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
+        <Box sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 3,
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            boxSizing: 'border-box',
+        }}>
             {replyToMessage && (
                 <ReplyBar replyToMessage={replyToMessage} onCancel={onCancelReply ?? (() => {})} onScrollTo={onScrollToMessage} />
             )}
@@ -120,11 +132,21 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{ px: 2, py: 1, display: 'flex', gap: 1.5, alignItems: 'center', height: '62px', boxSizing: 'border-box' }}>
+            <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
                 {isRecording ? (
                     <RecordingBar duration={duration} onCancel={cancelRecording} onSend={handleMicClick} disabled={disabled} isSending={isSending} canvasRef={canvasRef} />
                 ) : (
-                    <>
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.25,
+                        width: '100%',
+                        height: '46px',
+                        pl: 0.25,
+                        pr: 0.25,
+                        borderRadius: INPUT_PILL_RADIUS,
+                        backgroundColor: 'background.level1',
+                    }}>
                         <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
                         <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
                         <RichInput
@@ -136,14 +158,15 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             disabled={disabled}
                             autoFocus={!disabled}
                             focusKey={focusKey}
+                            embedded
                         />
-                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled}>
+                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ '&:hover': { backgroundColor: 'background.level2' } }}>
                             {message
                                 ? (editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />)
                                 : <MicIcon color="primary" />
                             }
                         </IconButton>
-                    </>
+                    </Box>
                 )}
             </Box>
         </Box>

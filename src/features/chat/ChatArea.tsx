@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Box, IconButton } from '@mui/joy';
+import { CHAT_COMPOSER_OVERLAY_HEIGHT } from './input/composerLayout.js';
 import { EmptyChat } from './EmptyChat.js';
 import { MessageItem } from './message/MessageItem.js';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -158,7 +159,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 backgroundColor: 'background.body',
                 px: 4,
                 pt: 2,
-                pb: 4,
+                pb: `${CHAT_COMPOSER_OVERLAY_HEIGHT}px`,
                 gap: 0.4,
                 boxSizing: 'border-box'
             }}

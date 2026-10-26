@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Box, Input, IconButton, Chip, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import { INPUT_PILL_RADIUS } from '../../inputShape.js';
 
 interface SidebarSearchProps {
     value: string;
@@ -51,7 +52,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     backgroundColor: 'background.level1',
-                    borderRadius: '8px',
+                    borderRadius: INPUT_PILL_RADIUS,
                     border: '1px solid transparent',
                     px: 1,
                     flexGrow: 1,

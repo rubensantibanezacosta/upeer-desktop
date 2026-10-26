@@ -3,6 +3,7 @@ import { Box, IconButton, Typography } from '@mui/joy';
 import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 
 interface RecordingBarProps {
     duration: number;
@@ -26,7 +27,7 @@ export const RecordingBar: React.FC<RecordingBarProps> = ({ duration, onCancel, 
         </IconButton>
         <Box sx={{
             flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.5,
-            backgroundColor: 'background.level1', borderRadius: '8px',
+            backgroundColor: 'background.level1', borderRadius: INPUT_PILL_RADIUS,
             px: 2, height: '40px', overflow: 'hidden',
         }}>
             <FiberManualRecordIcon sx={{

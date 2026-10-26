@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Box, Card, CardContent, Chip, IconButton, Stack, Tooltip, Typography } from '@mui/joy';
+import { Avatar, Box, Card, CardContent, Chip, IconButton, List, ListItem, Stack, Tooltip, Typography } from '@mui/joy';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Contact, Group, RawChatMessage } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
 import { useCall } from './useCall.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from '../../components/layout/listRowMetrics.js';
+import { EmptyState } from '../../components/layout/sidebar/EmptyState.js';
 
 interface CallsPanelProps {
     contacts: Contact[];
@@ -101,59 +103,59 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                     })}
                 </Stack> : <Stack spacing={1.5}>
                     <Typography level="h3">Llamadas recientes</Typography>
-                    {recentCalls.length === 0 ? <Card variant="soft"><CardContent><Typography level="body-sm">No hay llamadas recientes.</Typography></CardContent></Card> : recentCalls.map((call) => {
-                        const group = groups.find((item) => item.groupId === call.chatId);
-                        const contact = contacts.find((item) => item.upeerId === call.chatId);
-                        const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
-                        const participants = getRecentParticipants(call.chatId);
-                        const CallIconComponent = call.kind === 'video' ? VideocamIcon : CallIcon;
-                        const groupMembers = group?.members.filter((memberId) => memberId !== selfUpeerId) ?? [];
-                        const canCallBack = group ? groupMembers.length > 0 : Boolean(contact && contact.upeerId !== selfUpeerId);
-                        const callDate = new Date(call.timestamp);
-                        const dateLabel = callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
-                        const timeLabel = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        return <Card key={call.id} variant="outlined" sx={{ transition: 'transform 160ms ease, box-shadow 160ms ease', '&:hover': { transform: 'translateY(-2px)', boxShadow: 'sm' } }}>
-                            <CardContent>
-                                <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                                        <Avatar size="lg" src={group?.avatar || contact?.avatar}>{name.charAt(0).toUpperCase()}</Avatar>
-                                        <Box sx={{ position: 'absolute', right: -5, bottom: -3, display: 'grid', placeItems: 'center', width: 24, height: 24, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.surface' }}>
-                                            <CallIconComponent sx={{ fontSize: 14 }} />
+                    {recentCalls.length === 0 ? <EmptyState icon={<CallIcon />} title="Sin llamadas" subtitle="Todavía no has hecho ninguna llamada con tus contactos." /> : <List sx={{ '--ListItemDecorator-size': 'auto', p: 0 }}>
+                        {recentCalls.map((call) => {
+                            const group = groups.find((item) => item.groupId === call.chatId);
+                            const contact = contacts.find((item) => item.upeerId === call.chatId);
+                            const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
+                            const participants = getRecentParticipants(call.chatId);
+                            const CallIconComponent = call.kind === 'video' ? VideocamIcon : CallIcon;
+                            const groupMembers = group?.members.filter((memberId) => memberId !== selfUpeerId) ?? [];
+                            const canCallBack = group ? groupMembers.length > 0 : Boolean(contact && contact.upeerId !== selfUpeerId);
+                            const callDate = new Date(call.timestamp);
+                            const dateLabel = callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                            const timeLabel = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            return <ListItem key={call.id} sx={listRowListItemSx}>
+                                <Box sx={{ ...listRowButtonSx, display: 'flex', alignItems: 'center', width: '100%' }}>
+                                    <Box sx={{ ...listRowDecoratorSx, position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                                        <Avatar size="lg" src={group?.avatar || contact?.avatar} sx={listRowAvatarSx}>{name.charAt(0).toUpperCase()}</Avatar>
+                                        <Box sx={{ position: 'absolute', right: 0, bottom: 0, display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.body' }}>
+                                            <CallIconComponent sx={{ fontSize: 13 }} />
                                         </Box>
                                     </Box>
-                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-                                            <Typography level="title-md" noWrap>{name}</Typography>
-                                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                <Typography level="body-xs" sx={{ color: 'text.tertiary', whiteSpace: 'nowrap' }}>{dateLabel} · {timeLabel}</Typography>
-                                                <Tooltip title="Volver a llamar por voz">
-                                                    <span><IconButton size="sm" variant="soft" color="success" aria-label={`Llamada de voz a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
-                                                        if (group) void startCall(group.groupId, 'audio', true, groupMembers, group.groupId);
-                                                        else if (contact) void startCall(contact.upeerId, 'audio');
-                                                    }}><CallIcon /></IconButton></span>
-                                                </Tooltip>
-                                                <Tooltip title="Volver a llamar por vídeo">
-                                                    <span><IconButton size="sm" variant="soft" color="primary" aria-label={`Videollamada a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
-                                                        if (group) void startCall(group.groupId, 'video', true, groupMembers, group.groupId);
-                                                        else if (contact) void startCall(contact.upeerId, 'video');
-                                                    }}><VideocamIcon /></IconButton></span>
-                                                </Tooltip>
-                                            </Stack>
-                                        </Stack>
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.5 }}>
-                                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-                                                <Typography level="body-sm" sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
+                                    <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', py: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+                                            <Typography level="body-md" sx={{ fontWeight: 500 }} noWrap>{name}</Typography>
+                                            <Typography level="body-xs" sx={{ color: 'text.tertiary', whiteSpace: 'nowrap' }}>{dateLabel} · {timeLabel}</Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                                                <Typography level="body-sm" noWrap sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
                                                 {group && <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>· {participants}</Typography>}
-                                            </Stack>
+                                            </Box>
                                             <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <AccessTimeIcon /> : undefined}>
                                                 {call.duration ? call.duration : call.rejected ? 'Rechazada' : 'Perdida'}
                                             </Chip>
-                                        </Stack>
+                                        </Box>
                                     </Box>
-                                </Stack>
-                            </CardContent>
-                        </Card>;
-                    })}
+                                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, pl: 1 }}>
+                                        <Tooltip title="Volver a llamar por voz">
+                                            <span><IconButton size="sm" variant="soft" color="success" aria-label={`Llamada de voz a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
+                                                if (group) void startCall(group.groupId, 'audio', true, groupMembers, group.groupId);
+                                                else if (contact) void startCall(contact.upeerId, 'audio');
+                                            }}><CallIcon /></IconButton></span>
+                                        </Tooltip>
+                                        <Tooltip title="Volver a llamar por vídeo">
+                                            <span><IconButton size="sm" variant="soft" color="primary" aria-label={`Videollamada a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
+                                                if (group) void startCall(group.groupId, 'video', true, groupMembers, group.groupId);
+                                                else if (contact) void startCall(contact.upeerId, 'video');
+                                            }}><VideocamIcon /></IconButton></span>
+                                        </Tooltip>
+                                    </Stack>
+                                </Box>
+                            </ListItem>;
+                        })}
+                    </List>}
                 </Stack>}
             </Stack>
         </Box>

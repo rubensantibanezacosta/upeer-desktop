@@ -12,6 +12,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
+import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 
 // ─── Campo copiable ───────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
                 backgroundColor: 'background.level1', px: 1.5, py: 1,
-                border: '1px solid', borderColor: 'divider',
+                border: '1px solid', borderColor: 'divider', borderRadius: INPUT_PILL_RADIUS,
             }}>
                 <Typography
                     level="body-sm"

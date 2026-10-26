@@ -101,7 +101,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                         disabled: disabled,
                         sx: {
                             '&:hover': {
-                                backgroundColor: 'background.level1',
+                                backgroundColor: 'background.level2',
                                 color: 'primary.plainColor'
                             }
                         }
