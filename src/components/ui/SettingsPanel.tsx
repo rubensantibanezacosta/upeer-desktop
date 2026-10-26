@@ -9,13 +9,14 @@ import {
     ListItemDecorator,
 } from '@mui/joy';
 
-import { CircleUser, Lock, Bell, Palette, Shield, HardDrive, Info, Network, MonitorSmartphone, LogOut } from 'lucide-react';
+import { CircleUser, Lock, Ban, Bell, Palette, Shield, HardDrive, Info, Network, MonitorSmartphone, LogOut } from 'lucide-react';
 
 import { SettingsPanelProps, SettingsSection } from './settings/types.js';
 import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx, LIST_ROW_MIN_HEIGHT } from '../layout/listRowMetrics.js';
 import { SectionPerfil } from './settings/SectionPerfil.js';
 import { SectionSeguridad } from './settings/SectionSeguridad.js';
 import { SectionPrivacidad } from './settings/SectionPrivacidad.js';
+import { SectionBloqueados } from './settings/SectionBloqueados.js';
 import { SectionNotificaciones } from './settings/SectionNotificaciones.js';
 import { SectionApariencia } from './settings/SectionApariencia.js';
 import { SectionAlmacenamiento } from './settings/SectionAlmacenamiento.js';
@@ -30,6 +31,7 @@ const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.
     { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <CircleUser /> },
     { id: 'dispositivos', label: 'Dispositivos', desc: 'Añadir y revisar los de tu cuenta', icon: <MonitorSmartphone /> },
     { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <Lock /> },
+    { id: 'bloqueados', label: 'Bloqueados', desc: 'Usuarios que no pueden contactarte', icon: <Ban /> },
     { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <Shield /> },
     { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <Bell /> },
     { id: 'apariencia', label: 'Apariencia', desc: 'Tema y tamaño de texto', icon: <Palette /> },
@@ -58,6 +60,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             case 'perfil': return <SectionPerfil identity={identity} networkAddress={networkAddress} onIdentityUpdate={onIdentityUpdate} />;
             case 'dispositivos': return <SectionDispositivos />;
             case 'privacidad': return <SectionPrivacidad />;
+            case 'bloqueados': return <SectionBloqueados />;
             case 'seguridad': return <SectionSeguridad />;
             case 'notificaciones': return <SectionNotificaciones />;
             case 'apariencia': return <SectionApariencia />;

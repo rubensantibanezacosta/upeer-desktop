@@ -20,6 +20,7 @@ export interface SettingsPanelProps {
 export type SettingsSection =
     | 'perfil'
     | 'privacidad'
+    | 'bloqueados'
     | 'dispositivos'
     | 'notificaciones'
     | 'apariencia'

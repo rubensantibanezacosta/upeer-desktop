@@ -81,10 +81,12 @@ export const SectionBloqueados: React.FC = () => {
                             <ListItem
                                 key={c.upeerId}
                                 sx={{
-                                    px: 1.25, py: 1,
-                                    borderRadius: '10px', mb: 0.5,
+                                    px: 0.5, py: 1,
                                     display: 'flex', alignItems: 'center', gap: 2,
+                                    borderBottom: '1px solid',
+                                    borderColor: 'divider',
                                     transition: 'background-color 0.15s ease',
+                                    '&:last-of-type': { borderBottom: 'none' },
                                     '&:hover': { backgroundColor: 'background.level2' },
                                 }}
                             >

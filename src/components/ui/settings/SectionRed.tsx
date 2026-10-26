@@ -97,14 +97,10 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 px: 0.5, py: 1,
                 display: 'flex', alignItems: 'center', gap: 2,
             }}>
-                <Box sx={{
-                    width: 44, height: 44, borderRadius: 'md',
-                    backgroundColor: `${meta.color}.softBg`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
+                <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: `var(--joy-palette-${meta.color}-500)` }}>
                     {meta.spinning
                         ? <CircularProgress size="sm" color={meta.color} thickness={3} />
-                        : <meta.Icon style={{ fontSize: 22, color: `var(--joy-palette-${meta.color}-plainColor)` }} />
+                        : <meta.Icon style={{ fontSize: 22 }} />
                     }
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -167,7 +163,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                         </Typography>
                         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 0.5 }}>
                             {reservePeers.map((peer) => (
-                                <Box key={`reserve-${peer.uri}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 0.75, py: 0.35, borderRadius: 'sm', backgroundColor: 'background.level1' }}>
+                                <Box key={`reserve-${peer.uri}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 0.5, py: 0.35, borderBottom: '1px solid', borderColor: 'divider' }}>
                                     <Typography level="body-xs" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.68rem' }} title={peer.uri}>
                                         {peer.country} · {peer.host}
                                     </Typography>
