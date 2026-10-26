@@ -53,7 +53,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
                     variant="plain"
                     color="neutral"
                     onClick={(event) => { event.stopPropagation(); setEmojiOpen((value) => !value); }}
-                    sx={{ '--IconButton-size': '26px', borderRadius: 'sm', flexShrink: 0, opacity: 0.7, '&:hover': { opacity: 1, backgroundColor: 'background.level1' }, '&:active': { backgroundColor: 'background.level2' } }}
+                    sx={{ '--IconButton-size': '26px', borderRadius: '50%', flexShrink: 0, opacity: 0.7, '&:hover': { opacity: 1, backgroundColor: 'background.level1' }, '&:active': { backgroundColor: 'background.level2' } }}
                 >
                     <AddReactionOutlinedIcon sx={{ fontSize: '18px' }} />
                 </IconButton>

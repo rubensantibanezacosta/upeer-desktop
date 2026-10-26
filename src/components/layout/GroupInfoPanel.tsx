@@ -71,7 +71,7 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                 </Box>
             ) : <Box sx={{ flexGrow: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
                 <Box sx={{ pt: 4, pb: 3, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1 }}>
-                    <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, borderRadius: 'md', mb: 1 }}>
+                    <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, mb: 1 }}>
                         {!group.avatar && <GroupsIcon sx={{ fontSize: 40 }} />}
                     </Avatar>
                     <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
@@ -93,7 +93,7 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                             const name = isCurrentUser ? 'Tú' : contact?.name || `${id.slice(0, 12)}…`;
                             return (
                                 <ListItem key={id} sx={{ gap: 1.5, py: 1 }}>
-                                    <Avatar src={contact?.avatar || undefined} size="md" sx={{ borderRadius: 'md' }}>{name.charAt(0).toUpperCase()}</Avatar>
+                                    <Avatar src={contact?.avatar || undefined} size="md">{name.charAt(0).toUpperCase()}</Avatar>
                                     <ListItemContent>
                                         <Typography level="body-sm">{name}</Typography>
                                         {contact?.alias && contact.alias !== contact.name && <Typography level="body-xs" color="neutral">{contact.alias}</Typography>}

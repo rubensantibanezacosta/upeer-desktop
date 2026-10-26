@@ -42,7 +42,7 @@ export const CreateFlowProfileSetup: React.FC<CreateFlowProfileSetupProps> = ({
                     sx={{
                         width: 88,
                         height: 88,
-                        borderRadius: '24px',
+                        borderRadius: '50%',
                         cursor: isLoading ? 'default' : 'pointer',
                         border: '1px dashed',
                         borderColor: avatar ? 'primary.500' : 'divider',

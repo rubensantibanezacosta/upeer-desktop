@@ -27,7 +27,7 @@ export const ContactInfoHero: React.FC<ContactInfoHeroProps> = ({
         <Avatar
             src={avatar || undefined}
             variant="soft"
-            sx={{ width: 96, height: 96, borderRadius: 'md', mb: 1, fontSize: '2.5rem' }}
+            sx={{ width: 96, height: 96, mb: 1, fontSize: '2.5rem' }}
         >
             {(contactName || contactId).charAt(0).toUpperCase()}
         </Avatar>

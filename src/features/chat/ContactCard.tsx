@@ -100,7 +100,7 @@ export const ContactCard: React.FC<ContactCardProps> = ({ name, address, upeerId
     return (
         <Box sx={{ p: 1.25, borderRadius: 'md', bgcolor: isMe ? 'rgba(255,255,255,0.08)' : 'background.level1' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <Avatar size="lg" src={avatar} sx={{ fontWeight: 700, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'primary.100', color: isMe ? 'white' : 'primary.600', borderRadius: 'md' }}>
+                <Avatar size="lg" src={avatar} sx={{ fontWeight: 700, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'primary.100', color: isMe ? 'white' : 'primary.600' }}>
                     {(name?.[0] ?? '?').toUpperCase()}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>

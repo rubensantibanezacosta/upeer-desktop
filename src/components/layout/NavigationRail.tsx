@@ -60,7 +60,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
                         onClick={onOpenChats}
-                        sx={{ borderRadius: 'sm' }}
+                        sx={{ borderRadius: '50%' }}
                     >
                         <Badge
                             badgeContent={unreadChatCount > 99 ? '99+' : unreadChatCount}
@@ -81,7 +81,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'contacts' ? 'soft' : 'plain'}
                         color={activeView === 'contacts' ? 'primary' : 'neutral'}
                         onClick={onOpenContacts}
-                        sx={{ borderRadius: 'sm' }}
+                        sx={{ borderRadius: '50%' }}
                     >
                         <ContactsRoundedIcon />
                     </IconButton>
@@ -94,19 +94,19 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'calls' ? 'soft' : 'plain'}
                         color={activeView === 'calls' ? 'primary' : 'neutral'}
                         onClick={onOpenCalls}
-                        sx={{ borderRadius: 'sm' }}
+                        sx={{ borderRadius: '50%' }}
                     >
                         {activeCallKind === 'video' ? <VideocamIcon color="success" /> : <CallIcon color={activeCallKind === 'audio' ? 'success' : undefined} />}
                     </IconButton>
                 </Box>
             </Tooltip>
             <Tooltip title="Actualizaciones" placement="right">
-                <IconButton variant="plain" color="neutral" sx={{ borderRadius: 'sm' }}>
+                <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
                     <DonutLargeIcon />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Comunidades" placement="right">
-                <IconButton variant="plain" color="neutral" sx={{ borderRadius: 'sm' }}>
+                <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
                     <GroupsIcon />
                 </IconButton>
             </Tooltip>
@@ -120,7 +120,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     variant={activeView === 'settings' ? 'soft' : 'plain'}
                     color={activeView === 'settings' ? 'primary' : 'neutral'}
                     onClick={onOpenSettings}
-                    sx={{ borderRadius: 'sm' }}
+                    sx={{ borderRadius: '50%' }}
                 >
                     <SettingsIcon />
                 </IconButton>
@@ -136,7 +136,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         mt: 1,
                         width: 32,
                         height: 32,
-                        borderRadius: 'md',
+                        borderRadius: '50%',
                         background: myAvatar ? 'transparent' : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
                         fontWeight: 700,
                         fontSize: '14px',

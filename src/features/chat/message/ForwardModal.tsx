@@ -169,7 +169,6 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({ open, onClose, conta
                                             src={t.avatar}
                                             variant="soft"
                                             color="neutral"
-                                            sx={{ borderRadius: 'md' }}
                                         >
                                             {t.isGroup ? <GroupsIcon /> : t.name[0]?.toUpperCase()}
                                         </Avatar>

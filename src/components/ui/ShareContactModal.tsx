@@ -113,7 +113,6 @@ export const ShareContactModal: React.FC<ShareContactModalProps> = ({ open, onCl
                                         src={contact.avatar}
                                         variant="soft"
                                         color="neutral"
-                                        sx={{ borderRadius: 'md' }}
                                     >
                                         {contact.name[0]?.toUpperCase()}
                                     </Avatar>

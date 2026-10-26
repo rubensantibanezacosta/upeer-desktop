@@ -106,7 +106,7 @@ export const SectionBloqueados: React.FC = () => {
                             <Avatar
                                 src={c.avatar || undefined}
                                 size="md"
-                                sx={{ flexShrink: 0, filter: 'grayscale(60%)', borderRadius: 'md' }}
+                                sx={{ flexShrink: 0, filter: 'grayscale(60%)' }}
                             >
                                 {!c.avatar && displayName(c).charAt(0).toUpperCase()}
                             </Avatar>

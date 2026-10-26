@@ -60,7 +60,6 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 <Avatar
                     src={avatar || undefined}
                     sx={{
-                        borderRadius: 'md',
                         fontSize: '3rem',
                         backgroundColor: isUntrustworthy ? 'warning.softBg' : 'background.level1',
                         border: '2px solid',

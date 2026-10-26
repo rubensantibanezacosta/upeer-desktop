@@ -84,13 +84,13 @@ export const ProfileHeroSection: React.FC<ProfileHeroSectionProps> = ({
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
 
         <Tooltip title="Cambiar foto de perfil" variant="soft" size="sm">
-            <Box onClick={onAvatarClick} sx={{ width: 96, height: 96, borderRadius: 'md', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', '&:hover .avatar-overlay': { opacity: 1 } }}>
+            <Box onClick={onAvatarClick} sx={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', '&:hover .avatar-overlay': { opacity: 1 } }}>
                 {avatar ? (
                     <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                    <Avatar sx={{ width: '100%', height: '100%', fontSize: '2.5rem', borderRadius: 'md' }}>{displayName.charAt(0).toUpperCase()}</Avatar>
+                    <Avatar sx={{ width: '100%', height: '100%', fontSize: '2.5rem' }}>{displayName.charAt(0).toUpperCase()}</Avatar>
                 )}
-                <Box className="avatar-overlay" sx={{ position: 'absolute', inset: 0, borderRadius: 'md', backgroundColor: 'rgba(0,0,0,0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.18s' }}>
+                <Box className="avatar-overlay" sx={{ position: 'absolute', inset: 0, borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.18s' }}>
                     <EditIcon sx={{ color: 'white', fontSize: '24px' }} />
                 </Box>
             </Box>

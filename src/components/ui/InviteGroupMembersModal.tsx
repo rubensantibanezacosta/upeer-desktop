@@ -204,7 +204,7 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
                                                         color="primary"
                                                         onClick={(event) => event.stopPropagation()}
                                                     />
-                                                    <Avatar size="sm" src={contact.avatar || undefined} color="neutral" sx={{ borderRadius: 'md' }}>
+                                                    <Avatar size="sm" src={contact.avatar || undefined} color="neutral">
                                                         {contact.name[0]}
                                                     </Avatar>
                                                     <Typography level="body-sm" sx={{ fontWeight: 500 }}>{contact.name}</Typography>

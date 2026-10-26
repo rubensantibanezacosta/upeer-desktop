@@ -119,7 +119,7 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock, onTooManyAttempts })
                     size="lg"
                     src={myIdentity?.avatar || undefined}
                     variant="soft"
-                    sx={{ width: 64, height: 64, mx: 'auto', borderRadius: 'md', fontSize: '2rem' }}
+                    sx={{ width: 64, height: 64, mx: 'auto', fontSize: '2rem' }}
                 >
                     {(myIdentity?.alias || 'U')[0].toUpperCase()}
                 </Avatar>

@@ -272,7 +272,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                 }}
                 onPointerDown={embedded ? undefined : handlePointerDown}
             >
-                <Avatar src={avatar} sx={{ width: 32, height: 32, fontSize: 14, borderRadius: 'md' }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                <Avatar src={avatar} sx={{ width: 32, height: 32, fontSize: 14 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                 <Typography level="body-sm" sx={{ flex: 1, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {peerName}
                 </Typography>
@@ -294,7 +294,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                         {remoteScreen && (
                             <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
                                 <canvas ref={attachScreenCanvas} style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111' }} />
-                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10, borderRadius: 'md' }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
+                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10 }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
                             </Box>
                         )}
                         <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0, borderRadius: 8, overflow: 'hidden', backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.3)' }}>
@@ -302,7 +302,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                                 <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>
-                                    <Avatar sx={{ width: 40, height: 40, fontSize: 16, borderRadius: 'md' }}>T</Avatar>
+                                    <Avatar sx={{ width: 40, height: 40, fontSize: 16 }}>T</Avatar>
                                 </Box>
                             )}
                             <Box sx={{ position: 'absolute', bottom: 4, left: 6, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
@@ -319,7 +319,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                         ))}
                         {remotePeers.length === 0 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, gridColumn: '1 / -1' }}>
-                                <Avatar size="lg" sx={{ width: 72, height: 72, fontSize: 28, borderRadius: 'md' }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                                <Avatar size="lg" sx={{ width: 72, height: 72, fontSize: 28 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                                 <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
                                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{formatDuration(seconds)}</Typography>
                             </Box>
@@ -330,13 +330,13 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                         {remoteScreen ? (
                             <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                                 <canvas ref={attachScreenCanvas} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
-                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10, borderRadius: 'md' }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
+                                <Chip size="sm" color="warning" startDecorator={<Avatar src={peerAvatars[remoteScreen]} sx={{ width: 22, height: 22, fontSize: 10 }}>{remoteScreenName.charAt(0).toUpperCase()}</Avatar>} sx={{ position: 'absolute', top: 8, left: 8 }}>{remoteScreenName} comparte pantalla</Chip>
                             </Box>
                         ) : remotePeers.length > 0 ? (
                             <canvas ref={remoteCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#111', borderRadius: 8 }} />
                         ) : (
                             <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                                <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32, borderRadius: 'md' }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                                <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                                 <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
                                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{formatDuration(seconds)}</Typography>
                             </Box>
@@ -346,7 +346,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                                 <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#333' }}>
-                                    <Avatar sx={{ width: 32, height: 32, fontSize: 14, borderRadius: 'md' }}>T</Avatar>
+                                    <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>T</Avatar>
                                 </Box>
                             )}
                             <Box sx={{ position: 'absolute', bottom: 2, left: 4, px: 0.5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.6)' }}>
@@ -356,7 +356,7 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
                     </Box>
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                        <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32, borderRadius: 'md' }}>{peerName.charAt(0).toUpperCase()}</Avatar>
+                        <Avatar src={avatar} size="lg" sx={{ width: 80, height: 80, fontSize: 32 }}>{peerName.charAt(0).toUpperCase()}</Avatar>
                         <Typography level="title-md" sx={{ color: 'white' }}>{peerName}</Typography>
                         <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{formatDuration(seconds)}</Typography>
                     </Box>

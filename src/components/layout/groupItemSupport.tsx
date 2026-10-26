@@ -20,7 +20,6 @@ export const GroupAvatar: React.FC<{ avatar?: string | null; size?: 'sm' | 'md' 
         color="primary"
         variant="soft"
         sx={{
-            borderRadius: 'md',
             ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}),
         }}
     >

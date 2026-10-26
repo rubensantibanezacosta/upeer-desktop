@@ -103,7 +103,7 @@ export const ContactsPanelList: React.FC<ContactsPanelListProps> = ({
                             }}
                         >
                             <ListItemDecorator sx={{ mr: 2 }}>
-                                <Avatar src={contact.avatar || undefined} size="lg" variant="soft" sx={{ borderRadius: 'md' }}>
+                                <Avatar src={contact.avatar || undefined} size="lg" variant="soft">
                                     {(contact.name || contact.upeerId).charAt(0).toUpperCase()}
                                 </Avatar>
                             </ListItemDecorator>

@@ -35,7 +35,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
             {!newChatSearch && (
                 <Box>
                     <Box aria-label="Nueva conversación" role="button" onClick={onOpenAddContact} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
-                        <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
+                        <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
                             <PersonAddIcon />
                         </Avatar>
                         <Box>
@@ -45,7 +45,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
                     </Box>
                     {onOpenCreateGroup && (
                         <Box aria-label="Nuevo grupo" role="button" onClick={onOpenCreateGroup} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
-                            <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0, borderRadius: 'md' }}>
+                            <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
                                 <GroupAddIcon />
                             </Avatar>
                             <Box>

@@ -63,7 +63,7 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
                         {!avatar && <GroupsIcon sx={{ fontSize: 18, color: 'white' }} />}
                     </Avatar>
                 ) : (
-                    <Avatar size="sm" src={avatar || undefined} sx={{ borderRadius: 'md' }}>
+                    <Avatar size="sm" src={avatar || undefined}>
                         {contactName ? contactName[0] : ''}
                     </Avatar>
                 )}

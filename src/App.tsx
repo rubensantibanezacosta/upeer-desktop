@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CssVarsProvider } from '@mui/joy';
 import { useColorScheme } from '@mui/joy/styles';
+import { appTheme } from './theme.js';
 import { useAppearanceStore, FONT_SIZE_PX } from './store/useAppearanceStore.js';
 import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
@@ -270,7 +271,7 @@ export default function App() {
     const activeGroup = chatStore.groups.find((group) => group.groupId === chatStore.activeGroupId);
 
     return (
-        <CssVarsProvider defaultMode={appearanceTheme === 'system' ? 'system' : appearanceTheme}>
+        <CssVarsProvider theme={appTheme} defaultMode={appearanceTheme === 'system' ? 'system' : appearanceTheme}>
             <AppearanceController>
                 <div data-testid="app-shell">
                 <MainLayout

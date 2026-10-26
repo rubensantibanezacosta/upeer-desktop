@@ -16,7 +16,7 @@ interface CallIncomingModalProps {
 export const CallIncomingModal: React.FC<CallIncomingModalProps> = ({ open, kind, isGroup = false, callerName, callerAvatar, onAccept, onReject }) => (
     <Modal open={open} onClose={onReject}>
         <ModalDialog size="lg" sx={{ textAlign: 'center', gap: 2 }}>
-            <Avatar src={callerAvatar || undefined} sx={{ alignSelf: 'center', width: 88, height: 88, fontSize: 36, borderRadius: 'md' }}>{callerName.charAt(0).toUpperCase()}</Avatar>
+            <Avatar src={callerAvatar || undefined} sx={{ alignSelf: 'center', width: 88, height: 88, fontSize: 36 }}>{callerName.charAt(0).toUpperCase()}</Avatar>
             <Typography level="h4">{callerName}</Typography>
             <Typography level="body-md">{isGroup ? 'Llamada grupal' : kind === 'video' ? 'Videollamada entrante' : 'Llamada entrante'}</Typography>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>

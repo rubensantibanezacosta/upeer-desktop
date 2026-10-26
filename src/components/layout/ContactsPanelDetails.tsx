@@ -86,7 +86,7 @@ export const ContactsPanelDetails: React.FC<ContactsPanelDetailsProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pb: 8 }}>
                     <Box sx={{ width: '100%', maxWidth: 860, px: { xs: 2, md: 4 } }}>
                         <Box sx={{ mt: 6, mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <Avatar src={activeContact.avatar || undefined} variant="soft" sx={{ width: 140, height: 140, fontSize: '3.5rem', borderRadius: 'md', mb: 2.5, boxShadow: 'sm' }}>
+                            <Avatar src={activeContact.avatar || undefined} variant="soft" sx={{ width: 140, height: 140, fontSize: '3.5rem', mb: 2.5, boxShadow: 'sm' }}>
                                 {(activeContact.name || activeContact.upeerId).charAt(0).toUpperCase()}
                             </Avatar>
                             <Typography level="h2" sx={{ fontWeight: 700, mb: 0.5 }}>

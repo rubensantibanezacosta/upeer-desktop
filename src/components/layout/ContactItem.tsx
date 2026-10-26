@@ -54,7 +54,6 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                             color={c.status === 'incoming' ? 'primary' : 'neutral'}
                             src={c.avatar || undefined}
                             variant="soft"
-                            sx={{ borderRadius: 'md' }}
                         >
                             {c.name[0]}
                         </Avatar>

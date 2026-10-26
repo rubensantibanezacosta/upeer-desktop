@@ -35,7 +35,7 @@ export const StartupRecoveryOverlay: React.FC<StartupRecoveryOverlayProps> = ({ 
                 <Box sx={{
                     width: 84,
                     height: 84,
-                    borderRadius: '24px',
+                    borderRadius: '50%',
                     backgroundColor: 'background.level1',
                     border: '1px solid',
                     borderColor: 'divider',
@@ -48,7 +48,7 @@ export const StartupRecoveryOverlay: React.FC<StartupRecoveryOverlayProps> = ({ 
                     <Box sx={{
                         position: 'absolute',
                         inset: -10,
-                        borderRadius: '28px',
+                        borderRadius: '50%',
                         border: '3px solid',
                         borderColor: 'primary.700',
                         borderTopColor: 'primary.400',
@@ -100,7 +100,7 @@ export const WelcomePlaceholder: React.FC = () => (
             <Box sx={{
                 width: 100, height: 100,
                 backgroundColor: 'background.level1',
-                borderRadius: 'xl',
+                borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 mb: 3, border: '1px solid', borderColor: 'divider',
             }}>

@@ -111,7 +111,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                             src={identity?.avatar || undefined}
                                             color={active === s.id ? 'primary' : 'neutral'}
                                             variant="soft"
-                                            sx={{ borderRadius: 'md' }}
                                         >
                                             {!identity?.avatar && s.icon}
                                         </Avatar>

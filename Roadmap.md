@@ -130,6 +130,7 @@ El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](.
 ### UI / UX
 
 - [x] Stack: Electron + Vite + React + TypeScript + Joy UI
+- [x] Avatares y botones de icono circulares (26/10/2026). Joy los dibuja con esquinas suaves por defecto y cada componente repetía `borderRadius: 'md'` a mano, así que el mismo avatar salía redondeado en un sitio y cuadrado en otro. Ahora `src/theme.ts` extiende el tema con `JoyAvatar` y `JoyIconButton` a `50%` y se quitaron los `borderRadius` sueltos: lo que no se toque a mano ya sale redondo. En el móvil hace lo mismo `ProfileAvatar`, que calcula el radio a partir del tamaño en vez de fijar 8 px
 - [x] Sidebar modular — `ContactItem`, `GroupItem`, `SidebarHeader`, `SidebarSearch`
 - [x] `TopHeader` con edición inline de nombre y avatar de grupo
 - [x] Modales: Identidad, Seguridad, Añadir Contacto, Compartir Contacto, Crear Grupo

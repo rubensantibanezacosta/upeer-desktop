@@ -35,7 +35,7 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
 }) => (
     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)', zIndex: 30, pointerEvents: 'none' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pointerEvents: 'auto' }}>
-            <Avatar src={currentItem.senderAvatar} size="sm" sx={{ borderRadius: 'md', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <Avatar src={currentItem.senderAvatar} size="sm" sx={{ border: '1px solid rgba(255,255,255,0.2)' }}>
                 {currentItem.senderName?.charAt(0).toUpperCase()}
             </Avatar>
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
