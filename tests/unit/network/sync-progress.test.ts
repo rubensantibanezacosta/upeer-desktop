@@ -6,7 +6,9 @@ import {
     parsePendingCount,
     recordHistoryComplete,
     recordHistoryPage,
+    recordHistoryServed,
     resetHistoryWork,
+    resetServedHistory,
 } from '../../../src/main_process/network/sync/historyProgress.js';
 
 const base = {
@@ -109,5 +111,41 @@ describe('histórico de sincronización', () => {
         expect(parsePendingCount(-3)).toBeNull();
         expect(parsePendingCount('12')).toBeNull();
         expect(parsePendingCount(12.9)).toBe(12);
+    });
+});
+
+describe('histórico servido al otro dispositivo', () => {
+    beforeEach(() => {
+        resetHistoryWork();
+    });
+
+    it('cuenta los mensajes enviados como trabajo del mismo proceso', () => {
+        recordHistoryServed('device-b', 50, 150);
+        recordHistoryServed('device-b', 50, 100);
+        expect(getHistoryWork()).toEqual({ done: 100, total: 200, known: true });
+    });
+
+    it('suma el histórico recibido y el servido cuando los dos lados conocen el total', () => {
+        recordHistoryPage('device-a', 10, 40);
+        recordHistoryServed('device-b', 30, 70);
+        expect(getHistoryWork()).toEqual({ done: 40, total: 150, known: true });
+    });
+
+    it('prefiere el lado conocido en vez de volver indeterminado el total', () => {
+        recordHistoryPage('device-a', 10, null);
+        recordHistoryServed('device-b', 30, 70);
+        expect(getHistoryWork()).toEqual({ done: 30, total: 100, known: true });
+    });
+
+    it('reinicia el histórico servido cuando el otro dispositivo empieza de cero', () => {
+        recordHistoryServed('device-b', 50, 50);
+        resetServedHistory('device-b');
+        expect(getHistoryWork()).toEqual({ done: 0, total: 0, known: false });
+    });
+
+    it('olvida también el histórico servido al reiniciar el de un dispositivo', () => {
+        recordHistoryServed('device-b', 50, 50);
+        forgetHistoryWork('device-b');
+        expect(getHistoryWork()).toEqual({ done: 0, total: 0, known: false });
     });
 });

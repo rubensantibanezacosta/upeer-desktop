@@ -12,7 +12,7 @@ import { signSyncEventOrigin } from './origin.js';
 import { sendEncryptedSync } from './transport.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
-import { forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage } from './historyProgress.js';
+import { forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
 
 const HISTORY_PAGE_SIZE = 50;
 const inFlight = new Set<string>();
@@ -39,6 +39,7 @@ export async function respondSyncHistory(
 ): Promise<void> {
     const cursor = parseSyncHistoryCursor(request.cursor);
     const limit = Math.max(1, Math.min(200, request.limit));
+    if (!request.cursor) resetServedHistory(peer.deviceId);
     const page = listSyncHistoryMessages(cursor.timestamp, cursor.id, limit);
     const deviceId = getMySyncIdentity()?.deviceId ?? 'unknown-device';
     const entries = page.messages.map((message) => signSyncEventOrigin({
@@ -62,12 +63,14 @@ export async function respondSyncHistory(
             }));
         }
     }
+    const remaining = nextRemaining(page.nextCursor, page.done);
+    recordHistoryServed(peer.deviceId, page.messages.length, remaining);
     await sendEncryptedSync(peer, 'SYNC_HISTORY_RES', {
         requestId: request.requestId,
         entries,
         nextCursor: page.nextCursor,
         done: page.done,
-        pending: nextRemaining(page.nextCursor, page.done),
+        pending: remaining,
     });
 }
 
