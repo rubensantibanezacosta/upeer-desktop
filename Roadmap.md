@@ -249,7 +249,9 @@ Lo que queda abierto:
 - [ ] La barra no mezcla unidades: los archivos se informan aparte, no como fracción del total. Mezclarlos exigiría un peso por archivo y hoy no hay base para elegirlo.
 - [ ] El `pending` del móvil es el que responde, así que un par que no sea nuestro cliente deja la barra indeterminada. Es el comportamiento buscado, pero conviene tenerlo escrito.
 
-En el móvil el anuncio vive en `SyncHistory.kt` (`pendingAfter`) y en `ProtocolMessageList.historyPending`, compartiendo el recorrido con `historyPage` para que el cursor no se pueda desincronizar.
+El histórico que el escritorio **sirve** al móvil cuenta como trabajo propio desde el 29/10/2026 (`recordHistoryServed`, acumulado por dispositivo y reiniciado cuando el otro extremo pide desde cero). Sin eso, un escritorio que estaba enviando cientos de mensajes se quedaba en «Conectando con tus dispositivos». Los dos lados solo se suman cuando ambos conocen su total: sumar un lado conocido con otro desconocido volvería indeterminada una fase que sí sabía cuánto le quedaba.
+
+En el móvil el anuncio vive en `SyncHistory.kt` (`pendingAfter`) y en `ProtocolMessageList.historyPending`, compartiendo el recorrido con `historyPage` para que el cursor no se pueda desincronizar. El cálculo y el texto están en `SyncProgress.kt`, con los contadores persistidos junto al cursor en `SyncHistoryState` para que cada página continúe la cuenta en vez de reiniciarla; `SyncStatusReport` los publica en `progress` y `sync-blocking-overlay.tsx` ya no usa `devicesDone` ni el suelo del 8 %.
 
 ### Mientras carga no hay vacío (28/10/2026)
 
