@@ -4,6 +4,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import { INPUT_PILL_RADIUS } from '../../inputShape.js';
 
+const PILL_HEIGHT = 40;
+const SEARCH_ICON_SIZE = 18;
+const ICON_INSET = (PILL_HEIGHT - SEARCH_ICON_SIZE) / 2;
+const CLEAR_BUTTON_SIZE = 24;
+const CLEAR_GLYPH_SIZE = 16;
+
 interface SidebarSearchProps {
     value: string;
     onChange: (val: string) => void;
@@ -54,15 +60,15 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                     backgroundColor: 'background.level1',
                     borderRadius: INPUT_PILL_RADIUS,
                     border: '1px solid transparent',
-                    px: 1,
+                    px: `${ICON_INSET}px`,
                     flexGrow: 1,
-                    height: '40px',
+                    height: `${PILL_HEIGHT}px`,
                     transition: 'border-color 0.15s',
                     '&:focus-within': {
                         borderColor: 'var(--joy-palette-primary-300)',
                     },
                 }}>
-                    <SearchIcon sx={{ color: 'text.tertiary', fontSize: '18px', mr: 1 }} />
+                    <SearchIcon sx={{ color: 'text.tertiary', fontSize: `${SEARCH_ICON_SIZE}px`, mr: 1 }} />
                     <Input
                         size="sm"
                         placeholder={placeholder}
@@ -85,9 +91,13 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                             size="sm"
                             variant="plain"
                             onClick={() => onChange('')}
-                            sx={{ '--IconButton-size': '24px' }}
+                            sx={{
+                                '--IconButton-size': `${CLEAR_BUTTON_SIZE}px`,
+                                mr: `${-(CLEAR_BUTTON_SIZE - CLEAR_GLYPH_SIZE) / 2}px`,
+                                ml: 0,
+                            }}
                         >
-                            <ClearIcon sx={{ fontSize: '16px' }} />
+                            <ClearIcon sx={{ fontSize: `${CLEAR_GLYPH_SIZE}px` }} />
                         </IconButton>
                     )}
                 </Box>
