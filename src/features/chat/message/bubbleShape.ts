@@ -1,8 +1,6 @@
 export const BUBBLE_RADIUS = 12;
 
-export const BUBBLE_TAIL_RADIUS = 4;
-
-export const BUBBLE_JOIN_RADIUS = 6;
+export const BUBBLE_JOIN_RADIUS = 4;
 
 export interface BubbleShapeOptions {
     isMine: boolean;
@@ -18,12 +16,21 @@ export interface BubbleCorners {
 }
 
 export function resolveBubbleCorners({ isMine, isFirstInGroupChain, isLastInGroupChain }: BubbleShapeOptions): BubbleCorners {
-    const outerTop = isFirstInGroupChain ? BUBBLE_TAIL_RADIUS : BUBBLE_JOIN_RADIUS;
-    const outerBottom = isLastInGroupChain ? BUBBLE_RADIUS : BUBBLE_JOIN_RADIUS;
+    const corners: BubbleCorners = {
+        topLeft: BUBBLE_RADIUS,
+        topRight: BUBBLE_RADIUS,
+        bottomLeft: BUBBLE_RADIUS,
+        bottomRight: BUBBLE_RADIUS,
+    };
+    if (isFirstInGroupChain && isLastInGroupChain) return corners;
     if (isMine) {
-        return { topLeft: BUBBLE_RADIUS, topRight: outerTop, bottomLeft: BUBBLE_RADIUS, bottomRight: outerBottom };
+        if (!isFirstInGroupChain) corners.topRight = BUBBLE_JOIN_RADIUS;
+        if (!isLastInGroupChain) corners.bottomRight = BUBBLE_JOIN_RADIUS;
+        return corners;
     }
-    return { topLeft: outerTop, topRight: BUBBLE_RADIUS, bottomLeft: outerBottom, bottomRight: BUBBLE_RADIUS };
+    if (!isFirstInGroupChain) corners.topLeft = BUBBLE_JOIN_RADIUS;
+    if (!isLastInGroupChain) corners.bottomLeft = BUBBLE_JOIN_RADIUS;
+    return corners;
 }
 
 export function bubbleRadiusSx(corners: BubbleCorners): Record<string, string> {

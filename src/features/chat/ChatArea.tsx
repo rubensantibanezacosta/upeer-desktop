@@ -160,7 +160,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 px: 4,
                 pt: 2,
                 pb: `${CHAT_COMPOSER_OVERLAY_HEIGHT}px`,
-                gap: 0.4,
+                gap: 0,
                 boxSizing: 'border-box'
             }}
         >
@@ -169,8 +169,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 const prevMsg = index > 0 ? reversedHistory[index - 1] : undefined;
                 const showSeparator = !nextMsg || new Date(msg.date).toDateString() !== new Date(nextMsg.date).toDateString();
 
-                const sameAsPrev = prevMsg && !prevMsg.isSystem && prevMsg.isMine === msg.isMine && prevMsg.senderUpeerId === msg.senderUpeerId;
-                const sameAsNext = nextMsg && !nextMsg.isSystem && nextMsg.isMine === msg.isMine && nextMsg.senderUpeerId === msg.senderUpeerId;
+                const sameAsPrev = prevMsg && !prevMsg.isSystem && prevMsg.isMine === msg.isMine && prevMsg.senderUpeerId === msg.senderUpeerId && new Date(prevMsg.date).toDateString() === new Date(msg.date).toDateString();
+                const sameAsNext = nextMsg && !nextMsg.isSystem && nextMsg.isMine === msg.isMine && nextMsg.senderUpeerId === msg.senderUpeerId && new Date(nextMsg.date).toDateString() === new Date(msg.date).toDateString();
                 const isFirstInGroupChain = !sameAsNext;
                 const isLastInGroupChain = !sameAsPrev;
 
