@@ -6,6 +6,7 @@ import { isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
 
 export interface FileMessageData {
     fileId: string;
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType: string;
@@ -71,6 +72,7 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
             isMe={isMe}
             timestamp={timestamp}
             status={isTransferFailed ? 'failed' : status}
+            messageId={data.messageId}
             onRetry={() => onRetry?.(fileId)}
         />;
     }
@@ -106,6 +108,7 @@ export const FileMessageItem: React.FC<FileMessageItemProps> = ({
         fileId,
         fileName, fileSize, mimeType, caption, timestamp,
         isMe, status,
+        messageId: data.messageId,
         isTransferComplete, isTransferInProgress, isTransferFailed,
         savedPath: fullPath || savedPath, direction,
         safeProgress, transferState,

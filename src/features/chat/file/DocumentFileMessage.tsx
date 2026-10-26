@@ -14,6 +14,7 @@ import { formatFileSize } from '../../../utils/fileUtils.js';
 import { RichText } from '../../../components/ui/RichText.js';
 
 interface DocumentFileMessageProps {
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType: string;
@@ -37,6 +38,7 @@ interface DocumentFileMessageProps {
 }
 
 export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
+    messageId,
     fileName,
     fileSize,
     mimeType,
@@ -168,7 +170,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                             <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px' }}>
                                 {timestamp}
                             </Typography>
-                            {isMe && <MessageStatus status={status} />}
+                            {isMe && <MessageStatus status={status} messageId={messageId} />}
                         </Box>
                     )}
                 </Box>
@@ -179,7 +181,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                     <Typography level="body-xs" sx={{ color: 'inherit', fontSize: '10px' }}>
                         {timestamp}
                     </Typography>
-                    {isMe && <MessageStatus status={status} />}
+                    {isMe && <MessageStatus status={status} messageId={messageId} />}
                 </Box>
             )}
         </Box>

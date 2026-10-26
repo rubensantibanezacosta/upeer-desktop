@@ -16,6 +16,7 @@ import { RichText } from '../../../components/ui/RichText.js';
 
 interface MediaFileMessageProps {
     fileId: string;
+    messageId?: string;
     fileName: string;
     fileSize: number;
     mimeType: string;
@@ -42,6 +43,7 @@ interface MediaFileMessageProps {
 
 export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     fileId,
+    messageId,
     fileName,
     fileSize: _fileSize,
     mimeType,
@@ -217,7 +219,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                             opacity: 0.8
                         }}>
                             <Typography level="body-xs" sx={{ fontSize: '10px', color: 'inherit' }}>{timestamp}</Typography>
-                            {isMe && <MessageStatus status={status} />}
+                            {isMe && <MessageStatus status={status} messageId={messageId} />}
                         </Box>
                     )}
                 </Box>
@@ -238,7 +240,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         <Typography level="body-xs" sx={{ color: 'white', fontSize: '10px', opacity: 0.8 }}>
                             {timestamp}
                         </Typography>
-                        {isMe && <MessageStatus status={status} />}
+                        {isMe && <MessageStatus status={status} messageId={messageId} />}
                     </Box>
                 </Box>
             )}

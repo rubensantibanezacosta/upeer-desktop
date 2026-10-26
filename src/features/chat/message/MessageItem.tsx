@@ -158,7 +158,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
 
                                 {isFile && fileData && !msg.isDeleted ? (
                                     <FileMessageItem
-                                        data={{ ...fileData, timestamp: msg.timestamp }}
+                                        data={{ ...fileData, messageId: msg.id, timestamp: msg.timestamp }}
                                         isMe={isMe}
                                         status={msg.status}
                                         onRetry={onRetryTransfer}
