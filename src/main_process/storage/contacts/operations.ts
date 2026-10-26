@@ -55,20 +55,22 @@ export function getContactByAddress(address: string) {
         .get() as StoredContact | undefined;
 }
 
-export function listContactProfiles(): { upeerId: string; name: string; avatar: string | null; isFavorite: boolean }[] {
+export function listContactProfiles(): { upeerId: string; name: string; avatar: string | null; isFavorite: boolean; publicKey: string | null }[] {
     const db = getDb();
     const schema = getSchema();
 
     const rows = db.select().from(schema.contacts).all() as StoredContact[];
-    const profiles: { upeerId: string; name: string; avatar: string | null; isFavorite: boolean }[] = [];
+    const profiles: { upeerId: string; name: string; avatar: string | null; isFavorite: boolean; publicKey: string | null }[] = [];
     for (const row of rows) {
         const upeerId = (row.upeerId ?? '').toLowerCase();
         if (!/^[0-9a-f]{64}$/.test(upeerId)) continue;
+        const publicKey = (row.publicKey ?? '').toLowerCase();
         profiles.push({
             upeerId,
             name: row.name ?? '',
             avatar: row.avatar ?? null,
             isFavorite: row.isFavorite === true,
+            publicKey: /^[0-9a-f]{64}$/.test(publicKey) ? publicKey : null,
         });
     }
     return profiles;
@@ -245,13 +247,15 @@ export function setContactFavorite(upeerId: string, isFavorite: boolean) {
 }
 
 function emitContactProfile(upeerId: string): void {
-    const contact = getContactByUpeerId(upeerId) as { name?: string; avatar?: string | null; isFavorite?: boolean } | undefined;
+    const contact = getContactByUpeerId(upeerId) as { name?: string; avatar?: string | null; isFavorite?: boolean; publicKey?: string | null } | undefined;
     if (!contact) return;
+    const publicKey = (contact.publicKey ?? '').toLowerCase();
     emitSyncEvent('CONTACT_PROFILE', {
         upeerId,
         name: contact.name ?? '',
         avatar: contact.avatar ?? null,
         isFavorite: contact.isFavorite === true,
+        publicKey: /^[0-9a-f]{64}$/.test(publicKey) ? publicKey : null,
     });
 }
 

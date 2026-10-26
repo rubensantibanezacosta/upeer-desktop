@@ -57,7 +57,8 @@ import {
     blockContact,
     unblockContact,
     getBlockedContacts,
-    isContactBlocked
+    isContactBlocked,
+    listContactProfiles
 } from '../../../src/main_process/storage/contacts/operations.js';
 
 describe('storage/contacts/operations.ts', () => {
@@ -254,6 +255,29 @@ describe('storage/contacts/operations.ts', () => {
 
             mockDb.get.mockReturnValueOnce(undefined);
             expect(isContactBlocked('u3')).toBe(false);
+        });
+    });
+
+    describe('listContactProfiles', () => {
+        it('should publish the public key of every contact so other devices can reach them', () => {
+            mockDb.all.mockReturnValueOnce([
+                { upeerId: 'A'.repeat(64), name: 'Alice', avatar: null, isFavorite: true, publicKey: 'B'.repeat(64) },
+                { upeerId: 'c'.repeat(64), name: 'Carol', avatar: null, isFavorite: false, publicKey: null },
+                { upeerId: 'not-an-id', name: 'Broken', avatar: null, isFavorite: false, publicKey: null }
+            ]);
+
+            const profiles = listContactProfiles();
+
+            expect(profiles).toHaveLength(2);
+            expect(profiles[0]).toEqual({
+                upeerId: 'a'.repeat(64),
+                name: 'Alice',
+                avatar: null,
+                isFavorite: true,
+                publicKey: 'b'.repeat(64)
+            });
+            expect(profiles[1].upeerId).toBe('c'.repeat(64));
+            expect(profiles[1].publicKey).toBeNull();
         });
     });
 });
