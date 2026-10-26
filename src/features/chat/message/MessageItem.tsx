@@ -9,6 +9,7 @@ import { RichText } from '../../../components/ui/RichText.js';
 import { LinkPreviewCard } from './LinkPreviewCard.js';
 import { MessageItemActions } from './MessageItemActions.js';
 import { parseMessage } from './messageItemSupport.js';
+import { bubbleRadiusSx, resolveBubbleCorners } from './bubbleShape.js';
 import type { FileTransfer } from '../../../hooks/fileTransferTypes.js';
 import type { ChatMessage, TransferMessageUpdates } from '../../../types/chat.js';
 
@@ -89,6 +90,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
         return msg.message;
     })();
 
+    const bubbleShape = bubbleRadiusSx(resolveBubbleCorners({ isMine: isMe, isFirstInGroupChain, isLastInGroupChain }));
+
     return (
         <Box
             id={`msg-${msg.id}`}
@@ -100,7 +103,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: isMe ? 'flex-end' : 'flex-start',
-                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : 0.2,
+                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 0.75 : 0,
             }}
         >
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
@@ -138,9 +141,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                 sx={{
                                     p: 0,
                                     overflow: 'hidden',
-                                    borderRadius: '12px',
-                                    borderTopRightRadius: isMe ? '4px' : '12px',
-                                    borderTopLeftRadius: isMe ? '12px' : '4px',
+                                    ...bubbleShape,
                                     maxWidth: isContactCard ? '360px' : '100%',
                                     position: 'relative',
                                     opacity: msg.isDeleted ? 0.6 : 1,
