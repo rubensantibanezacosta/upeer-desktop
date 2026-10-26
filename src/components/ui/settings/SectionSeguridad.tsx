@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { List } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
-import PinIcon from '@mui/icons-material/Pin';
+import { Shield, KeyRound } from 'lucide-react';
 
 import { ToggleRow } from './shared.js';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
@@ -176,7 +175,7 @@ export const SectionSeguridad: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<ShieldIcon />}
+            icon={<Shield style={{ fontSize: 18 }} />}
             title="Seguridad"
             description="Protege este equipo con un PIN y guarda a mano las palabras que recuperan tu cuenta."
         >
@@ -184,7 +183,7 @@ export const SectionSeguridad: React.FC = () => {
                 <SecurityStatusCard pinEnabled={pinEnabled} />
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                     <ToggleRow
-                        icon={<PinIcon />}
+                        icon={<KeyRound />}
                         label="Bloqueo con PIN"
                         desc="Pedir un PIN cada vez que abres la aplicación"
                         value={pinEnabled}

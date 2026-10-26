@@ -1,9 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import ImageIcon from '@mui/icons-material/Image';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import DescriptionIcon from '@mui/icons-material/Description';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import { Image as ImageIcon, FileAudio, FileVideo, FileText, File } from 'lucide-react';
 import { generatePdfThumbnail } from '../file/pdfThumbnail.js';
 import { getMimeType, isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
 
@@ -176,9 +172,9 @@ export const getFileTypeIcon = (fileType: string, fileName: string, size = 60) =
     if (!effectiveType || effectiveType === 'application/octet-stream') {
         effectiveType = getMimeType(fileName);
     }
-    if (effectiveType.startsWith('image/')) return <ImageIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('audio/')) return <AudioFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('video/')) return <VideoFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.includes('pdf')) return <DescriptionIcon sx={{ fontSize: size }} />;
-    return <InsertDriveFileIcon sx={{ fontSize: size }} />;
+    if (effectiveType.startsWith('image/')) return <ImageIcon style={{ fontSize: size }} />;
+    if (effectiveType.startsWith('audio/')) return <FileAudio style={{ fontSize: size }} />;
+    if (effectiveType.startsWith('video/')) return <FileVideo style={{ fontSize: size }} />;
+    if (effectiveType.includes('pdf')) return <FileText style={{ fontSize: size }} />;
+    return <File style={{ fontSize: size }} />;
 };

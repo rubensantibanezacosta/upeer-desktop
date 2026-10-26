@@ -9,9 +9,7 @@ import {
     ListItemDecorator,
     Switch,
 } from '@mui/joy';
-import CheckIcon from '@mui/icons-material/Check';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { Check, Copy, Info } from 'lucide-react';
 import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
 import type { SxProps } from '@mui/joy/styles/types';
 import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
@@ -56,7 +54,7 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
                 {onInfo && (
                     <Tooltip title="¿Qué es esto?" variant="soft" size="sm">
                         <IconButton size="sm" variant="plain" color="neutral" onClick={onInfo}>
-                            <InfoOutlinedIcon sx={{ fontSize: '16px', opacity: 0.5 }} />
+                            <Info style={{ fontSize: 16, opacity: 0.5 }} />
                         </IconButton>
                     </Tooltip>
                 )}
@@ -91,8 +89,8 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
                         }}
                     >
                         {copied
-                            ? <CheckIcon sx={{ fontSize: '16px' }} />
-                            : <ContentCopyIcon sx={{ fontSize: '16px' }} />
+                            ? <Check style={{ fontSize: 16 }} />
+                            : <Copy style={{ fontSize: 16 }} />
                         }
                     </IconButton>
                 </Tooltip>

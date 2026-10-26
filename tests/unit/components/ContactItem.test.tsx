@@ -3,40 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import type { Contact } from '../../../src/types/chat.js';
 
-vi.mock('@mui/icons-material', () => ({}));
-vi.mock('@mui/icons-material/esm/utils/createSvgIcon.js', () => ({
-    default: () => null
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    BadgeCheck: () => <div data-testid="BadgeCheckIcon" />,
 }));
-type CallbackFunction = (...args: unknown[]) => unknown;
-
-vi.mock('@mui/material/utils', () => ({
-    createSvgIcon: () => null,
-    capitalize: (s: string) => s,
-    useIsomorphicLayoutEffect: (callback: CallbackFunction) => callback(),
-    debounce: (callback: CallbackFunction) => callback,
-}));
-
-vi.mock('@mui/icons-material/HourglassEmpty', () => ({ default: () => <div data-testid="HourglassEmptyIcon" /> }));
-vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => <div data-testid="ErrorOutlineIcon" /> }));
-vi.mock('@mui/icons-material/Done', () => ({ default: () => <div data-testid="DoneIcon" /> }));
-vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => <div data-testid="DoneAllIcon" /> }));
-vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <div data-testid="KeyboardArrowDownIcon" /> }));
-vi.mock('@mui/icons-material/Archive', () => ({ default: () => <div data-testid="ArchiveIcon" /> }));
-vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => <div data-testid="NotificationsOffIcon" /> }));
-vi.mock('@mui/icons-material/PushPin', () => ({ default: () => <div data-testid="PushPinIcon" /> }));
-vi.mock('@mui/icons-material/Notifications', () => ({ default: () => <div data-testid="NotificationsIcon" /> }));
-vi.mock('@mui/icons-material/MarkChatUnread', () => ({ default: () => <div data-testid="MarkChatUnreadIcon" /> }));
-vi.mock('@mui/icons-material/Favorite', () => ({ default: () => <div data-testid="FavoriteIcon" /> }));
-vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => <div data-testid="FavoriteBorderIcon" /> }));
-vi.mock('@mui/icons-material/Block', () => ({ default: () => <div data-testid="BlockIcon" /> }));
-vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => <div data-testid="DeleteSweepIcon" /> }));
-vi.mock('@mui/icons-material/Delete', () => ({ default: () => <div data-testid="DeleteIcon" /> }));
-vi.mock('@mui/icons-material/WarningRounded', () => ({ default: () => <div data-testid="WarningRoundedIcon" /> }));
-vi.mock('@mui/icons-material/Security', () => ({ default: () => <div data-testid="SecurityIcon" /> }));
-vi.mock('@mui/icons-material/CheckCircle', () => ({ default: () => <div data-testid="CheckCircleIcon" /> }));
-vi.mock('@mui/icons-material/VerifiedUser', () => ({ default: () => <div data-testid="VerifiedUserIcon" /> }));
-vi.mock('@mui/icons-material/GppMaybe', () => ({ default: () => <div data-testid="GppMaybeIcon" /> }));
-vi.mock('@mui/icons-material/NewReleases', () => ({ default: () => <div data-testid="NewReleasesIcon" /> }));
 
 import { ContactItem } from '../../../src/components/layout/ContactItem.js';
 
@@ -100,7 +70,7 @@ describe('ContactItem Component', () => {
 
     it('shows high reputation badge for high vouchScore', () => {
         render(<ContactItem {...defaultProps} />);
-        expect(screen.getByTestId('VerifiedUserIcon')).toBeDefined();
+        expect(screen.getByTestId('BadgeCheckIcon')).toBeDefined();
     });
 
     it('shows online indicator when lastSeen is recent', () => {
@@ -109,6 +79,6 @@ describe('ContactItem Component', () => {
             lastSeen: new Date().toISOString()
         };
         render(<ContactItem {...defaultProps} contact={onlineContact} />);
-        expect(screen.getByTestId('VerifiedUserIcon')).toBeDefined();
+        expect(screen.getByTestId('BadgeCheckIcon')).toBeDefined();
     });
 });

@@ -1,9 +1,5 @@
 import React from 'react';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import GroupsIcon from '@mui/icons-material/Groups';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import SearchOffIcon from '@mui/icons-material/SearchOff';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
+import { MessageSquare, Users, BellOff, SearchX, Star } from 'lucide-react';
 import { EmptyState } from './EmptyState.js';
 import { LoadingState } from './LoadingState.js';
 import type { SidebarFilter } from '../../../store/useNavigationStore.js';
@@ -42,7 +38,7 @@ const filterCopy = (filter: SidebarFilter, input: SidebarEmptyStateInput): Sideb
     switch (filter) {
         case 'groups':
             return {
-                icon: <GroupsIcon sx={{ fontSize: 'inherit' }} />,
+                icon: <Users style={{ fontSize: 'inherit' }} />,
                 title: 'Sin grupos',
                 subtitle: 'Crea un grupo para hablar con varias personas a la vez.',
                 action: input.onCreateGroup
@@ -51,21 +47,21 @@ const filterCopy = (filter: SidebarFilter, input: SidebarEmptyStateInput): Sideb
             };
         case 'unread':
             return {
-                icon: <NotificationsOffIcon sx={{ fontSize: 'inherit' }} />,
+                icon: <BellOff style={{ fontSize: 'inherit' }} />,
                 title: 'Sin mensajes no leídos',
                 subtitle: 'Estás al día. Aquí aparecerán los chats con mensajes nuevos.',
                 action: { label: 'Ver todos los chats', onClick: input.onShowAll },
             };
         case 'favorites':
             return {
-                icon: <StarBorderIcon sx={{ fontSize: 'inherit' }} />,
+                icon: <Star style={{ fontSize: 'inherit' }} />,
                 title: 'Sin favoritos',
                 subtitle: 'Marca contactos o grupos como favoritos para encontrarlos rápidamente aquí.',
                 action: { label: 'Ver todos los chats', onClick: input.onShowAll },
             };
         default:
             return {
-                icon: <ChatBubbleOutlineIcon sx={{ fontSize: 'inherit' }} />,
+                icon: <MessageSquare style={{ fontSize: 'inherit' }} />,
                 title: 'Sin conversaciones',
                 subtitle: 'Añade un contacto para empezar a chatear de forma segura.',
                 action: { label: 'Nueva conversación', onClick: input.onOpenNew },
@@ -80,7 +76,7 @@ export const resolveSidebarEmptyState = (input: SidebarEmptyStateInput): Sidebar
     if (term && input.sourceCount > 0) {
         return {
             kind: 'empty',
-            icon: <SearchOffIcon sx={{ fontSize: 'inherit' }} />,
+            icon: <SearchX style={{ fontSize: 'inherit' }} />,
             title: 'Sin coincidencias',
             subtitle: `Ninguna conversación coincide con "${term}".`,
             action: { label: 'Limpiar búsqueda', onClick: input.onClearSearch },

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import LanguageIcon from '@mui/icons-material/Language';
-import ImageIcon from '@mui/icons-material/Image';
+import { Globe, Image } from 'lucide-react';
 import type { LinkPreview } from '../../../types/chat.js';
 
 interface LinkPreviewCardProps {
@@ -40,12 +39,12 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({ data }) => {
                         sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                 ) : (
-                    <ImageIcon sx={{ fontSize: 28, color: 'text.tertiary', opacity: 0.4 }} />
+                    <Image style={{ fontSize: 28, color: 'var(--joy-palette-text-tertiary)', opacity: 0.4 }} />
                 )}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0, px: 1.5, py: 0.75 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
-                    <LanguageIcon sx={{ fontSize: 11, color: 'text.tertiary', flexShrink: 0 }} />
+                    <Globe style={{ fontSize: 11, color: 'var(--joy-palette-text-tertiary)', flexShrink: 0 }} />
                     <Typography
                         level="body-xs"
                         sx={{ color: 'text.tertiary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}

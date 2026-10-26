@@ -1,10 +1,6 @@
 import React from 'react';
 import { Badge, Box, Tooltip } from '@mui/joy';
-import GppMaybeIcon from '@mui/icons-material/GppMaybe';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import SecurityIcon from '@mui/icons-material/Security';
-import NewReleasesIcon from '@mui/icons-material/NewReleases';
+import { BadgeCheck, ShieldAlert, CircleCheck, Shield, Sparkles } from 'lucide-react';
 
 interface TrustAvatarBadgeProps {
     vouchScore?: number;
@@ -20,19 +16,19 @@ export const TrustAvatarBadge: React.FC<TrustAvatarBadgeProps> = ({ vouchScore, 
     let label = 'Reputación estándar';
 
     if (vouchScore < 40) {
-        icon = <GppMaybeIcon sx={{ fontSize: 12, color: 'danger.600' }} />;
+        icon = <ShieldAlert style={{ fontSize: 12, color: 'var(--joy-palette-danger-600)' }} />;
         label = `Baja reputación (${vouchScore}/100) - Ten cuidado`;
     } else if (vouchScore >= 80) {
-        icon = <VerifiedUserIcon sx={{ fontSize: 12, color: 'success.600' }} />;
+        icon = <BadgeCheck style={{ fontSize: 12, color: 'var(--joy-palette-success-600)' }} />;
         label = `Alta reputación (${vouchScore}/100) - Muy confiable`;
     } else if (vouchScore >= 65) {
-        icon = <CheckCircleIcon sx={{ fontSize: 12, color: 'primary.600' }} />;
+        icon = <CircleCheck style={{ fontSize: 12, color: 'var(--joy-palette-primary-600)' }} />;
         label = `Buena reputación (${vouchScore}/100) - Confiable`;
     } else if (vouchScore === 50) {
-        icon = <NewReleasesIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
+        icon = <Sparkles style={{ fontSize: 12, color: 'var(--joy-palette-neutral-600)' }} />;
         label = 'Sin historial de red aún';
     } else {
-        icon = <SecurityIcon sx={{ fontSize: 12, color: 'neutral.600' }} />;
+        icon = <Shield style={{ fontSize: 12, color: 'var(--joy-palette-neutral-600)' }} />;
         label = `Reputación estándar (${vouchScore}/100)`;
     }
 

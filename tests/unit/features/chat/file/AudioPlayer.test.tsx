@@ -22,9 +22,11 @@ vi.mock('wavesurfer.js', () => ({
     default: { create: wavesurferMocks.create },
 }));
 
-vi.mock('@mui/icons-material/PlayArrow', () => ({ default: () => <span data-testid="PlayArrowIcon" /> }));
-vi.mock('@mui/icons-material/Pause', () => ({ default: () => <span data-testid="PauseIcon" /> }));
-vi.mock('@mui/icons-material/Close', () => ({ default: () => <span /> }));
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    Play: () => <span data-testid="PlayArrowIcon" />,
+    Pause: () => <span data-testid="PauseIcon" />,
+}));
 
 import { AudioPlayer } from '../../../../../src/features/chat/file/AudioPlayer';
 

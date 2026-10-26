@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, IconButton, Slider, Typography } from '@mui/joy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import { Play, Pause, Volume2, VolumeOff } from 'lucide-react';
 
 interface MediaViewerVideoPlayerProps {
     src: string;
@@ -97,10 +94,10 @@ export const MediaViewerVideoPlayer: React.FC<MediaViewerVideoPlayerProps> = ({ 
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <IconButton size="sm" variant="plain" color="neutral" onClick={togglePlay} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
-                            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                            {isPlaying ? <Pause /> : <Play />}
                         </IconButton>
                         <IconButton size="sm" variant="plain" color="neutral" onClick={toggleMute} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
-                            {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+                            {isMuted ? <VolumeOff /> : <Volume2 />}
                         </IconButton>
                         <Typography level="body-sm" sx={{ color: 'white', fontWeight: 600, ml: 1, letterSpacing: '0.5px' }}>
                             {formatTime(currentTime)} <Box component="span" sx={{ opacity: 0.5, mx: 0.5 }}>/</Box> {formatTime(duration)}

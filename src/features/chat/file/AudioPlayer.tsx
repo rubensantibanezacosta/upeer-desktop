@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, IconButton, Typography, CircularProgress } from '@mui/joy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
+import { Play, Pause } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import { MessageStatus } from '../message/MessageStatus.js';
 
@@ -99,9 +98,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, isMe, timestamp, 
                 {isLoading ? (
                     <CircularProgress size="sm" variant="plain" sx={{ color: 'inherit' }} />
                 ) : isPlaying ? (
-                    <PauseIcon sx={{ fontSize: '24px' }} />
+                    <Pause style={{ fontSize: 24 }} />
                 ) : (
-                    <PlayArrowIcon sx={{ fontSize: '24px' }} />
+                    <Play style={{ fontSize: 24 }} />
                 )}
             </IconButton>
 

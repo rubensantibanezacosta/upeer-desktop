@@ -2,10 +2,7 @@ import React from 'react';
 import { List } from '@mui/joy';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { ToggleRow } from './shared.js';
-import LockIcon from '@mui/icons-material/Lock';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import CircleIcon from '@mui/icons-material/Circle';
-import ScheduleIcon from '@mui/icons-material/Schedule';
+import { Lock, CheckCheck, Circle, Clock } from 'lucide-react';
 import { usePrivacyStore } from '../../../store/usePrivacyStore.js';
 
 export const SectionPrivacidad: React.FC = () => {
@@ -18,28 +15,28 @@ export const SectionPrivacidad: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<LockIcon />}
+            icon={<Lock style={{ fontSize: 18 }} />}
             title="Privacidad"
             description="Controla qué información comparten tus contactos sobre tu actividad."
         >
             <SettingsCard>
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                     <ToggleRow
-                        icon={<DoneAllIcon />}
+                        icon={<CheckCheck />}
                         label="Confirmaciones de lectura"
                         desc="Enviar y recibir ticks azules"
                         value={readReceipts}
                         onChange={setReadReceipts}
                     />
                     <ToggleRow
-                        icon={<CircleIcon sx={{ fontSize: '12px' }} />}
+                        icon={<Circle style={{ fontSize: 12 }} />}
                         label="Mostrar cuando estoy conectado"
                         desc="Que tus contactos vean si estás disponible"
                         value={onlineStatus}
                         onChange={setOnlineStatus}
                     />
                     <ToggleRow
-                        icon={<ScheduleIcon />}
+                        icon={<Clock />}
                         label="Última vez visto"
                         desc="Mostrar tu última actividad a tus contactos"
                         value={lastSeen}

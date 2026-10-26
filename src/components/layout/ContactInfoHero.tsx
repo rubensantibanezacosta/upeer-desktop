@@ -59,7 +59,7 @@ export const ContactInfoHero: React.FC<ContactInfoHeroProps> = ({
         </Box>
         {trust && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <trust.Icon sx={{ fontSize: 14, color: 'text.tertiary' }} />
+                <trust.Icon style={{ fontSize: 14, color: 'var(--joy-palette-text-tertiary)' }} />
                 <Typography level="body-xs" color="neutral">{trust.label}</Typography>
             </Box>
         )}

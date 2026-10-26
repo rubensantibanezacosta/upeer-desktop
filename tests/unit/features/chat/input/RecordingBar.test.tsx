@@ -2,9 +2,11 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('@mui/icons-material/Delete', () => ({ default: () => <span data-testid="DeleteIcon" /> }));
-vi.mock('@mui/icons-material/FiberManualRecord', () => ({ default: () => <span data-testid="RecordIcon" /> }));
-vi.mock('@mui/icons-material/Send', () => ({ default: () => <span data-testid="SendIcon" /> }));
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    Trash2: () => <span data-testid="DeleteIcon" />,
+    Send: () => <span data-testid="SendIcon" />,
+}));
 
 import { RecordingBar } from '../../../../../src/features/chat/input/RecordingBar';
 

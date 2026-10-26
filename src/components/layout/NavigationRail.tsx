@@ -1,11 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Avatar, Tooltip, Badge } from '@mui/joy';
-import ChatIcon from '@mui/icons-material/Chat';
-import DonutLargeIcon from '@mui/icons-material/DonutLarge';
-import GroupsIcon from '@mui/icons-material/Groups';
-import SettingsIcon from '@mui/icons-material/Settings';
-import CallIcon from '@mui/icons-material/Call';
-import VideocamIcon from '@mui/icons-material/Videocam';
+import { MessageCircle, CircleDashed, Users, Settings, Phone, Video } from 'lucide-react';
 import { SyncStatusIndicator } from './SyncStatusIndicator.js';
 
 interface NavigationRailProps {
@@ -66,7 +61,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                             size="sm"
                             sx={{ '& .MuiBadge-badge': { top: 1, right: 1, fontSize: '10px', minWidth: 16, height: 16, px: 0.4 } }}
                         >
-                            <ChatIcon />
+                            <MessageCircle style={{ fontSize: 22 }} />
                         </Badge>
                     </IconButton>
                 </Box>
@@ -80,18 +75,20 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         onClick={onOpenCalls}
                         sx={{ borderRadius: '50%' }}
                     >
-                        {activeCallKind === 'video' ? <VideocamIcon color="success" /> : <CallIcon color={activeCallKind === 'audio' ? 'success' : undefined} />}
+                        {activeCallKind === 'video'
+                            ? <Video style={{ fontSize: 22, color: 'var(--joy-palette-success-400)' }} />
+                            : <Phone style={{ fontSize: 22, color: activeCallKind === 'audio' ? 'var(--joy-palette-success-400)' : undefined }} />}
                     </IconButton>
                 </Box>
             </Tooltip>
             <Tooltip title="Actualizaciones" placement="right">
                 <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
-                    <DonutLargeIcon />
+                    <CircleDashed style={{ fontSize: 22 }} />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Comunidades" placement="right">
                 <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
-                    <GroupsIcon />
+                    <Users style={{ fontSize: 22 }} />
                 </IconButton>
             </Tooltip>
         </Box>
@@ -106,7 +103,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     onClick={onOpenSettings}
                     sx={{ borderRadius: '50%' }}
                 >
-                    <SettingsIcon />
+                    <Settings style={{ fontSize: 22 }} />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Mi perfil" placement="right">

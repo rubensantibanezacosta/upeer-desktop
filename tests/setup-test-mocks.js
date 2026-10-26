@@ -4,53 +4,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import '@testing-library/jest-dom/vitest';
 
-// Mocks para evitar dependencias de @mui/material en tests de componentes Joy UI
-vi.mock('@mui/icons-material', () => ({}));
-vi.mock('@mui/icons-material/HourglassEmpty', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Done', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Archive', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/PushPin', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Notifications', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/MarkChatUnread', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Favorite', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Block', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Delete', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/WarningRounded', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Security', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/CheckCircle', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/VerifiedUser', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/GppMaybe', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/NewReleases', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Chat', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Call', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Groups', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Settings', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/AccountCircle', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/ChatBubbleOutline', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/StarBorder', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/PersonAdd', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/GroupAdd', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Search', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/MoreVert', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Add', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/InsertDriveFile', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Image', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Language', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/VideoFile', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/AudioFile', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Description', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/AttachFile', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Mic', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Close', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Edit', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Send', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => null }));
-
 // Setup test mocks for sodium-native
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

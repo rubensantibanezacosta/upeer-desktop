@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Input, IconButton, Chip, Stack } from '@mui/joy';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
+import { Search, X } from 'lucide-react';
 import { INPUT_PILL_RADIUS } from '../../inputShape.js';
 
 const PILL_HEIGHT = 40;
@@ -68,7 +67,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                         borderColor: 'var(--joy-palette-primary-300)',
                     },
                 }}>
-                    <SearchIcon sx={{ color: 'text.tertiary', fontSize: `${SEARCH_ICON_SIZE}px`, mr: 1 }} />
+                    <Search style={{ fontSize: SEARCH_ICON_SIZE, color: 'var(--joy-palette-text-tertiary)', marginRight: 8 }} />
                     <Input
                         size="sm"
                         placeholder={placeholder}
@@ -97,7 +96,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                                 ml: 0,
                             }}
                         >
-                            <ClearIcon sx={{ fontSize: `${CLEAR_GLYPH_SIZE}px` }} />
+                            <X style={{ fontSize: CLEAR_GLYPH_SIZE }} />
                         </IconButton>
                     )}
                 </Box>

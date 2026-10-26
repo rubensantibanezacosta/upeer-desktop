@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, DialogActions, DialogContent, DialogTitle, IconButton, Modal, ModalDialog, Stack, Tooltip, Typography } from '@mui/joy';
-import DeleteIcon from '@mui/icons-material/Delete';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { Trash2, BadgeCheck } from 'lucide-react';
 import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 export interface AuthorizedDevice {
@@ -71,7 +70,7 @@ export const AuthorizedDeviceList: React.FC = () => {
     return (
         <Box>
             <CardGroupLabel
-                icon={<VerifiedUserIcon sx={{ fontSize: '15px' }} />}
+                icon={<BadgeCheck style={{ fontSize: 15 }} />}
                 title="Autorizados en esta cuenta"
                 description="Pueden usar tu cuenta sin tu frase semilla. Revocar uno le quita el acceso sin tocar el resto."
                 action={epoch !== null ? <Chip size="sm" variant="soft">epoch {epoch}</Chip> : undefined}
@@ -138,7 +137,7 @@ export const AuthorizedDeviceList: React.FC = () => {
                                     loading={busy === device.deviceId}
                                     onClick={() => setPending(device)}
                                 >
-                                    <DeleteIcon sx={{ fontSize: 18 }} />
+                                    <Trash2 style={{ fontSize: 18 }} />
                                 </IconButton>
                             </Tooltip>
                         )}

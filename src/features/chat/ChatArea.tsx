@@ -3,7 +3,7 @@ import { Box, IconButton } from '@mui/joy';
 import { CHAT_COMPOSER_OVERLAY_HEIGHT } from './input/composerLayout.js';
 import { EmptyChat } from './EmptyChat.js';
 import { MessageItem } from './message/MessageItem.js';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { ChevronDown } from 'lucide-react';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
@@ -222,7 +222,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                         zIndex: 1100,
                     }}
                 >
-                    <KeyboardArrowDownIcon />
+                    <ChevronDown />
                 </IconButton>
             )}
         </Box>

@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Box, Button, Chip, IconButton, LinearProgress, Stack, Textarea, Typography } from '@mui/joy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckIcon from '@mui/icons-material/Check';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { ArrowLeft, Check, LockOpen, Eye, EyeOff } from 'lucide-react';
 
 interface ImportStepProps {
     mode: 'import' | 'unlock';
@@ -26,7 +22,7 @@ export const ImportStep: React.FC<ImportStepProps> = ({ mode, onBack, onSubmit, 
         <Stack spacing={2.5}>
             <Stack direction="row" alignItems="center" spacing={1}>
                 <IconButton variant="plain" color="neutral" size="sm" onClick={onBack} disabled={isLoading}>
-                    <ArrowBackIcon />
+                    <ArrowLeft style={{ fontSize: 20 }} />
                 </IconButton>
                 <Typography level="title-lg">{title}</Typography>
             </Stack>
@@ -64,7 +60,7 @@ export const ImportStep: React.FC<ImportStepProps> = ({ mode, onBack, onSubmit, 
                     onClick={() => setShowWords((value) => !value)}
                     sx={{ position: 'absolute', top: 10, right: 10, borderRadius: '12px' }}
                 >
-                    {showWords ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    {showWords ? <EyeOff style={{ fontSize: 18 }} /> : <Eye style={{ fontSize: 18 }} />}
                 </IconButton>
             </Box>
 
@@ -73,7 +69,7 @@ export const ImportStep: React.FC<ImportStepProps> = ({ mode, onBack, onSubmit, 
                     {words.length} de 12 palabras detectadas
                 </Typography>
                 {isValid && (
-                    <Chip size="sm" color="success" variant="soft" startDecorator={<CheckIcon />} sx={{ borderRadius: '999px' }}>
+                    <Chip size="sm" color="success" variant="soft" startDecorator={<Check style={{ fontSize: 14 }} />} sx={{ borderRadius: '999px' }}>
                         Frase completa
                     </Chip>
                 )}
@@ -91,7 +87,7 @@ export const ImportStep: React.FC<ImportStepProps> = ({ mode, onBack, onSubmit, 
             <Button
                 fullWidth
                 size="lg"
-                startDecorator={<LockOpenIcon />}
+                startDecorator={<LockOpen style={{ fontSize: 18 }} />}
                 disabled={!isValid || isLoading}
                 loading={isLoading}
                 onClick={() => onSubmit(input.trim().toLowerCase())}

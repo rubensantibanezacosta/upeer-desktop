@@ -1,11 +1,6 @@
 import React from 'react';
 import { Box, Button, IconButton, Tooltip } from '@mui/joy';
-import SearchIcon from '@mui/icons-material/Search';
-import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import CheckIcon from '@mui/icons-material/Check';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
+import { Search, Phone, Video, Check, MoreVertical, UserPlus } from 'lucide-react';
 
 interface TopHeaderActionsProps {
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
@@ -34,7 +29,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
 }) => (
     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
         {status === 'incoming' && onAccept && (
-            <Button size="sm" variant="solid" color="primary" startDecorator={<CheckIcon />} onClick={onAccept} sx={{ borderRadius: 'md', mr: 1, fontWeight: 600 }}>
+            <Button size="sm" variant="solid" color="primary" startDecorator={<Check style={{ fontSize: 18 }} />} onClick={onAccept} sx={{ borderRadius: 'md', mr: 1, fontWeight: 600 }}>
                 Aceptar Solicitud
             </Button>
         )}
@@ -42,27 +37,27 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
         {contactName && (
             <>
                 <Tooltip title="Buscar en el chat" variant="soft">
-                    <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral" onClick={onSearch}><SearchIcon sx={{ fontSize: '22px' }} /></IconButton>
+                    <IconButton aria-label="Buscar en el chat" size="md" variant="plain" color="neutral" onClick={onSearch}><Search style={{ fontSize: 22 }} /></IconButton>
                 </Tooltip>
                 {!isSelfChat && (
                     <>
                         <Tooltip title="Llamada de voz" variant="soft">
-                            <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral" onClick={onCallAudio}><LocalPhoneIcon sx={{ fontSize: '22px' }} /></IconButton>
+                            <IconButton aria-label="Llamada de voz" size="md" variant="plain" color="neutral" onClick={onCallAudio}><Phone style={{ fontSize: 22 }} /></IconButton>
                         </Tooltip>
                         <Tooltip title="Videollamada" variant="soft">
-                            <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral" onClick={onCallVideo}><VideocamIcon sx={{ fontSize: '24px' }} /></IconButton>
+                            <IconButton aria-label="Videollamada" size="md" variant="plain" color="neutral" onClick={onCallVideo}><Video style={{ fontSize: 24 }} /></IconButton>
                         </Tooltip>
                     </>
                 )}
                 {isGroup && isAdmin && onInviteMembers && (
                     <Tooltip title="Añadir miembros" variant="soft">
                         <IconButton aria-label="Añadir miembros" size="md" variant="plain" color="neutral" onClick={onInviteMembers}>
-                            <PersonAddAlt1Icon sx={{ fontSize: '22px' }} />
+                            <UserPlus style={{ fontSize: 22 }} />
                         </IconButton>
                     </Tooltip>
                 )}
                 <Box sx={{ width: '1px', height: '24px', backgroundColor: 'divider', mx: 0.5 }} />
-                <IconButton aria-label="Más acciones" size="md" variant="plain" color="neutral"><MoreVertIcon /></IconButton>
+                <IconButton aria-label="Más acciones" size="md" variant="plain" color="neutral"><MoreVertical style={{ fontSize: 22 }} /></IconButton>
             </>
         )}
     </Box>

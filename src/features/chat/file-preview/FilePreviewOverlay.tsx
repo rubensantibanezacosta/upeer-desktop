@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, IconButton, Typography, Input, Sheet,
 } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import SendIcon from '@mui/icons-material/Send';
-import AddIcon from '@mui/icons-material/Add';
+import { X, Send, Plus } from 'lucide-react';
 import { FilePreviewCarousel } from './FilePreviewCarousel.js';
 import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { FilePreviewVideoPlayer } from './FilePreviewVideoPlayer.js';
@@ -101,7 +99,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                         border: '2px dashed', borderColor: 'divider', borderRadius: 'xl',
                         backgroundColor: 'background.level1', transition: 'all 0.2s ease-in-out',
                     }}>
-                        <AddIcon sx={{ fontSize: 48, color: 'text.primary', mb: 2 }} />
+                        <Plus style={{ fontSize: 48, color: 'var(--joy-palette-text-primary)', marginBottom: 16 }} />
                         <Typography level="h3" sx={{ color: 'text.primary', fontWeight: 500 }}>Suelta para añadir archivos</Typography>
                     </Box>
                 </Box>
@@ -116,7 +114,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                 background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
             }}>
                 <IconButton aria-label="Cerrar adjuntos" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
-                    <CloseIcon />
+                    <X />
                 </IconButton>
 
                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 'md', ml: 'auto' }}>
@@ -178,7 +176,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
                             disabled={isGenerating}
                         />
                         <IconButton aria-label="Enviar adjuntos" variant="plain" color={isGenerating ? 'neutral' : 'primary'} onClick={handleSendAll} disabled={isGenerating}>
-                            <SendIcon />
+                            <Send />
                         </IconButton>
                     </Box>
                 </Box>

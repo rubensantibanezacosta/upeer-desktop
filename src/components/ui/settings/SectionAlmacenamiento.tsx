@@ -13,14 +13,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/joy';
-import StorageIcon from '@mui/icons-material/Storage';
-import HardDriveIcon from '@mui/icons-material/Computer';
-import ForumIcon from '@mui/icons-material/Forum';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import BackupIcon from '@mui/icons-material/Backup';
-import ShieldIcon from '@mui/icons-material/Shield';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { HardDrive, Monitor, MessagesSquare, Paperclip, DatabaseBackup, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
 import { CardGroupLabel, SettingsCard, SettingsSection } from './sectionShell.js';
 
 type StorageUsage = Awaited<ReturnType<NonNullable<Window['upeer']>['getStorageUsage']>>;
@@ -87,20 +80,20 @@ export const SectionAlmacenamiento: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<StorageIcon />}
+            icon={<HardDrive style={{ fontSize: 18 }} />}
             title="Almacenamiento"
             description="Qué ocupa uPeer en este dispositivo y cuánto espacio dedica a custodiar mensajes de otros usuarios."
             action={
                 <Tooltip title="Actualizar datos" variant="soft" size="sm">
                     <IconButton size="sm" variant="plain" color="neutral" onClick={() => void load()}>
-                        <RefreshIcon sx={{ fontSize: '18px' }} />
+                        <RefreshCw style={{ fontSize: 18 }} />
                     </IconButton>
                 </Tooltip>
             }
         >
             <SettingsCard>
                 <CardGroupLabel
-                    icon={<HardDriveIcon sx={{ fontSize: '15px' }} />}
+                    icon={<Monitor style={{ fontSize: 15 }} />}
                     title="En este dispositivo"
                     description="Mensajes, archivos y copias de seguridad que uPeer guarda en tu ordenador."
                 />
@@ -118,19 +111,19 @@ export const SectionAlmacenamiento: React.FC = () => {
                             </Box>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 2 }}>
                                 <BreakdownRow
-                                    icon={<ForumIcon sx={{ fontSize: '18px' }} />}
+                                    icon={<MessagesSquare style={{ fontSize: 18 }} />}
                                     label="Conversaciones e identidad"
                                     hint="Base de datos cifrada"
                                     value={fmt(usage.databaseBytes)}
                                 />
                                 <BreakdownRow
-                                    icon={<AttachFileIcon sx={{ fontSize: '18px' }} />}
+                                    icon={<Paperclip style={{ fontSize: 18 }} />}
                                     label="Archivos compartidos"
                                     hint={`${usage.attachmentCount} archivos en la carpeta de datos`}
                                     value={fmt(usage.attachmentsBytes)}
                                 />
                                 <BreakdownRow
-                                    icon={<BackupIcon sx={{ fontSize: '18px' }} />}
+                                    icon={<DatabaseBackup style={{ fontSize: 18 }} />}
                                     label="Copias de seguridad"
                                     hint="Se generan automáticamente cada día"
                                     value={fmt(usage.backupsBytes)}
@@ -147,7 +140,7 @@ export const SectionAlmacenamiento: React.FC = () => {
 
             <SettingsCard>
                 <CardGroupLabel
-                    icon={<ShieldIcon sx={{ fontSize: '15px' }} />}
+                    icon={<ShieldCheck style={{ fontSize: 15 }} />}
                     title="Vault de mensajes"
                     description="Mensajes cifrados que custodias temporalmente para contactos desconectados."
                 />
@@ -178,7 +171,7 @@ export const SectionAlmacenamiento: React.FC = () => {
                                 size="sm"
                                 variant="soft"
                                 color="danger"
-                                startDecorator={<DeleteForeverIcon sx={{ fontSize: '16px' }} />}
+                                startDecorator={<Trash2 style={{ fontSize: 16 }} />}
                                 onClick={() => setConfirming(true)}
                                 disabled={usage.vaultEntries === 0}
                                 sx={{ mt: 1.75 }}

@@ -18,9 +18,7 @@ import {
     Stack,
     IconButton
 } from '@mui/joy';
-import GroupsIcon from '@mui/icons-material/Groups';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
+import { Users, Search, X } from 'lucide-react';
 import { Contact } from '../../types/chat.js';
 
 interface CreateGroupModalProps {
@@ -97,11 +95,11 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                     backgroundColor: 'background.surface'
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <GroupsIcon color="primary" />
+                        <Users style={{ fontSize: 20, color: 'var(--joy-palette-primary-400)' }} />
                         <DialogTitle sx={{ m: 0 }}>Nuevo Grupo de Chat</DialogTitle>
                     </Box>
                     <IconButton variant="plain" color="neutral" size="sm" onClick={handleClose}>
-                        <CloseIcon />
+                        <X style={{ fontSize: 20 }} />
                     </IconButton>
                 </Box>
 
@@ -157,7 +155,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                             placeholder="Buscar en tus contactos..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            startDecorator={<SearchIcon sx={{ opacity: 0.5, fontSize: '20px' }} />}
+                            startDecorator={<Search style={{ opacity: 0.5, fontSize: 20 }} />}
                             size="sm"
                             sx={{ borderRadius: 'md', mb: 0.5 }}
                         />

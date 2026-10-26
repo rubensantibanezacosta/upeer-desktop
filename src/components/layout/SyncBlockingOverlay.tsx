@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, LinearProgress, Typography } from '@mui/joy';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import DevicesIcon from '@mui/icons-material/Devices';
+import { CircleCheck, MonitorSmartphone } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore.js';
 
 const FADE_OUT_MS = 700;
@@ -57,8 +56,8 @@ export const SyncBlockingOverlay: React.FC<{ enabled: boolean }> = ({ enabled })
         >
             <Box sx={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {done
-                    ? <CheckCircleOutlineIcon sx={{ fontSize: 48, color: 'success.400' }} />
-                    : <DevicesIcon sx={{ fontSize: 40, color: 'primary.400' }} />}
+                    ? <CircleCheck style={{ fontSize: 48, color: 'var(--joy-palette-success-400)' }} />
+                    : <MonitorSmartphone style={{ fontSize: 40, color: 'var(--joy-palette-primary-400)' }} />}
                 {!done && <CircularProgress size="lg" sx={{ position: 'absolute', inset: 0, '--CircularProgress-size': '80px', '--CircularProgress-thickness': '3px' }} />}
             </Box>
             <Box sx={{ textAlign: 'center', maxWidth: 340 }}>

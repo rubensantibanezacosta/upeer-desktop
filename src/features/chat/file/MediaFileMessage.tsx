@@ -5,11 +5,7 @@ import {
     IconButton,
     CircularProgress,
 } from '@mui/joy';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import CloseIcon from '@mui/icons-material/Close';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import ImageIcon from '@mui/icons-material/Image';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { RefreshCw, X, FileVideo, Image, Play } from 'lucide-react';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { toMediaUrl } from '../../../utils/fileUtils.js';
 import { RichText } from '../../../components/ui/RichText.js';
@@ -130,7 +126,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         color: 'text.secondary',
                         backgroundColor: 'background.level2'
                     }}>
-                        {isVideo ? <VideoFileIcon sx={{ fontSize: 48 }} /> : <ImageIcon sx={{ fontSize: 48 }} />}
+                        {isVideo ? <FileVideo style={{ fontSize: 48 }} /> : <Image style={{ fontSize: 48 }} />}
                         <Typography level="body-xs" sx={{ mt: 1 }}>{getFileExtension()}</Typography>
                     </Box>
                 )}
@@ -156,7 +152,7 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                             }
                         }}
                     >
-                        <PlayArrowIcon sx={{ fontSize: 32 }} />
+                        <Play style={{ fontSize: 32 }} />
                     </IconButton>
                 )}
             </Box>
@@ -174,12 +170,12 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <CircularProgress determinate={transferState === 'active'} value={safeProgress} color="primary" sx={{ '--CircularProgress-size': '44px' }} />
                             <IconButton size="sm" variant="plain" sx={{ position: 'absolute', color: 'white' }} onClick={(e) => { e.stopPropagation(); onCancel(); }}>
-                                <CloseIcon sx={{ fontSize: 20 }} />
+                                <X style={{ fontSize: 20 }} />
                             </IconButton>
                         </Box>
                     ) : isTransferFailed ? (
                         <IconButton size="sm" variant="plain" sx={{ color: 'white' }} onClick={(e) => { e.stopPropagation(); onRetry(); }}>
-                            <RefreshIcon />
+                            <RefreshCw />
                         </IconButton>
                     ) : null}
                 </Box>

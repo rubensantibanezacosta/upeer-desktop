@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Box, Button, Input, Stack, Typography } from '@mui/joy';
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import { ImagePlus } from 'lucide-react';
 import { resizeImageToDataUrl } from './utils.js';
 
 interface CreateFlowProfileSetupProps {
@@ -55,7 +55,7 @@ export const CreateFlowProfileSetup: React.FC<CreateFlowProfileSetupProps> = ({
                     {avatar ? (
                         <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                        <AddPhotoAlternateIcon sx={{ fontSize: 30, color: 'text.tertiary' }} />
+                        <ImagePlus style={{ fontSize: 30, color: 'var(--joy-palette-text-tertiary)' }} />
                     )}
                 </Box>
                 <Button

@@ -6,7 +6,7 @@ import {
     Tooltip,
     Input
 } from '@mui/joy';
-import EditIcon from '@mui/icons-material/Edit';
+import { Pencil } from 'lucide-react';
 import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
 import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
@@ -140,7 +140,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                     <Tooltip title="Editar nombre del grupo" variant="soft" size="sm">
                                         <IconButton aria-label="Editar nombre del grupo" size="sm" variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); startEditName(); }}
                                             sx={{ minHeight: 'auto', p: 0.25 }}>
-                                            <EditIcon sx={{ fontSize: 13 }} />
+                                            <Pencil style={{ fontSize: 13 }} />
                                         </IconButton>
                                     </Tooltip>
                                 )}

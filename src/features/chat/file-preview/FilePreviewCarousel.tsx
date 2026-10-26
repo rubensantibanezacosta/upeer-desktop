@@ -1,13 +1,6 @@
 import React from 'react';
 import { Box, IconButton } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import AddIcon from '@mui/icons-material/Add';
-import ImageIcon from '@mui/icons-material/Image';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import DescriptionIcon from '@mui/icons-material/Description';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { X, Plus, Image, FileAudio, FileVideo, FileText, File, Play } from 'lucide-react';
 import { getMimeType } from '../../../utils/fileUtils.js';
 
 const THUMB_WIDTH = 56;
@@ -36,11 +29,11 @@ const getFileIcon = (fileType: string, fileName: string, size = 24) => {
     if (!effectiveType || effectiveType === 'application/octet-stream') {
         effectiveType = getMimeType(fileName);
     }
-    if (effectiveType.startsWith('image/')) return <ImageIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('audio/')) return <AudioFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.startsWith('video/')) return <VideoFileIcon sx={{ fontSize: size }} />;
-    if (effectiveType.includes('pdf')) return <DescriptionIcon sx={{ fontSize: size }} />;
-    return <InsertDriveFileIcon sx={{ fontSize: size }} />;
+    if (effectiveType.startsWith('image/')) return <Image style={{ fontSize: size }} />;
+    if (effectiveType.startsWith('audio/')) return <FileAudio style={{ fontSize: size }} />;
+    if (effectiveType.startsWith('video/')) return <FileVideo style={{ fontSize: size }} />;
+    if (effectiveType.includes('pdf')) return <FileText style={{ fontSize: size }} />;
+    return <File style={{ fontSize: size }} />;
 };
 
 export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
@@ -106,7 +99,7 @@ export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         width: 20, height: 20,
                                     }}>
-                                        <PlayArrowIcon sx={{ fontSize: 14 }} />
+                                        <Play style={{ fontSize: 14 }} />
                                     </Box>
                                 )}
                             </Box>
@@ -129,7 +122,7 @@ export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
                                 }}
                                 className="remove-btn"
                             >
-                                <CloseIcon sx={{ fontSize: 10 }} />
+                                <X style={{ fontSize: 10 }} />
                             </IconButton>
                         )}
                         <style>{`div:hover > .remove-btn { opacity: 1 !important; }`}</style>
@@ -141,7 +134,7 @@ export const FilePreviewCarousel: React.FC<FilePreviewCarouselProps> = ({
                 variant="outlined" color="neutral" onClick={onAddMore}
                 sx={{ width: THUMB_WIDTH, height: THUMB_WIDTH, borderRadius: '8px', flexShrink: 0 }}
             >
-                <AddIcon />
+                <Plus />
             </IconButton>
         </Box>
     );

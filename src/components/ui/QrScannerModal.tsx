@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, ModalDialog, DialogTitle, DialogContent, Box, Button, Typography, Alert, IconButton, Divider } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { X, ScanLine, Info } from 'lucide-react';
 import jsQR from 'jsqr';
 
 const SCAN_INTERVAL_MS = 180;
@@ -104,11 +102,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ open, onClose, o
             <ModalDialog sx={{ width: 420, maxWidth: '95vw', borderRadius: 'xl', p: 0, overflow: 'hidden' }}>
                 <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'background.surface' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <QrCodeScannerIcon color="primary" />
+                        <ScanLine style={{ fontSize: 20, color: 'var(--joy-palette-primary-400)' }} />
                         <DialogTitle sx={{ m: 0 }}>Escanear código QR</DialogTitle>
                     </Box>
                     <IconButton aria-label="Cerrar escáner" variant="plain" color="neutral" size="sm" onClick={close}>
-                        <CloseIcon />
+                        <X style={{ fontSize: 20 }} />
                     </IconButton>
                 </Box>
                 <Divider />
@@ -117,7 +115,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ open, onClose, o
                         Apunta al código QR que muestra el móvil en Perfil → Mostrar QR.
                     </Typography>
                     {error ? (
-                        <Alert variant="soft" color="danger" startDecorator={<InfoOutlined />} sx={{ py: 1 }}>
+                        <Alert variant="soft" color="danger" startDecorator={<Info style={{ fontSize: 16 }} />} sx={{ py: 1 }}>
                             {error}
                         </Alert>
                     ) : (

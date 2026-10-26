@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { toMediaUrl, fromMediaUrl } from '../../../utils/fileUtils.js';
 import { Box, IconButton, Sheet, Typography, CircularProgress, Stack, Button } from '@mui/joy';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { UnsupportedVideoFallback } from '../../../components/ui/UnsupportedVideoFallback.js';
 import { PdfPreview } from '../file/PdfPreview.js';
 import { getInlineVideoUnsupportedReason, supportsInlineVideoPlayback } from '../../../utils/videoPlayback.js';
@@ -139,7 +137,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                             '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
                         }}
                     >
-                        <ChevronLeftIcon />
+                        <ChevronLeft />
                     </IconButton>
                 )}
 
@@ -156,7 +154,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                             '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
                         }}
                     >
-                        <ChevronRightIcon />
+                        <ChevronRight />
                     </IconButton>
                 )}
 
@@ -180,7 +178,7 @@ export const MediaViewerOverlay: React.FC<MediaViewerOverlayProps> = ({
                                 <Button
                                     variant="solid"
                                     color="primary"
-                                    startDecorator={<OpenInNewIcon />}
+                                    startDecorator={<ExternalLink />}
                                     onClick={async (e) => {
                                         e.stopPropagation();
                                         const cleanPath = fromMediaUrl(contentUrl);

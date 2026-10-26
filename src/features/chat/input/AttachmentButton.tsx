@@ -9,13 +9,7 @@ import {
     Dropdown,
     MenuButton
 } from '@mui/joy';
-import AddIcon from '@mui/icons-material/Add';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import ImageIcon from '@mui/icons-material/Image';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import DescriptionIcon from '@mui/icons-material/Description';
-import ShareIcon from '@mui/icons-material/Share';
+import { Plus, Paperclip, Image, FileVideo, FileAudio, FileText, Share2 } from 'lucide-react';
 
 
 export type AttachmentType =
@@ -43,31 +37,31 @@ const ATTACHMENT_OPTIONS: Array<{
         {
             type: 'any',
             label: 'Cualquier archivo',
-            icon: <AttachFileIcon />,
+            icon: <Paperclip />,
             description: 'Selecciona cualquier tipo de archivo'
         },
         {
             type: 'image',
             label: 'Imagen',
-            icon: <ImageIcon />,
+            icon: <Image />,
             description: 'JPG, PNG, GIF, WebP'
         },
         {
             type: 'video',
             label: 'Video',
-            icon: <VideoFileIcon />,
+            icon: <FileVideo />,
             description: 'MP4, MOV, AVI, WebM'
         },
         {
             type: 'audio',
             label: 'Audio',
-            icon: <AudioFileIcon />,
+            icon: <FileAudio />,
             description: 'MP3, WAV, OGG'
         },
         {
             type: 'document',
             label: 'Documento',
-            icon: <DescriptionIcon />,
+            icon: <FileText />,
             description: 'PDF, Word, Excel, PowerPoint'
         }
     ];
@@ -83,7 +77,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
             {
                 type: 'contact' as AttachmentType,
                 label: 'Contacto',
-                icon: <ShareIcon />,
+                icon: <Share2 />,
                 description: 'Comparte una tarjeta de contacto'
             }
         ]
@@ -108,7 +102,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                     }
                 }}
             >
-                <AddIcon />
+                <Plus />
             </MenuButton>
 
             <Menu

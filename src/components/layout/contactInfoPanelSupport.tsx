@@ -1,14 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/joy';
-import ArchiveIcon from '@mui/icons-material/Archive';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import BlockIcon from '@mui/icons-material/Block';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import { Archive, BellOff, Heart, Share2, Eraser, Ban, LockOpen, UserMinus } from 'lucide-react';
 import { parseMessage } from '../../features/chat/message/messageItemSupport.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import { toMediaUrl } from '../../utils/fileUtils.js';
@@ -79,28 +71,28 @@ export const buildContactInfoActions = ({
         {
             key: 'share',
             label: 'Compartir contacto',
-            icon: <ShareOutlinedIcon sx={{ fontSize: 22 }} />,
+            icon: <Share2 style={{ fontSize: 20 }} />,
             onClick: onShare,
             disabled: false,
         },
         {
             key: 'mute',
             label: 'Silenciar notificaciones',
-            icon: <NotificationsOffIcon sx={{ fontSize: 22 }} />,
+            icon: <BellOff style={{ fontSize: 20 }} />,
             onClick: onMute,
             disabled: !onMute,
         },
         {
             key: 'archive',
             label: 'Archivar chat',
-            icon: <ArchiveIcon sx={{ fontSize: 22 }} />,
+            icon: <Archive style={{ fontSize: 20 }} />,
             onClick: onArchive,
             disabled: !onArchive,
         },
         {
             key: 'favorite',
             label: contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos',
-            icon: contact.isFavorite ? <FavoriteIcon sx={{ fontSize: 22 }} /> : <FavoriteBorderIcon sx={{ fontSize: 22 }} />,
+            icon: <Heart style={{ fontSize: 20 }} fill={contact.isFavorite ? 'currentColor' : 'none'} />,
             onClick: onFavorite,
             disabled: !onFavorite,
         },
@@ -110,21 +102,21 @@ export const buildContactInfoActions = ({
         {
             key: 'clear',
             label: 'Vaciar chat',
-            icon: <DeleteSweepIcon sx={{ fontSize: 22 }} />,
+            icon: <Eraser style={{ fontSize: 20 }} />,
             color: 'warning.600',
             onClick: onClearChat,
         },
         {
             key: 'block',
             label: contact.status === 'blocked' ? 'Desbloquear' : `Bloquear a ${contact.name}`,
-            icon: contact.status === 'blocked' ? <LockOpenIcon sx={{ fontSize: 22 }} /> : <BlockIcon sx={{ fontSize: 22 }} />,
+            icon: contact.status === 'blocked' ? <LockOpen style={{ fontSize: 20 }} /> : <Ban style={{ fontSize: 20 }} />,
             color: 'danger.600',
             onClick: onBlockContact,
         },
         {
             key: 'delete',
             label: 'Eliminar contacto',
-            icon: <PersonRemoveIcon sx={{ fontSize: 22 }} />,
+            icon: <UserMinus style={{ fontSize: 20 }} />,
             color: 'danger.600',
             onClick: onDeleteRequest,
         },

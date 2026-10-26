@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Box, Button, Stack, Typography } from '@mui/joy';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { Copy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface EnrollmentCodeCardProps {
@@ -66,7 +66,7 @@ export const EnrollmentCodeCard: React.FC<EnrollmentCodeCardProps> = ({ title, d
                 </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
-                <Button size="sm" variant="outlined" startDecorator={<ContentCopyIcon />} onClick={copy}>
+                <Button size="sm" variant="outlined" startDecorator={<Copy style={{ fontSize: 16 }} />} onClick={copy}>
                     {copied ? 'Copiado' : 'Copiar código'}
                 </Button>
                 {expiry && <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>{expiry}</Typography>}

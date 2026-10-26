@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge, Box, Tooltip, Typography } from '@mui/joy';
-import DevicesIcon from '@mui/icons-material/Devices';
+import { MonitorSmartphone } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore.js';
 
 const deviceLabel = (device: UpeerSyncDevice): string => (
@@ -45,7 +45,11 @@ export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ 
     const devices = syncStatus.devices ?? [];
     const total = devices.length;
     const online = devices.filter((device) => device.state === 'synced' || device.state === 'local').length;
-    const color = online > 1 ? 'success.500' : online === 1 ? 'warning.500' : 'text.tertiary';
+    const color = online > 1
+        ? 'var(--joy-palette-success-500)'
+        : online === 1
+            ? 'var(--joy-palette-warning-500)'
+            : 'var(--joy-palette-text-tertiary)';
     const label = total === 0
         ? 'Sin dispositivos en la cuenta'
         : `${total} dispositivo${total === 1 ? '' : 's'} en tu cuenta, ${online} conectado${online === 1 ? '' : 's'}`;
@@ -64,7 +68,7 @@ export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ 
                     size="sm"
                     sx={{ '& .MuiBadge-badge': { top: 2, right: 2, fontSize: '10px', minWidth: 16, height: 16, px: 0.4 } }}
                 >
-                    <DevicesIcon sx={{ fontSize: 20, color }} />
+                    <MonitorSmartphone style={{ fontSize: 20, color }} />
                 </Badge>
             </Box>
         </Tooltip>

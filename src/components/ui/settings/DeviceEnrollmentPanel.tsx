@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Stack, Textarea, Typography } from '@mui/joy';
-import AddLinkIcon from '@mui/icons-material/AddLink';
-import VerifiedIcon from '@mui/icons-material/Verified';
+import { Link, BadgeCheck } from 'lucide-react';
 import { EnrollmentCodeCard } from '../enrollment/EnrollmentCodeCard.js';
 import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
@@ -115,7 +114,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
     return (
         <Box>
             <CardGroupLabel
-                icon={<AddLinkIcon sx={{ fontSize: '15px' }} />}
+                icon={<Link style={{ fontSize: 15 }} />}
                 title="Añadir otro dispositivo"
                 description="Genera la invitación y añade el dispositivo escaneando el QR o pegando el código en el otro equipo."
             />
@@ -123,7 +122,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
                 <Stack spacing={2}>
             {!invite && !issued && (
                 <Box>
-                    <Button startDecorator={<AddLinkIcon />} loading={busy} onClick={() => void createInvite()}>
+                    <Button startDecorator={<Link style={{ fontSize: 16 }} />} loading={busy} onClick={() => void createInvite()}>
                         Generar invitación
                     </Button>
                 </Box>
@@ -162,7 +161,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
                         />
                         <Box>
                             <Button
-                                startDecorator={<VerifiedIcon />}
+                                startDecorator={<BadgeCheck style={{ fontSize: 16 }} />}
                                 loading={busy}
                                 disabled={requestCode.trim().length === 0}
                                 onClick={() => void authorizeManually()}
@@ -187,7 +186,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
 
             {issued && (
                 <Stack spacing={1.5}>
-                    <Alert color="success" variant="soft" size="sm" startDecorator={<VerifiedIcon />}>
+                    <Alert color="success" variant="soft" size="sm" startDecorator={<BadgeCheck style={{ fontSize: 16 }} />}>
                         Dispositivo añadido a tu cuenta ({issued.deviceId.slice(0, 16)}…)
                     </Alert>
                     <Box>

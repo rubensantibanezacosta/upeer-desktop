@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { CircleUser } from 'lucide-react';
 import type { Identity } from './types.js';
 import { resizeImageToDataUrl } from './shared.js';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
@@ -121,7 +121,7 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
 
     return (
         <SettingsSection
-            icon={<AccountCircleIcon />}
+            icon={<CircleUser style={{ fontSize: 18 }} />}
             title="Perfil"
             description="Así te ven tus contactos: nombre, foto y la dirección con la que pueden escribirte."
         >

@@ -15,10 +15,7 @@ import {
     IconButton,
     Divider
 } from '@mui/joy';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
-import CloseIcon from '@mui/icons-material/Close';
-import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import { UserPlus, Info, X, ScanLine } from 'lucide-react';
 import { isYggdrasilAddress } from '../../utils/yggdrasilAddress.js';
 import { parseContactQrPayload } from '../../utils/contactQr.js';
 import { QrScannerModal } from './QrScannerModal.js';
@@ -92,11 +89,11 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                     backgroundColor: 'background.surface'
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonAddIcon color="primary" />
+                        <UserPlus style={{ fontSize: 20, color: 'var(--joy-palette-primary-400)' }} />
                         <DialogTitle sx={{ m: 0 }}>Nueva Conexión Segura</DialogTitle>
                     </Box>
                     <IconButton variant="plain" color="neutral" size="sm" onClick={onClose}>
-                        <CloseIcon />
+                        <X style={{ fontSize: 20 }} />
                     </IconButton>
                 </Box>
                 <Divider />
@@ -108,7 +105,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                     <Button
                         variant="outlined"
                         color="neutral"
-                        startDecorator={<QrCodeScannerIcon />}
+                        startDecorator={<ScanLine style={{ fontSize: 16 }} />}
                         onClick={() => setScanning(true)}
                         fullWidth
                         sx={{ mb: 2.5 }}
@@ -120,7 +117,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({ open, onClose,
                         <Alert
                             variant="soft"
                             color="danger"
-                            startDecorator={<InfoOutlined />}
+                            startDecorator={<Info style={{ fontSize: 16 }} />}
                             sx={{ mb: 2.5, py: 1 }}
                         >
                             {error}

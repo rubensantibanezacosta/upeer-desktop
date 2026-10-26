@@ -4,8 +4,7 @@ import {
     List, ListItem, ListItemButton, ListItemContent, ListItemDecorator,
     Button, Checkbox,
 } from '@mui/joy';
-import SearchIcon from '@mui/icons-material/Search';
-import GroupsIcon from '@mui/icons-material/Groups';
+import { Search, Users } from 'lucide-react';
 import { getContactCardSummary } from './messageItemSupport.js';
 
 interface ForwardTarget {
@@ -118,7 +117,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({ open, onClose, conta
                     <Input
                         aria-label="Buscar destino para reenviar"
                         placeholder="Buscar un nombre o número"
-                        startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                        startDecorator={<Search style={{ fontSize: 18 }} />}
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         autoFocus
@@ -170,7 +169,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({ open, onClose, conta
                                             variant="soft"
                                             color="neutral"
                                         >
-                                            {t.isGroup ? <GroupsIcon /> : t.name[0]?.toUpperCase()}
+                                            {t.isGroup ? <Users /> : t.name[0]?.toUpperCase()}
                                         </Avatar>
                                     </ListItemDecorator>
                                     <ListItemContent sx={{ minWidth: 0 }}>

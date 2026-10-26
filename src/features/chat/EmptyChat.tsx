@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
+import { ShieldCheck } from 'lucide-react';
 import { LoadingState } from '../../components/layout/sidebar/LoadingState.js';
 
 export const EmptyChat: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
@@ -37,7 +37,7 @@ export const EmptyChat: React.FC<{ loading?: boolean }> = ({ loading = false }) 
                 border: '1px solid',
                 borderColor: 'divider'
             }}>
-                <ShieldIcon sx={{ fontSize: '48px', color: 'primary.500' }} />
+                <ShieldCheck style={{ fontSize: 48, color: 'var(--joy-palette-primary-500)' }} />
             </Box>
             <Typography level="h4" sx={{ fontWeight: 600, mb: 1 }}>
                 Conversación Segura Activada

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Box, Button, Stack, Textarea, Typography } from '@mui/joy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import { ArrowLeft, ScanLine } from 'lucide-react';
 import { EnrollmentCodeCard } from '../enrollment/EnrollmentCodeCard.js';
 
 interface LinkDeviceStepProps {
@@ -64,7 +63,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
     return (
         <Stack spacing={2.5}>
             <Stack direction="row" spacing={1} alignItems="center">
-                <Button size="sm" variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={() => void cancel()}>
+                <Button size="sm" variant="plain" color="neutral" startDecorator={<ArrowLeft style={{ fontSize: 16 }} />} onClick={() => void cancel()}>
                     Volver
                 </Button>
                 <Typography level="title-lg">Entrar en mi cuenta con una invitación</Typography>
@@ -72,7 +71,7 @@ export const LinkDeviceStep: React.FC<LinkDeviceStepProps> = ({ onBack, onLinked
 
             {phase === 'invite' && (
                 <Stack spacing={2}>
-                    <Alert variant="soft" color="primary" startDecorator={<QrCodeScannerIcon />} sx={{ borderRadius: '18px' }}>
+                    <Alert variant="soft" color="primary" startDecorator={<ScanLine style={{ fontSize: 18 }} />} sx={{ borderRadius: '18px' }}>
                         Este dispositivo se unirá a una cuenta existente sin guardar su frase semilla: solo recibirá un certificado firmado por la cuenta.
                     </Alert>
                     <Box>

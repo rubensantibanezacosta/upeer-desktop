@@ -9,16 +9,7 @@ import {
     ListItemDecorator,
 } from '@mui/joy';
 
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import LockIcon from '@mui/icons-material/Lock';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import PaletteIcon from '@mui/icons-material/Palette';
-import ShieldIcon from '@mui/icons-material/Shield';
-import StorageIcon from '@mui/icons-material/Storage';
-import InfoIcon from '@mui/icons-material/Info';
-import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
-import DevicesIcon from '@mui/icons-material/Devices';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { CircleUser, Lock, Bell, Palette, Shield, HardDrive, Info, Network, MonitorSmartphone, LogOut } from 'lucide-react';
 
 import { SettingsPanelProps, SettingsSection } from './settings/types.js';
 import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx, LIST_ROW_MIN_HEIGHT } from '../layout/listRowMetrics.js';
@@ -35,15 +26,15 @@ import { SectionDispositivos } from './settings/SectionDispositivos.js';
 // ─── Definicion de secciones ─────────────────────────────────────────────────
 
 const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.ReactNode }[] = [
-    { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <AccountCircleIcon /> },
-    { id: 'dispositivos', label: 'Dispositivos', desc: 'Añadir y revisar los de tu cuenta', icon: <DevicesIcon /> },
-    { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <LockIcon /> },
-    { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <ShieldIcon /> },
-    { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <NotificationsIcon /> },
-    { id: 'apariencia', label: 'Apariencia', desc: 'Tema y tamaño de texto', icon: <PaletteIcon /> },
-    { id: 'almacenamiento', label: 'Almacenamiento', desc: 'Mensajes guardados y archivos', icon: <StorageIcon /> },
-    { id: 'red', label: 'Conexión', desc: 'Estado y dirección de red', icon: <NetworkCheckIcon /> },
-    { id: 'acerca', label: 'Acerca de', desc: 'Versión y licencia', icon: <InfoIcon /> },
+    { id: 'perfil', label: 'Perfil', desc: 'Nombre, foto, dirección de contacto', icon: <CircleUser /> },
+    { id: 'dispositivos', label: 'Dispositivos', desc: 'Añadir y revisar los de tu cuenta', icon: <MonitorSmartphone /> },
+    { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <Lock /> },
+    { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <Shield /> },
+    { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <Bell /> },
+    { id: 'apariencia', label: 'Apariencia', desc: 'Tema y tamaño de texto', icon: <Palette /> },
+    { id: 'almacenamiento', label: 'Almacenamiento', desc: 'Mensajes guardados y archivos', icon: <HardDrive /> },
+    { id: 'red', label: 'Conexión', desc: 'Estado y dirección de red', icon: <Network /> },
+    { id: 'acerca', label: 'Acerca de', desc: 'Versión y licencia', icon: <Info /> },
 ];
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -149,7 +140,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     color: 'danger.500',
                                                 }}>
-                                                    <LogoutIcon />
+                                                    <LogOut style={{ fontSize: 18 }} />
                                                 </Box>
                                             </ListItemDecorator>
                                             <Box>

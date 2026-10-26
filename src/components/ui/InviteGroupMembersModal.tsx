@@ -18,9 +18,7 @@ import {
     Stack,
     IconButton
 } from '@mui/joy';
-import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
+import { UserPlus, Search, X } from 'lucide-react';
 import { Contact, Group } from '../../types/chat.js';
 
 interface InviteGroupMembersModalProps {
@@ -113,11 +111,11 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
                     backgroundColor: 'background.surface'
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonAddAlt1Icon color="primary" />
+                        <UserPlus style={{ fontSize: 20, color: 'var(--joy-palette-primary-400)' }} />
                         <DialogTitle sx={{ m: 0 }}>Añadir miembros</DialogTitle>
                     </Box>
                     <IconButton variant="plain" color="neutral" size="sm" onClick={handleClose}>
-                        <CloseIcon />
+                        <X style={{ fontSize: 20 }} />
                     </IconButton>
                 </Box>
 
@@ -155,7 +153,7 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
                             placeholder="Buscar en tus contactos..."
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            startDecorator={<SearchIcon sx={{ opacity: 0.5, fontSize: '20px' }} />}
+                            startDecorator={<Search style={{ opacity: 0.5, fontSize: 20 }} />}
                             size="sm"
                             sx={{ borderRadius: 'md', mb: 0.5 }}
                         />

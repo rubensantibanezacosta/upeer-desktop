@@ -3,9 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { DeviceEnrollmentPanel } from '../../../../src/components/ui/settings/DeviceEnrollmentPanel.js';
 
-vi.mock('@mui/icons-material/AddLink', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/Verified', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/ContentCopy', () => ({ default: () => <span /> }));
 vi.mock('qrcode.react', () => ({
     QRCodeSVG: ({ value }: { value: string }) => <div data-testid="qr" data-value={value} />,
 }));

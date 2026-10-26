@@ -3,23 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import type { Group } from '../../../src/types/chat.js';
 
-vi.mock('@mui/icons-material', () => ({}));
-vi.mock('@mui/icons-material/esm/utils/createSvgIcon.js', () => ({ default: () => null }));
-vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
-vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <div data-testid="KeyboardArrowDownIcon" /> }));
-vi.mock('@mui/icons-material/Archive', () => ({ default: () => <div data-testid="ArchiveIcon" /> }));
-vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => <div data-testid="NotificationsOffIcon" /> }));
-vi.mock('@mui/icons-material/PushPin', () => ({ default: () => <div data-testid="PushPinIcon" /> }));
-vi.mock('@mui/icons-material/MarkChatUnread', () => ({ default: () => <div data-testid="MarkChatUnreadIcon" /> }));
-vi.mock('@mui/icons-material/Favorite', () => ({ default: () => <div data-testid="FavoriteIcon" /> }));
-vi.mock('@mui/icons-material/FavoriteBorder', () => ({ default: () => <div data-testid="FavoriteBorderIcon" /> }));
-vi.mock('@mui/icons-material/DeleteSweep', () => ({ default: () => <div data-testid="DeleteSweepIcon" /> }));
-vi.mock('@mui/icons-material/ExitToApp', () => ({ default: () => <div data-testid="ExitToAppIcon" /> }));
-vi.mock('@mui/icons-material/WarningRounded', () => ({ default: () => <div data-testid="WarningRoundedIcon" /> }));
-vi.mock('@mui/icons-material/Done', () => ({ default: () => <div data-testid="DoneIcon" /> }));
-vi.mock('@mui/icons-material/DoneAll', () => ({ default: () => <div data-testid="DoneAllIcon" /> }));
-vi.mock('@mui/icons-material/ErrorOutline', () => ({ default: () => <div data-testid="ErrorOutlineIcon" /> }));
-vi.mock('@mui/icons-material/Mic', () => ({ default: () => <div data-testid="MicIcon" /> }));
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    Users: () => <div data-testid="UsersIcon" />,
+    ChevronDown: () => <div data-testid="ChevronDownIcon" />,
+    Check: () => <div data-testid="CheckIcon" />,
+    CheckCheck: () => <div data-testid="CheckCheckIcon" />,
+}));
 vi.mock('../../../src/utils/fileIcons.js', () => ({ getFileIcon: () => <div data-testid="FileIcon" /> }));
 
 import { GroupItem } from '../../../src/components/layout/GroupItem.js';
@@ -63,34 +53,34 @@ describe('GroupItem Component', () => {
         expect(defaultProps.onSelect).toHaveBeenCalledWith('g1');
     });
 
-    it('renders Groups icon when no avatar is provided', () => {
+    it('renders Users icon when no avatar is provided', () => {
         render(<GroupItem {...defaultProps} />);
-        expect(screen.getByTestId('GroupsIcon')).toBeDefined();
+        expect(screen.getByTestId('UsersIcon')).toBeDefined();
     });
 
-    it('shows DoneIcon when last message is mine and status is sent', () => {
+    it('shows CheckIcon when last message is mine and status is sent', () => {
         const groupWithAck = { ...mockGroup, lastMessageIsMine: true, lastMessageStatus: 'sent' };
         render(<GroupItem {...defaultProps} group={groupWithAck} />);
-        expect(screen.getByTestId('DoneIcon')).toBeDefined();
+        expect(screen.getByTestId('CheckIcon')).toBeDefined();
     });
 
-    it('shows DoneAllIcon when last message is mine and status is delivered', () => {
+    it('shows CheckCheckIcon when last message is mine and status is delivered', () => {
         const groupWithAck = { ...mockGroup, lastMessageIsMine: true, lastMessageStatus: 'delivered' };
         render(<GroupItem {...defaultProps} group={groupWithAck} />);
-        expect(screen.getByTestId('DoneAllIcon')).toBeDefined();
+        expect(screen.getByTestId('CheckCheckIcon')).toBeDefined();
     });
 
     it('does not show ack icon when last message is not mine', () => {
         const groupWithAck = { ...mockGroup, lastMessageIsMine: false, lastMessageStatus: 'delivered' };
         render(<GroupItem {...defaultProps} group={groupWithAck} />);
-        expect(screen.queryByTestId('DoneIcon')).toBeNull();
-        expect(screen.queryByTestId('DoneAllIcon')).toBeNull();
+        expect(screen.queryByTestId('CheckIcon')).toBeNull();
+        expect(screen.queryByTestId('CheckCheckIcon')).toBeNull();
     });
 
     it('opens leave group modal', async () => {
         render(<GroupItem {...defaultProps} />);
 
-        const icon = screen.getByTestId('KeyboardArrowDownIcon');
+        const icon = screen.getByTestId('ChevronDownIcon');
         const optionsBtn = icon.parentElement as HTMLElement;
         fireEvent.click(optionsBtn);
 

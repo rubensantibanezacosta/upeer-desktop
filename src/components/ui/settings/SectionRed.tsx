@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Button, Chip, CircularProgress, Typography } from '@mui/joy';
-import PublicIcon from '@mui/icons-material/Public';
-import LockIcon from '@mui/icons-material/Lock';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { Globe, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { CopyableField } from './shared.js';
 import { CardGroupLabel, SettingsCard, SettingsSection } from './sectionShell.js';
 import { NetworkMap } from './NetworkMap.js';
@@ -92,7 +89,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
     return (
         <SettingsSection
-            icon={<PublicIcon />}
+            icon={<Globe style={{ fontSize: 18 }} />}
             title="Conexión"
             description="Estado de tu nodo en la red P2P, peers cercanos y la dirección con la que te encuentran."
         >
@@ -107,7 +104,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 }}>
                     {meta.spinning
                         ? <CircularProgress size="sm" color={meta.color} thickness={3} />
-                        : <meta.Icon sx={{ fontSize: 22, color: `${meta.color}.plainColor` }} />
+                        : <meta.Icon style={{ fontSize: 22, color: `var(--joy-palette-${meta.color}-plainColor)` }} />
                     }
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -125,7 +122,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
             {isUp && stats && (
                 <SettingsCard>
                     <CardGroupLabel
-                        icon={<PublicIcon sx={{ fontSize: 14 }} />}
+                        icon={<Globe style={{ fontSize: 14 }} />}
                         title={`Conectados a la red · ${stats.connectionStatusAvailable ? peers.length : '—'}`}
                         action={<LiveDot freshSec={freshSec} />}
                     />
@@ -216,10 +213,10 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                     }}
                 >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LockIcon sx={{ fontSize: 15, opacity: 0.55 }} />
+                    <Lock style={{ fontSize: 15, opacity: 0.55 }} />
                     <Typography level="body-xs" sx={{ fontWeight: 600 }}>Cómo funciona la red</Typography>
                 </Box>
-                {showDetails ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <ExpandMoreIcon sx={{ fontSize: 18 }} />}
+                {showDetails ? <ChevronUp style={{ fontSize: 18 }} /> : <ChevronDown style={{ fontSize: 18 }} />}
                 </Box>
 
                 {showDetails && (
@@ -235,7 +232,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     backgroundColor: `${accent}18`,
                                 }}>
-                                    <Icon sx={{ fontSize: 16, color: accent }} />
+                                    <Icon style={{ fontSize: 16, color: accent }} />
                                 </Box>
                                 <Box>
                                     <Typography level="body-xs" sx={{ fontWeight: 700 }}>{label}</Typography>

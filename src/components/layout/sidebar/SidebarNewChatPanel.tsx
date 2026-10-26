@@ -1,7 +1,6 @@
 import React from 'react';
 import { Avatar, Box, List, Typography } from '@mui/joy';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import { UserPlus, UsersRound } from 'lucide-react';
 import { NewChatHeader } from '../SidebarHeader.js';
 import { SidebarSearch } from '../SidebarSearch.js';
 import { ContactItem } from '../ContactItem.js';
@@ -36,7 +35,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
                 <Box>
                     <Box aria-label="Nueva conversación" role="button" onClick={onOpenAddContact} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
                         <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
-                            <PersonAddIcon />
+                            <UserPlus style={{ fontSize: 20 }} />
                         </Avatar>
                         <Box>
                             <Typography level="body-md" sx={{ fontWeight: 500 }}>Nueva conversación</Typography>
@@ -46,7 +45,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
                     {onOpenCreateGroup && (
                         <Box aria-label="Nuevo grupo" role="button" onClick={onOpenCreateGroup} sx={{ display: 'flex', alignItems: 'center', height: '60px', px: 2, gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' } }}>
                             <Avatar size="md" color="primary" variant="soft" sx={{ flexShrink: 0 }}>
-                                <GroupAddIcon />
+                                <UsersRound style={{ fontSize: 20 }} />
                             </Avatar>
                             <Box>
                                 <Typography level="body-md" sx={{ fontWeight: 500 }}>Nuevo grupo</Typography>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Box, Button, Typography } from '@mui/joy';
-import WarningIcon from '@mui/icons-material/Warning';
+import { TriangleAlert } from 'lucide-react';
 
 import type { KeyChangeAlert } from '../../types/chat.js';
 
@@ -14,7 +14,7 @@ export const KeyChangeAlertBanner: React.FC<KeyChangeAlertBannerProps> = ({ aler
         <Alert
             color="warning"
             variant="soft"
-            startDecorator={<WarningIcon />}
+            startDecorator={<TriangleAlert style={{ fontSize: 20 }} />}
             endDecorator={(
                 <Button size="sm" variant="plain" color="warning" onClick={onDismiss}>
                     Entendido

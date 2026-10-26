@@ -1,6 +1,6 @@
 import React from 'react';
 import { Avatar, Box, Button, Modal, ModalDialog, Typography } from '@mui/joy';
-import CallIcon from '@mui/icons-material/Call';
+import { Phone } from 'lucide-react';
 import type { CallKind } from './useCall.js';
 
 interface CallIncomingModalProps {
@@ -21,7 +21,7 @@ export const CallIncomingModal: React.FC<CallIncomingModalProps> = ({ open, kind
             <Typography level="body-md">{isGroup ? 'Llamada grupal' : kind === 'video' ? 'Videollamada entrante' : 'Llamada entrante'}</Typography>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                 <Button color="danger" variant="soft" onClick={onReject}>Rechazar</Button>
-                <Button color="success" variant="solid" startDecorator={<CallIcon />} onClick={onAccept}>Aceptar</Button>
+                <Button color="success" variant="solid" startDecorator={<Phone />} onClick={onAccept}>Aceptar</Button>
             </Box>
         </ModalDialog>
     </Modal>

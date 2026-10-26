@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Box, Button, Chip, IconButton, LinearProgress, Stack, Textarea, Typography } from '@mui/joy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckIcon from '@mui/icons-material/Check';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { ArrowLeft, Check, Copy, RefreshCw, TriangleAlert } from 'lucide-react';
 import { CreateFlowMnemonicPanel } from './CreateFlowMnemonicPanel.js';
 import { CreateFlowProfileSetup } from './CreateFlowProfileSetup.js';
 
@@ -18,7 +14,7 @@ export const CreateExplainStep: React.FC<CreateExplainStepProps> = ({ onBack, on
     <Stack spacing={2.5}>
         <Stack direction="row" alignItems="center" spacing={1}>
             <IconButton variant="plain" color="neutral" size="sm" onClick={onBack}>
-                <ArrowBackIcon />
+                <ArrowLeft style={{ fontSize: 20 }} />
             </IconButton>
             <Typography level="title-lg">Antes de crear tu cuenta</Typography>
         </Stack>
@@ -36,7 +32,7 @@ export const CreateExplainStep: React.FC<CreateExplainStepProps> = ({ onBack, on
                     Con la misma frase podrás entrar desde cualquier dispositivo y recuperar la misma cuenta.
                 </Typography>
             </Box>
-            <Alert color="warning" variant="soft" startDecorator={<WarningAmberIcon />} sx={{ borderRadius: '18px' }}>
+            <Alert color="warning" variant="soft" startDecorator={<TriangleAlert style={{ fontSize: 18 }} />} sx={{ borderRadius: '18px' }}>
                 Si pierdes estas palabras, nadie podrá devolverte el acceso.
             </Alert>
         </Box>
@@ -76,12 +72,12 @@ export const CreateGenerateStep: React.FC<CreateGenerateStepProps> = ({ mnemonic
         <Stack spacing={2.5}>
             <Stack direction="row" alignItems="center" spacing={1}>
                 <IconButton variant="plain" color="neutral" size="sm" onClick={onBack}>
-                    <ArrowBackIcon />
+                    <ArrowLeft style={{ fontSize: 20 }} />
                 </IconButton>
                 <Typography level="title-lg">Guarda tus palabras</Typography>
             </Stack>
 
-            <Alert color="warning" variant="soft" startDecorator={<WarningAmberIcon />} sx={{ borderRadius: '18px' }}>
+            <Alert color="warning" variant="soft" startDecorator={<TriangleAlert style={{ fontSize: 18 }} />} sx={{ borderRadius: '18px' }}>
                 Escríbelas en papel o guárdalas en un lugar privado antes de continuar.
             </Alert>
 
@@ -94,14 +90,14 @@ export const CreateGenerateStep: React.FC<CreateGenerateStepProps> = ({ mnemonic
                     fullWidth
                     variant="outlined"
                     color={copied ? 'success' : 'neutral'}
-                    startDecorator={copied ? <CheckIcon /> : <ContentCopyIcon />}
+                    startDecorator={copied ? <Check style={{ fontSize: 16 }} /> : <Copy style={{ fontSize: 16 }} />}
                     onClick={handleCopy}
                     disabled={!revealed}
                     sx={{ minHeight: 46, borderRadius: '14px' }}
                 >
                     {copied ? 'Copiadas' : 'Copiar palabras'}
                 </Button>
-                <Button fullWidth variant="outlined" color="neutral" startDecorator={<RefreshIcon />} onClick={onRegenerate} sx={{ minHeight: 46, borderRadius: '14px' }}>
+                <Button fullWidth variant="outlined" color="neutral" startDecorator={<RefreshCw style={{ fontSize: 16 }} />} onClick={onRegenerate} sx={{ minHeight: 46, borderRadius: '14px' }}>
                     Generar otras
                 </Button>
             </Stack>
@@ -132,7 +128,7 @@ export const CreateConfirmStep: React.FC<CreateConfirmStepProps> = ({ mnemonic, 
         <Stack spacing={2.5}>
             <Stack direction="row" alignItems="center" spacing={1}>
                 <IconButton variant="plain" color="neutral" size="sm" onClick={onBack} disabled={isLoading}>
-                    <ArrowBackIcon />
+                    <ArrowLeft style={{ fontSize: 20 }} />
                 </IconButton>
                 <Typography level="title-lg">Confirma y personaliza</Typography>
             </Stack>
@@ -159,7 +155,7 @@ export const CreateConfirmStep: React.FC<CreateConfirmStepProps> = ({ mnemonic, 
                 <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
                     {words.length} de 12 palabras
                 </Typography>
-                {isValid && <Chip size="sm" color="success" variant="soft" startDecorator={<CheckIcon />} sx={{ borderRadius: '999px' }}>Orden correcto</Chip>}
+                {isValid && <Chip size="sm" color="success" variant="soft" startDecorator={<Check style={{ fontSize: 14 }} />} sx={{ borderRadius: '999px' }}>Orden correcto</Chip>}
             </Stack>
 
             {!isValid && words.length === 12 && <Alert color="danger" variant="soft" sx={{ borderRadius: '16px' }}>Las palabras no coinciden o no están en el mismo orden.</Alert>}

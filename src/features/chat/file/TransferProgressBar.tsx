@@ -9,11 +9,7 @@ import {
     Tooltip,
     CircularProgress
 } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
+import { X, CloudUpload, CloudDownload, CircleCheck, CircleAlert } from 'lucide-react';
 import { FileTransfer } from '../../../hooks/useFileTransfer.js';
 import { useTransferSpeed, formatSpeed, formatEta } from './transferSpeed.js';
 
@@ -71,17 +67,17 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
     const getStatusIcon = () => {
         switch (state) {
             case 'completed':
-                return <CheckCircleIcon sx={{ color: 'success.500', fontSize: '1.2rem' }} />;
+                return <CircleCheck style={{ color: 'var(--joy-palette-success-500)', fontSize: '1.2rem' }} />;
             case 'failed':
-                return <ErrorIcon sx={{ color: 'danger.500', fontSize: '1.2rem' }} />;
+                return <CircleAlert style={{ color: 'var(--joy-palette-danger-500)', fontSize: '1.2rem' }} />;
             case 'cancelled':
-                return <CloseIcon sx={{ color: 'neutral.500', fontSize: '1.2rem' }} />;
+                return <X style={{ color: 'var(--joy-palette-neutral-500)', fontSize: '1.2rem' }} />;
             case 'active': {
-                if (phase === 3) return <CloudUploadIcon sx={{ color: 'warning.500', fontSize: '1.2rem', animation: 'pulse 1s infinite' }} />;
-                if (phase === 4) return <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
+                if (phase === 3) return <CloudUpload style={{ color: 'var(--joy-palette-warning-500)', fontSize: '1.2rem', animation: 'pulse 1s infinite' }} />;
+                if (phase === 4) return <CloudUpload style={{ color: 'var(--joy-palette-primary-500)', fontSize: '1.2rem' }} />;
                 return direction === 'sending'
-                    ? <CloudUploadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />
-                    : <CloudDownloadIcon sx={{ color: 'primary.500', fontSize: '1.2rem' }} />;
+                    ? <CloudUpload style={{ color: 'var(--joy-palette-primary-500)', fontSize: '1.2rem' }} />
+                    : <CloudDownload style={{ color: 'var(--joy-palette-primary-500)', fontSize: '1.2rem' }} />;
             }
             case 'pending':
                 return <CircularProgress size="sm" thickness={3} />;
@@ -173,7 +169,7 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
                             onClick={handleCancel}
                             sx={{ ml: 0.5 }}
                         >
-                            <CloseIcon />
+                            <X />
                         </IconButton>
                     )}
                 </Stack>
@@ -224,7 +220,7 @@ export const TransferProgressBar: React.FC<TransferProgressBarProps> = ({
                                 color="danger"
                                 onClick={handleCancel}
                             >
-                                <CloseIcon />
+                                <X />
                             </IconButton>
                         </Tooltip>
                     )}

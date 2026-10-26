@@ -17,14 +17,7 @@ import {
     Box,
     Typography,
 } from '@mui/joy';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import ArchiveIcon from '@mui/icons-material/Archive';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import { ChevronDown, Archive, BellOff, Pin, Mail, Heart, Eraser } from 'lucide-react';
 import type { Contact } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 
@@ -65,33 +58,33 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
                         },
                     }}
                 >
-                    <KeyboardArrowDownIcon sx={{ fontSize: '20px' }} />
+                    <ChevronDown style={{ fontSize: 20 }} />
                 </MenuButton>
                 <Menu placement="bottom-end" size="sm" sx={{ minWidth: 180, borderRadius: 'lg', '--ListItem-radius': '8px', boxShadow: 'lg', zIndex: 1000 }}>
                     <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'archived'); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Archive style={{ fontSize: 18 }} /></ListItemDecorator>
                         {archived ? 'Desarchivar chat' : 'Archivar chat'}
                     </MenuItem>
                     <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'muted'); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><BellOff style={{ fontSize: 18 }} /></ListItemDecorator>
                         {muted ? 'Reactivar notificaciones' : 'Silenciar notificaciones'}
                     </MenuItem>
                     <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'pinned'); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Pin style={{ fontSize: 18 }} /></ListItemDecorator>
                         {pinned ? 'Desfijar chat' : 'Fijar chat'}
                     </MenuItem>
                     <ListDivider />
                     <MenuItem onClick={(event) => { event.stopPropagation(); toggleContact(contact.upeerId, 'unread'); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Mail style={{ fontSize: 18 }} /></ListItemDecorator>
                         {unread ? 'Marcar como leído' : 'Marcar como no leído'}
                     </MenuItem>
                     <MenuItem onClick={(event) => { event.stopPropagation(); onToggleFavorite(contact.upeerId); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}>{contact.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}</ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Heart style={{ fontSize: 18 }} fill={contact.isFavorite ? 'currentColor' : 'none'} /></ListItemDecorator>
                         {contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
                     </MenuItem>
                     <ListDivider />
                     <MenuItem onClick={(event) => { event.stopPropagation(); setConfirmClearOpen(true); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Eraser style={{ fontSize: 18 }} /></ListItemDecorator>
                         Vaciar chat
                     </MenuItem>
                 </Menu>
@@ -101,7 +94,7 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
         <Modal open={confirmClearOpen} onClose={() => setConfirmClearOpen(false)}>
             <ModalDialog variant="outlined" role="alertdialog" sx={{ minWidth: 400 }}>
                 <DialogTitle>
-                    <DeleteSweepIcon color="warning" />
+                    <Eraser style={{ fontSize: 20, color: 'var(--joy-palette-warning-500)' }} />
                     Vaciar mensajes del chat
                 </DialogTitle>
                 <Divider />

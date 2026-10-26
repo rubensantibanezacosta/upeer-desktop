@@ -1,13 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import SyncIcon from '@mui/icons-material/Sync';
-import SecurityIcon from '@mui/icons-material/Security';
-import HubIcon from '@mui/icons-material/Hub';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import TravelExploreIcon from '@mui/icons-material/TravelExplore';
+import { CircleCheck, WifiOff, RefreshCw, ShieldCheck, Network, ArrowLeftRight, EyeOff, Compass } from 'lucide-react';
 
 export interface PeerStat {
     uri: string;
@@ -34,10 +27,10 @@ export interface NetworkStats {
 type StatusColor = 'success' | 'danger' | 'warning' | 'neutral';
 
 export const STATUS_META: Record<string, { color: StatusColor; Icon: React.ElementType; title: string; spinning?: boolean }> = {
-    up: { color: 'success', Icon: CheckCircleIcon, title: 'Conexión activa' },
-    connecting: { color: 'neutral', Icon: SyncIcon, title: 'Preparando la red…', spinning: true },
-    reconnecting: { color: 'warning', Icon: SyncIcon, title: 'Reconectando…', spinning: true },
-    down: { color: 'danger', Icon: WifiOffIcon, title: 'Sin conexión' },
+    up: { color: 'success', Icon: CircleCheck, title: 'Conexión activa' },
+    connecting: { color: 'neutral', Icon: RefreshCw, title: 'Preparando la red…', spinning: true },
+    reconnecting: { color: 'warning', Icon: RefreshCw, title: 'Reconectando…', spinning: true },
+    down: { color: 'danger', Icon: WifiOff, title: 'Sin conexión' },
 };
 
 export const STATUS_SUBTITLE: Record<string, (r: number, max: number) => string> = {
@@ -48,11 +41,11 @@ export const STATUS_SUBTITLE: Record<string, (r: number, max: number) => string>
 };
 
 export const TECH_ITEMS = [
-    { Icon: SecurityIcon, accent: '#4ade80', label: 'Cifrado', value: 'ChaCha20-Poly1305 · extremo a extremo' },
-    { Icon: HubIcon, accent: '#60a5fa', label: 'Protocolo', value: 'Yggdrasil · red IPv6 descentralizada' },
-    { Icon: SwapHorizIcon, accent: '#a78bfa', label: 'Transporte', value: 'TCP directo entre nodos de la red' },
-    { Icon: VisibilityOffIcon, accent: '#fb923c', label: 'Privacidad', value: 'Sin servidores centrales ni metadatos' },
-    { Icon: TravelExploreIcon, accent: '#22d3ee', label: 'Descubrimiento', value: 'Lista pública de peers global' },
+    { Icon: ShieldCheck, accent: '#4ade80', label: 'Cifrado', value: 'ChaCha20-Poly1305 · extremo a extremo' },
+    { Icon: Network, accent: '#60a5fa', label: 'Protocolo', value: 'Yggdrasil · red IPv6 descentralizada' },
+    { Icon: ArrowLeftRight, accent: '#a78bfa', label: 'Transporte', value: 'TCP directo entre nodos de la red' },
+    { Icon: EyeOff, accent: '#fb923c', label: 'Privacidad', value: 'Sin servidores centrales ni metadatos' },
+    { Icon: Compass, accent: '#22d3ee', label: 'Descubrimiento', value: 'Lista pública de peers global' },
 ];
 
 export const LATENCY_MAX = 500;

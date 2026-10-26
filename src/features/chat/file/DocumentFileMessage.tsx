@@ -5,9 +5,7 @@ import {
     IconButton,
     CircularProgress,
 } from '@mui/joy';
-import DownloadIcon from '@mui/icons-material/Download';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import CloseIcon from '@mui/icons-material/Close';
+import { Download, RefreshCw, X } from 'lucide-react';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 import { formatFileSize } from '../../../utils/fileUtils.js';
@@ -101,13 +99,13 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                                 <>
                                     <CircularProgress determinate={transferState === 'active'} value={safeProgress} size="sm" sx={{ '--CircularProgress-size': '44px', color: 'white' }} />
                                     <IconButton size="sm" variant="plain" sx={{ position: 'absolute', color: 'white', minHeight: 0, minWidth: 0, p: 0 }} onClick={(e) => { e.stopPropagation(); onCancel(); }}>
-                                        <CloseIcon sx={{ fontSize: 18 }} />
+                                        <X style={{ fontSize: 18 }} />
                                     </IconButton>
                                 </>
                             )}
                             {isTransferFailed && (
                                 <IconButton size="sm" variant="plain" sx={{ position: 'absolute', color: 'white', minHeight: 0, minWidth: 0, p: 0 }} onClick={(e) => { e.stopPropagation(); onRetry(); }}>
-                                    <RefreshIcon sx={{ fontSize: 18 }} />
+                                    <RefreshCw style={{ fontSize: 18 }} />
                                 </IconButton>
                             )}
                         </Box>
@@ -138,7 +136,7 @@ export const DocumentFileMessage: React.FC<DocumentFileMessageProps> = ({
                         onClick={(e) => { e.stopPropagation(); onDownload(); }}
                         disabled={isDownloading}
                     >
-                        {isDownloading ? <CircularProgress color="primary" size="sm" /> : <DownloadIcon />}
+                        {isDownloading ? <CircularProgress color="primary" size="sm" /> : <Download />}
                     </IconButton>
                 )}
             </Box>

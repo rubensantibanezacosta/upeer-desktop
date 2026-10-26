@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, IconButton } from '@mui/joy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { ArrowLeft } from 'lucide-react';
 
 interface SubViewHeaderProps {
     title: string;
@@ -21,7 +21,7 @@ export const SubViewHeader: React.FC<SubViewHeaderProps> = ({ title, onBack }) =
         flexShrink: 0,
     }}>
         <IconButton variant="plain" color="neutral" onClick={onBack} size="sm">
-            <ArrowBackIcon />
+            <ArrowLeft style={{ fontSize: 20 }} />
         </IconButton>
         <Typography level="title-md" sx={{ fontWeight: 600, ml: 0.5 }}>{title}</Typography>
     </Box>

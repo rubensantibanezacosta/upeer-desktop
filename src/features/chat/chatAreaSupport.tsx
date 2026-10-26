@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import CallIcon from '@mui/icons-material/Call';
-import VideocamIcon from '@mui/icons-material/Videocam';
+import { Phone, Video } from 'lucide-react';
 
 type CallSystemEvent = { kind: 'audio' | 'video'; duration: string | null; startedAt: number | null; outcome: 'missed' | 'rejected' | null };
 
@@ -60,7 +59,7 @@ interface ChatSystemMessageProps {
 export const ChatSystemMessage: React.FC<ChatSystemMessageProps> = ({ message }) => {
     const callEvent = parseCallSystemEvent(message);
     if (callEvent) {
-        const Icon = callEvent.kind === 'video' ? VideocamIcon : CallIcon;
+        const Icon = callEvent.kind === 'video' ? Video : Phone;
         const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
         const outcome = callEvent.duration ? `Duración ${callEvent.duration}` : callEvent.outcome === 'rejected' ? 'Llamada rechazada' : 'Llamada perdida';
         const startTime = callEvent.startedAt === null
@@ -74,7 +73,7 @@ export const ChatSystemMessage: React.FC<ChatSystemMessageProps> = ({ message })
                     sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1, borderRadius: 'lg', backgroundColor: 'background.level1', border: '1px solid', borderColor: 'divider', minWidth: 190 }}
                 >
                     <Box sx={{ display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '50%', color: 'success.600', backgroundColor: 'success.softBg' }}>
-                        <Icon fontSize="small" />
+                        <Icon style={{ fontSize: 18 }} />
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                         <Typography level="body-sm" sx={{ fontWeight: 600 }}>{label}</Typography>

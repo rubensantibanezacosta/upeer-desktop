@@ -1,9 +1,6 @@
 import React from 'react';
 import { Alert, Box, Button, Divider, Input, Modal, ModalDialog, Stack, Typography } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
-import KeyIcon from '@mui/icons-material/Key';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import WarningIcon from '@mui/icons-material/Warning';
+import { Shield, KeyRound, Trash2, TriangleAlert } from 'lucide-react';
 
 interface PinCodeInputsProps {
     digits: string[];
@@ -65,7 +62,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
 }) => (
     <Modal open={open} onClose={onClose}>
         <ModalDialog variant="outlined" sx={{ maxWidth: 400, borderRadius: 'md', p: 3 }}>
-            <Typography level="title-lg" startDecorator={<ShieldIcon />}>
+            <Typography level="title-lg" startDecorator={<Shield style={{ fontSize: 20 }} />}>
                 {pinEnabled ? 'Deshabilitar PIN' : 'Configurar PIN'}
             </Typography>
             <Divider sx={{ my: 1.5 }} />
@@ -111,7 +108,7 @@ export const RevealMnemonicModal: React.FC<RevealMnemonicModalProps> = ({
 }) => (
     <Modal open={open} onClose={onClose}>
         <ModalDialog variant="outlined" sx={{ maxWidth: 450, borderRadius: 'md', p: 3 }}>
-            <Typography level="title-lg" startDecorator={<KeyIcon />}>Tus Palabras Clave</Typography>
+            <Typography level="title-lg" startDecorator={<KeyRound style={{ fontSize: 20 }} />}>Tus Palabras Clave</Typography>
             <Divider sx={{ my: 1.5 }} />
             <Stack spacing={2}>
                 {!mnemonic ? (
@@ -128,7 +125,7 @@ export const RevealMnemonicModal: React.FC<RevealMnemonicModalProps> = ({
                     </>
                 ) : (
                     <>
-                        <Alert color="warning" variant="solid" sx={{ alignItems: 'flex-start' }} startDecorator={<WarningIcon />}>
+                        <Alert color="warning" variant="solid" sx={{ alignItems: 'flex-start' }} startDecorator={<TriangleAlert style={{ fontSize: 20 }} />}>
                             Anota estas palabras en papel y guárdalas en un lugar secreto.
                         </Alert>
                         <Box sx={{
@@ -180,12 +177,12 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
 }) => (
     <Modal open={open} onClose={onClose}>
         <ModalDialog variant="outlined" sx={{ maxWidth: 400, borderRadius: 'md', p: 3 }}>
-            <Typography level="title-lg" startDecorator={<DeleteForeverIcon color="error" />}>
+            <Typography level="title-lg" startDecorator={<Trash2 style={{ fontSize: 20, color: 'var(--joy-palette-danger-500)' }} />}>
                 Confirmar eliminación
             </Typography>
             <Divider sx={{ my: 1.5 }} />
             <Stack spacing={2}>
-                <Alert color="danger" variant="soft" startDecorator={<WarningIcon />}>
+                <Alert color="danger" variant="soft" startDecorator={<TriangleAlert style={{ fontSize: 20 }} />}>
                     Introduce tu PIN para confirmar que quieres BORRAR TODA LA INFORMACIÓN de este dispositivo.
                 </Alert>
                 <PinCodeInputs digits={digits} refs={refs} color={errorMsg ? 'danger' : 'primary'} onChange={onChange} />

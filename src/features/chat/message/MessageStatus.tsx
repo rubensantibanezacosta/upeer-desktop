@@ -1,10 +1,7 @@
 import React from 'react';
 import { Box } from '@mui/joy';
 import { IconButton } from '@mui/joy';
-import DoneIcon from '@mui/icons-material/Done';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import ReplayIcon from '@mui/icons-material/Replay';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { Check, CheckCheck, RotateCcw, CloudUpload } from 'lucide-react';
 import { useChatStore } from '../../../store/useChatStore.js';
 
 interface MessageStatusProps {
@@ -30,28 +27,27 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, messageId,
                 }}
                 sx={{ '--IconButton-size': '18px', minHeight: 0, minWidth: 0, p: 0, opacity: 0.9 }}
             >
-                <ReplayIcon sx={{ fontSize: '14px' }} />
+                <RotateCcw style={{ fontSize: 14 }} />
             </IconButton>
         );
     }
 
     const isRead = status === 'read';
     const isSingleCheck = status === 'sent' || status === 'vaulted';
-    const Icon = isSingleCheck ? DoneIcon : DoneAllIcon;
+    const Icon = isSingleCheck ? Check : CheckCheck;
     const readableStatus = isRead ? 'leído' : isSingleCheck ? 'enviado' : 'entregado';
     return (
         <Box component="span" aria-label={`Estado del mensaje: ${readableStatus}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
             {syncPending && (
-                <CloudUploadIcon
+                <CloudUpload
                     aria-label="Pendiente de sincronizar con tus dispositivos"
-                    sx={{ fontSize: '13px', opacity: 0.7, verticalAlign: 'middle' }}
+                    style={{ fontSize: 13, opacity: 0.7, verticalAlign: 'middle' }}
                 />
             )}
-            <Icon sx={{
-                fontSize: '16px',
-                lineHeight: 1,
+            <Icon style={{
+                fontSize: 16,
                 flexShrink: 0,
-                color: isRead ? '#53bdeb' : 'text.tertiary',
+                color: isRead ? '#53bdeb' : 'var(--joy-palette-text-tertiary)',
                 opacity: isRead ? 1 : 0.7,
                 verticalAlign: 'middle',
             }} />

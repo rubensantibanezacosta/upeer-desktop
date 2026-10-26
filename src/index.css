@@ -65,3 +65,13 @@ body {
 .highlight-message-active {
   animation: highlight-message 2.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Los iconos de Lucide heredan tamaño y color del contenedor, como los de MUI.
+   1.5rem replica el tamaño por defecto de SvgIcon; un `font-size` en el contenedor
+   o en el propio svg lo sobreescribe igual que antes. */
+svg.lucide {
+  font-size: 1.5rem;
+  width: 1em;
+  height: 1em;
+  flex: none;
+}

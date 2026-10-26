@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/joy';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { FileVideo, ExternalLink } from 'lucide-react';
 
 interface UnsupportedVideoFallbackProps {
     fileName: string;
@@ -26,7 +25,7 @@ export const UnsupportedVideoFallback: React.FC<UnsupportedVideoFallbackProps> =
                 {thumbnailSrc ? (
                     <Box component="img" src={thumbnailSrc} alt={fileName} sx={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.82 }} />
                 ) : (
-                    <VideoFileIcon sx={{ fontSize: compact ? 72 : 96, color: 'rgba(255,255,255,0.45)' }} />
+                    <FileVideo style={{ fontSize: compact ? 72 : 96, color: 'rgba(255,255,255,0.45)' }} />
                 )}
             </Box>
             <Box sx={{ p: compact ? 2 : 2.5, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
@@ -34,7 +33,7 @@ export const UnsupportedVideoFallback: React.FC<UnsupportedVideoFallbackProps> =
                 <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.72)' }}>{reason}</Typography>
                 {onAction ? (
                     <Box sx={{ pt: 0.5 }}>
-                        <Button size={compact ? 'sm' : 'md'} variant="solid" color="primary" startDecorator={<OpenInNewIcon />} onClick={onAction}>
+                        <Button size={compact ? 'sm' : 'md'} variant="solid" color="primary" startDecorator={<ExternalLink style={{ fontSize: 16 }} />} onClick={onAction}>
                             {actionLabel}
                         </Button>
                     </Box>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Stack, FormControl, FormLabel, Select, Option, Typography } from '@mui/joy';
-import PaletteIcon from '@mui/icons-material/Palette';
+import { Palette } from 'lucide-react';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { useAppearanceStore, type AppearanceTheme, type AppearanceFontSize } from '../../../store/useAppearanceStore.js';
 
@@ -12,7 +12,7 @@ export const SectionApariencia: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<PaletteIcon />}
+            icon={<Palette style={{ fontSize: 18 }} />}
             title="Apariencia"
             description="Ajusta cómo se ve la aplicación en este equipo."
         >

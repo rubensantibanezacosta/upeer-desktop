@@ -3,8 +3,7 @@ import {
     Modal, ModalDialog, ModalClose, Typography, Input, Box, Avatar,
     List, ListItem, ListItemButton, ListItemContent, ListItemDecorator,
 } from '@mui/joy';
-import ShareIcon from '@mui/icons-material/Share';
-import SearchIcon from '@mui/icons-material/Search';
+import { Share2, Search } from 'lucide-react';
 
 interface Contact {
     address: string;
@@ -63,7 +62,7 @@ export const ShareContactModal: React.FC<ShareContactModalProps> = ({ open, onCl
             >
                 <Box sx={{ px: 2.5, pt: 2, pb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <ModalClose sx={{ position: 'static', ml: 0 }} />
-                    <ShareIcon color="primary" sx={{ fontSize: 20 }} />
+                    <Share2 style={{ fontSize: 20, color: 'var(--joy-palette-primary-400)' }} />
                     <Typography level="title-md" sx={{ fontWeight: 700, flex: 1 }}>
                         Compartir contacto
                     </Typography>
@@ -72,7 +71,7 @@ export const ShareContactModal: React.FC<ShareContactModalProps> = ({ open, onCl
                 <Box sx={{ px: 1.5, pb: 1.5 }}>
                     <Input
                         placeholder="Buscar un nombre o dirección"
-                        startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                        startDecorator={<Search style={{ fontSize: 18 }} />}
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         autoFocus

@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
-import SendIcon from '@mui/icons-material/Send';
-import MicIcon from '@mui/icons-material/Mic';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
+import { Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { RecordingBar } from './RecordingBar.js';
@@ -94,13 +91,13 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
             {editingMessage && (
                 <Box sx={{ p: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5, backgroundColor: 'background.level1', borderLeft: '4px solid', borderColor: 'warning.main', mx: 2, mt: 1, borderRadius: '4px' }}>
-                    <EditIcon sx={{ fontSize: '18px', color: 'warning.main' }} />
+                    <Pencil style={{ fontSize: 18, color: 'var(--joy-palette-warning-main)' }} />
                     <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                         <Typography level="body-xs" sx={{ fontWeight: 600, color: 'warning.main' }}>Editando mensaje</Typography>
                         <Typography level="body-sm" noWrap sx={{ opacity: 0.8 }}>{editingMessage.message}</Typography>
                     </Box>
                     <IconButton size="sm" variant="plain" color="neutral" onClick={onCancelEdit}>
-                        <CloseIcon sx={{ fontSize: '18px' }} />
+                        <X style={{ fontSize: 18 }} />
                     </IconButton>
                 </Box>
             )}
@@ -109,7 +106,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 <Box sx={{ px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'danger.softBg', mx: 2, mt: 1, borderRadius: '4px' }}>
                     <Typography level="body-xs" sx={{ color: 'danger.plainColor' }}>{voiceError}</Typography>
                     <IconButton size="sm" variant="plain" color="danger" onClick={() => setVoiceError(null)}>
-                        <CloseIcon sx={{ fontSize: '14px' }} />
+                        <X style={{ fontSize: 14 }} />
                     </IconButton>
                 </Box>
             )}
@@ -125,7 +122,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 <LinkPreviewCard data={linkPreview} />
                             </Box>
                             <IconButton size="sm" variant="plain" color="neutral" onClick={dismissPreview} sx={{ flexShrink: 0 }}>
-                                <CloseIcon sx={{ fontSize: '14px' }} />
+                                <X style={{ fontSize: 14 }} />
                             </IconButton>
                         </Box>
                     )}
@@ -162,8 +159,10 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         />
                         <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ '&:hover': { backgroundColor: 'background.level2' } }}>
                             {message
-                                ? (editingMessage ? <SendIcon color="warning" /> : <SendIcon color="primary" />)
-                                : <MicIcon color="primary" />
+                                ? (editingMessage
+                                    ? <Send style={{ color: 'var(--joy-palette-warning-main)' }} />
+                                    : <Send style={{ color: 'var(--joy-palette-primary-main)' }} />)
+                                : <Mic style={{ color: 'var(--joy-palette-primary-main)' }} />
                             }
                         </IconButton>
                     </Box>

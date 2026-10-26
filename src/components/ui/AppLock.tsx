@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Input, Button, Stack, Sheet, Avatar } from '@mui/joy';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { LogOut } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore.js';
 import { resetAccountStores } from '../../store/resetAccountStores.js';
 
@@ -183,7 +183,7 @@ export const AppLock: React.FC<AppLockProps> = ({ onUnlock, onTooManyAttempts })
                     <Button
                         variant="plain"
                         color="neutral"
-                        startDecorator={<LogoutIcon />}
+                        startDecorator={<LogOut style={{ fontSize: 18 }} />}
                         onClick={async () => {
                             if (confirm('Se borrarán todos tus datos locales para iniciar sesión con otra cuenta. ¿Estás seguro?')) {
                                 try {

@@ -3,8 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { AppLock } from '../../../src/components/ui/AppLock.js';
 
-vi.mock('@mui/icons-material/LockRounded', () => ({ default: () => null }));
-
 const mockVerifyPin = vi.fn();
 const mockDeleteIdentity = vi.fn();
 type AppLockUpeer = Pick<Window['upeer'], 'verifyPin' | 'deleteIdentity'>;

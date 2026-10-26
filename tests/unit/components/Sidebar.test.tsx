@@ -21,16 +21,19 @@ vi.mock('../../../src/store/useNavigationStore', () => ({
     useNavigationStore: () => mockStore
 }));
 
-vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
-vi.mock('@mui/icons-material/ChatBubbleOutline', () => ({ default: () => <div data-testid="ChatIcon" /> }));
-vi.mock('@mui/icons-material/NotificationsOff', () => ({ default: () => <div data-testid="MuteIcon" /> }));
-vi.mock('@mui/icons-material/StarBorder', () => ({ default: () => <div data-testid="StarIcon" /> }));
-vi.mock('@mui/icons-material/PersonAdd', () => ({ default: () => <div data-testid="AddPersonIcon" /> }));
-vi.mock('@mui/icons-material/GroupAdd', () => ({ default: () => <div data-testid="AddGroupIcon" /> }));
-vi.mock('@mui/icons-material/ArrowBack', () => ({ default: () => <div data-testid="BackIcon" /> }));
-vi.mock('@mui/icons-material/MoreVert', () => ({ default: () => <div data-testid="MoreIcon" /> }));
-vi.mock('@mui/icons-material/Add', () => ({ default: () => <div data-testid="PlusIcon" /> }));
-vi.mock('@mui/icons-material/Search', () => ({ default: () => <div data-testid="SearchIcon" /> }));
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    Users: () => <div data-testid="GroupsIcon" />,
+    MessageSquare: () => <div data-testid="ChatIcon" />,
+    BellOff: () => <div data-testid="MuteIcon" />,
+    Star: () => <div data-testid="StarIcon" />,
+    UserPlus: () => <div data-testid="AddPersonIcon" />,
+    UsersRound: () => <div data-testid="AddGroupIcon" />,
+    ArrowLeft: () => <div data-testid="BackIcon" />,
+    MoreVertical: () => <div data-testid="MoreIcon" />,
+    Plus: () => <div data-testid="PlusIcon" />,
+    Search: () => <div data-testid="SearchIcon" />,
+}));
 
 type SidebarHeaderProps = {
     onAddNew: () => void;

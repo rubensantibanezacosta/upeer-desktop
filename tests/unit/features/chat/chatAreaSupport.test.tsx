@@ -3,8 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ChatSystemMessage, parseCallSystemEvent } from '../../../../src/features/chat/chatAreaSupport.js';
 
-vi.mock('@mui/icons-material/Call', () => ({ default: () => <span data-testid="audio-call-icon" /> }));
-vi.mock('@mui/icons-material/Videocam', () => ({ default: () => <span data-testid="video-call-icon" /> }));
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    Phone: () => <span data-testid="audio-call-icon" />,
+    Video: () => <span data-testid="video-call-icon" />,
+}));
 
 describe('ChatSystemMessage', () => {
     it('maqueta eventos de llamada de voz con su duración', () => {

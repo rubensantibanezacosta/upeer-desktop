@@ -9,15 +9,7 @@ import {
     MenuButton,
     MenuItem,
 } from '@mui/joy';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import ArchiveIcon from '@mui/icons-material/Archive';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import { ChevronDown, Archive, BellOff, Pin, Mail, Heart, Eraser, LogOut } from 'lucide-react';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 
 interface GroupItemActionsProps {
@@ -71,33 +63,33 @@ export const GroupItemActions: React.FC<GroupItemActionsProps> = ({
                     },
                 }}
             >
-                <KeyboardArrowDownIcon sx={{ fontSize: '20px' }} />
+                <ChevronDown style={{ fontSize: 20 }} />
             </MenuButton>
             <Menu placement="bottom-end" size="sm" sx={{ minWidth: 180, borderRadius: 'lg', '--ListItem-radius': '8px', boxShadow: 'lg', zIndex: 1000 }}>
                 <MenuItem onClick={(event) => { event.stopPropagation(); toggleGroup(groupId, 'archived'); }}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><ArchiveIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Archive style={{ fontSize: 18 }} /></ListItemDecorator>
                     {archived ? 'Desarchivar chat' : 'Archivar chat'}
                 </MenuItem>
                 <MenuItem onClick={(event) => { event.stopPropagation(); toggleGroup(groupId, 'muted'); }}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><NotificationsOffIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><BellOff style={{ fontSize: 18 }} /></ListItemDecorator>
                     {muted ? 'Reactivar notificaciones' : 'Silenciar notificaciones'}
                 </MenuItem>
                 <MenuItem onClick={(event) => { event.stopPropagation(); toggleGroup(groupId, 'pinned'); }}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><PushPinIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Pin style={{ fontSize: 18 }} /></ListItemDecorator>
                     {pinned ? 'Desfijar chat' : 'Fijar chat'}
                 </MenuItem>
                 <ListDivider />
                 <MenuItem onClick={(event) => { event.stopPropagation(); toggleGroup(groupId, 'unread'); }}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><MarkChatUnreadIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Mail style={{ fontSize: 18 }} /></ListItemDecorator>
                     {unread ? 'Marcar como leído' : 'Marcar como no leído'}
                 </MenuItem>
                 <MenuItem onClick={(event) => { event.stopPropagation(); onToggleFavorite(groupId); }}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}>{isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}</ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Heart style={{ fontSize: 18 }} fill={isFavorite ? 'currentColor' : 'none'} /></ListItemDecorator>
                     {isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
                 </MenuItem>
                 <ListDivider />
-                <MenuItem onClick={(event) => { event.stopPropagation(); onClearChat?.(); }}><ListItemDecorator sx={{ color: 'inherit' }}><DeleteSweepIcon /></ListItemDecorator> Vaciar chat</MenuItem>
-                <MenuItem onClick={(event) => { event.stopPropagation(); onLeaveRequest(); }}><ListItemDecorator sx={{ color: 'inherit' }}><ExitToAppIcon /></ListItemDecorator> Eliminar grupo</MenuItem>
+                <MenuItem onClick={(event) => { event.stopPropagation(); onClearChat?.(); }}><ListItemDecorator sx={{ color: 'inherit' }}><Eraser style={{ fontSize: 18 }} /></ListItemDecorator> Vaciar chat</MenuItem>
+                <MenuItem onClick={(event) => { event.stopPropagation(); onLeaveRequest(); }}><ListItemDecorator sx={{ color: 'inherit' }}><LogOut style={{ fontSize: 18 }} /></ListItemDecorator> Eliminar grupo</MenuItem>
             </Menu>
         </Dropdown>
     </Box>

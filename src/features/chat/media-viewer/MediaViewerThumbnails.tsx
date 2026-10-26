@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box } from '@mui/joy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import DescriptionIcon from '@mui/icons-material/Description';
+import { Play, FileText } from 'lucide-react';
 import { isPdfFile, toMediaUrl } from '../../../utils/fileUtils.js';
 import { THUMB_GAP, THUMB_WIDTH, VISIBLE_BUFFER, isImageThumbnailItem, isVideo, type MediaItem } from './mediaViewerSupport.js';
 
@@ -39,12 +38,14 @@ export const MediaViewerThumbnails: React.FC<MediaViewerThumbnailsProps> = ({ it
                                 <img src={thumb || (item.url && !item.url.startsWith('data:') ? toMediaUrl(item.url) : item.url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(event) => { (event.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
                                 <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    {isPdf ? <DescriptionIcon sx={{ fontSize: 24, color: 'neutral.400' }} /> : <PlayArrowIcon sx={{ fontSize: 24, color: 'neutral.400' }} />}
+                                    {isPdf
+                                        ? <FileText style={{ fontSize: 24, color: 'var(--joy-palette-neutral-400)' }} />
+                                        : <Play style={{ fontSize: 24, color: 'var(--joy-palette-neutral-400)' }} />}
                                 </Box>
                             )}
                             {isVideo(item.mimeType, item.fileName) && (
                                 <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'sm', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <PlayArrowIcon sx={{ fontSize: 14 }} />
+                                    <Play style={{ fontSize: 14 }} />
                                 </Box>
                             )}
                         </Box>

@@ -2,8 +2,6 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('@mui/icons-material/OpenInNew', () => ({ default: () => <div data-testid="OpenInNewIcon" /> }));
-
 import { PdfPreview } from '../../../../../src/features/chat/file/PdfPreview.js';
 
 describe('PdfPreview', () => {

@@ -1,11 +1,6 @@
 import React from 'react';
 import { Avatar, Box, IconButton, Tooltip, Typography } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
-import ReplyIcon from '@mui/icons-material/Reply';
-import ShortcutOutlinedIcon from '@mui/icons-material/ShortcutOutlined';
-import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { X, Download, Reply, Share2, SmilePlus, ExternalLink } from 'lucide-react';
 import { QUICK_EMOJIS, type MediaItem } from './mediaViewerSupport.js';
 
 interface MediaViewerHeaderProps {
@@ -51,18 +46,18 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
         <Box sx={{ display: 'flex', gap: 1, pointerEvents: 'auto' }} onClick={(event) => event.stopPropagation()}>
             <Tooltip title="Responder" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton aria-label="Responder desde visor" variant="plain" color="neutral" onClick={() => onReply?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                    <ReplyIcon />
+                    <Reply />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Reenviar" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton aria-label="Reenviar desde visor" variant="plain" color="neutral" onClick={() => onForward?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                    <ShortcutOutlinedIcon />
+                    <Share2 />
                 </IconButton>
             </Tooltip>
             <Box sx={{ position: 'relative' }}>
                 <Tooltip title="Reaccionar" variant="soft" sx={{ zIndex: 3000 }} open={emojiOpen ? false : undefined}>
                     <IconButton aria-label="Reaccionar desde visor" variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); setEmojiOpen((value) => !value); }} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                        <AddReactionOutlinedIcon />
+                        <SmilePlus />
                     </IconButton>
                 </Tooltip>
 
@@ -89,17 +84,17 @@ export const MediaViewerHeader: React.FC<MediaViewerHeaderProps> = ({
             </Box>
             <Tooltip title="Ir al mensaje" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton aria-label="Ir al mensaje desde visor" variant="plain" color="neutral" onClick={() => onGoToMessage?.(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                    <OpenInNewIcon />
+                    <ExternalLink />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Descargar" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton aria-label="Descargar desde visor" variant="plain" color="neutral" onClick={() => onDownload(currentItem)} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                    <DownloadOutlinedIcon />
+                    <Download />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Cerrar" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton aria-label="Cerrar visor multimedia" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                    <CloseIcon />
+                    <X />
                 </IconButton>
             </Tooltip>
         </Box>

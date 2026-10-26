@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Button, Typography } from '@mui/joy';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { ExternalLink } from 'lucide-react';
 
 interface PdfPreviewProps {
     src: string;
@@ -57,7 +57,7 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
         </Box>
         {onOpenExternal ? (
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button variant="soft" color="neutral" startDecorator={<OpenInNewIcon />} onClick={onOpenExternal}>
+                <Button variant="soft" color="neutral" startDecorator={<ExternalLink />} onClick={onOpenExternal}>
                     Abrir en el sistema
                 </Button>
             </Box>

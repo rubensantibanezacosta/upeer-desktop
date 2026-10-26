@@ -8,19 +8,7 @@ import {
     Dropdown,
     MenuButton,
 } from '@mui/joy';
-import ReplyIcon from '@mui/icons-material/Reply';
-
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
-import ShortcutOutlinedIcon from '@mui/icons-material/ShortcutOutlined';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined';
-import StarIcon from '@mui/icons-material/Star';
-import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import { Reply, ChevronDown, Download, Share2, Pin, Star, ThumbsDown, Trash2, Pencil } from 'lucide-react';
 import { useChatActionsStore } from '../../../store/useChatActionsStore.js';
 
 interface MessageContextMenuProps {
@@ -86,7 +74,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     }
                 }}
             >
-                <KeyboardArrowDownIcon sx={{ fontSize: '20px' }} />
+                <ChevronDown style={{ fontSize: 20 }} />
             </MenuButton>
 
             <Menu
@@ -101,50 +89,50 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                 }}
             >
                 <MenuItem onClick={onReply}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><ReplyIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Reply /></ListItemDecorator>
                     Responder
                 </MenuItem>
                 {isFile && fileCompleted && onDownload && (
                     <MenuItem onClick={onDownload}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><DownloadOutlinedIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Download /></ListItemDecorator>
                         Descargar
                     </MenuItem>
                 )}
 
                 <MenuItem onClick={() => setTimeout(() => onForward?.(), 0)}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}><ShortcutOutlinedIcon /></ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}><Share2 /></ListItemDecorator>
                     Reenviar
                 </MenuItem>
 
                 <ListDivider />
 
                 <MenuItem onClick={toggle('pinned')}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}>{pinned ? <PushPinIcon color="primary" /> : <PushPinOutlinedIcon />}</ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}>{pinned ? <Pin fill="currentColor" style={{ color: 'var(--joy-palette-primary-main)' }} /> : <Pin />}</ListItemDecorator>
                     {pinned ? 'Desfijar mensaje' : 'Fijar mensaje'}
                 </MenuItem>
 
                 <MenuItem onClick={toggle('starred')}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}>{starred ? <StarIcon color="warning" /> : <StarBorderOutlinedIcon />}</ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}>{starred ? <Star fill="currentColor" style={{ color: 'var(--joy-palette-warning-main)' }} /> : <Star />}</ListItemDecorator>
                     {starred ? 'Quitar destacado' : 'Destacar'}
                 </MenuItem>
 
                 <ListDivider />
 
                 <MenuItem onClick={toggle('reported')}>
-                    <ListItemDecorator sx={{ color: 'inherit' }}>{reported ? <ThumbDownIcon color="error" /> : <ThumbDownOutlinedIcon />}</ListItemDecorator>
+                    <ListItemDecorator sx={{ color: 'inherit' }}>{reported ? <ThumbsDown fill="currentColor" style={{ color: 'var(--joy-palette-danger-main)' }} /> : <ThumbsDown />}</ListItemDecorator>
                     {reported ? 'Quitar reporte' : 'Reportar'}
                 </MenuItem>
 
                 {onEdit && (
                     <MenuItem onClick={onEdit}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><EditOutlinedIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Pencil /></ListItemDecorator>
                         Editar
                     </MenuItem>
                 )}
 
                 {isMe && (
                     <MenuItem onClick={onDelete} color="danger">
-                        <ListItemDecorator sx={{ color: 'inherit' }}><DeleteOutlineIcon /></ListItemDecorator>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><Trash2 /></ListItemDecorator>
                         Eliminar
                     </MenuItem>
                 )}

@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Avatar, Button } from '@mui/joy';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import HowToRegIcon from '@mui/icons-material/HowToReg';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import BlockIcon from '@mui/icons-material/Block';
+import { UserPlus, UserCheck, Clock, Ban } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useChatStore } from '../../store/useChatStore.js';
 
@@ -64,10 +61,10 @@ export const ContactCard: React.FC<ContactCardProps> = ({ name, address, upeerId
     })();
 
     const buttonIcon = (() => {
-        if (isSelfContact || isSavedContact || didSave) return <HowToRegIcon />;
-        if (isBlockedContact) return <BlockIcon />;
-        if (isPendingContact) return <AccessTimeIcon />;
-        return <PersonAddIcon />;
+        if (isSelfContact || isSavedContact || didSave) return <UserCheck />;
+        if (isBlockedContact) return <Ban />;
+        if (isPendingContact) return <Clock />;
+        return <UserPlus />;
     })();
 
     const handleSaveContact = async () => {

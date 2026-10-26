@@ -1,14 +1,7 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TopHeaderActions } from '../../../src/components/layout/TopHeaderActions.js';
-
-vi.mock('@mui/icons-material/Search', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/LocalPhone', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/Videocam', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/Check', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/MoreVert', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/PersonAddAlt1', () => ({ default: () => <span /> }));
 
 describe('TopHeaderActions', () => {
     it('oculta las llamadas en la conversación conmigo mismo', () => {

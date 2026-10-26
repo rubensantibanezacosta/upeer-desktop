@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
-import CloseIcon from '@mui/icons-material/Close';
+import { X } from 'lucide-react';
 import { getFileIcon } from '../../../utils/fileIcons.js';
 import { toMediaUrl } from '../../../utils/fileUtils.js';
 import { getContactCardSummary } from '../message/messageItemSupport.js';
@@ -114,7 +114,7 @@ export const ReplyBar: React.FC<ReplyBarProps> = ({ replyToMessage, onCancel, on
                     onCancel();
                 }}
             >
-                <CloseIcon sx={{ fontSize: '18px' }} />
+                <X style={{ fontSize: 18 }} />
             </IconButton>
         </Box>
     );

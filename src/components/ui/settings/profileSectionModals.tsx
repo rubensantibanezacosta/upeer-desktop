@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Button, Modal, ModalClose, ModalDialog, Typography } from '@mui/joy';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DoneIcon from '@mui/icons-material/Done';
+import { Copy, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
     AlmacenamientoModalContent,
@@ -34,7 +33,7 @@ export const ProfileQrModal: React.FC<ProfileQrModalProps> = ({ open, fullId, co
             <Box sx={{ width: '100%', px: 1.5, py: 1, borderRadius: 'sm', backgroundColor: 'background.level1', fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', textAlign: 'left', color: 'text.secondary' }}>
                 {fullId || '—'}
             </Box>
-            <Button fullWidth variant={copied ? 'soft' : 'outlined'} color={copied ? 'success' : 'neutral'} startDecorator={copied ? <DoneIcon /> : <ContentCopyIcon />} onClick={onCopy} sx={{ transition: 'all 0.2s' }}>
+            <Button fullWidth variant={copied ? 'soft' : 'outlined'} color={copied ? 'success' : 'neutral'} startDecorator={copied ? <Check style={{ fontSize: 16 }} /> : <Copy style={{ fontSize: 16 }} />} onClick={onCopy} sx={{ transition: 'all 0.2s' }}>
                 {copied ? '¡Copiado!' : 'Copiar dirección'}
             </Button>
             {copyError && <Typography level="body-xs" color="danger">No se pudo copiar al portapapeles: {copyError}</Typography>}

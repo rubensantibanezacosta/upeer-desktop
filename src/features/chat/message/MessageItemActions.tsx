@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Tooltip } from '@mui/joy';
-import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
+import { SmilePlus } from 'lucide-react';
 import { MessageContextMenu } from './MessageContextMenu.js';
 import { QUICK_EMOJIS, getQuickEmojiLabel } from './messageItemSupport.js';
 import type { ChatMessage } from '../../../types/chat.js';
@@ -55,7 +55,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
                     onClick={(event) => { event.stopPropagation(); setEmojiOpen((value) => !value); }}
                     sx={{ '--IconButton-size': '26px', borderRadius: '50%', flexShrink: 0, opacity: 0.7, '&:hover': { opacity: 1, backgroundColor: 'background.level1' }, '&:active': { backgroundColor: 'background.level2' } }}
                 >
-                    <AddReactionOutlinedIcon sx={{ fontSize: '18px' }} />
+                    <SmilePlus style={{ fontSize: 18 }} />
                 </IconButton>
                 {emojiOpen && (
                     <Box sx={{ position: 'absolute', [isMe ? 'right' : 'left']: 0, bottom: 'calc(100% + 6px)', display: 'flex', gap: 0.5, backgroundColor: 'background.surface', border: '1px solid', borderColor: 'divider', borderRadius: 'lg', p: 0.75, boxShadow: 'lg', zIndex: 1300, whiteSpace: 'nowrap' }}>

@@ -1,10 +1,6 @@
 import React from 'react';
 import { Box, Typography, Button, Alert, Avatar } from '@mui/joy';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import ShieldIcon from '@mui/icons-material/Shield';
-import WarningIcon from '@mui/icons-material/Warning';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import BlockIcon from '@mui/icons-material/Block';
+import { UserPlus, ShieldCheck, TriangleAlert, Clock, Ban } from 'lucide-react';
 import type { UntrustworthyInfo } from '../../types/chat.js';
 
 interface IncomingRequestChatProps {
@@ -76,7 +72,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid', borderColor: 'background.surface'
                     }}>
-                        <WarningIcon sx={{ fontSize: 16, color: 'warning.main' }} />
+                        <TriangleAlert style={{ fontSize: 16, color: 'var(--joy-palette-warning-main)' }} />
                     </Box>
                 )}
             </Box>
@@ -92,7 +88,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
 
             {receivedAt && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 4, color: 'text.tertiary' }}>
-                    <AccessTimeIcon sx={{ fontSize: 13 }} />
+                    <Clock style={{ fontSize: 13 }} />
                     <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
                         Solicitud recibida · {formatTimestamp(receivedAt)}
                     </Typography>
@@ -103,7 +99,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 <Alert
                     variant="soft"
                     color="danger"
-                    startDecorator={<WarningIcon />}
+                    startDecorator={<TriangleAlert />}
                     sx={{ mb: 4, maxWidth: 450, textAlign: 'left', borderRadius: 'md' }}
                 >
                     <Box>
@@ -121,7 +117,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 <Alert
                     variant="soft"
                     color="success"
-                    startDecorator={<ShieldIcon />}
+                    startDecorator={<ShieldCheck />}
                     sx={{ mb: 4, maxWidth: 450, textAlign: 'left', borderRadius: 'md' }}
                 >
                     <Box>
@@ -138,7 +134,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 <Alert
                     variant="soft"
                     color="neutral"
-                    startDecorator={<PersonAddIcon />}
+                    startDecorator={<UserPlus />}
                     sx={{ mb: 4, maxWidth: 450, textAlign: 'left', borderRadius: 'md' }}
                 >
                     <Box>
@@ -158,7 +154,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                     size="lg"
                     variant="outlined"
                     color="neutral"
-                    startDecorator={<BlockIcon />}
+                    startDecorator={<Ban />}
                     onClick={onReject}
                     sx={{ borderRadius: 'md', fontWeight: 600, px: 3 }}
                 >
@@ -168,7 +164,7 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                     size="lg"
                     variant="solid"
                     color={isUntrustworthy ? 'warning' : 'primary'}
-                    startDecorator={isUntrustworthy ? <WarningIcon /> : <ShieldIcon />}
+                    startDecorator={isUntrustworthy ? <TriangleAlert /> : <ShieldCheck />}
                     onClick={onAccept}
                     sx={{ borderRadius: 'md', fontWeight: 600, px: 4 }}
                 >

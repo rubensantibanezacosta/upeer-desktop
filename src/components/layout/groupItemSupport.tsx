@@ -1,10 +1,6 @@
 import React from 'react';
 import { Avatar, Box } from '@mui/joy';
-import DoneIcon from '@mui/icons-material/Done';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import GroupsIcon from '@mui/icons-material/Groups';
-import MicIcon from '@mui/icons-material/Mic';
+import { Check, CheckCheck, CircleAlert, Users, Mic } from 'lucide-react';
 import { Group } from '../../types/chat.js';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
@@ -25,7 +21,7 @@ export const GroupAvatar: React.FC<{ avatar?: string | null; size?: 'sm' | 'md' 
             ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}),
         }}
     >
-        {!avatar && <GroupsIcon sx={{ fontSize: size === 'lg' ? 24 : 20, color: 'white' }} />}
+        {!avatar && <Users style={{ fontSize: size === 'lg' ? 24 : 20, color: 'white' }} />}
     </Avatar>
 );
 
@@ -34,15 +30,15 @@ export const GroupItemStatusIcon: React.FC<{ group: Group }> = ({ group }) => {
         return null;
     }
     if (group.lastMessageStatus === 'failed') {
-        return <ErrorOutlineIcon sx={{ fontSize: '16px', color: 'danger.500' }} />;
+        return <CircleAlert style={{ fontSize: 16, color: 'var(--joy-palette-danger-500)' }} />;
     }
     if (group.lastMessageStatus === 'sent' || group.lastMessageStatus === 'vaulted') {
-        return <DoneIcon sx={{ fontSize: '16px', opacity: 0.7 }} />;
+        return <Check style={{ fontSize: 16, opacity: 0.7 }} />;
     }
     return (
-        <DoneAllIcon
-            sx={{
-                fontSize: '16px',
+        <CheckCheck
+            style={{
+                fontSize: 16,
                 color: group.lastMessageStatus === 'read' ? '#53bdeb' : 'inherit',
                 opacity: group.lastMessageStatus === 'read' ? 1 : 0.7,
             }}
@@ -74,7 +70,7 @@ export const renderGroupLastMessage = (group: Group, highlight: string) => {
                 if (parsed.isVoiceNote) {
                     return (
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                            <MicIcon sx={{ fontSize: 16, opacity: 0.8 }} />
+                            <Mic style={{ fontSize: 16, opacity: 0.8 }} />
                             <span>Nota de voz</span>
                         </Box>
                     );

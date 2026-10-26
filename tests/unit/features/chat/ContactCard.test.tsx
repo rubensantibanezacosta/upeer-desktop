@@ -15,10 +15,6 @@ vi.mock('../../../../src/store/useChatStore.js', () => ({
     useChatStore: <T,>(selector: (state: ContactCardStore) => T) => selector(mockState),
 }));
 
-vi.mock('@mui/icons-material/PersonAdd', () => ({
-    default: () => <div data-testid="person-add-icon" />,
-}));
-
 vi.mock('qrcode.react', () => ({
     QRCodeSVG: () => <div data-testid="qr-code" />,
 }));

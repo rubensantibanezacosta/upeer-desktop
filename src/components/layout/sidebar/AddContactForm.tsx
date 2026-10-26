@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Input, FormControl, FormLabel, Stack, Alert, Button } from '@mui/joy';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { Info } from 'lucide-react';
 import { isYggdrasilAddress } from '../../../utils/yggdrasilAddress.js';
 
 interface AddContactFormProps {
@@ -44,7 +44,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onAdd, onDone })
             {error && (
                 <Alert
                     variant="soft" color="danger"
-                    startDecorator={<InfoOutlined />}
+                    startDecorator={<Info style={{ fontSize: 18 }} />}
                     sx={{ mb: 2, py: 1 }}
                 >
                     {error}

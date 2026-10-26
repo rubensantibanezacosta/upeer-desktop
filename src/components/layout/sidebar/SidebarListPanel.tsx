@@ -1,6 +1,6 @@
 import React from 'react';
 import { Avatar, Box, List, ListItem, ListItemContent, ListItemDecorator, Typography } from '@mui/joy';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import { MessageSquare } from 'lucide-react';
 import { SidebarHeader } from '../SidebarHeader.js';
 import { SidebarSearch } from '../SidebarSearch.js';
 import { ContactItem } from '../ContactItem.js';
@@ -129,7 +129,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                                                 >
                                                     <ListItemDecorator sx={{ mr: 1.5 }}>
                                                         <Avatar size="sm" src={msg.senderAvatar || undefined}>
-                                                            {!msg.senderAvatar && <ChatBubbleOutlineIcon />}
+                                                            {!msg.senderAvatar && <MessageSquare style={{ fontSize: 16 }} />}
                                                         </Avatar>
                                                     </ListItemDecorator>
                                                     <ListItemContent>

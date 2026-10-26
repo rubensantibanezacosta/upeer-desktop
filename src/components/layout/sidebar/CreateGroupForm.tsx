@@ -3,9 +3,7 @@ import {
     Box, Typography, Input, FormControl, FormLabel, Stack,
     Button, Divider, List, ListItem, Checkbox, Avatar, Chip
 } from '@mui/joy';
-import GroupsIcon from '@mui/icons-material/Groups';
-import SearchIcon from '@mui/icons-material/Search';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import { Users, Search, Camera } from 'lucide-react';
 import { Contact } from '../../../types/chat.js';
 import { resizeImageToDataUrl } from '../../ui/settings/shared.js';
 
@@ -99,7 +97,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                             background: groupAvatar ? undefined : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))'
                         }}
                     >
-                        {!groupAvatar && <GroupsIcon sx={{ fontSize: 32, color: 'white' }} />}
+                        {!groupAvatar && <Users style={{ fontSize: 32, color: 'white' }} />}
                     </Avatar>
                     <Box className="avatar-overlay" sx={{
                         position: 'absolute', inset: 0,
@@ -108,7 +106,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                         opacity: groupAvatar ? 0 : 0.6,
                         transition: 'opacity 0.2s',
                     }}>
-                        <CameraAltIcon sx={{ color: 'white', fontSize: 24 }} />
+                        <Camera style={{ color: 'white', fontSize: 24 }} />
                     </Box>
                 </Box>
             </Box>
@@ -144,7 +142,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                 size="sm"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                startDecorator={<SearchIcon sx={{ opacity: 0.5, fontSize: '18px' }} />}
+                startDecorator={<Search style={{ opacity: 0.5, fontSize: 18 }} />}
             />
             <Box sx={{
                 flex: 1, overflowY: 'auto', minHeight: 120,

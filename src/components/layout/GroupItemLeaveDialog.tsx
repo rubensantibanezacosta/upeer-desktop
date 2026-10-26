@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, DialogActions, DialogContent, DialogTitle, Divider, Modal, ModalDialog, Typography } from '@mui/joy';
-import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import { TriangleAlert } from 'lucide-react';
 
 interface GroupItemLeaveDialogProps {
     open: boolean;
@@ -13,7 +13,7 @@ export const GroupItemLeaveDialog: React.FC<GroupItemLeaveDialogProps> = ({ open
     <Modal open={open} onClose={onClose}>
         <ModalDialog variant="outlined" role="alertdialog" sx={{ minWidth: 400 }}>
             <DialogTitle>
-                <WarningRoundedIcon color="error" />
+                <TriangleAlert style={{ fontSize: 20, color: 'var(--joy-palette-danger-500)' }} />
                 Confirmar eliminación
             </DialogTitle>
             <Divider />

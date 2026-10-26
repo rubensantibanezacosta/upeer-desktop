@@ -2,13 +2,7 @@ import React from 'react';
 import {
     Box, IconButton, Tooltip, Dropdown, Menu, MenuItem, MenuButton, ListItemDecorator,
 } from '@mui/joy';
-import CropIcon from '@mui/icons-material/Crop';
-import EditIcon from '@mui/icons-material/Edit';
-import TextFieldsIcon from '@mui/icons-material/TextFields';
-import TuneIcon from '@mui/icons-material/Tune';
-import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined';
-import AppsIcon from '@mui/icons-material/Apps';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { Crop, Pencil, Type, RotateCw, StickyNote, LayoutGrid, RotateCcw } from 'lucide-react';
 
 type EditMode = 'crop' | 'draw' | 'text' | 'sticker' | null;
 
@@ -50,37 +44,37 @@ export const ImageEditToolbar: React.FC<ImageEditToolbarProps> = ({
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
             <Tooltip title={isActiveMode(editMode, 'crop') ? 'Cancelar recorte' : 'Recortar'} variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton variant="plain" color={isActiveMode(editMode, 'crop') ? 'primary' : 'neutral'} sx={toolbarButtonSx} onClick={() => onModeChange('crop')}>
-                    <CropIcon />
+                    <Crop />
                 </IconButton>
             </Tooltip>
             <Tooltip title={isActiveMode(editMode, 'draw') ? 'Cancelar dibujo' : 'Dibujar'} variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton variant="plain" color={isActiveMode(editMode, 'draw') ? 'primary' : 'neutral'} sx={toolbarButtonSx} onClick={() => onModeChange('draw')}>
-                    <EditIcon />
+                    <Pencil />
                 </IconButton>
             </Tooltip>
             <Tooltip title={isActiveMode(editMode, 'text') ? 'Cancelar texto' : 'Texto'} variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton variant="plain" color={isActiveMode(editMode, 'text') ? 'primary' : 'neutral'} sx={toolbarButtonSx} onClick={() => onModeChange('text')}>
-                    <TextFieldsIcon />
+                    <Type />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Rotar 90°" variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton variant="plain" color="neutral" sx={toolbarButtonSx} onClick={onRotate}>
-                    <TuneIcon />
+                    <RotateCw />
                 </IconButton>
             </Tooltip>
             <Tooltip title={isActiveMode(editMode, 'sticker') ? 'Cancelar stickers' : 'Stickers'} variant="soft" sx={{ zIndex: 3000 }}>
                 <IconButton variant="plain" color={isActiveMode(editMode, 'sticker') ? 'primary' : 'neutral'} sx={toolbarButtonSx} onClick={() => onModeChange('sticker')}>
-                    <StickyNote2OutlinedIcon />
+                    <StickyNote />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Más" variant="soft" sx={{ zIndex: 3000 }}>
                 <Dropdown>
                     <MenuButton slots={{ root: IconButton }} slotProps={{ root: { variant: 'plain', color: 'neutral', sx: toolbarButtonSx, 'aria-label': 'Más opciones de edición' } }}>
-                        <AppsIcon />
+                        <LayoutGrid />
                     </MenuButton>
                     <Menu size="sm" placement="bottom-end" sx={{ minWidth: 200, borderRadius: 'lg', '--ListItem-radius': '8px', boxShadow: 'lg', zIndex: 3000 }}>
                         <MenuItem onClick={onReset} disabled={!canReset}>
-                            <ListItemDecorator sx={{ color: 'inherit' }}><RestartAltIcon /></ListItemDecorator>
+                            <ListItemDecorator sx={{ color: 'inherit' }}><RotateCcw /></ListItemDecorator>
                             Restablecer imagen original
                         </MenuItem>
                     </Menu>

@@ -1,8 +1,6 @@
 import React from 'react';
 import { Box, Typography, IconButton } from '@mui/joy';
-import EditNoteIcon from '@mui/icons-material/EditNote';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { SquarePen, MoreVertical, ArrowLeft } from 'lucide-react';
 import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
 
 interface SidebarHeaderProps {
@@ -20,10 +18,10 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew }) => (
         <Typography level="h4" sx={{ fontWeight: 600 }}>uPeer</Typography>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
             <IconButton aria-label="Nuevo chat" size="sm" variant="plain" color="neutral" onClick={onAddNew}>
-                <EditNoteIcon />
+                <SquarePen style={{ fontSize: 20 }} />
             </IconButton>
             <IconButton aria-label="Más opciones" size="sm" variant="plain" color="neutral">
-                <MoreVertIcon />
+                <MoreVertical style={{ fontSize: 20 }} />
             </IconButton>
         </Box>
     </Box>
@@ -36,7 +34,7 @@ export const NewChatHeader: React.FC<{ onBack: () => void }> = ({ onBack }) => (
         height: LIST_ROW_MIN_HEIGHT, boxSizing: 'border-box',
     }}>
         <IconButton aria-label="Volver" size="sm" variant="plain" color="neutral" onClick={onBack}>
-            <ArrowBackIcon />
+            <ArrowLeft style={{ fontSize: 20 }} />
         </IconButton>
         <Typography level="h4" sx={{ fontWeight: 600 }}>Nuevo chat</Typography>
     </Box>

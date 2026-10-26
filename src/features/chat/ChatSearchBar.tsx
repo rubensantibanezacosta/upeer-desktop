@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Input, List, ListItem, ListItemButton, ListItemContent, Typography, IconButton, Chip, CircularProgress } from '@mui/joy';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import { Search, X, MessageSquare } from 'lucide-react';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 
 interface ChatSearchBarProps {
@@ -103,14 +101,14 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
                 <Input
                     aria-label="Buscar mensajes en esta conversación"
                     size="sm"
-                    startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                    startDecorator={<Search style={{ fontSize: 18 }} />}
                     placeholder="Buscar mensajes…"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     autoFocus
                     endDecorator={
                         <IconButton aria-label="Cerrar búsqueda" size="sm" variant="plain" color="neutral" onClick={onClose}>
-                            <CloseIcon sx={{ fontSize: 18 }} />
+                            <X style={{ fontSize: 18 }} />
                         </IconButton>
                     }
                     sx={{ flexGrow: 1 }}
@@ -138,7 +136,7 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
                                 onClick={() => openResult(result.id)}
                                 sx={{ px: 1, py: 0.75, borderRadius: 'sm', gap: 1 }}
                             >
-                                <ChatBubbleOutlineIcon sx={{ fontSize: 18, color: 'text.tertiary', flexShrink: 0 }} />
+                                <MessageSquare style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)', flexShrink: 0 }} />
                                 <ListItemContent sx={{ minWidth: 0 }}>
                                     <Typography level="body-xs" noWrap sx={{ color: result.isMine ? 'primary.500' : 'neutral' }}>
                                         {result.isMine ? 'Tú' : 'Contacto'} · {fmtTime(result.timestamp)}

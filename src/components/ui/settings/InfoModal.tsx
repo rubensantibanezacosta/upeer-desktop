@@ -11,7 +11,7 @@ import {
     Stack,
     Alert,
 } from '@mui/joy';
-import SecurityIcon from '@mui/icons-material/Security';
+import { ShieldCheck } from 'lucide-react';
 
 interface InfoModalProps {
     open: boolean;
@@ -91,7 +91,7 @@ export const AlmacenamientoModalContent: React.FC = () => (
             Esta aplicación funciona sin servidores centrales. Para que tus contactos reciban mensajes mientras están desconectados, los nodos de la red P2P (como el tuyo) "ceden" un pequeño espacio para guardar temporalmente esos datos cifrados.
         </Typography>
 
-        <Alert variant="soft" color="primary" startDecorator={<SecurityIcon />}>
+        <Alert variant="soft" color="primary" startDecorator={<ShieldCheck style={{ fontSize: 20 }} />}>
             <Typography level="body-xs">
                 Todo el contenido está cifrado de extremo a extremo (E2EE) con llaves que solo el destinatario posee. <b>Tú no puedes leer lo que almacenas</b>, ni nadie puede leer tus mensajes guardados en otros nodos.
             </Typography>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
+import { Plus, X } from 'lucide-react';
 
 interface DragDropPlaceholderProps {
     onClose: () => void;
@@ -21,7 +20,7 @@ export const DragDropPlaceholder: React.FC<DragDropPlaceholderProps> = ({
     <>
         <Box sx={{ p: 2 }}>
             <IconButton variant="plain" color="neutral" onClick={onClose}>
-                <CloseIcon />
+                <X />
             </IconButton>
         </Box>
         <Box sx={{ p: 4, display: 'flex', flexGrow: 1, pointerEvents: 'none' }}>
@@ -32,7 +31,7 @@ export const DragDropPlaceholder: React.FC<DragDropPlaceholderProps> = ({
                 backgroundColor: 'background.level1',
                 transition: 'all 0.2s ease-in-out',
             }}>
-                <AddIcon sx={{ fontSize: 48, color: 'text.primary', mb: 2 }} />
+                <Plus style={{ fontSize: 48, color: 'var(--joy-palette-text-primary)', marginBottom: 16 }} />
                 <Typography level="h3" sx={{ color: 'text.primary', fontWeight: 500 }}>{label}</Typography>
             </Box>
         </Box>

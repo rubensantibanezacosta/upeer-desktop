@@ -1,12 +1,5 @@
 import React from 'react';
-import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import PetsIcon from '@mui/icons-material/Pets';
-import RestaurantIcon from '@mui/icons-material/Restaurant';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import SportsBasketballIcon from '@mui/icons-material/SportsBasketball';
-import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FlagIcon from '@mui/icons-material/Flag';
+import { Smile, PawPrint, Utensils, Car, Volleyball, Lightbulb, Heart, Flag } from 'lucide-react';
 
 export interface EmojiCategory {
     icon: React.ReactElement;
@@ -16,7 +9,7 @@ export interface EmojiCategory {
 
 export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
     smileys: {
-        icon: React.createElement(EmojiEmotionsIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Smile, { style: { fontSize: 18 } }),
         label: 'Emoticonos',
         emojis: [
             '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌',
@@ -31,7 +24,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     people: {
-        icon: React.createElement(PetsIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(PawPrint, { style: { fontSize: 18 } }),
         label: 'Personas y animales',
         emojis: [
             '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙',
@@ -48,7 +41,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     food: {
-        icon: React.createElement(RestaurantIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Utensils, { style: { fontSize: 18 } }),
         label: 'Comida y bebida',
         emojis: [
             '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑',
@@ -63,7 +56,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     travel: {
-        icon: React.createElement(DirectionsCarIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Car, { style: { fontSize: 18 } }),
         label: 'Viajes y lugares',
         emojis: [
             '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛',
@@ -76,7 +69,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     activities: {
-        icon: React.createElement(SportsBasketballIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Volleyball, { style: { fontSize: 18 } }),
         label: 'Actividades',
         emojis: [
             '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸',
@@ -89,7 +82,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     objects: {
-        icon: React.createElement(LightbulbIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Lightbulb, { style: { fontSize: 18 } }),
         label: 'Objetos',
         emojis: [
             '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾',
@@ -102,7 +95,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     symbols: {
-        icon: React.createElement(FavoriteIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Heart, { style: { fontSize: 18 } }),
         label: 'Símbolos',
         emojis: [
             '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '❣️',
@@ -115,7 +108,7 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
         ]
     },
     flags: {
-        icon: React.createElement(FlagIcon, { sx: { fontSize: 18 } }),
+        icon: React.createElement(Flag, { style: { fontSize: 18 } }),
         label: 'Banderas',
         emojis: [
             '🏳️', '🏴', '🏴‍☠️', '🏁', '🚩', '🎌', '🏳️‍🌈', '🏳️‍⚧️', '🇺🇳', '🇦🇫', '🇦🇱', '🇩🇿', '🇦🇸',

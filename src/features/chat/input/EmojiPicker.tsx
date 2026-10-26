@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { IconButton, Box, Input, Typography, Tabs, TabList, Tab, Sheet } from '@mui/joy';
-import MoodIcon from '@mui/icons-material/Mood';
-import SearchIcon from '@mui/icons-material/Search';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { Smile, Search, Clock } from 'lucide-react';
 import { EMOJI_CATEGORIES, CATEGORY_KEYS, STORAGE_KEY } from './emojiData.js';
 
 interface EmojiPickerProps {
@@ -63,7 +61,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                 onClick={() => setIsOpen(!isOpen)}
                 sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
             >
-                <MoodIcon />
+                <Smile />
             </IconButton>
 
             {isOpen && (
@@ -90,7 +88,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                             placeholder="Buscar emoji..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            startDecorator={<SearchIcon sx={{ fontSize: 18, opacity: 0.5 }} />}
+                            startDecorator={<Search style={{ fontSize: 18, opacity: 0.5 }} />}
                             sx={{ '--Input-focusedThickness': '0px', backgroundColor: 'background.level1', border: 'none' }}
                         />
                     </Box>
@@ -129,7 +127,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                         {!search && recentEmojis.length > 0 && activeTab === 0 && (
                             <Box sx={{ mb: 1.5 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5, mb: 0.5 }}>
-                                    <AccessTimeIcon sx={{ fontSize: 14, opacity: 0.6 }} />
+                                    <Clock style={{ fontSize: 14, opacity: 0.6 }} />
                                     <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 600 }}>
                                         Usados recientemente
                                     </Typography>

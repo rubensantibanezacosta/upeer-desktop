@@ -9,9 +9,7 @@ import {
     CircularProgress,
     Chip,
 } from '@mui/joy';
-import BlockIcon from '@mui/icons-material/Block';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import PersonOffIcon from '@mui/icons-material/PersonOff';
+import { Ban, LockOpen, UserX } from 'lucide-react';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
 
 interface BlockedContact {
@@ -57,7 +55,7 @@ export const SectionBloqueados: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<BlockIcon />}
+            icon={<Ban style={{ fontSize: 18 }} />}
             title="Bloqueados"
             description="Los usuarios bloqueados no pueden enviarte solicitudes de contacto. Puedes desbloquearlos en cualquier momento."
         >
@@ -71,7 +69,7 @@ export const SectionBloqueados: React.FC = () => {
                     alignItems: 'center', justifyContent: 'center',
                     py: 8, gap: 1.5, color: 'text.tertiary',
                 }}>
-                    <PersonOffIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+                    <UserX style={{ fontSize: 48, opacity: 0.3 }} />
                     <Typography level="body-sm" color="neutral">
                         No has bloqueado a ningún usuario
                     </Typography>
@@ -134,7 +132,7 @@ export const SectionBloqueados: React.FC = () => {
                                 startDecorator={
                                     unblocking === c.upeerId
                                         ? <CircularProgress size="sm" />
-                                        : <LockOpenIcon />
+                                        : <LockOpen style={{ fontSize: 16 }} />
                                 }
                                 disabled={unblocking === c.upeerId}
                                 onClick={() => handleUnblock(c.upeerId)}

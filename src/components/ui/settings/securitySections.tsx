@@ -1,10 +1,6 @@
 import React from 'react';
 import { Box, Button, Chip, Typography } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
-import KeyIcon from '@mui/icons-material/Key';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import WarningIcon from '@mui/icons-material/Warning';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { Shield, KeyRound, Trash2, TriangleAlert, BadgeCheck } from 'lucide-react';
 import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 interface SecurityStatusCardProps {
@@ -14,14 +10,14 @@ interface SecurityStatusCardProps {
 export const SecurityStatusCard: React.FC<SecurityStatusCardProps> = ({ pinEnabled }) => (
     <Box>
         <CardGroupLabel
-            icon={<ShieldIcon sx={{ fontSize: '15px' }} />}
+            icon={<Shield style={{ fontSize: 15 }} />}
             title="Protección de cuenta"
             action={
                 <Chip
                     size="sm"
                     color={pinEnabled ? 'success' : 'warning'}
                     variant="soft"
-                    startDecorator={pinEnabled ? <VerifiedUserIcon sx={{ fontSize: '12px' }} /> : <WarningIcon sx={{ fontSize: '12px' }} />}
+                    startDecorator={pinEnabled ? <BadgeCheck style={{ fontSize: 12 }} /> : <TriangleAlert style={{ fontSize: 12 }} />}
                     sx={{ fontSize: '11px' }}
                 >
                     {pinEnabled ? 'Activada' : 'No protegida'}
@@ -32,8 +28,8 @@ export const SecurityStatusCard: React.FC<SecurityStatusCardProps> = ({ pinEnabl
         <Box sx={{ ...cardBodySx, pt: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, px: 0.5, py: 0.5 }}>
                 {pinEnabled
-                    ? <VerifiedUserIcon sx={{ fontSize: '18px', color: 'success.500', mt: '1px', flexShrink: 0 }} />
-                    : <WarningIcon sx={{ fontSize: '18px', color: 'warning.500', mt: '1px', flexShrink: 0 }} />
+                    ? <BadgeCheck style={{ fontSize: 18, color: 'var(--joy-palette-success-500)', marginTop: 1, flexShrink: 0 }} />
+                    : <TriangleAlert style={{ fontSize: 18, color: 'var(--joy-palette-warning-500)', marginTop: 1, flexShrink: 0 }} />
                 }
                 <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
                     {pinEnabled
@@ -52,13 +48,13 @@ interface RecoverySectionProps {
 export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }) => (
     <Box>
         <CardGroupLabel
-            icon={<KeyIcon sx={{ fontSize: '15px' }} />}
+            icon={<KeyRound style={{ fontSize: 15 }} />}
             title="Frase de recuperación"
         />
 
         <Box
             sx={{
-                mb: 1,
+                mb: 3.5,
                 px: 0.5,
                 display: 'flex',
                 flexDirection: 'column',
@@ -67,7 +63,7 @@ export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }
             }}
         >
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25 }}>
-                <WarningIcon sx={{ fontSize: '18px', color: 'warning.500', mt: '1px', flexShrink: 0 }} />
+                <TriangleAlert style={{ fontSize: 18, color: 'var(--joy-palette-warning-500)', marginTop: 1, flexShrink: 0 }} />
                 <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.5 }}>
                     Estas 12 palabras son la única forma de recuperar tu cuenta si pierdes acceso a este dispositivo. NUNCA las compartas.
                 </Typography>
@@ -76,7 +72,7 @@ export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }
                 size="sm"
                 variant="soft"
                 color="warning"
-                startDecorator={<KeyIcon sx={{ fontSize: '16px' }} />}
+                startDecorator={<KeyRound style={{ fontSize: 16,  }} />}
                 onClick={onRevealSeed}
             >
                 Revelar mis palabras clave
@@ -92,7 +88,7 @@ interface DangerZoneSectionProps {
 export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({ onDeleteClick }) => (
     <Box sx={{ backgroundColor: 'danger.softBg', borderRadius: '12px', my: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, pt: 1.75 }}>
-            <DeleteForeverIcon sx={{ fontSize: '15px', color: 'danger.300' }} />
+            <Trash2 style={{ fontSize: 15, color: 'var(--joy-palette-danger-300)' }} />
             <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'danger.300' }}>
                 Zona de peligro
             </Typography>
@@ -105,7 +101,7 @@ export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({ onDeleteCl
                 size="sm"
                 color="danger"
                 variant="soft"
-                startDecorator={<DeleteForeverIcon sx={{ fontSize: '16px' }} />}
+                startDecorator={<Trash2 style={{ fontSize: 16 }} />}
                 sx={{ fontWeight: 600 }}
                 onClick={onDeleteClick}
             >

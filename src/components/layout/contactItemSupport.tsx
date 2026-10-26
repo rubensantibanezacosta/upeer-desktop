@@ -1,11 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import DoneIcon from '@mui/icons-material/Done';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import MicIcon from '@mui/icons-material/Mic';
+import { Hourglass, Bell, Check, CheckCheck, CircleAlert, Mic } from 'lucide-react';
 import { getFileIcon } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
@@ -26,8 +21,8 @@ export const formatContactTime = (iso?: string | number | null) => formatMessage
 export const renderPendingLabel = (contact: Contact) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
         {contact.status === 'pending'
-            ? <HourglassEmptyIcon sx={{ fontSize: 14, flexShrink: 0 }} />
-            : <NotificationsIcon sx={{ fontSize: 14, color: 'primary.500', flexShrink: 0 }} />}
+            ? <Hourglass style={{ fontSize: 14, flexShrink: 0 }} />
+            : <Bell style={{ fontSize: 14, color: 'var(--joy-palette-primary-500)', flexShrink: 0 }} />}
         <Typography level="body-sm" noWrap sx={{ fontStyle: 'inherit', color: contact.status === 'incoming' ? 'primary.500' : 'inherit' }}>
             {contact.status === 'pending' ? 'Esperando respuesta...' : 'Solicitud de contacto recibida'}
         </Typography>
@@ -61,7 +56,7 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
             if (parsed.isVoiceNote) {
                 return (
                     <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                        <MicIcon sx={{ fontSize: 16, opacity: 0.8 }} />
+                        <Mic style={{ fontSize: 16, opacity: 0.8 }} />
                         <span>Nota de voz</span>
                     </Box>
                 );
@@ -102,15 +97,15 @@ export const renderMessageStatusIcon = (contact: Contact) => {
         return null;
     }
     if (contact.lastMessageStatus === 'failed') {
-        return <ErrorOutlineIcon sx={{ fontSize: '16px', color: 'danger.500' }} />;
+        return <CircleAlert style={{ fontSize: 16, color: 'var(--joy-palette-danger-500)' }} />;
     }
     if (contact.lastMessageStatus === 'sent' || contact.lastMessageStatus === 'vaulted') {
-        return <DoneIcon sx={{ fontSize: '16px', opacity: 0.7 }} />;
+        return <Check style={{ fontSize: 16, opacity: 0.7 }} />;
     }
     return (
-        <DoneAllIcon
-            sx={{
-                fontSize: '16px',
+        <CheckCheck
+            style={{
+                fontSize: 16,
                 color: contact.lastMessageStatus === 'read' ? '#53bdeb' : 'inherit',
                 opacity: contact.lastMessageStatus === 'read' ? 1 : 0.7,
             }}

@@ -1,12 +1,6 @@
 import React from 'react';
 import { Alert, Box, Button, IconButton, Stack, Typography } from '@mui/joy';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DownloadIcon from '@mui/icons-material/Download';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { Plus, ArrowLeft, Download, Lock, LockOpen, ScanLine, TriangleAlert } from 'lucide-react';
 
 interface HomeStepProps {
     isLocked: boolean;
@@ -21,19 +15,19 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
     if (isLocked) {
         return (
             <Stack spacing={2.5}>
-                <Alert variant="soft" color="warning" startDecorator={<LockIcon />} sx={{ borderRadius: '18px' }}>
+                <Alert variant="soft" color="warning" startDecorator={<Lock style={{ fontSize: 18 }} />} sx={{ borderRadius: '18px' }}>
                     Tu cuenta está protegida en este dispositivo. Usa tus 12 palabras para volver a entrar.
                 </Alert>
-                <Button fullWidth size="lg" startDecorator={<LockOpenIcon />} onClick={onUnlock} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+                <Button fullWidth size="lg" startDecorator={<LockOpen style={{ fontSize: 18 }} />} onClick={onUnlock} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Entrar a mi cuenta
                 </Button>
-                <Button fullWidth size="lg" variant="outlined" color="primary" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+                <Button fullWidth size="lg" variant="outlined" color="primary" startDecorator={<ScanLine style={{ fontSize: 18 }} />} onClick={onLinkDevice} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Entrar con un QR de otro dispositivo
                 </Button>
-                <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<AddIcon />} onClick={onSwitchAccount} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+                <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<Plus style={{ fontSize: 18 }} />} onClick={onSwitchAccount} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                     Crear cuenta nueva
                 </Button>
-                <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<DownloadIcon />} onClick={onSwitchAccount} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
+                <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<Download style={{ fontSize: 18 }} />} onClick={onSwitchAccount} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
                     Usar otra cuenta existente
                 </Button>
             </Stack>
@@ -56,13 +50,13 @@ export const HomeStep: React.FC<HomeStepProps> = ({ isLocked, onCreateNew, onImp
                     Puedes crear una cuenta nueva en este dispositivo o recuperar una existente con tus 12 palabras.
                 </Typography>
             </Box>
-            <Button fullWidth size="lg" startDecorator={<AddIcon />} onClick={onCreateNew} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
+            <Button fullWidth size="lg" startDecorator={<Plus style={{ fontSize: 18 }} />} onClick={onCreateNew} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
                 Crear cuenta nueva
             </Button>
-            <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<DownloadIcon />} onClick={onImport} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
+            <Button fullWidth size="lg" variant="outlined" color="neutral" startDecorator={<Download style={{ fontSize: 18 }} />} onClick={onImport} sx={{ minHeight: 54, borderRadius: '16px', fontWeight: 700 }}>
                 Entrar con la frase de mi cuenta
             </Button>
-            <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<QrCodeScannerIcon />} onClick={onLinkDevice} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
+            <Button fullWidth size="lg" variant="plain" color="neutral" startDecorator={<ScanLine style={{ fontSize: 18 }} />} onClick={onLinkDevice} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>
                 Entrar con un QR de otro dispositivo
             </Button>
         </Stack>
@@ -80,12 +74,12 @@ export const SwitchAccountWarnStep: React.FC<SwitchAccountWarnStepProps> = ({ cu
     <Stack spacing={2.5}>
         <Stack direction="row" alignItems="center" spacing={1}>
             <IconButton variant="plain" color="neutral" size="sm" onClick={onBack}>
-                <ArrowBackIcon />
+                <ArrowLeft style={{ fontSize: 20 }} />
             </IconButton>
             <Typography level="title-lg">Usar una cuenta diferente</Typography>
         </Stack>
 
-        <Alert variant="soft" color="warning" startDecorator={<WarningAmberIcon />} sx={{ borderRadius: '18px' }}>
+        <Alert variant="soft" color="warning" startDecorator={<TriangleAlert style={{ fontSize: 18 }} />} sx={{ borderRadius: '18px' }}>
             La cuenta {currentId ? `...${currentId.slice(-8)}` : 'actual'} se eliminará de este dispositivo si continúas.
         </Alert>
 
@@ -99,10 +93,10 @@ export const SwitchAccountWarnStep: React.FC<SwitchAccountWarnStepProps> = ({ cu
         </Box>
 
         <Stack spacing={1.5}>
-            <Button fullWidth size="lg" color="warning" startDecorator={<AddIcon />} onClick={onContinueCreate} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+            <Button fullWidth size="lg" color="warning" startDecorator={<Plus style={{ fontSize: 18 }} />} onClick={onContinueCreate} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                 Crear cuenta nueva
             </Button>
-            <Button fullWidth size="lg" variant="outlined" color="warning" startDecorator={<DownloadIcon />} onClick={onContinueImport} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
+            <Button fullWidth size="lg" variant="outlined" color="warning" startDecorator={<Download style={{ fontSize: 18 }} />} onClick={onContinueImport} sx={{ minHeight: 52, borderRadius: '16px', fontWeight: 700 }}>
                 Recuperar mi cuenta
             </Button>
             <Button fullWidth size="lg" variant="plain" color="neutral" onClick={onBack} sx={{ minHeight: 48, borderRadius: '16px', fontWeight: 700 }}>

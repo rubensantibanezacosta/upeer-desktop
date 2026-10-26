@@ -3,9 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { LinkDeviceStep } from '../../../../src/components/ui/login/LinkDeviceStep.js';
 
-vi.mock('@mui/icons-material/ArrowBack', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/QrCodeScanner', () => ({ default: () => <span /> }));
-vi.mock('@mui/icons-material/ContentCopy', () => ({ default: () => <span /> }));
 vi.mock('qrcode.react', () => ({
     QRCodeSVG: ({ value }: { value: string }) => <div data-testid="qr" data-value={value} />,
 }));

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Button, Typography } from '@mui/joy';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Eye } from 'lucide-react';
 
 interface WordChipProps {
     index: number;
@@ -50,7 +50,7 @@ export const CreateFlowMnemonicPanel: React.FC<CreateFlowMnemonicPanelProps> = (
         </Box>
         {!revealed && (
             <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', backdropFilter: 'blur(2px)' }}>
-                <Button variant="soft" startDecorator={<VisibilityIcon />} onClick={onReveal} sx={{ borderRadius: '999px', px: 2.5 }}>
+                <Button variant="soft" startDecorator={<Eye style={{ fontSize: 18 }} />} onClick={onReveal} sx={{ borderRadius: '999px', px: 2.5 }}>
                     Mostrar palabras
                 </Button>
             </Box>

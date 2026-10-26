@@ -1,36 +1,28 @@
 import React from 'react';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import ImageIcon from '@mui/icons-material/Image';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import DescriptionIcon from '@mui/icons-material/Description';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
+import { File, Image, FileVideo, FileAudio, FileText, Paperclip } from 'lucide-react';
 
-/**
- * Returns the appropriate MUI icon based on the file's MIME type and name.
- */
 export const getFileIcon = (mimeType: string, fileName = '') => {
     const type = mimeType.toLowerCase();
     const name = fileName.toLowerCase();
 
     if (type.startsWith('image/')) {
-        return <ImageIcon />;
+        return <Image />;
     }
     if (type.startsWith('video/')) {
-        return <VideoFileIcon />;
+        return <FileVideo />;
     }
     if (type.startsWith('audio/')) {
-        return <AudioFileIcon />;
+        return <FileAudio />;
     }
 
     if (/\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) {
-        return <ImageIcon />;
+        return <Image />;
     }
     if (/\.(mp4|mov|avi|mkv|webm)$/.test(name)) {
-        return <VideoFileIcon />;
+        return <FileVideo />;
     }
     if (/\.(mp3|wav|ogg|flac|m4a)$/.test(name)) {
-        return <AudioFileIcon />;
+        return <FileAudio />;
     }
 
     if (
@@ -40,12 +32,12 @@ export const getFileIcon = (mimeType: string, fileName = '') => {
         type.includes('presentation') ||
         /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf)$/.test(name)
     ) {
-        return <DescriptionIcon />;
+        return <FileText />;
     }
     if (type.includes('zip') || type.includes('rar') || type.includes('compressed') || /\.(zip|rar|7z|tar|gz)$/.test(name)) {
-        return <AttachFileIcon />;
+        return <Paperclip />;
     }
 
-    return <InsertDriveFileIcon />;
+    return <File />;
 };
 

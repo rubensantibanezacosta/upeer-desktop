@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar, Box, Card, CardContent, Chip, IconButton, List, ListItem, Stack, Tooltip, Typography } from '@mui/joy';
-import CallIcon from '@mui/icons-material/Call';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { Phone, Video, Clock } from 'lucide-react';
 import type { Contact, Group, RawChatMessage } from '../../types/chat.js';
 import { useCallStore } from './useCallStore.js';
 import { useCall } from './useCall.js';
@@ -103,13 +101,13 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                     })}
                 </Stack> : <Stack spacing={1.5}>
                     <Typography level="h3">Llamadas recientes</Typography>
-                    {recentCalls.length === 0 ? <EmptyState icon={<CallIcon />} title="Sin llamadas" subtitle="Todavía no has hecho ninguna llamada con tus contactos." /> : <List sx={{ '--ListItemDecorator-size': 'auto', p: 0 }}>
+                    {recentCalls.length === 0 ? <EmptyState icon={<Phone />} title="Sin llamadas" subtitle="Todavía no has hecho ninguna llamada con tus contactos." /> : <List sx={{ '--ListItemDecorator-size': 'auto', p: 0 }}>
                         {recentCalls.map((call) => {
                             const group = groups.find((item) => item.groupId === call.chatId);
                             const contact = contacts.find((item) => item.upeerId === call.chatId);
                             const name = group?.name || contact?.alias?.trim() || contact?.name || 'Contacto';
                             const participants = getRecentParticipants(call.chatId);
-                            const CallIconComponent = call.kind === 'video' ? VideocamIcon : CallIcon;
+                            const CallKindIcon = call.kind === 'video' ? Video : Phone;
                             const groupMembers = group?.members.filter((memberId) => memberId !== selfUpeerId) ?? [];
                             const canCallBack = group ? groupMembers.length > 0 : Boolean(contact && contact.upeerId !== selfUpeerId);
                             const callDate = new Date(call.timestamp);
@@ -120,7 +118,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                     <Box sx={{ ...listRowDecoratorSx, position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                                         <Avatar size="lg" src={group?.avatar || contact?.avatar} sx={listRowAvatarSx}>{name.charAt(0).toUpperCase()}</Avatar>
                                         <Box sx={{ position: 'absolute', right: 0, bottom: 0, display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', color: call.kind === 'video' ? 'primary.700' : 'success.700', backgroundColor: call.kind === 'video' ? 'primary.softBg' : 'success.softBg', border: '2px solid', borderColor: 'background.body' }}>
-                                            <CallIconComponent sx={{ fontSize: 13 }} />
+                                            <CallKindIcon style={{ fontSize: 13 }} />
                                         </Box>
                                     </Box>
                                     <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', py: 1 }}>
@@ -133,7 +131,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                                 <Typography level="body-sm" noWrap sx={{ color: 'text.secondary' }}>{call.kind === 'video' ? 'Videollamada' : 'Llamada de voz'}</Typography>
                                                 {group && <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>· {participants}</Typography>}
                                             </Box>
-                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <AccessTimeIcon /> : undefined}>
+                                            <Chip size="sm" variant="soft" color={call.duration ? 'neutral' : call.rejected ? 'warning' : 'danger'} startDecorator={call.duration ? <Clock /> : undefined}>
                                                 {call.duration ? call.duration : call.rejected ? 'Rechazada' : 'Perdida'}
                                             </Chip>
                                         </Box>
@@ -143,13 +141,13 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({ contacts, groups, selfUp
                                             <span><IconButton size="sm" variant="soft" color="success" aria-label={`Llamada de voz a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
                                                 if (group) void startCall(group.groupId, 'audio', true, groupMembers, group.groupId);
                                                 else if (contact) void startCall(contact.upeerId, 'audio');
-                                            }}><CallIcon /></IconButton></span>
+                                            }}><Phone /></IconButton></span>
                                         </Tooltip>
                                         <Tooltip title="Volver a llamar por vídeo">
                                             <span><IconButton size="sm" variant="soft" color="primary" aria-label={`Videollamada a ${name}`} disabled={hasActiveCall || !canCallBack} onClick={() => {
                                                 if (group) void startCall(group.groupId, 'video', true, groupMembers, group.groupId);
                                                 else if (contact) void startCall(contact.upeerId, 'video');
-                                            }}><VideocamIcon /></IconButton></span>
+                                            }}><Video /></IconButton></span>
                                         </Tooltip>
                                     </Stack>
                                 </Box>

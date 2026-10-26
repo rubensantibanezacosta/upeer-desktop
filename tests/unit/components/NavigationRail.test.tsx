@@ -2,13 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
-// Mocking icons to avoid @mui/material dependency issues in tests
-vi.mock('@mui/icons-material/Chat', () => ({ default: () => <div data-testid="ChatIcon" /> }));
-vi.mock('@mui/icons-material/DonutLarge', () => ({ default: () => <div data-testid="DonutLargeIcon" /> }));
-vi.mock('@mui/icons-material/Groups', () => ({ default: () => <div data-testid="GroupsIcon" /> }));
-vi.mock('@mui/icons-material/Settings', () => ({ default: () => <div data-testid="SettingsIcon" /> }));
-vi.mock('@mui/icons-material/Call', () => ({ default: () => <div data-testid="CallIcon" /> }));
-vi.mock('@mui/icons-material/Videocam', () => ({ default: () => <div data-testid="VideocamIcon" /> }));
+// Los iconos se mockean para poder afirmar sobre ellos sin depender de Lucide
+vi.mock('lucide-react', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('lucide-react')>()),
+    MessageCircle: () => <div data-testid="MessageCircleIcon" />,
+    CircleDashed: () => <div data-testid="CircleDashedIcon" />,
+    Users: () => <div data-testid="UsersIcon" />,
+    Settings: () => <div data-testid="SettingsIcon" />,
+    Phone: () => <div data-testid="PhoneIcon" />,
+    Video: () => <div data-testid="VideoIcon" />,
+}));
 
 import { NavigationRail } from '../../../src/components/layout/NavigationRail';
 
@@ -21,9 +24,9 @@ describe('NavigationRail Component', () => {
 
     it('renders navigation icons', () => {
         render(<NavigationRail {...defaultProps} />);
-        expect(screen.getByTestId('ChatIcon')).toBeDefined();
+        expect(screen.getByTestId('MessageCircleIcon')).toBeDefined();
         expect(screen.getByTestId('SettingsIcon')).toBeDefined();
-        expect(screen.getByTestId('CallIcon')).toBeDefined();
+        expect(screen.getByTestId('PhoneIcon')).toBeDefined();
     });
 
     it('muestra la cantidad de chats sin leer en el badge', () => {
@@ -46,18 +49,18 @@ describe('NavigationRail Component', () => {
 
     it('muestra el icono de voz cuando hay una llamada de audio activa', () => {
         render(<NavigationRail {...defaultProps} activeCallKind="audio" />);
-        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="CallIcon"]')).not.toBeNull();
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="PhoneIcon"]')).not.toBeNull();
     });
 
     it('muestra el icono de vídeo cuando hay una videollamada activa', () => {
         render(<NavigationRail {...defaultProps} activeCallKind="video" />);
-        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="VideocamIcon"]')).not.toBeNull();
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="VideoIcon"]')).not.toBeNull();
     });
 
     it('muestra el icono habitual cuando no hay llamadas activas', () => {
         render(<NavigationRail {...defaultProps} />);
-        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="CallIcon"]')).not.toBeNull();
-        expect(screen.queryByTestId('VideocamIcon')).toBeNull();
+        expect(screen.getByRole('button', { name: 'Llamadas' }).querySelector('[data-testid="PhoneIcon"]')).not.toBeNull();
+        expect(screen.queryByTestId('VideoIcon')).toBeNull();
     });
 
     it('calls onOpenSettings when settings icon is clicked', () => {
@@ -87,7 +90,7 @@ describe('NavigationRail Component', () => {
 
     it('highlights active view', () => {
         const { rerender } = render(<NavigationRail {...defaultProps} activeView="chat" />);
-        const chatButton = screen.getByTestId('ChatIcon').closest('button');
+        const chatButton = screen.getByTestId('MessageCircleIcon').closest('button');
         expect(chatButton).not.toBeNull();
         expect(chatButton!.className).toContain('MuiIconButton-variantSoft');
 

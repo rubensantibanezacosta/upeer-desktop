@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, LinearProgress, Chip } from '@mui/joy';
-import RouterIcon from '@mui/icons-material/Router';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SyncIcon from '@mui/icons-material/Sync';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import WifiIcon from '@mui/icons-material/Wifi';
+import { Router, CircleCheck, RefreshCw, WifiOff, Wifi } from 'lucide-react';
 
 // ─── Tipo de estado de red exportado para App.tsx ─────────────────────────────
 export type YggNetworkStatus = 'connecting' | 'up' | 'down' | 'reconnecting';
@@ -96,8 +92,8 @@ function WarmupOverlay({ networkStatus, address }: { networkStatus: YggNetworkSt
                 )}
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {isUp
-                        ? <CheckCircleOutlineIcon sx={{ fontSize: 48, color: 'success.400' }} />
-                        : <RouterIcon sx={{ fontSize: 40, color: 'primary.400' }} />
+                        ? <CircleCheck style={{ fontSize: 48, color: 'var(--joy-palette-success-400)' }} />
+                        : <Router style={{ fontSize: 40, color: 'var(--joy-palette-primary-400)' }} />
                     }
                 </Box>
             </Box>
@@ -185,10 +181,10 @@ function ReconnectBanner({ networkStatus }: { networkStatus: YggNetworkStatus })
 
     const chipProps: { color: 'danger' | 'warning' | 'success'; label: string; icon: React.ReactNode } =
         networkStatus === 'down'
-            ? { color: 'danger', label: 'Red segura no disponible', icon: <WifiOffIcon sx={{ fontSize: 16 }} /> }
+            ? { color: 'danger', label: 'Red segura no disponible', icon: <WifiOff style={{ fontSize: 16 }} /> }
             : networkStatus === 'reconnecting'
-                ? { color: 'warning', label: 'Reconectando a la red segura…', icon: <SyncIcon sx={{ fontSize: 16, animation: 'spin 1s linear infinite', '@keyframes spin': { to: { transform: 'rotate(360deg)' } } }} /> }
-                : { color: 'success', label: '¡Red segura reconectada!', icon: <WifiIcon sx={{ fontSize: 16 }} /> };
+                ? { color: 'warning', label: 'Reconectando a la red segura…', icon: <RefreshCw style={{ fontSize: 16, animation: 'spin 1s linear infinite' }} /> }
+                : { color: 'success', label: '¡Red segura reconectada!', icon: <Wifi style={{ fontSize: 16 }} /> };
 
     return (
         <Box

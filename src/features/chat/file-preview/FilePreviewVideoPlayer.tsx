@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, IconButton, Slider, Typography } from '@mui/joy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import { Play, Pause, Volume2, VolumeOff } from 'lucide-react';
 
 interface FilePreviewVideoPlayerProps {
     src: string;
@@ -96,10 +93,10 @@ export const FilePreviewVideoPlayer: React.FC<FilePreviewVideoPlayerProps> = ({ 
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <IconButton size="sm" variant="plain" color="neutral" onClick={togglePlay} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                            {isPlaying ? <Pause /> : <Play />}
                         </IconButton>
                         <IconButton size="sm" variant="plain" color="neutral" onClick={toggleMute} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                            {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+                            {isMuted ? <VolumeOff /> : <Volume2 />}
                         </IconButton>
                         <Typography level="body-xs" sx={{ color: 'white', fontWeight: 500, ml: 1 }}>
                             {formatTime(currentTime)} / {formatTime(duration)}

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import DevicesIcon from '@mui/icons-material/Devices';
+import { MonitorSmartphone } from 'lucide-react';
 import { DeviceEnrollmentPanel } from './DeviceEnrollmentPanel.js';
 import { AuthorizedDeviceList } from './AuthorizedDeviceList.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
@@ -11,7 +11,7 @@ export const SectionDispositivos: React.FC = () => {
 
     return (
         <SettingsSection
-            icon={<DevicesIcon />}
+            icon={<MonitorSmartphone style={{ fontSize: 18 }} />}
             title="Dispositivos"
             description="Los equipos vinculados comparten la misma cuenta, los mismos contactos y las mismas conversaciones. Ninguno recibe la frase semilla: cada uno guarda un certificado firmado por la cuenta."
         >

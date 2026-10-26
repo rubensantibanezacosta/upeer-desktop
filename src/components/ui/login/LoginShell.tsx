@@ -1,9 +1,6 @@
 import React from 'react';
 import { Box, Chip, Stack, Typography } from '@mui/joy';
-import ShieldIcon from '@mui/icons-material/Shield';
-import BoltIcon from '@mui/icons-material/Bolt';
-import LockIcon from '@mui/icons-material/Lock';
-import CloudOffIcon from '@mui/icons-material/CloudOff';
+import { Shield, Zap, Lock, CloudOff } from 'lucide-react';
 
 interface LoginShellProps {
     title: string;
@@ -14,17 +11,17 @@ interface LoginShellProps {
 
 const highlights = [
     {
-        icon: <BoltIcon sx={{ fontSize: 18 }} />,
+        icon: <Zap style={{ fontSize: 18 }} />,
         title: 'Directo entre dispositivos',
         description: 'Tus mensajes viajan sin pasar por servidores centrales.'
     },
     {
-        icon: <LockIcon sx={{ fontSize: 18 }} />,
+        icon: <Lock style={{ fontSize: 18 }} />,
         title: 'Acceso por frase secreta',
         description: 'Tus 12 palabras son la llave de tu identidad.'
     },
     {
-        icon: <CloudOffIcon sx={{ fontSize: 18 }} />,
+        icon: <CloudOff style={{ fontSize: 18 }} />,
         title: 'Sin dependencia de terceros',
         description: 'Tu cuenta y tu historial siguen siendo tuyos.'
     }
@@ -67,7 +64,7 @@ export const LoginShell: React.FC<LoginShellProps> = ({ title, description, step
                             borderColor: 'rgba(255,255,255,0.08)'
                         }}
                     >
-                        <ShieldIcon sx={{ fontSize: 34 }} />
+                        <Shield style={{ fontSize: 34 }} />
                     </Box>
                     <Stack spacing={1.5}>
                         <Chip size="sm" variant="soft" color="primary" sx={{ width: 'fit-content', borderRadius: '999px' }}>

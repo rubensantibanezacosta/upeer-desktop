@@ -1,7 +1,6 @@
 import React from 'react';
 import { Avatar, Box } from '@mui/joy';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import GroupsIcon from '@mui/icons-material/Groups';
+import { Camera, Users } from 'lucide-react';
 import { TrustAvatarBadge } from './TrustAvatarBadge.js';
 
 export const formatTopHeaderLastSeen = (iso: string) => {
@@ -62,7 +61,7 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
                             ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}),
                         }}
                     >
-                        {!avatar && <GroupsIcon sx={{ fontSize: 22, color: 'white' }} />}
+                        {!avatar && <Users style={{ fontSize: 22, color: 'white' }} />}
                     </Avatar>
                 ) : (
                     <Avatar size="lg" src={avatar || undefined} sx={listRowAvatarSx}>
@@ -85,7 +84,7 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
                         '&:hover': { opacity: 1 },
                     }}
                 >
-                    <CameraAltIcon sx={{ fontSize: 13, color: 'white' }} />
+                    <Camera style={{ fontSize: 13, color: 'white' }} />
                 </Box>
             )}
         </Box>
