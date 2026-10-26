@@ -3,6 +3,8 @@ import { Box } from '@mui/joy';
 import { Group, Contact, ChatMessage } from '../../types/chat.js';
 import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
+import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { isContactUnread, isGroupUnread } from './chatUnread.js';
 import { messageTimestampValue } from '../../utils/dateTime.js';
 import { SubViewHeader } from './sidebar/SubViewHeader.js';
 import { AddContactForm } from './sidebar/AddContactForm.js';
@@ -67,6 +69,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return () => clearTimeout(timer);
     }, [sidebarSearch, sidebarView, handleSearchGlobal]);
 
+    const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
+    const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
+
     const mergedList = useMemo(() => {
         type Entry =
             | { kind: 'group'; data: Group; time: number }
@@ -77,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const entries: Entry[] = [
             ...groups
                 .filter(g => sidebarFilter !== 'favorites' || !!g.isFavorite)
+                .filter(g => sidebarFilter !== 'unread' || isGroupUnread(g, groupPrefs[g.groupId]))
                 .filter(g => !q || g.name.toLowerCase().includes(q))
                 .map(g => ({
                     kind: 'group' as const,
@@ -86,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ...contacts
                 .filter(c => c.status !== 'blocked')
                 .filter(c => sidebarFilter !== 'favorites' || !!c.isFavorite)
+                .filter(c => sidebarFilter !== 'unread' || isContactUnread(c, contactPrefs[c.upeerId]))
                 .filter(c => !q || c.name?.toLowerCase().includes(q) || c.upeerId?.toLowerCase().includes(q))
                 .map(c => ({
                     kind: 'contact' as const,
@@ -94,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 })),
         ];
         return entries.sort((a, b) => b.time - a.time);
-    }, [groups, contacts, sidebarFilter, sidebarSearch]);
+    }, [groups, contacts, sidebarFilter, sidebarSearch, contactPrefs, groupPrefs]);
 
     const filteredGroups = useMemo(() => {
         if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];

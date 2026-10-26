@@ -14,6 +14,7 @@ import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreview
 import { useCall } from '../../features/call/useCall.js';
 import { useCallStore } from '../../features/call/useCallStore.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { isContactUnread, isGroupUnread } from './chatUnread.js';
 import { useSharedMediaItems } from './contactInfoPanelSupport.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { GroupInfoPanel } from './GroupInfoPanel.js';
@@ -131,13 +132,9 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
         fileTransfer.allTransfers.filter((transfer: FileTransfer) => transfer.chatUpeerId === activeGroupId),
     );
     const unreadChatCount = chatStore.contacts.filter((contact) =>
-        contact.status !== 'blocked' && (
-            contactPrefs[contact.upeerId]?.unread ||
-            (!contact.lastMessageIsMine && !!contact.lastMessage && contact.lastMessageStatus !== 'read')
-        )
+        contact.status !== 'blocked' && isContactUnread(contact, contactPrefs[contact.upeerId])
     ).length + chatStore.groups.filter((group) =>
-        groupPrefs[group.groupId]?.unread ||
-        (!group.lastMessageIsMine && !!group.lastMessage && group.lastMessageStatus !== 'read')
+        isGroupUnread(group, groupPrefs[group.groupId])
     ).length;
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
