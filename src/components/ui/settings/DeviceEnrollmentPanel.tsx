@@ -3,7 +3,7 @@ import { Alert, Box, Button, CircularProgress, Stack, Textarea, Typography } fro
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import { EnrollmentCodeCard } from '../enrollment/EnrollmentCodeCard.js';
-import { sectionCardSx } from './shared.js';
+import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 interface InviteState {
     code: string;
@@ -113,21 +113,20 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
     };
 
     return (
-        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                <AddLinkIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
-                <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
-                    Añadir otro dispositivo a mi cuenta
-                </Typography>
-            </Box>
-            <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 1.5 }}>
-                Genera la invitación y añade el dispositivo escaneando el QR o pegando el código en el otro equipo.
-            </Typography>
-
+        <Box>
+            <CardGroupLabel
+                icon={<AddLinkIcon sx={{ fontSize: '15px' }} />}
+                title="Añadir otro dispositivo"
+                description="Genera la invitación y añade el dispositivo escaneando el QR o pegando el código en el otro equipo."
+            />
+            <Box sx={{ ...cardBodySx, pt: 1.5 }}>
+                <Stack spacing={2}>
             {!invite && !issued && (
-                <Button startDecorator={<AddLinkIcon />} loading={busy} onClick={() => void createInvite()}>
-                    Generar invitación
-                </Button>
+                <Box>
+                    <Button startDecorator={<AddLinkIcon />} loading={busy} onClick={() => void createInvite()}>
+                        Generar invitación
+                    </Button>
+                </Box>
             )}
 
             {invite && !issued && (
@@ -198,6 +197,8 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
             )}
 
             {error && <Alert color="danger" variant="soft" size="sm">{error}</Alert>}
+                </Stack>
+            </Box>
         </Box>
     );
 };

@@ -1,32 +1,29 @@
 import React, { useCallback, useState } from 'react';
-import { Box, Typography } from '@mui/joy';
 import DevicesIcon from '@mui/icons-material/Devices';
 import { DeviceEnrollmentPanel } from './DeviceEnrollmentPanel.js';
 import { AuthorizedDeviceList } from './AuthorizedDeviceList.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
-import { sectionCardSx, sectionGroupSx } from './shared.js';
+import { SettingsCard, SettingsSection } from './sectionShell.js';
 
 export const SectionDispositivos: React.FC = () => {
     const [refreshKey, setRefreshKey] = useState(0);
     const refresh = useCallback(() => setRefreshKey((current) => current + 1), []);
 
     return (
-    <Box sx={sectionGroupSx}>
-        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                <DevicesIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
-                <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
-                    Dispositivos de la cuenta
-                </Typography>
-            </Box>
-            <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-                Los dispositivos vinculados comparten la misma cuenta, los mismos contactos y las mismas conversaciones.
-                Ninguno recibe la frase semilla: cada uno guarda un certificado firmado por la cuenta.
-            </Typography>
-        </Box>
-        <DeviceEnrollmentPanel onEnrolled={refresh} />
-        <AuthorizedDeviceList key={`devices-${refreshKey}`} />
-        <DeviceSessionList />
-    </Box>
+        <SettingsSection
+            icon={<DevicesIcon />}
+            title="Dispositivos"
+            description="Los equipos vinculados comparten la misma cuenta, los mismos contactos y las mismas conversaciones. Ninguno recibe la frase semilla: cada uno guarda un certificado firmado por la cuenta."
+        >
+            <SettingsCard>
+                <DeviceEnrollmentPanel onEnrolled={refresh} />
+            </SettingsCard>
+            <SettingsCard>
+                <AuthorizedDeviceList key={`devices-${refreshKey}`} />
+            </SettingsCard>
+            <SettingsCard>
+                <DeviceSessionList />
+            </SettingsCard>
+        </SettingsSection>
     );
 };

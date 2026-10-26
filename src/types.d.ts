@@ -108,6 +108,17 @@ declare global {
             getMyReputation: () => Promise<{ vouchScore: number; connectionCount: number } | null>;
             getVaultStats: () => Promise<{ count: number, sizeBytes: number }>;
             cleanupVaultExpired: () => Promise<void>;
+            clearVault: () => Promise<{ removed: number }>;
+            getStorageUsage: () => Promise<{
+                ownBytes: number;
+                databaseBytes: number;
+                attachmentsBytes: number;
+                backupsBytes: number;
+                attachmentCount: number;
+                messageCount: number;
+                vaultBytes: number;
+                vaultEntries: number;
+            }>;
             setMyAlias: (alias: string) => Promise<{ success: boolean }>;
             setMyAvatar: (dataUrl: string) => Promise<{ success: boolean }>;
             // Identity / Wallet Auth

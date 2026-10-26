@@ -14,6 +14,7 @@ import { registerNetworkHandlers } from './main_process/core/ipcHandlers/network
 import { registerSecurityHandlers } from './main_process/core/ipcHandlers/security.js';
 import { registerScreenShareHandlers } from './main_process/core/ipcHandlers/screenShare.js';
 import { registerVaultHandlers } from './main_process/core/ipcHandlers/vault.js';
+import { registerStorageHandlers } from './main_process/core/ipcHandlers/storage.js';
 
 export const registerMediaScheme = () => {
     protocol.registerSchemesAsPrivileged([
@@ -45,6 +46,7 @@ export const registerIpcHandlers = () => {
     registerFileHandlers();
     registerFileTransferHandlers();
     registerVaultHandlers();
+    registerStorageHandlers();
     registerSecurityHandlers();
     registerDeviceHandlers();
     registerEnrollmentHandlers();

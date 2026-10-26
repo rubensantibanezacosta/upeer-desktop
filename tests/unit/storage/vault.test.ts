@@ -6,6 +6,7 @@ import {
     getVaultEntriesForRecipient,
     deleteVaultEntry,
     cleanupExpiredVaultEntries,
+    clearVault,
     getExpiringSoonEntries,
     getVaultEntryByHash,
     renewVaultEntry
@@ -174,6 +175,25 @@ describe('Storage - Vault Operations', () => {
 
         await cleanupExpiredVaultEntries();
         expect(mockDb.delete).toHaveBeenCalled();
+    });
+
+    it('should clear every vault entry and report how many were removed', async () => {
+        mockDb.delete.mockReturnValue({
+            run: vi.fn().mockReturnValue({ changes: 9 })
+        });
+
+        const removed = await clearVault();
+        expect(removed).toBe(9);
+        expect(mockDb.delete).toHaveBeenCalled();
+    });
+
+    it('should report zero removed entries when the vault is already empty', async () => {
+        mockDb.delete.mockReturnValue({
+            run: vi.fn().mockReturnValue({ changes: undefined })
+        });
+
+        const removed = await clearVault();
+        expect(removed).toBe(0);
     });
 
     it('should find expiring soon entries', async () => {

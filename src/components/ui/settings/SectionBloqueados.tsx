@@ -12,7 +12,7 @@ import {
 import BlockIcon from '@mui/icons-material/Block';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
-import { sectionCardSx, sectionGroupSx } from './shared.js';
+import { SettingsCard, SettingsSection } from './sectionShell.js';
 
 interface BlockedContact {
     upeerId: string;
@@ -56,26 +56,11 @@ export const SectionBloqueados: React.FC = () => {
         c.alias || c.name || c.upeerId.slice(0, 12) + '…';
 
     return (
-        <Box sx={sectionGroupSx}>
-
-            {/* Encabezado informativo */}
-            <Box sx={{
-                ...sectionCardSx,
-                px: 3, py: 2.5,
-                display: 'flex', alignItems: 'center', gap: 1.5,
-            }}>
-                <BlockIcon sx={{ color: 'danger.500', fontSize: 20 }} />
-                <Box>
-                    <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                        Contactos bloqueados
-                    </Typography>
-                    <Typography level="body-xs" color="neutral">
-                        Los usuarios bloqueados no pueden enviarte solicitudes de contacto.
-                        Puedes desbloquearlos en cualquier momento.
-                    </Typography>
-                </Box>
-            </Box>
-
+        <SettingsSection
+            icon={<BlockIcon />}
+            title="Bloqueados"
+            description="Los usuarios bloqueados no pueden enviarte solicitudes de contacto. Puedes desbloquearlos en cualquier momento."
+        >
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                     <CircularProgress size="md" />
@@ -92,15 +77,19 @@ export const SectionBloqueados: React.FC = () => {
                     </Typography>
                 </Box>
             ) : (
-                <List sx={{ '--ListItem-paddingY': '0px', p: 0.5, ...sectionCardSx }}>
-                    {blocked.map(c => (
-                        <ListItem
-                            key={c.upeerId}
-                            sx={{
-                                px: 3, py: 1.5,
-                                display: 'flex', alignItems: 'center', gap: 2,
-                            }}
-                        >
+                <SettingsCard>
+                    <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
+                        {blocked.map(c => (
+                            <ListItem
+                                key={c.upeerId}
+                                sx={{
+                                    px: 1.25, py: 1,
+                                    borderRadius: '10px', mb: 0.5,
+                                    display: 'flex', alignItems: 'center', gap: 2,
+                                    transition: 'background-color 0.15s ease',
+                                    '&:hover': { backgroundColor: 'background.level2' },
+                                }}
+                            >
                             {/* Avatar */}
                             <Avatar
                                 src={c.avatar || undefined}
@@ -154,9 +143,10 @@ export const SectionBloqueados: React.FC = () => {
                                 Desbloquear
                             </Button>
                         </ListItem>
-                    ))}
-                </List>
+                        ))}
+                    </List>
+                </SettingsCard>
             )}
-        </Box>
+        </SettingsSection>
     );
 };

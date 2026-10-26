@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box } from '@mui/joy';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import type { Identity } from './types.js';
-import { resizeImageToDataUrl, sectionGroupSx } from './shared.js';
+import { resizeImageToDataUrl } from './shared.js';
+import { SettingsCard, SettingsSection } from './sectionShell.js';
 import type { ReputationData } from '../../../types/chat.js';
 import {
     DEFAULT_REPUTATION,
     type InfoKey,
     ProfileAddressSection,
     ProfileHeroSection,
-    ProfileStatsSection,
+    ProfileReputationSection,
     ProfileTechnicalSection,
+    ProfileVaultSection,
 } from './profileSectionBlocks.js';
 
 const normalizeReputation = (reputation: ReputationData | null) => {
@@ -118,27 +120,38 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     };
 
     return (
-        <Box sx={sectionGroupSx}>
-            <ProfileHeroSection
-                avatar={avatar}
-                alias={alias}
-                identityId={identity?.upeerId}
-                displayName={displayName}
-                isEditingAlias={isEditingAlias}
-                isSaving={isSaving}
-                fileInputRef={fileInputRef}
-                onAvatarClick={handleAvatarClick}
-                onFileChange={handleFileChange}
-                onAliasChange={setAlias}
-                onAliasEdit={() => setIsEditingAlias(true)}
-                onAliasCancel={() => setIsEditingAlias(false)}
-                onAliasSave={saveAlias}
-            />
-            <ProfileStatsSection myReputation={myReputation} vaultStats={vaultStats} fmtBytes={fmtBytes} onToggleInfo={toggleInfo} />
-            <ProfileAddressSection fullId={fullId} copied={copied} copyError={copyError} onCopy={handleCopy} onShowQr={() => setShowQR(true)} onToggleInfo={toggleInfo} />
-            <ProfileTechnicalSection identityId={identity?.upeerId} publicKey={identity?.publicKey} networkAddress={networkAddress} onToggleInfo={toggleInfo} />
+        <SettingsSection
+            icon={<AccountCircleIcon />}
+            title="Perfil"
+            description="Así te ven tus contactos: nombre, foto y la dirección con la que pueden escribirte."
+        >
+            <SettingsCard>
+                <ProfileHeroSection
+                    avatar={avatar}
+                    alias={alias}
+                    identityId={identity?.upeerId}
+                    displayName={displayName}
+                    isEditingAlias={isEditingAlias}
+                    isSaving={isSaving}
+                    fileInputRef={fileInputRef}
+                    onAvatarClick={handleAvatarClick}
+                    onFileChange={handleFileChange}
+                    onAliasChange={setAlias}
+                    onAliasEdit={() => setIsEditingAlias(true)}
+                    onAliasCancel={() => setIsEditingAlias(false)}
+                    onAliasSave={saveAlias}
+                />
+            </SettingsCard>
+            <ProfileReputationSection myReputation={myReputation} onToggleInfo={toggleInfo} />
+            <ProfileVaultSection vaultStats={vaultStats} fmtBytes={fmtBytes} onToggleInfo={toggleInfo} />
+            <SettingsCard>
+                <ProfileAddressSection fullId={fullId} copied={copied} copyError={copyError} onCopy={handleCopy} onShowQr={() => setShowQR(true)} onToggleInfo={toggleInfo} />
+            </SettingsCard>
+            <SettingsCard>
+                <ProfileTechnicalSection identityId={identity?.upeerId} publicKey={identity?.publicKey} networkAddress={networkAddress} onToggleInfo={toggleInfo} />
+            </SettingsCard>
             <ProfileQrModal open={showQR} fullId={fullId} copied={copied} copyError={copyError} onClose={() => setShowQR(false)} onCopy={handleCopy} />
             <ProfileInfoModal activeInfo={activeInfo} onClose={() => setActiveInfo(null)} />
-        </Box>
+        </SettingsSection>
     );
 };

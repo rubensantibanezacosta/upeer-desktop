@@ -128,6 +128,16 @@ export async function deleteVaultEntry(payloadHash: string): Promise<boolean> {
 }
 
 /**
+ * Elimina todas las entradas del vault, sin esperar a su expiración.
+ * Devuelve el número de entradas eliminadas.
+ */
+export async function clearVault(): Promise<number> {
+    const db = getDb();
+    const result = await db.delete(vaultStorage).run();
+    return Number(result?.changes) || 0;
+}
+
+/**
  * Removes all entries that have passed their expiration timestamp.
  */
 export async function cleanupExpiredVaultEntries() {

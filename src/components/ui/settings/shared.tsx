@@ -6,6 +6,7 @@ import {
     Tooltip,
     ListItem,
     ListItemButton,
+    ListItemDecorator,
     Switch,
 } from '@mui/joy';
 import CheckIcon from '@mui/icons-material/Check';
@@ -14,22 +15,29 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
 import type { SxProps } from '@mui/joy/styles/types';
 import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
-import { listRowButtonSx, listRowListItemSx } from '../../layout/listRowMetrics.js';
+import { listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from '../../layout/listRowMetrics.js';
 
-// ─── Contenedores de sección ──────────────────────────────────────────────────
+const rowButtonSx: SxProps = {
+    ...listRowButtonSx,
+    '&:hover': { backgroundColor: 'background.level2' },
+    '&.Mui-selected:hover': { backgroundColor: 'background.level2' },
+};
 
-export const sectionGroupSx: SxProps = {
+export const rowIconSx: SxProps = {
+    width: 40,
+    height: 40,
     display: 'flex',
-    flexDirection: 'column',
-    gap: 1,
-    p: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'text.tertiary',
+    fontSize: '20px',
 };
 
-export const sectionCardSx: SxProps = {
-    borderRadius: 'lg',
-    backgroundColor: 'background.surface',
-    overflow: 'hidden',
-};
+const RowIcon: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
+    <ListItemDecorator sx={listRowDecoratorSx}>
+        <Box sx={rowIconSx}>{children}</Box>
+    </ListItemDecorator>
+);
 
 // ─── Campo copiable ───────────────────────────────────────────────────────────
 
@@ -97,17 +105,16 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
 // ─── Fila con toggle ──────────────────────────────────────────────────────────
 
 export const ToggleRow: React.FC<{
+    icon?: React.ReactNode;
     label: string;
     desc: string;
     value: boolean;
     onChange: (v: boolean) => void;
-}> = ({ label, desc, value, onChange }) => (
+}> = ({ icon, label, desc, value, onChange }) => (
     <ListItem sx={listRowListItemSx}>
-        <ListItemButton
-            sx={listRowButtonSx}
-            onClick={() => onChange(!value)}
-        >
-            <Box sx={{ flexGrow: 1 }}>
+        <ListItemButton sx={rowButtonSx} onClick={() => onChange(!value)}>
+            {icon && <RowIcon>{icon}</RowIcon>}
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography level="body-md" sx={{ fontWeight: 500 }}>{label}</Typography>
                 <Typography level="body-sm" color="neutral">{desc}</Typography>
             </Box>
@@ -122,13 +129,15 @@ export const ToggleRow: React.FC<{
 
 // ─── Fila de informacion ──────────────────────────────────────────────────────
 
-export const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+export const InfoRow: React.FC<{ icon?: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
     <ListItem sx={listRowListItemSx}>
-        <ListItemButton sx={{
-            ...listRowButtonSx,
-            cursor: 'default', '&:hover': { backgroundColor: 'transparent' },
-        }}>
-            <Box sx={{ flexGrow: 1 }}>
+        <ListItemButton sx={{ ...rowButtonSx, height: '52px', minHeight: '52px', cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+            {icon && (
+                <ListItemDecorator sx={{ ...listRowDecoratorSx, minInlineSize: '28px' }}>
+                    <Box sx={{ ...rowIconSx, width: 24, height: 24, fontSize: '18px' }}>{icon}</Box>
+                </ListItemDecorator>
+            )}
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography level="body-md" sx={{ fontWeight: 500 }}>{label}</Typography>
             </Box>
             <Typography level="body-sm" color="neutral">{value}</Typography>

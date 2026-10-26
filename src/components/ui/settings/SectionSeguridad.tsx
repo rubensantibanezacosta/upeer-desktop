@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-    List,
-    Box,
-} from '@mui/joy';
+import { List } from '@mui/joy';
+import ShieldIcon from '@mui/icons-material/Shield';
+import PinIcon from '@mui/icons-material/Pin';
 
-import { sectionCardSx, sectionGroupSx, ToggleRow } from './shared.js';
+import { ToggleRow } from './shared.js';
+import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { DeleteAccountModal, RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
 import { DangerZoneSection, RecoverySection, SecurityStatusCard } from './securitySections.js';
 import { resetAccountStores } from '../../../store/resetAccountStores.js';
@@ -175,18 +175,23 @@ export const SectionSeguridad: React.FC = () => {
     if (loading) return null;
 
     return (
-        <Box sx={sectionGroupSx}>
-            <Box sx={sectionCardSx}>
+        <SettingsSection
+            icon={<ShieldIcon />}
+            title="Seguridad"
+            description="Protege este equipo con un PIN y guarda a mano las palabras que recuperan tu cuenta."
+        >
+            <SettingsCard>
                 <SecurityStatusCard pinEnabled={pinEnabled} />
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                     <ToggleRow
+                        icon={<PinIcon />}
                         label="Bloqueo con PIN"
                         desc="Pedir un PIN cada vez que abres la aplicación"
                         value={pinEnabled}
                         onChange={handlePinToggle}
                     />
                 </List>
-            </Box>
+            </SettingsCard>
 
             <SecurityPinModal
                 open={pinModalOpen}
@@ -199,7 +204,9 @@ export const SectionSeguridad: React.FC = () => {
                 onSubmit={() => handleSavePin(pinDigits.join(''))}
             />
 
-            <RecoverySection onRevealSeed={handleRevealSeed} />
+            <SettingsCard>
+                <RecoverySection onRevealSeed={handleRevealSeed} />
+            </SettingsCard>
 
             <RevealMnemonicModal
                 open={revealModalOpen}
@@ -231,7 +238,7 @@ export const SectionSeguridad: React.FC = () => {
                 onChange={handleDeleteChange}
                 onSubmit={() => handleConfirmDelete(deleteDigits.join(''))}
             />
-        </Box>
+        </SettingsSection>
     );
 };
 

@@ -1,6 +1,11 @@
 import React from 'react';
-import { Box, List } from '@mui/joy';
-import { sectionCardSx, sectionGroupSx, ToggleRow } from './shared.js';
+import { List } from '@mui/joy';
+import { SettingsCard, SettingsSection } from './sectionShell.js';
+import { ToggleRow } from './shared.js';
+import LockIcon from '@mui/icons-material/Lock';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
+import CircleIcon from '@mui/icons-material/Circle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { usePrivacyStore } from '../../../store/usePrivacyStore.js';
 
 export const SectionPrivacidad: React.FC = () => {
@@ -12,29 +17,36 @@ export const SectionPrivacidad: React.FC = () => {
     const setLastSeen = usePrivacyStore((s) => s.setLastSeen);
 
     return (
-        <Box sx={sectionGroupSx}>
-            <Box sx={sectionCardSx}>
+        <SettingsSection
+            icon={<LockIcon />}
+            title="Privacidad"
+            description="Controla qué información comparten tus contactos sobre tu actividad."
+        >
+            <SettingsCard>
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                     <ToggleRow
+                        icon={<DoneAllIcon />}
                         label="Confirmaciones de lectura"
                         desc="Enviar y recibir ticks azules"
                         value={readReceipts}
                         onChange={setReadReceipts}
                     />
                     <ToggleRow
+                        icon={<CircleIcon sx={{ fontSize: '12px' }} />}
                         label="Mostrar cuando estoy conectado"
-                        desc="Que tus contactos vean si estas disponible"
+                        desc="Que tus contactos vean si estás disponible"
                         value={onlineStatus}
                         onChange={setOnlineStatus}
                     />
                     <ToggleRow
+                        icon={<ScheduleIcon />}
                         label="Última vez visto"
-                        desc="Mostrar tu ultima actividad a tus contactos"
+                        desc="Mostrar tu última actividad a tus contactos"
                         value={lastSeen}
                         onChange={setLastSeen}
                     />
                 </List>
-            </Box>
-        </Box>
+            </SettingsCard>
+        </SettingsSection>
     );
 };

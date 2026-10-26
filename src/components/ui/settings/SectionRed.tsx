@@ -4,7 +4,8 @@ import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { CopyableField, sectionCardSx, sectionGroupSx } from './shared.js';
+import { CopyableField } from './shared.js';
+import { CardGroupLabel, SettingsCard, SettingsSection } from './sectionShell.js';
 import { NetworkMap } from './NetworkMap.js';
 import type { Identity } from './types.js';
 import {
@@ -90,16 +91,18 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
     const uniqueCountries = [...new Set(peers.map(p => p.country).filter(Boolean))];
 
     return (
-        <Box sx={{ ...sectionGroupSx }}>
+        <SettingsSection
+            icon={<PublicIcon />}
+            title="Conexión"
+            description="Estado de tu nodo en la red P2P, peers cercanos y la dirección con la que te encuentran."
+        >
             <Box sx={{
-                px: 2.5, py: 2,
-                borderRadius: 'lg',
-                backgroundColor: `${meta.color}.softBg`,
+                px: 0.5, py: 1,
                 display: 'flex', alignItems: 'center', gap: 2,
             }}>
                 <Box sx={{
                     width: 44, height: 44, borderRadius: 'md',
-                    backgroundColor: `${meta.color}.softHoverBg`,
+                    backgroundColor: `${meta.color}.softBg`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
                     {meta.spinning
@@ -120,18 +123,13 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
             </Box>
 
             {isUp && stats && (
-                <>
-                    <Box sx={{ ...sectionCardSx, px: 2, py: 1.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                <PublicIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
-                                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                                    Conectados a la red · {stats.connectionStatusAvailable ? peers.length : '—'}
-                                </Typography>
-                            </Box>
-                            <LiveDot freshSec={freshSec} />
-                        </Box>
-
+                <SettingsCard>
+                    <CardGroupLabel
+                        icon={<PublicIcon sx={{ fontSize: 14 }} />}
+                        title={`Conectados a la red · ${stats.connectionStatusAvailable ? peers.length : '—'}`}
+                        action={<LiveDot freshSec={freshSec} />}
+                    />
+                    <Box sx={{ px: 0.5, pb: 1, pt: 0.5 }}>
                         <Typography level="body-xs" sx={{ color: 'text.tertiary', mb: 1 }}>
                             {stats.connectionStatusAvailable
                                 ? 'Conexiones actuales de tu nodo.'
@@ -194,26 +192,27 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                         </Box>
 
                     </Box>
-                </>
+                </SettingsCard>
             )}
 
             {isUp && addr && addr !== 'No detectado' && (
-                <>
-                    <Box sx={{ ...sectionCardSx, px: 1.5, py: 1.5 }}>
+                <SettingsCard>
+                    <Box sx={{ px: 0.5, py: 1 }}>
                         <CopyableField label="Tu dirección de red" value={addr} />
                     </Box>
-                </>
+                </SettingsCard>
             )}
 
-            <Box sx={{ ...sectionCardSx }}>
+            <SettingsCard>
                 <Box
                     component="button"
                     onClick={() => setShowDetails(v => !v)}
                     sx={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        width: '100%', px: 2, py: 1.25,
+                        width: '100%', px: 0.5, py: 1.25,
+                        borderRadius: 'sm',
                         background: 'none', border: 'none', cursor: 'pointer', color: 'text.secondary',
-                        '&:hover': { backgroundColor: 'background.level1' },
+                        '&:hover': { backgroundColor: 'background.level2' },
                     }}
                 >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -224,12 +223,12 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </Box>
 
                 {showDetails && (
-                    <Box sx={{ px: 1.5, pb: 1 }}>
+                    <Box sx={{ px: 0.5, pb: 0.5 }}>
                         {TECH_ITEMS.map(({ Icon, accent, label, value }) => (
                             <Box key={label} sx={{
                                 display: 'flex', alignItems: 'flex-start', gap: 1.5,
                                 px: 1, py: 1, borderRadius: 'sm',
-                                '&:hover': { backgroundColor: 'background.level1' },
+                                '&:hover': { backgroundColor: 'background.level2' },
                             }}>
                                 <Box sx={{
                                     width: 30, height: 30, borderRadius: 'sm', flexShrink: 0,
@@ -246,7 +245,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                         ))}
                     </Box>
                 )}
-            </Box>
-        </Box>
+            </SettingsCard>
+        </SettingsSection>
     );
 };

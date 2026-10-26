@@ -23,7 +23,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DoneIcon from '@mui/icons-material/Done';
-import { CopyableField, sectionCardSx } from './shared.js';
+import { CopyableField } from './shared.js';
+import { CardGroupLabel } from './sectionShell.js';
 
 export type ReputationData = {
     vouchScore: number;
@@ -70,9 +71,8 @@ export const ProfileHeroSection: React.FC<ProfileHeroSectionProps> = ({
 }) => (
     <Box
         sx={{
-            ...sectionCardSx,
-            px: 2.5,
-            py: 3,
+            px: 0.5,
+            py: 1,
             display: 'flex',
             alignItems: 'center',
             gap: 3,
@@ -124,97 +124,108 @@ export const ProfileHeroSection: React.FC<ProfileHeroSectionProps> = ({
     </Box>
 );
 
-interface ProfileStatsSectionProps {
+interface ProfileReputationSectionProps {
     myReputation: ReputationData | null;
-    vaultStats: { count: number; sizeBytes: number } | null;
-    fmtBytes: (bytes: number) => string;
     onToggleInfo: (key: InfoKey) => void;
 }
 
-export const ProfileStatsSection: React.FC<ProfileStatsSectionProps> = ({ myReputation, vaultStats, fmtBytes, onToggleInfo }) => (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    <SecurityIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
-                    <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>Reputacion</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {myReputation && (() => {
-                        const { vouchScore, connectionCount } = myReputation;
-                        const isNew = vouchScore === 50 && connectionCount === 0;
-                        let color: 'success' | 'primary' | 'neutral' | 'danger' = 'neutral';
-                        let icon = <SecurityIcon sx={{ fontSize: '12px' }} />;
-                        let label = isNew ? 'Sin historial' : 'Estándar';
-                        if (!isNew) {
-                            if (vouchScore >= 80) { color = 'success'; icon = <VerifiedUserIcon sx={{ fontSize: '12px' }} />; label = 'Alta'; }
-                            else if (vouchScore >= 65) { color = 'primary'; icon = <CheckCircleIcon sx={{ fontSize: '12px' }} />; label = 'Buena'; }
-                            else if (vouchScore < 40) { color = 'danger'; icon = <GppMaybeIcon sx={{ fontSize: '12px' }} />; label = 'Baja'; }
-                        }
-                        return <Chip size="sm" color={color} variant="soft" startDecorator={icon} sx={{ fontSize: '11px' }}>{label}</Chip>;
-                    })()}
-                    <Tooltip title="¿Qué es la reputación?" variant="soft" size="sm">
-                        <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('reputacion')}><InfoOutlinedIcon sx={{ fontSize: '16px' }} /></IconButton>
-                    </Tooltip>
-                </Box>
-            </Box>
+const reputationBadge = (myReputation: ReputationData | null): React.ReactNode => {
+    if (!myReputation) {
+        return undefined;
+    }
+    const { vouchScore, connectionCount } = myReputation;
+    const isNew = vouchScore === 50 && connectionCount === 0;
+    let color: 'success' | 'primary' | 'neutral' | 'danger' = 'neutral';
+    let icon = <SecurityIcon sx={{ fontSize: '12px' }} />;
+    let label = isNew ? 'Sin historial' : 'Estándar';
+    if (!isNew) {
+        if (vouchScore >= 80) { color = 'success'; icon = <VerifiedUserIcon sx={{ fontSize: '12px' }} />; label = 'Alta'; }
+        else if (vouchScore >= 65) { color = 'primary'; icon = <CheckCircleIcon sx={{ fontSize: '12px' }} />; label = 'Buena'; }
+        else if (vouchScore < 40) { color = 'danger'; icon = <GppMaybeIcon sx={{ fontSize: '12px' }} />; label = 'Baja'; }
+    }
+    return (
+        <Chip size="sm" color={color} variant="soft" startDecorator={icon} sx={{ fontSize: '11px' }}>{label}</Chip>
+    );
+};
 
+export const ProfileReputationSection: React.FC<ProfileReputationSectionProps> = ({ myReputation, onToggleInfo }) => (
+    <Box>
+        <CardGroupLabel
+            icon={<SecurityIcon sx={{ fontSize: '15px' }} />}
+            title="Reputación"
+            badge={reputationBadge(myReputation)}
+            action={
+                <Tooltip title="¿Qué es la reputación?" variant="soft" size="sm">
+                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('reputacion')}><InfoOutlinedIcon sx={{ fontSize: '16px' }} /></IconButton>
+                </Tooltip>
+            }
+        />
+        <Box sx={{ px: 0.5, pb: 1 }}>
             {myReputation ? (() => {
                 const { vouchScore, connectionCount } = myReputation;
                 const barColor = vouchScore >= 80 ? 'success' : vouchScore >= 65 ? 'primary' : vouchScore < 40 ? 'danger' : 'neutral';
                 return (
                     <>
-                        <LinearProgress determinate value={vouchScore} size="sm" color={barColor} sx={{ mb: 2, borderRadius: 'sm' }} />
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                        <LinearProgress determinate value={vouchScore} size="sm" color={barColor} sx={{ mb: 1.5, borderRadius: 'sm' }} />
+                        <Box sx={{ display: 'flex', gap: 5 }}>
                             {[
                                 { label: 'Vouches', value: `${vouchScore}/100` },
                                 { label: 'Contactos', value: String(connectionCount) },
                             ].map(({ label, value }) => (
                                 <Box key={label}>
-                                    <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</Typography>
+                                    <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</Typography>
                                     <Typography level="body-sm" sx={{ fontWeight: 600 }}>{value}</Typography>
                                 </Box>
                             ))}
                         </Box>
                     </>
                 );
-            })() : <Typography level="body-xs" sx={{ opacity: 0.4 }}>Cargando...</Typography>}
+            })() : <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Cargando...</Typography>}
         </Box>
+    </Box>
+);
 
-        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    <CloudDoneIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
-                    <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>Almac. cedido</Typography>
-                </Box>
+interface ProfileVaultSectionProps {
+    vaultStats: { count: number; sizeBytes: number } | null;
+    fmtBytes: (bytes: number) => string;
+    onToggleInfo: (key: InfoKey) => void;
+}
+
+export const ProfileVaultSection: React.FC<ProfileVaultSectionProps> = ({ vaultStats, fmtBytes, onToggleInfo }) => (
+    <Box>
+        <CardGroupLabel
+            icon={<CloudDoneIcon sx={{ fontSize: '15px' }} />}
+            title="Almacenamiento cedido"
+            action={
                 <Tooltip title="¿Qué es el almacenamiento cedido?" variant="soft" size="sm">
                     <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('almacenamiento')}><InfoOutlinedIcon sx={{ fontSize: '16px' }} /></IconButton>
                 </Tooltip>
-            </Box>
-
+            }
+        />
+        <Box sx={{ px: 0.5, pb: 1 }}>
             {vaultStats !== null ? (() => {
                 const usageGB = vaultStats.sizeBytes / (1024 * 1024 * 1024);
                 const pct = Math.min(usageGB * 100, 100);
                 return (
                     <>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
-                            <Typography level="body-sm" sx={{ fontWeight: 600 }}>{fmtBytes(vaultStats.sizeBytes)}</Typography>
-                            <Typography level="body-xs" sx={{ opacity: 0.4 }}>usados</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
+                            <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(vaultStats.sizeBytes)}</Typography>
+                            <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>usados de 1 GB cedido</Typography>
                         </Box>
                         <LinearProgress determinate value={pct} size="sm" color={usageGB > 0.8 ? 'warning' : 'neutral'} sx={{ mb: 1.5, borderRadius: 'sm' }} />
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', gap: 5 }}>
                             <Box>
-                                <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Archivos P2P</Typography>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Archivos P2P</Typography>
                                 <Typography level="body-sm" sx={{ fontWeight: 600 }}>{vaultStats.count}</Typography>
                             </Box>
                             <Box>
-                                <Typography level="body-xs" sx={{ opacity: 0.45, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cuota dinámica</Typography>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cuota dinámica</Typography>
                                 <Typography level="body-sm" sx={{ fontWeight: 600 }}>Activa</Typography>
                             </Box>
                         </Box>
                     </>
                 );
-            })() : <Typography level="body-xs" sx={{ opacity: 0.4 }}>Cargando...</Typography>}
+            })() : <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Cargando...</Typography>}
         </Box>
     </Box>
 );
@@ -229,14 +240,17 @@ interface ProfileAddressSectionProps {
 }
 
 export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fullId, copied, copyError, onCopy, onShowQr, onToggleInfo }) => (
-    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <FingerprintIcon sx={{ fontSize: '16px', opacity: 0.45 }} />
-            <Typography level="body-sm" sx={{ fontWeight: 600, flexGrow: 1 }}>Tu dirección de contacto</Typography>
-            <Tooltip title="¿Qué es esto?" variant="soft" size="sm">
-                <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('direccion')}><InfoOutlinedIcon sx={{ fontSize: '16px' }} /></IconButton>
-            </Tooltip>
-        </Box>
+    <Box>
+        <CardGroupLabel
+            icon={<FingerprintIcon sx={{ fontSize: '15px' }} />}
+            title="Tu dirección de contacto"
+            action={
+                <Tooltip title="¿Qué es esto?" variant="soft" size="sm">
+                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('direccion')}><InfoOutlinedIcon sx={{ fontSize: '16px' }} /></IconButton>
+                </Tooltip>
+            }
+        />
+        <Box sx={{ px: 0.5, pb: 1, pt: 0.5 }}>
         <CopyableField label="Comparte esta dirección para que puedan escribirte" value={fullId} />
         <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
             <Button variant="outlined" color="neutral" size="sm" startDecorator={<QrCode2Icon sx={{ fontSize: '15px' }} />} onClick={onShowQr}>Mostrar QR</Button>
@@ -245,6 +259,7 @@ export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fu
             </Button>
         </Box>
         {copyError && <Typography level="body-xs" color="danger" sx={{ mt: 1 }}>No se pudo copiar al portapapeles: {copyError}</Typography>}
+        </Box>
     </Box>
 );
 
@@ -256,8 +271,9 @@ interface ProfileTechnicalSectionProps {
 }
 
 export const ProfileTechnicalSection: React.FC<ProfileTechnicalSectionProps> = ({ identityId, publicKey, networkAddress, onToggleInfo }) => (
-    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-        <Stack spacing={0}>
+    <Box>
+        <CardGroupLabel icon={<FingerprintIcon sx={{ fontSize: '15px' }} />} title="Datos técnicos" />
+        <Stack spacing={0} sx={{ px: 0.5, pb: 1, pt: 0.5 }}>
             <CopyableField label="ID de contacto" value={identityId || '—'} onInfo={() => onToggleInfo('id')} />
             <Box sx={{ height: 12 }} />
             <CopyableField label="Clave de verificación" value={publicKey || '—'} onInfo={() => onToggleInfo('clave')} />

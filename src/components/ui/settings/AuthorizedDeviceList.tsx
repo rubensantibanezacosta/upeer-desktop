@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, DialogActions, DialogContent, DialogTitle, IconButton, Modal, ModalDialog, Stack, Tooltip, Typography } from '@mui/joy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import { sectionCardSx } from './shared.js';
+import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 export interface AuthorizedDevice {
     deviceId: string;
@@ -69,45 +69,43 @@ export const AuthorizedDeviceList: React.FC = () => {
     };
 
     return (
-        <Stack spacing={1.25} sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-                <VerifiedUserIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
-                <Typography level="body-xs" sx={{ flexGrow: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
-                    Autorizados en esta cuenta
-                </Typography>
-                {epoch !== null && <Chip size="sm" variant="soft">epoch {epoch}</Chip>}
-            </Stack>
-            <Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-                Pueden usar tu cuenta sin tu frase semilla. Revocar uno le quita el acceso sin tocar el resto.
-            </Typography>
+        <Box>
+            <CardGroupLabel
+                icon={<VerifiedUserIcon sx={{ fontSize: '15px' }} />}
+                title="Autorizados en esta cuenta"
+                description="Pueden usar tu cuenta sin tu frase semilla. Revocar uno le quita el acceso sin tocar el resto."
+                action={epoch !== null ? <Chip size="sm" variant="soft">epoch {epoch}</Chip> : undefined}
+            />
+            <Stack spacing={1} sx={cardBodySx}>
 
-            {loading && devices.length === 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress size="sm" />
-                </Box>
-            )}
+                {loading && devices.length === 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                        <CircularProgress size="sm" />
+                    </Box>
+                )}
 
-            {!loading && devices.length === 0 && (
-                <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-                    Todavía no hay dispositivos autorizados en esta cuenta.
-                </Typography>
-            )}
+                {!loading && devices.length === 0 && (
+                    <Typography level="body-sm" sx={{ color: 'text.tertiary', px: 0.5 }}>
+                        Todavía no hay dispositivos autorizados en esta cuenta.
+                    </Typography>
+                )}
 
-            {devices.map((device) => {
-                const current = device.deviceId === localDeviceId;
-                return (
-                    <Box
-                        key={device.deviceId}
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.25,
-                            px: 1.5,
-                            py: 1.5,
-                            borderRadius: '12px',
-                            backgroundColor: 'background.level1',
-                        }}
-                    >
+                {devices.map((device) => {
+                    const current = device.deviceId === localDeviceId;
+                    return (
+                        <Box
+                            key={device.deviceId}
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.25,
+                                px: 1.25,
+                                py: 1.25,
+                                borderRadius: '10px',
+                                transition: 'background-color 0.15s ease',
+                                '&:hover': { backgroundColor: 'background.level2' },
+                            }}
+                        >
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                             <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
                                 <Typography level="body-sm" sx={{ fontWeight: 600 }}>
@@ -149,7 +147,7 @@ export const AuthorizedDeviceList: React.FC = () => {
             })}
 
             {error && <Alert color="warning" variant="soft" size="sm">{error}</Alert>}
-            <Box>
+            <Box sx={{ px: 0.5, pb: 0.5 }}>
                 <Button size="sm" variant="plain" color="neutral" onClick={() => void load()}>Actualizar</Button>
             </Box>
 
@@ -175,7 +173,8 @@ export const AuthorizedDeviceList: React.FC = () => {
                     </DialogActions>
                 </ModalDialog>
             </Modal>
-        </Stack>
+            </Stack>
+        </Box>
     );
 };
 

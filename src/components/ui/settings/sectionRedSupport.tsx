@@ -83,7 +83,7 @@ export const PeerRow: React.FC<{ peer: PeerStat; maxLatency: number }> = ({ peer
             py: 0.75,
             px: 0.5,
             borderRadius: 'sm',
-            '&:hover': { backgroundColor: 'background.level1' },
+            '&:hover': { backgroundColor: 'background.level2' },
         }}>
             <Box>
                 <Typography level="body-xs" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
