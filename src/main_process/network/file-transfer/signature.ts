@@ -50,3 +50,25 @@ export function verifyFileTransferPacketSignature(packet: SignedTransferPacket, 
         publicKeyBuffer,
     ));
 }
+
+export type TransferSigner = {
+    publicKey?: string | null;
+    deviceId?: string | null;
+    devicePublicKey?: string | null;
+};
+
+export function verifyFileTransferPacketFromSigner(packet: SignedTransferPacket, signer: TransferSigner | null | undefined): boolean {
+    if (!packet?.signature) return true;
+    if (verifyFileTransferPacketSignature(packet, signer?.publicKey ?? undefined)) return true;
+
+    const announcedDeviceId = typeof packet.senderDeviceId === 'string'
+        ? packet.senderDeviceId.toLowerCase()
+        : undefined;
+    const knownDeviceId = typeof signer?.deviceId === 'string' ? signer.deviceId.toLowerCase() : undefined;
+    const devicePublicKey = typeof signer?.devicePublicKey === 'string' && /^[0-9a-f]{64}$/i.test(signer.devicePublicKey)
+        ? signer.devicePublicKey
+        : undefined;
+    if (!announcedDeviceId || !knownDeviceId || announcedDeviceId !== knownDeviceId || !devicePublicKey) return false;
+
+    return verifyFileTransferPacketSignature(packet, devicePublicKey);
+}

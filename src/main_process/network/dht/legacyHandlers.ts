@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { updateContactDhtLocation } from '../../storage/contacts/location.js';
 import { upsertDevice } from '../../storage/devices-operations.js';
+import { rememberContactDevice } from './contactDevice.js';
 import { verifyLocationBlockWithDHT, validateDhtSequence, storeRenewalTokenInDHT, renewLocationBlock, canRenewLocationBlock } from '../utils.js';
 import { network, security, error } from '../../security/secure-logger.js';
 import { AdaptivePow } from '../../security/pow.js';
@@ -112,6 +113,9 @@ export async function handleDhtUpdate(senderUpeerId: string, data: DhtUpdatePayl
 
     network('Updating location', undefined, { upeerId: senderUpeerId, address: block.address, addresses: block.addresses, dhtSeq: block.dhtSeq }, 'dht');
     updateContactDhtLocation(senderUpeerId, block.addresses || block.address, block.dhtSeq, block.signature, block.expiresAt, block.renewalToken);
+    void rememberContactDevice(senderUpeerId, block).catch(err => {
+        error('Failed to persist contact device from DHT_UPDATE', err, 'dht');
+    });
     if (block.deviceId && block.deviceMeta) {
         upsertDevice(senderUpeerId, block.deviceId, block.deviceMeta).catch(() => {
             security('Failed to upsert device from DHT_UPDATE', { upeerId: senderUpeerId, deviceId: block.deviceId }, 'dht');
@@ -189,6 +193,9 @@ export async function handleDhtExchange(senderUpeerId: string, data: DhtExchange
         }
 
         updateContactDhtLocation(peer.upeerId, finalBlock.addresses || finalBlock.address, finalBlock.dhtSeq, finalBlock.signature, finalBlock.expiresAt, finalRenewalToken);
+        void rememberContactDevice(peer.upeerId, block).catch(err => {
+            error('Failed to persist contact device from PEEREX', err, 'dht');
+        });
         if (finalBlock.deviceId && finalBlock.deviceMeta) {
             upsertDevice(peer.upeerId, finalBlock.deviceId, finalBlock.deviceMeta).catch(() => {
                 security('Failed to upsert device from PEEREX', { upeerId: peer.upeerId, deviceId: finalBlock.deviceId }, 'dht');

@@ -85,6 +85,22 @@ export function updateContactDeviceSignedPreKey(
         .run();
 }
 
+export function updateContactDeviceCertificate(
+    upeerId: string,
+    binding: { deviceId: string; devicePublicKey: string; deviceCertificate: string },
+): void {
+    const db = getDb();
+    const schema = getSchema();
+    db.update(schema.contacts)
+        .set({
+            deviceId: binding.deviceId,
+            devicePublicKey: binding.devicePublicKey,
+            deviceCertificate: binding.deviceCertificate,
+        })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+}
+
 export type ContactDeviceIdentity = {
     devicePublicKey: string;
     deviceId: string;

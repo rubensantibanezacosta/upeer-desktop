@@ -2,7 +2,7 @@ import { warn, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { FileTransfer, TransferPhase } from './types.js';
 import { updateTransferMessageStatus } from './db-helper.js';
-import { verifyFileTransferPacketSignature } from './signature.js';
+import { verifyFileTransferPacketFromSigner } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
 type FileAcceptPayload = {
@@ -31,7 +31,11 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
     const contact = await getContactByUpeerId(upeerId);
     if (!contact?.publicKey) return;
 
-    if (data.signature && !verifyFileTransferPacketSignature(data, contact.publicKey)) {
+    if (data.signature && !verifyFileTransferPacketFromSigner(data, {
+        publicKey: contact.publicKey,
+        deviceId: contact.deviceId,
+        devicePublicKey: contact.devicePublicKey,
+    })) {
         warn('Invalid FILE_ACCEPT signature', { fileId: data.fileId }, 'security');
         return;
     }

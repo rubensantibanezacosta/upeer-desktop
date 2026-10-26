@@ -5,7 +5,8 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { TransferPhase } from './types.js';
-import { generateTransferKey, sealTransferKey, encryptChunk } from './crypto.js';
+import { generateTransferKey, encryptChunk } from './crypto.js';
+import { isDevicePublicKey, sealTransferKeyEnvelope } from './keyEnvelope.js';
 import { saveTransferToDB } from './db-helper.js';
 import { metadataSanitizer } from './metadata-sanitizer.js';
 import { calculateHashFromChunks } from './senderSupport.js';
@@ -24,6 +25,7 @@ type FileProposalPacket = {
     fileHash: string;
     encryptedKey?: string;
     encryptedKeyNonce?: string;
+    deviceEncryptedKey?: string;
     useRecipientEphemeral?: boolean;
     thumbnail?: EncryptedThumbnail;
     caption?: string;
@@ -139,17 +141,12 @@ export async function startSend(
 
         const contact = await getContactByUpeerId(upeerId);
         const peerKey = contact?.publicKey;
-        let encryptedKey: string | undefined;
-        let encryptedKeyNonce: string | undefined;
+        const deviceKey = isDevicePublicKey(contact?.devicePublicKey) ? contact.devicePublicKey : undefined;
 
         const aesKey = generateTransferKey();
         this.transferKeys.set(transfer.fileId, aesKey);
 
-        if (peerKey) {
-            const sealed = sealTransferKey(aesKey, peerKey);
-            encryptedKey = sealed.ciphertext;
-            encryptedKeyNonce = sealed.nonce;
-        }
+        const keyEnvelope = sealTransferKeyEnvelope(aesKey, peerKey, deviceKey);
 
         let encThumb: EncryptedThumbnail | undefined;
         if (thumbnail && aesKey) {
@@ -170,7 +167,9 @@ export async function startSend(
             totalChunks: transfer.totalChunks,
             chunkSize: transfer.chunkSize,
             fileHash: transfer.fileHash,
-            ...(encryptedKey ? { encryptedKey, ...(encryptedKeyNonce ? { encryptedKeyNonce } : {}), useRecipientEphemeral: false } : {}),
+            ...(keyEnvelope.encryptedKey || keyEnvelope.deviceEncryptedKey
+                ? { ...keyEnvelope, useRecipientEphemeral: false }
+                : {}),
             ...(encThumb ? { thumbnail: encThumb } : {}),
             caption: transfer.caption,
             isVoiceNote: transfer.isVoiceNote,

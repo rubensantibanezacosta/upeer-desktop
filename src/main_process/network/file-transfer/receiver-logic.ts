@@ -4,9 +4,10 @@ import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { TransferPhase } from './types.js';
-import { decryptChunk, unsealTransferKey } from './crypto.js';
+import { decryptChunk } from './crypto.js';
+import { unsealTransferKeyEnvelope } from './keyEnvelope.js';
 import { saveTransferToDB } from './db-helper.js';
-import { verifyFileTransferPacketSignature } from './signature.js';
+import { verifyFileTransferPacketFromSigner } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
 type EncryptedThumbnail = {
@@ -33,6 +34,7 @@ type FileProposalPacket = {
     signature?: string;
     encryptedKey?: string;
     encryptedKeyNonce?: string;
+    deviceEncryptedKey?: string;
     useRecipientEphemeral?: boolean;
     thumbnail?: string | EncryptedThumbnail;
     caption?: string;
@@ -101,13 +103,24 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         }
 
         const contact = await getContactByUpeerId(upeerId);
-        if (data.signature && !verifyFileTransferPacketSignature(data, contact?.publicKey)) {
+        if (data.signature && !verifyFileTransferPacketFromSigner(data, {
+            publicKey: contact?.publicKey,
+            deviceId: contact?.deviceId,
+            devicePublicKey: contact?.devicePublicKey,
+        })) {
             warn('Invalid signature on file proposal', { upeerId, fileId: data.fileId }, 'file-transfer');
             return;
         }
 
-        if (data.encryptedKey) {
-            const aesKey = unsealTransferKey(data.encryptedKey, data.encryptedKeyNonce, contact?.publicKey);
+        if (data.encryptedKey || data.deviceEncryptedKey) {
+            const aesKey = unsealTransferKeyEnvelope(
+                {
+                    encryptedKey: data.encryptedKey,
+                    encryptedKeyNonce: data.encryptedKeyNonce,
+                    deviceEncryptedKey: data.deviceEncryptedKey,
+                },
+                contact?.publicKey,
+            );
             if (aesKey) {
                 this.transferKeys.set(data.fileId, aesKey);
                 debug('Transfer AES key unsealed', { fileId: data.fileId }, 'file-transfer');

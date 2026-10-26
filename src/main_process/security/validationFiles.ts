@@ -9,6 +9,7 @@ type FileProposalPayload = {
     chunkSize?: unknown;
     encryptedKey?: unknown;
     encryptedKeyNonce?: unknown;
+    deviceEncryptedKey?: unknown;
     chatUpeerId?: unknown;
     messageId?: unknown;
 };
@@ -52,6 +53,9 @@ export function validateFileProposal(data: FileProposalPayload): ValidationResul
     }
     if (data.encryptedKeyNonce !== undefined && (typeof data.encryptedKeyNonce !== 'string' || data.encryptedKeyNonce.length !== 48)) {
         return { valid: false, error: 'Invalid encryptedKeyNonce (expected 48 hex chars)' };
+    }
+    if (data.deviceEncryptedKey !== undefined && (typeof data.deviceEncryptedKey !== 'string' || ![96, 160].includes(data.deviceEncryptedKey.length))) {
+        return { valid: false, error: 'Invalid deviceEncryptedKey (expected 96 or 160 hex chars)' };
     }
     if (data.chatUpeerId !== undefined && (
         typeof data.chatUpeerId !== 'string'
