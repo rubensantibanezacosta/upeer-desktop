@@ -3,6 +3,7 @@ import { Box, Typography, IconButton } from '@mui/joy';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
 
 interface SidebarHeaderProps {
     onAddNew: () => void;
@@ -14,7 +15,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew }) => (
         p: 2, pt: 2.5,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         backgroundColor: 'background.surface',
-        height: '60px', boxSizing: 'border-box',
+        height: LIST_ROW_MIN_HEIGHT, boxSizing: 'border-box',
     }}>
         <Typography level="h4" sx={{ fontWeight: 600 }}>uPeer</Typography>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -32,7 +33,7 @@ export const NewChatHeader: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <Box sx={{
         px: 2, display: 'flex', alignItems: 'center', gap: 1.5,
         backgroundColor: 'background.surface',
-        height: '60px', boxSizing: 'border-box',
+        height: LIST_ROW_MIN_HEIGHT, boxSizing: 'border-box',
     }}>
         <IconButton aria-label="Volver" size="sm" variant="plain" color="neutral" onClick={onBack}>
             <ArrowBackIcon />

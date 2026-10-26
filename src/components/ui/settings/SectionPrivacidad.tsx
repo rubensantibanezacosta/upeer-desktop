@@ -1,6 +1,6 @@
 import React from 'react';
-import { List } from '@mui/joy';
-import { ToggleRow } from './shared.js';
+import { Box, List } from '@mui/joy';
+import { sectionCardSx, sectionGroupSx, ToggleRow } from './shared.js';
 import { usePrivacyStore } from '../../../store/usePrivacyStore.js';
 
 export const SectionPrivacidad: React.FC = () => {
@@ -12,25 +12,29 @@ export const SectionPrivacidad: React.FC = () => {
     const setLastSeen = usePrivacyStore((s) => s.setLastSeen);
 
     return (
-        <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
-            <ToggleRow
-                label="Confirmaciones de lectura"
-                desc="Enviar y recibir ticks azules"
-                value={readReceipts}
-                onChange={setReadReceipts}
-            />
-            <ToggleRow
-                label="Mostrar cuando estoy conectado"
-                desc="Que tus contactos vean si estas disponible"
-                value={onlineStatus}
-                onChange={setOnlineStatus}
-            />
-            <ToggleRow
-                label="Última vez visto"
-                desc="Mostrar tu ultima actividad a tus contactos"
-                value={lastSeen}
-                onChange={setLastSeen}
-            />
-        </List>
+        <Box sx={sectionGroupSx}>
+            <Box sx={sectionCardSx}>
+                <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
+                    <ToggleRow
+                        label="Confirmaciones de lectura"
+                        desc="Enviar y recibir ticks azules"
+                        value={readReceipts}
+                        onChange={setReadReceipts}
+                    />
+                    <ToggleRow
+                        label="Mostrar cuando estoy conectado"
+                        desc="Que tus contactos vean si estas disponible"
+                        value={onlineStatus}
+                        onChange={setOnlineStatus}
+                    />
+                    <ToggleRow
+                        label="Última vez visto"
+                        desc="Mostrar tu ultima actividad a tus contactos"
+                        value={lastSeen}
+                        onChange={setLastSeen}
+                    />
+                </List>
+            </Box>
+        </Box>
     );
 };

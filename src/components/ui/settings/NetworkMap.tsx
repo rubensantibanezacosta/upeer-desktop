@@ -134,8 +134,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
             maxWidth: 460,
             borderRadius: 'md',
             overflow: 'hidden',
-            border: '1px solid',
-            borderColor: 'divider',
             backgroundColor: '#060e1a',
             position: 'relative',
             userSelect: 'none',
@@ -219,8 +217,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
                         top: y - 10,
                         pointerEvents: 'none',
                         backgroundColor: '#0b1929',
-                        border: '1px solid',
-                        borderColor: color,
                         borderRadius: 'sm',
                         px: 1.25,
                         py: 0.75,
@@ -250,7 +246,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({ peers, selfLat, selfLon 
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 2,
                 px: 1.5, py: 0.75, flexWrap: 'wrap',
-                borderTop: '1px solid', borderColor: 'divider',
             }}>
                 {[
                     { color: '#22c55e', label: '< 100 ms' },

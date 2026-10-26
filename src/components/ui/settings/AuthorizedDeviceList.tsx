@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, DialogActions, DialogContent, DialogTitle, IconButton, Modal, ModalDialog, Stack, Tooltip, Typography } from '@mui/joy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { sectionCardSx } from './shared.js';
 
 export interface AuthorizedDevice {
     deviceId: string;
@@ -68,7 +69,7 @@ export const AuthorizedDeviceList: React.FC = () => {
     };
 
     return (
-        <Stack spacing={1.25} sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={1.25} sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <VerifiedUserIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                 <Typography level="body-xs" sx={{ flexGrow: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
@@ -104,8 +105,6 @@ export const AuthorizedDeviceList: React.FC = () => {
                             px: 1.5,
                             py: 1.5,
                             borderRadius: '12px',
-                            border: '1px solid',
-                            borderColor: current ? 'primary.400' : 'divider',
                             backgroundColor: 'background.level1',
                         }}
                     >

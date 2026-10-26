@@ -9,6 +9,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
+import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
 import { formatTopHeaderLastSeen, TopHeaderAvatar } from './topHeaderSupport.js';
 
 interface TopHeaderProps {
@@ -84,7 +85,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             backgroundColor: 'background.surface',
             borderBottom: '1px solid',
             borderColor: 'divider',
-            height: '60px',
+            height: LIST_ROW_MIN_HEIGHT,
             boxSizing: 'border-box'
         }}>
             <Box

@@ -7,6 +7,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import DangerousIcon from "@mui/icons-material/Dangerous";
 import { useDeviceStore, Device } from "../../../store/useDeviceStore.js";
+import { sectionCardSx } from './shared.js';
 
 export const DeviceSessionList: React.FC = () => {
     const { devices, isLoading, fetchDevices, setTrust, removeDevice } = useDeviceStore();
@@ -39,8 +40,8 @@ export const DeviceSessionList: React.FC = () => {
     }
 
     return (
-        <Box>
-            <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={sectionCardSx}>
+            <Box sx={{ px: 2.5, py: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                     <VerifiedIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                     <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
@@ -52,7 +53,7 @@ export const DeviceSessionList: React.FC = () => {
                 </Typography>
             </Box>
 
-            <List sx={{ "--ListItem-paddingY": "0px", p: 0 }}>
+            <List sx={{ "--ListItem-paddingY": "0px", p: 0.5 }}>
                 {devices.length === 0 && !isLoading && (
                     <Typography level="body-xs" sx={{ p: 2, textAlign: "center", opacity: 0.5 }}>
                         No hay otros dispositivos registrados.
@@ -62,8 +63,6 @@ export const DeviceSessionList: React.FC = () => {
                     <ListItem key={device.deviceId} sx={{
                         py: 1.5,
                         px: 2,
-                        borderTop: devices.indexOf(device) > 0 ? "1px solid" : "none",
-                        borderColor: "divider",
                         backgroundColor: device.isTrusted ? "transparent" : "warning.softBg"
                     }}>
                         <ListItemDecorator sx={{ color: device.isTrusted ? "primary.main" : "warning.main" }}>

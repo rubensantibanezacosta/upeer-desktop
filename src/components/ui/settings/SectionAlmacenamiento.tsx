@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Stack, Button, LinearProgress, Divider } from '@mui/joy';
+import { Box, Typography, Stack, Button, LinearProgress } from '@mui/joy';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import { FileHistoryExplorer } from './FileHistoryExplorer.js';
+import { sectionCardSx, sectionGroupSx } from './shared.js';
 
 export const SectionAlmacenamiento: React.FC = () => {
     const [vaultStats, setVaultStats] = useState<{ count: number; sizeBytes: number } | null>(null);
@@ -37,39 +38,40 @@ export const SectionAlmacenamiento: React.FC = () => {
     const pct = vaultStats ? Math.min((vaultStats.sizeBytes / (1024 * 1024 * 1024)) * 100, 100) : 0;
 
     return (
-        <Box>
-            <Box sx={{ px: 1.5, py: 2 }}>
-                <Stack spacing={0.75}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level="body-md" sx={{ fontWeight: 500 }}>
-                            Mensajes guardados para contactos
-                        </Typography>
+        <Box sx={sectionGroupSx}>
+            <Box sx={sectionCardSx}>
+                <Box sx={{ px: 2.5, py: 2 }}>
+                    <Stack spacing={0.75}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography level="body-md" sx={{ fontWeight: 500 }}>
+                                Mensajes guardados para contactos
+                            </Typography>
+                            <Typography level="body-sm" color="neutral">
+                                {vaultStats ? fmt(vaultStats.sizeBytes) : '...'} / 1 GB
+                            </Typography>
+                        </Box>
+                        <LinearProgress
+                            determinate
+                            value={pct}
+                            size="sm"
+                            color={pct > 80 ? 'danger' : pct > 60 ? 'warning' : 'primary'}
+                        />
                         <Typography level="body-sm" color="neutral">
-                            {vaultStats ? fmt(vaultStats.sizeBytes) : '...'} / 1 GB
+                            {vaultStats ? `${vaultStats.count} mensajes guardados` : '...'}
                         </Typography>
-                    </Box>
-                    <LinearProgress
-                        determinate
-                        value={pct}
-                        size="sm"
-                        color={pct > 80 ? 'danger' : pct > 60 ? 'warning' : 'primary'}
-                    />
-                    <Typography level="body-sm" color="neutral">
-                        {vaultStats ? `${vaultStats.count} mensajes guardados` : '...'}
-                    </Typography>
-                </Stack>
+                    </Stack>
+                </Box>
+                <Box sx={{ px: 2.5, pb: 2 }}>
+                    <Button
+                        size="sm" variant="plain" color="danger" sx={{ px: 0 }}
+                        startDecorator={<DeleteForeverIcon sx={{ fontSize: '16px' }} />}
+                        onClick={handleFreeSpace}
+                        disabled={freeing || !vaultStats}
+                    >
+                        {freeing ? 'Liberando...' : 'Liberar espacio'}
+                    </Button>
+                </Box>
             </Box>
-            <Box sx={{ px: 1.5, pb: 2 }}>
-                <Button
-                    size="sm" variant="plain" color="danger" sx={{ px: 0 }}
-                    startDecorator={<DeleteForeverIcon sx={{ fontSize: '16px' }} />}
-                    onClick={handleFreeSpace}
-                    disabled={freeing || !vaultStats}
-                >
-                    {freeing ? 'Liberando...' : 'Liberar espacio'}
-                </Button>
-            </Box>
-            <Divider sx={{ mx: 1.5 }} />
             <FileHistoryExplorer />
         </Box>
     );

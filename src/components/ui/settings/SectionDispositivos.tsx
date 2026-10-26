@@ -4,22 +4,15 @@ import DevicesIcon from '@mui/icons-material/Devices';
 import { DeviceEnrollmentPanel } from './DeviceEnrollmentPanel.js';
 import { AuthorizedDeviceList } from './AuthorizedDeviceList.js';
 import { DeviceSessionList } from './DeviceSessionList.js';
+import { sectionCardSx, sectionGroupSx } from './shared.js';
 
 export const SectionDispositivos: React.FC = () => {
     const [refreshKey, setRefreshKey] = useState(0);
     const refresh = useCallback(() => setRefreshKey((current) => current + 1), []);
 
     return (
-    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <Box
-            sx={{
-                px: 2.5,
-                py: 2.5,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                backgroundColor: 'background.surface',
-            }}
-        >
+    <Box sx={sectionGroupSx}>
+        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                 <DevicesIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                 <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     List,
-    Divider,
     Box,
 } from '@mui/joy';
 
-import { ToggleRow } from './shared.js';
+import { sectionCardSx, sectionGroupSx, ToggleRow } from './shared.js';
 import { DeleteAccountModal, RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
 import { DangerZoneSection, RecoverySection, SecurityStatusCard } from './securitySections.js';
 import { resetAccountStores } from '../../../store/resetAccountStores.js';
@@ -176,17 +175,18 @@ export const SectionSeguridad: React.FC = () => {
     if (loading) return null;
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <SecurityStatusCard pinEnabled={pinEnabled} />
-
-            <List sx={{ '--ListItem-paddingY': '0px', p: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <ToggleRow
-                    label="Bloqueo con PIN"
-                    desc="Pedir un PIN cada vez que abres la aplicación"
-                    value={pinEnabled}
-                    onChange={handlePinToggle}
-                />
-            </List>
+        <Box sx={sectionGroupSx}>
+            <Box sx={sectionCardSx}>
+                <SecurityStatusCard pinEnabled={pinEnabled} />
+                <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
+                    <ToggleRow
+                        label="Bloqueo con PIN"
+                        desc="Pedir un PIN cada vez que abres la aplicación"
+                        value={pinEnabled}
+                        onChange={handlePinToggle}
+                    />
+                </List>
+            </Box>
 
             <SecurityPinModal
                 open={pinModalOpen}
@@ -219,8 +219,6 @@ export const SectionSeguridad: React.FC = () => {
                     setMnemonic(null);
                 }}
             />
-
-            <Divider />
 
             <DangerZoneSection onDeleteClick={handleDeleteClick} />
 

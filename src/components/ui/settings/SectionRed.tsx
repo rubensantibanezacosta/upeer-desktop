@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, Button, Chip, CircularProgress, Divider, Typography } from '@mui/joy';
+import { Box, Button, Chip, CircularProgress, Typography } from '@mui/joy';
 import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { CopyableField } from './shared.js';
+import { CopyableField, sectionCardSx, sectionGroupSx } from './shared.js';
 import { NetworkMap } from './NetworkMap.js';
 import type { Identity } from './types.js';
 import {
@@ -90,12 +90,10 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
     const uniqueCountries = [...new Set(peers.map(p => p.country).filter(Boolean))];
 
     return (
-        <Box sx={{ pb: 2 }}>
+        <Box sx={{ ...sectionGroupSx }}>
             <Box sx={{
-                mx: 1.5, mt: 2, mb: 1.5, px: 2.5, py: 2,
+                px: 2.5, py: 2,
                 borderRadius: 'lg',
-                border: '1px solid',
-                borderColor: `${meta.color}.outlinedBorder`,
                 backgroundColor: `${meta.color}.softBg`,
                 display: 'flex', alignItems: 'center', gap: 2,
             }}>
@@ -123,8 +121,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
             {isUp && stats && (
                 <>
-                    <Divider sx={{ mx: 1.5, my: 0.5 }} />
-                    <Box sx={{ px: 2, py: 1.5 }}>
+                    <Box sx={{ ...sectionCardSx, px: 2, py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                 <PublicIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
@@ -202,54 +199,54 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
 
             {isUp && addr && addr !== 'No detectado' && (
                 <>
-                    <Divider sx={{ mx: 1.5, my: 0.5 }} />
-                    <Box sx={{ px: 1.5, py: 1.5 }}>
+                    <Box sx={{ ...sectionCardSx, px: 1.5, py: 1.5 }}>
                         <CopyableField label="Tu dirección de red" value={addr} />
                     </Box>
                 </>
             )}
 
-            <Divider sx={{ mx: 1.5, my: 0.5 }} />
-            <Box
-                component="button"
-                onClick={() => setShowDetails(v => !v)}
-                sx={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    width: '100%', px: 2, py: 1.25,
-                    background: 'none', border: 'none', cursor: 'pointer', color: 'text.secondary',
-                    '&:hover': { backgroundColor: 'background.level1' },
-                }}
-            >
+            <Box sx={{ ...sectionCardSx }}>
+                <Box
+                    component="button"
+                    onClick={() => setShowDetails(v => !v)}
+                    sx={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        width: '100%', px: 2, py: 1.25,
+                        background: 'none', border: 'none', cursor: 'pointer', color: 'text.secondary',
+                        '&:hover': { backgroundColor: 'background.level1' },
+                    }}
+                >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <LockIcon sx={{ fontSize: 15, opacity: 0.55 }} />
                     <Typography level="body-xs" sx={{ fontWeight: 600 }}>Cómo funciona la red</Typography>
                 </Box>
                 {showDetails ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <ExpandMoreIcon sx={{ fontSize: 18 }} />}
-            </Box>
-
-            {showDetails && (
-                <Box sx={{ px: 1.5, pb: 1 }}>
-                    {TECH_ITEMS.map(({ Icon, accent, label, value }) => (
-                        <Box key={label} sx={{
-                            display: 'flex', alignItems: 'flex-start', gap: 1.5,
-                            px: 1, py: 1, borderRadius: 'sm',
-                            '&:hover': { backgroundColor: 'background.level1' },
-                        }}>
-                            <Box sx={{
-                                width: 30, height: 30, borderRadius: 'sm', flexShrink: 0,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                backgroundColor: `${accent}18`,
-                            }}>
-                                <Icon sx={{ fontSize: 16, color: accent }} />
-                            </Box>
-                            <Box>
-                                <Typography level="body-xs" sx={{ fontWeight: 700 }}>{label}</Typography>
-                                <Typography level="body-xs" sx={{ color: 'text.secondary' }}>{value}</Typography>
-                            </Box>
-                        </Box>
-                    ))}
                 </Box>
-            )}
+
+                {showDetails && (
+                    <Box sx={{ px: 1.5, pb: 1 }}>
+                        {TECH_ITEMS.map(({ Icon, accent, label, value }) => (
+                            <Box key={label} sx={{
+                                display: 'flex', alignItems: 'flex-start', gap: 1.5,
+                                px: 1, py: 1, borderRadius: 'sm',
+                                '&:hover': { backgroundColor: 'background.level1' },
+                            }}>
+                                <Box sx={{
+                                    width: 30, height: 30, borderRadius: 'sm', flexShrink: 0,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    backgroundColor: `${accent}18`,
+                                }}>
+                                    <Icon sx={{ fontSize: 16, color: accent }} />
+                                </Box>
+                                <Box>
+                                    <Typography level="body-xs" sx={{ fontWeight: 700 }}>{label}</Typography>
+                                    <Typography level="body-xs" sx={{ color: 'text.secondary' }}>{value}</Typography>
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+            </Box>
         </Box>
     );
 };

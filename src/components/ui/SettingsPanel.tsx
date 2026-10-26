@@ -21,6 +21,7 @@ import DevicesIcon from '@mui/icons-material/Devices';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { SettingsPanelProps, SettingsSection } from './settings/types.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx, LIST_ROW_MIN_HEIGHT } from '../layout/listRowMetrics.js';
 import { SectionPerfil } from './settings/SectionPerfil.js';
 import { SectionSeguridad } from './settings/SectionSeguridad.js';
 import { SectionPrivacidad } from './settings/SectionPrivacidad.js';
@@ -90,73 +91,74 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <Box sx={{
                     p: 2, display: 'flex', alignItems: 'center',
                     backgroundColor: 'background.surface',
-                    height: '60px', boxSizing: 'border-box',
+                    height: LIST_ROW_MIN_HEIGHT, boxSizing: 'border-box',
                 }}>
                     <Typography level="h4" sx={{ fontWeight: 600 }}>Ajustes</Typography>
                 </Box>
 
                 {/* Lista de secciones */}
-                <List sx={{ '--ListItem-paddingY': '0px', p: 0, flexGrow: 1 }}>
+                                <List sx={{ '--ListItem-paddingY': '0px', p: 0.5, flexGrow: 1 }}>
                     {SECTIONS.map((s) => (
-                        <ListItem key={s.id} sx={{ p: 0 }}>
+                                        <ListItem key={s.id} sx={listRowListItemSx}>
                             <ListItemButton
                                 selected={active === s.id}
                                 onClick={() => setActive(s.id)}
-                                sx={{ height: '72px', px: 1.5, borderRadius: 0, margin: 0 }}
+                                                sx={listRowButtonSx}
                             >
-                                <ListItemDecorator sx={{ mr: 2 }}>
+                                                <ListItemDecorator sx={listRowDecoratorSx}>
                                     {s.id === 'perfil' ? (
                                         <Avatar
                                             size="lg"
                                             src={identity?.avatar || undefined}
                                             color={active === s.id ? 'primary' : 'neutral'}
                                             variant="soft"
-                                        >
-                                            {!identity?.avatar && s.icon}
-                                        </Avatar>
-                                    ) : (
-                                        <Box sx={{
-                                            width: 40, height: 40,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: active === s.id ? 'primary.500' : 'text.secondary',
-                                        }}>
-                                            {s.icon}
-                                        </Box>
-                                    )}
-                                </ListItemDecorator>
-                                <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                                    <Typography level="body-md" sx={{ fontWeight: 500 }}>{s.label}</Typography>
-                                    <Typography level="body-sm" color="neutral" noWrap>{s.desc}</Typography>
-                                </Box>
-                            </ListItemButton>
-                        </ListItem>
-                    ))}
+                                                            sx={listRowAvatarSx}
+                                                        >
+                                                            {!identity?.avatar && s.icon}
+                                                        </Avatar>
+                                                    ) : (
+                                                        <Box sx={{
+                                                            width: 40, height: 40,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            color: active === s.id ? 'primary.500' : 'text.secondary',
+                                                        }}>
+                                                            {s.icon}
+                                                        </Box>
+                                                    )}
+                                                </ListItemDecorator>
+                                                <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+                                                    <Typography level="body-md" sx={{ fontWeight: 500 }}>{s.label}</Typography>
+                                                    <Typography level="body-sm" color="neutral" noWrap>{s.desc}</Typography>
+                                                </Box>
+                                            </ListItemButton>
+                                        </ListItem>
+                                    ))}
 
-                    {/* Cerrar sesión */}
-                    <ListItem sx={{ p: 0 }}>
-                        <ListItemButton
-                            onClick={async () => {
-                                await window.upeer.lockSession();
-                                onLockSession?.();
-                            }}
-                            sx={{ height: '72px', px: 1.5, borderRadius: 0, margin: 0 }}
-                        >
-                            <ListItemDecorator sx={{ mr: 2 }}>
-                                <Box sx={{
-                                    width: 40, height: 40,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: 'danger.500',
-                                }}>
-                                    <LogoutIcon />
-                                </Box>
-                            </ListItemDecorator>
-                            <Box>
-                                <Typography level="body-md" sx={{ fontWeight: 500, color: 'danger.500' }}>Cerrar sesión</Typography>
-                                <Typography level="body-sm" color="neutral">Salir de tu cuenta en este dispositivo</Typography>
-                            </Box>
-                        </ListItemButton>
-                    </ListItem>
-                </List>
+                                    {/* Cerrar sesión */}
+                                    <ListItem sx={listRowListItemSx}>
+                                        <ListItemButton
+                                            onClick={async () => {
+                                                await window.upeer.lockSession();
+                                                onLockSession?.();
+                                            }}
+                                            sx={listRowButtonSx}
+                                        >
+                                            <ListItemDecorator sx={listRowDecoratorSx}>
+                                                <Box sx={{
+                                                    width: 40, height: 40,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    color: 'danger.500',
+                                                }}>
+                                                    <LogoutIcon />
+                                                </Box>
+                                            </ListItemDecorator>
+                                            <Box>
+                                                <Typography level="body-md" sx={{ fontWeight: 500, color: 'danger.500' }}>Cerrar sesión</Typography>
+                                                <Typography level="body-sm" color="neutral">Salir de tu cuenta en este dispositivo</Typography>
+                                            </Box>
+                                        </ListItemButton>
+                                    </ListItem>
+                                </List>
             </Box>
 
             {/* ── Columna derecha — detalle ──────────────────────────── */}

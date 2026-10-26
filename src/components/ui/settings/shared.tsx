@@ -12,7 +12,24 @@ import CheckIcon from '@mui/icons-material/Check';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
+import type { SxProps } from '@mui/joy/styles/types';
 import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
+import { listRowButtonSx, listRowListItemSx } from '../../layout/listRowMetrics.js';
+
+// ─── Contenedores de sección ──────────────────────────────────────────────────
+
+export const sectionGroupSx: SxProps = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    p: 1.5,
+};
+
+export const sectionCardSx: SxProps = {
+    borderRadius: 'lg',
+    backgroundColor: 'background.surface',
+    overflow: 'hidden',
+};
 
 // ─── Campo copiable ───────────────────────────────────────────────────────────
 
@@ -39,7 +56,7 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
                 backgroundColor: 'background.level1', px: 1.5, py: 1.25,
-                border: '1px solid', borderColor: 'divider', borderRadius: INPUT_PILL_RADIUS,
+                borderRadius: INPUT_PILL_RADIUS,
             }}>
                 <Typography
                     level="body-sm"
@@ -85,9 +102,9 @@ export const ToggleRow: React.FC<{
     value: boolean;
     onChange: (v: boolean) => void;
 }> = ({ label, desc, value, onChange }) => (
-    <ListItem sx={{ p: 0 }}>
+    <ListItem sx={listRowListItemSx}>
         <ListItemButton
-            sx={{ height: '72px', px: 1.5, borderRadius: 0, margin: 0 }}
+            sx={listRowButtonSx}
             onClick={() => onChange(!value)}
         >
             <Box sx={{ flexGrow: 1 }}>
@@ -106,9 +123,9 @@ export const ToggleRow: React.FC<{
 // ─── Fila de informacion ──────────────────────────────────────────────────────
 
 export const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-    <ListItem sx={{ p: 0 }}>
+    <ListItem sx={listRowListItemSx}>
         <ListItemButton sx={{
-            height: '72px', px: 1.5, borderRadius: 0, margin: 0,
+            ...listRowButtonSx,
             cursor: 'default', '&:hover': { backgroundColor: 'transparent' },
         }}>
             <Box sx={{ flexGrow: 1 }}>

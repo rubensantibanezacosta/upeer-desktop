@@ -22,6 +22,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import { getFileIcon } from '../../../utils/fileIcons.js';
+import { sectionCardSx } from './shared.js';
 
 type CategoryFilter = 'all' | UpeerFileHistoryEntry['category'];
 
@@ -83,7 +84,7 @@ export const FileHistoryExplorer: React.FC = () => {
     };
 
     return (
-        <Box sx={{ px: 1.5, py: 2 }}>
+        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Typography level="title-md" sx={{ fontWeight: 600, mb: 0.5 }}>
                 Historial de archivos
             </Typography>

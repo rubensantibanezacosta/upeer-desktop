@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/joy';
 import type { Identity } from './types.js';
-import { resizeImageToDataUrl } from './shared.js';
+import { resizeImageToDataUrl, sectionGroupSx } from './shared.js';
 import type { ReputationData } from '../../../types/chat.js';
 import {
     DEFAULT_REPUTATION,
@@ -118,7 +118,7 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <Box sx={sectionGroupSx}>
             <ProfileHeroSection
                 avatar={avatar}
                 alias={alias}

@@ -12,6 +12,7 @@ import {
 import BlockIcon from '@mui/icons-material/Block';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
+import { sectionCardSx, sectionGroupSx } from './shared.js';
 
 interface BlockedContact {
     upeerId: string;
@@ -55,12 +56,12 @@ export const SectionBloqueados: React.FC = () => {
         c.alias || c.name || c.upeerId.slice(0, 12) + '…';
 
     return (
-        <Box sx={{ p: 0 }}>
+        <Box sx={sectionGroupSx}>
 
             {/* Encabezado informativo */}
             <Box sx={{
+                ...sectionCardSx,
                 px: 3, py: 2.5,
-                borderBottom: '1px solid', borderColor: 'divider',
                 display: 'flex', alignItems: 'center', gap: 1.5,
             }}>
                 <BlockIcon sx={{ color: 'danger.500', fontSize: 20 }} />
@@ -91,15 +92,13 @@ export const SectionBloqueados: React.FC = () => {
                     </Typography>
                 </Box>
             ) : (
-                <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
+                <List sx={{ '--ListItem-paddingY': '0px', p: 0.5, ...sectionCardSx }}>
                     {blocked.map(c => (
                         <ListItem
                             key={c.upeerId}
                             sx={{
                                 px: 3, py: 1.5,
-                                borderBottom: '1px solid', borderColor: 'divider',
                                 display: 'flex', alignItems: 'center', gap: 2,
-                                '&:last-child': { borderBottom: 'none' },
                             }}
                         >
                             {/* Avatar */}

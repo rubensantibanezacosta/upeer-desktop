@@ -27,7 +27,6 @@ export const InfoModal: React.FC<InfoModalProps> = ({ open, onClose, title, icon
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1.5,
                 px: 2.5, py: 2,
-                borderBottom: '1px solid', borderColor: 'divider',
             }}>
                 {icon && <Box sx={{ opacity: 0.6, display: 'flex' }}>{icon}</Box>}
                 <DialogTitle sx={{ p: 0, flexGrow: 1 }}>{title}</DialogTitle>
@@ -104,15 +103,15 @@ export const AlmacenamientoModalContent: React.FC = () => (
         </Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 0.5 }}>
-            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Invitados</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800 }}>50 MB</Typography>
             </Box>
-            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Confiables</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800 }}>500 MB</Typography>
             </Box>
-            <Box sx={{ gridColumn: 'span 2', p: 1, borderRadius: 'sm', bgcolor: 'background.level2', border: '1px solid', borderColor: 'primary.outlinedBorder' }}>
+            <Box sx={{ gridColumn: 'span 2', p: 1, borderRadius: 'sm', bgcolor: 'primary.softBg' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.main' }}>Amigos Íntimos (Score 80+)</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800, color: 'primary.main' }}>Hasta 2.5 GB por persona</Typography>
             </Box>

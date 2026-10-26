@@ -3,6 +3,7 @@ import { Alert, Box, Button, CircularProgress, Stack, Textarea, Typography } fro
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import { EnrollmentCodeCard } from '../enrollment/EnrollmentCodeCard.js';
+import { sectionCardSx } from './shared.js';
 
 interface InviteState {
     code: string;
@@ -112,7 +113,7 @@ export const DeviceEnrollmentPanel: React.FC<{ onEnrolled?: () => void }> = ({ o
     };
 
     return (
-        <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                 <AddLinkIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
                 <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>

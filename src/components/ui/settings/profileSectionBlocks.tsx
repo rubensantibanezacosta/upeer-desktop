@@ -4,7 +4,6 @@ import {
     Box,
     Button,
     Chip,
-    Divider,
     IconButton,
     Input,
     LinearProgress,
@@ -24,7 +23,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DoneIcon from '@mui/icons-material/Done';
-import { CopyableField } from './shared.js';
+import { CopyableField, sectionCardSx } from './shared.js';
 
 export type ReputationData = {
     vouchScore: number;
@@ -71,14 +70,12 @@ export const ProfileHeroSection: React.FC<ProfileHeroSectionProps> = ({
 }) => (
     <Box
         sx={{
+            ...sectionCardSx,
             px: 2.5,
             py: 3,
             display: 'flex',
             alignItems: 'center',
             gap: 3,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.surface',
         }}
     >
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
@@ -135,8 +132,8 @@ interface ProfileStatsSectionProps {
 }
 
 export const ProfileStatsSection: React.FC<ProfileStatsSectionProps> = ({ myReputation, vaultStats, fmtBytes, onToggleInfo }) => (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ px: 2.5, py: 2.5, borderRight: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     <SecurityIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
@@ -184,7 +181,7 @@ export const ProfileStatsSection: React.FC<ProfileStatsSectionProps> = ({ myRepu
             })() : <Typography level="body-xs" sx={{ opacity: 0.4 }}>Cargando...</Typography>}
         </Box>
 
-        <Box sx={{ px: 2.5, py: 2.5 }}>
+        <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     <CloudDoneIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
@@ -232,7 +229,7 @@ interface ProfileAddressSectionProps {
 }
 
 export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fullId, copied, copyError, onCopy, onShowQr, onToggleInfo }) => (
-    <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
             <FingerprintIcon sx={{ fontSize: '16px', opacity: 0.45 }} />
             <Typography level="body-sm" sx={{ fontWeight: 600, flexGrow: 1 }}>Tu dirección de contacto</Typography>
@@ -259,12 +256,12 @@ interface ProfileTechnicalSectionProps {
 }
 
 export const ProfileTechnicalSection: React.FC<ProfileTechnicalSectionProps> = ({ identityId, publicKey, networkAddress, onToggleInfo }) => (
-    <Box sx={{ px: 2.5, py: 2.5 }}>
+    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
         <Stack spacing={0}>
             <CopyableField label="ID de contacto" value={identityId || '—'} onInfo={() => onToggleInfo('id')} />
-            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ height: 12 }} />
             <CopyableField label="Clave de verificación" value={publicKey || '—'} onInfo={() => onToggleInfo('clave')} />
-            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ height: 12 }} />
             <CopyableField label="Dirección de red" value={networkAddress || '—'} onInfo={() => onToggleInfo('red')} />
         </Stack>
     </Box>

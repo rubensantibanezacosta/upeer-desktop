@@ -33,6 +33,8 @@ interface TopHeaderAvatarProps {
     onAvatarFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+import { listRowAvatarSx } from './listRowMetrics.js';
+
 export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
     isGroup,
     isAdmin,
@@ -51,19 +53,19 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
             <TrustAvatarBadge vouchScore={isGroup ? undefined : vouchScore}>
                 {isGroup ? (
                     <Avatar
-                        size="sm"
+                        size="lg"
                         src={avatar || undefined}
                         color="primary"
                         variant="soft"
                         sx={{
-                            borderRadius: 'md',
+                            ...listRowAvatarSx,
                             ...(!avatar ? { background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))' } : {}),
                         }}
                     >
-                        {!avatar && <GroupsIcon sx={{ fontSize: 18, color: 'white' }} />}
+                        {!avatar && <GroupsIcon sx={{ fontSize: 22, color: 'white' }} />}
                     </Avatar>
                 ) : (
-                    <Avatar size="sm" src={avatar || undefined}>
+                    <Avatar size="lg" src={avatar || undefined} sx={listRowAvatarSx}>
                         {contactName ? contactName[0] : ''}
                     </Avatar>
                 )}
@@ -73,7 +75,7 @@ export const TopHeaderAvatar: React.FC<TopHeaderAvatarProps> = ({
                     sx={{
                         position: 'absolute',
                         inset: 0,
-                        borderRadius: 'md',
+                        borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

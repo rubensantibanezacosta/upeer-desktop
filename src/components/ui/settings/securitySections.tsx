@@ -5,6 +5,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import WarningIcon from '@mui/icons-material/Warning';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { sectionCardSx } from './shared.js';
 
 interface SecurityStatusCardProps {
     pinEnabled: boolean;
@@ -15,9 +16,6 @@ export const SecurityStatusCard: React.FC<SecurityStatusCardProps> = ({ pinEnabl
         sx={{
             px: 2.5,
             py: 2.5,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.surface',
         }}
     >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -59,7 +57,7 @@ interface RecoverySectionProps {
 }
 
 export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }) => (
-    <Box sx={{ px: 2.5, py: 3, backgroundColor: 'background.surface' }}>
+    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5 }}>
             <KeyIcon sx={{ fontSize: '15px', opacity: 0.45 }} />
             <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6 }}>
@@ -71,8 +69,6 @@ export const RecoverySection: React.FC<RecoverySectionProps> = ({ onRevealSeed }
             sx={{
                 p: 2,
                 borderRadius: 'lg',
-                border: '1px solid',
-                borderColor: 'warning.outlinedBorder',
                 backgroundColor: 'warning.softBg',
                 display: 'flex',
                 flexDirection: 'column',
@@ -109,7 +105,7 @@ interface DangerZoneSectionProps {
 }
 
 export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({ onDeleteClick }) => (
-    <Box sx={{ px: 2.5, py: 3, backgroundColor: 'background.surface', borderTop: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ ...sectionCardSx, px: 2.5, py: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5 }}>
             <DeleteForeverIcon sx={{ fontSize: '15px', color: 'danger.500' }} />
             <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'danger.500' }}>

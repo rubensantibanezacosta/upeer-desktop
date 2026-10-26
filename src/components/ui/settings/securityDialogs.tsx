@@ -135,8 +135,6 @@ export const RevealMnemonicModal: React.FC<RevealMnemonicModalProps> = ({
                             p: 2.5,
                             bgcolor: 'background.level1',
                             borderRadius: 'lg',
-                            border: '1px solid',
-                            borderColor: 'divider',
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, 1fr)',
                             gap: 2,
