@@ -38,7 +38,7 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
             </Box>
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
-                backgroundColor: 'background.level1', px: 1.5, py: 1,
+                backgroundColor: 'background.level1', px: 1.5, py: 1.25,
                 border: '1px solid', borderColor: 'divider', borderRadius: INPUT_PILL_RADIUS,
             }}>
                 <Typography

@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useLayoutEffect, useEffect } from 'react';
 import { Box } from '@mui/joy';
-import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
+import { INPUT_PILL_RADIUS, INPUT_PILL_HEIGHT } from '../../../inputShape.js';
 
 const DIM = 'opacity:0.4';
 const URL_STYLE = 'color:var(--joy-palette-primary-plainColor);text-decoration:underline';
@@ -148,7 +148,7 @@ export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown
                 position: 'relative',
                 borderRadius: embedded ? 0 : INPUT_PILL_RADIUS,
                 backgroundColor: embedded ? 'transparent' : 'background.level1',
-                height: '40px',
+                height: INPUT_PILL_HEIGHT,
                 display: 'flex',
                 alignItems: 'center',
                 px: embedded ? 0.5 : 2,
@@ -178,7 +178,7 @@ export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown
                     overflowX: 'auto',
                     overflowY: 'hidden',
                     fontSize: '1rem',
-                    lineHeight: '40px',
+                    lineHeight: INPUT_PILL_HEIGHT,
                     color: 'text.primary',
                     '&::-webkit-scrollbar': { display: 'none' },
                     scrollbarWidth: 'none',

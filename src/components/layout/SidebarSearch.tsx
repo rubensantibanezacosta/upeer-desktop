@@ -56,7 +56,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                     border: '1px solid transparent',
                     px: 1,
                     flexGrow: 1,
-                    height: '35px',
+                    height: '40px',
                     transition: 'border-color 0.15s',
                     '&:focus-within': {
                         borderColor: 'var(--joy-palette-primary-300)',

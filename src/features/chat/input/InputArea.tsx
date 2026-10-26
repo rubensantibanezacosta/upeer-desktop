@@ -14,7 +14,7 @@ import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
 import { CHAT_COMPOSER_BAR_HEIGHT } from './composerLayout.js';
-import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
+import { INPUT_PILL_RADIUS, INPUT_PILL_HEIGHT } from '../../../inputShape.js';
 import type { LinkPreview } from '../../../types/chat.js';
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al enviar la nota de voz';
@@ -141,9 +141,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         alignItems: 'center',
                         gap: 0.25,
                         width: '100%',
-                        height: '46px',
-                        pl: 0.25,
-                        pr: 0.25,
+                        height: INPUT_PILL_HEIGHT,
+                        pl: 1.125,
+                        pr: 1.125,
                         borderRadius: INPUT_PILL_RADIUS,
                         backgroundColor: 'background.level1',
                     }}>

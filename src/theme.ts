@@ -1,5 +1,5 @@
 import { extendTheme } from '@mui/joy/styles';
-import { INPUT_PILL_RADIUS } from './inputShape.js';
+import { INPUT_PILL_RADIUS, INPUT_SIZE_HEIGHTS } from './inputShape.js';
 
 export const appTheme = extendTheme({
     components: {
@@ -21,6 +21,9 @@ export const appTheme = extendTheme({
             styleOverrides: {
                 root: {
                     '--Input-radius': INPUT_PILL_RADIUS,
+                    '&.MuiInput-sizeSm': { '--Input-minHeight': INPUT_SIZE_HEIGHTS.sm },
+                    '&.MuiInput-sizeMd': { '--Input-minHeight': INPUT_SIZE_HEIGHTS.md },
+                    '&.MuiInput-sizeLg': { '--Input-minHeight': INPUT_SIZE_HEIGHTS.lg },
                 },
             },
         },
