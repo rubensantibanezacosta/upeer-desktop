@@ -13,7 +13,7 @@ import {
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import { SidebarSearch } from './SidebarSearch.js';
 import type { Contact } from '../../types/chat.js';
-import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx } from './listRowMetrics.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from './listRowMetrics.js';
 
 type ContactsPanelFilter = 'all' | 'blocked';
 
@@ -87,19 +87,12 @@ export const ContactsPanelList: React.FC<ContactsPanelListProps> = ({
             ) : visibleContacts.map((contact) => {
                 const metaLabel = getContactMetaLabel(contact);
                 return (
-                    <ListItem key={contact.upeerId} sx={{ p: 0, mb: 0.5 }}>
+                    <ListItem key={contact.upeerId} sx={listRowListItemSx}>
                         <ListItemButton
                             aria-label={`Abrir ficha de ${contact.name}`}
                             selected={activeContact?.upeerId === contact.upeerId}
                             onClick={() => onSelectContact(contact.upeerId)}
-                            sx={{
-                                ...listRowButtonSx,
-                                borderRadius: '10px',
-                                transition: 'background-color 0.15s ease, border-color 0.15s ease',
-                                '&:hover': { backgroundColor: 'background.level1' },
-                                '&.Mui-selected': { backgroundColor: 'background.level1' },
-                                '&.Mui-selected:hover': { backgroundColor: 'background.level1' },
-                            }}
+                            sx={listRowButtonSx}
                         >
                             <ListItemDecorator sx={listRowDecoratorSx}>
                                 <Avatar src={contact.avatar || undefined} size="lg" variant="soft" sx={listRowAvatarSx}>

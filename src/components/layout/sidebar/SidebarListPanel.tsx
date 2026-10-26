@@ -105,7 +105,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
                 {emptyState ? (
                     <SidebarEmptyStateView model={emptyState} />
                 ) : (
-                    <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
+                    <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                         {sidebarFilter === 'groups'
                             ? filteredGroups.map((group) => (
                                 <GroupItem key={group.groupId} group={group} isSelected={selectedGroupId === group.groupId} onSelect={onSelectGroup || (() => undefined)} onToggleFavorite={onToggleFavoriteGroup} onLeaveGroup={onLeaveGroup} onClearChat={onClearGroupChat} highlight={sidebarSearch} />

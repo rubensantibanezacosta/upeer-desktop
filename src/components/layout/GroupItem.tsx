@@ -11,7 +11,7 @@ import { highlightText } from '../../utils/highlightText.js';
 import { GroupItemActions } from './GroupItemActions.js';
 import { GroupItemLeaveDialog } from './GroupItemLeaveDialog.js';
 import { formatGroupItemTime, GroupAvatar, GroupItemStatusIcon, renderGroupLastMessage } from './groupItemSupport.js';
-import { listRowButtonSx, listRowDecoratorSx } from './listRowMetrics.js';
+import { listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from './listRowMetrics.js';
 
 interface GroupItemProps {
     group: Group;
@@ -28,15 +28,12 @@ export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelec
     const timeStr = formatGroupItemTime(group.lastMessageTime);
 
     return (
-        <ListItem sx={{ p: 0 }}>
+        <ListItem sx={listRowListItemSx}>
             <ListItemButton
                 aria-label={`Abrir grupo ${group.name}`}
                 selected={isSelected}
                 onClick={() => onSelect(group.groupId)}
-                sx={{
-                    ...listRowButtonSx,
-                    borderRadius: 0,
-                }}
+                sx={listRowButtonSx}
             >
                 <ListItemDecorator sx={listRowDecoratorSx}>
                     <GroupAvatar avatar={group.avatar} size="lg" />

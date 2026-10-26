@@ -63,7 +63,7 @@ export const SidebarNewChatPanel: React.FC<SidebarNewChatPanelProps> = ({
                     )}
                 </Box>
             )}
-            <List sx={{ '--ListItem-paddingY': '0px', p: 0 }}>
+            <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
                 {searchedContacts.map((contact, index) => (
                     <ContactItem key={contact.upeerId || index} contact={contact} isSelected={false} onSelect={onSelectExisting} onToggleFavorite={() => undefined} onClear={() => undefined} isTyping={false} />
                 ))}

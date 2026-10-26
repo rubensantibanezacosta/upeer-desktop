@@ -13,7 +13,7 @@ import { ContactItemActions } from './ContactItemActions.js';
 import { formatContactTime, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
 import { TrustAvatarBadge } from './TrustAvatarBadge.js';
 import { useIsOnline } from '../../hooks/useIsOnline.js';
-import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx } from './listRowMetrics.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from './listRowMetrics.js';
 
 interface ContactItemProps {
     contact: Contact;
@@ -35,14 +35,13 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
     const isBold = c.status === 'incoming' || hasUnread;
 
     return (
-        <ListItem sx={{ p: 0 }}>
+        <ListItem sx={listRowListItemSx}>
             <ListItemButton
                 aria-label={`Abrir chat con ${c.name}`}
                 selected={isSelected}
                 onClick={() => onSelect(c.upeerId)}
                 sx={{
                     ...listRowButtonSx,
-                    borderRadius: 0,
                     opacity: isPending ? 0.7 : 1
                 }}
             >
