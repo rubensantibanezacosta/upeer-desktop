@@ -5,7 +5,7 @@ import { Contact, Group } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
-import { SectionSeparator, actionButtonSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
+import { SectionSeparator, actionButtonSx, actionsRowSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 
 interface GroupMediaClickPayload {
     url: string;
@@ -66,10 +66,28 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                     <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
                     <Typography level="body-xs" color="neutral">Grupo · {group.members.length} miembro{group.members.length === 1 ? '' : 's'}</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 0.5, px: 2, pb: 1 }}>
-                    <Button aria-label="Llamar al grupo" size="sm" variant="plain" disabled={callsUnavailable} onClick={onCallAudio} startDecorator={<Phone style={{ fontSize: 18 }} />} sx={actionButtonSx}>Llamar</Button>
-                    <Button aria-label="Videollamar al grupo" size="sm" variant="plain" disabled={callsUnavailable} onClick={onCallVideo} startDecorator={<Video style={{ fontSize: 18 }} />} sx={actionButtonSx}>Vídeo</Button>
-                    <Button aria-label="Buscar en el chat" size="sm" variant="plain" onClick={onSearch} startDecorator={<Search style={{ fontSize: 18 }} />} sx={actionButtonSx}>Buscar</Button>
+                <Box sx={actionsRowSx}>
+                    <Tooltip title="Llamar al grupo" variant="soft">
+                        <span>
+                            <IconButton aria-label="Llamar al grupo" variant="plain" disabled={callsUnavailable} onClick={onCallAudio} sx={actionButtonSx}>
+                                <Phone style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Videollamar al grupo" variant="soft">
+                        <span>
+                            <IconButton aria-label="Videollamar al grupo" variant="plain" disabled={callsUnavailable} onClick={onCallVideo} sx={actionButtonSx}>
+                                <Video style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Buscar en el chat" variant="soft">
+                        <span>
+                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onSearch} sx={actionButtonSx}>
+                                <Search style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                 </Box>
                 <SectionSeparator />
                 <Box sx={{ px: 2, pt: 1, pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

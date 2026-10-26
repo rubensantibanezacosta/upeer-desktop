@@ -1,13 +1,13 @@
 import React from 'react';
 import {
     Box,
-    Button,
     IconButton,
     List,
     ListItem,
     ListItemButton,
     ListItemContent,
     ListItemDecorator,
+    Tooltip,
     Typography,
 } from '@mui/joy';
 import { X, Lock, ChevronRight, Phone, Video, Search } from 'lucide-react';
@@ -15,7 +15,7 @@ import { Contact } from '../../types/chat.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { ContactInfoHero } from './ContactInfoHero.js';
 import { ContactInfoDangerAction, ContactInfoUtilityAction } from './contactInfoPanelSupport.js';
-import { SectionSeparator, actionButtonSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
+import { SectionSeparator, actionButtonSx, actionsRowSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 
 interface ContactInfoPanelMainViewProps {
     contact: Contact;
@@ -86,16 +86,28 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                     trust={trust}
                 />
 
-                <Box sx={{ display: 'flex', gap: 0.5, px: 2, pb: 1 }}>
-                    <Button aria-label="Llamar" size="sm" variant="plain" disabled={callsDisabled} onClick={onCallAudio} startDecorator={<Phone style={{ fontSize: 18 }} />} sx={actionButtonSx}>
-                        Llamar
-                    </Button>
-                    <Button aria-label="Videollamar" size="sm" variant="plain" disabled={callsDisabled} onClick={onCallVideo} startDecorator={<Video style={{ fontSize: 18 }} />} sx={actionButtonSx}>
-                        Vídeo
-                    </Button>
-                    <Button aria-label="Buscar en el chat" size="sm" variant="plain" onClick={onSearch} startDecorator={<Search style={{ fontSize: 18 }} />} sx={actionButtonSx}>
-                        Buscar
-                    </Button>
+                <Box sx={actionsRowSx}>
+                    <Tooltip title="Llamar" variant="soft">
+                        <span>
+                            <IconButton aria-label="Llamar" variant="plain" disabled={callsDisabled} onClick={onCallAudio} sx={actionButtonSx}>
+                                <Phone style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Videollamar" variant="soft">
+                        <span>
+                            <IconButton aria-label="Videollamar" variant="plain" disabled={callsDisabled} onClick={onCallVideo} sx={actionButtonSx}>
+                                <Video style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Buscar en el chat" variant="soft">
+                        <span>
+                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onSearch} sx={actionButtonSx}>
+                                <Search style={{ fontSize: 20 }} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                 </Box>
 
                 <SectionSeparator />
