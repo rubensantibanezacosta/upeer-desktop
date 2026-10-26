@@ -40,17 +40,7 @@ export function setupProcessHandlers(): void {
     terminateAfterFatalError('uncaught-exception', { message: err.message, stack: err.stack });
   });
 
-  // Forzar Ozone/Wayland rompe la ventana en Electron 40 sobre mutter: SIGSEGV al
-  // arrancar o ventana negra sin frames. X11 (XWayland) es el valor por defecto y el
-  // modo nativo se reactiva con UPEER_OZONE_PLATFORM=wayland|auto.
-  if (process.platform === 'linux') {
-    const ozonePlatform = process.env.UPEER_OZONE_PLATFORM ?? 'x11';
-    if (ozonePlatform !== 'auto') {
-      app.commandLine.appendSwitch('ozone-platform', ozonePlatform);
-      if (ozonePlatform === 'wayland') {
-        app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
-        app.commandLine.appendSwitch('ozone-platform-hint', 'wayland');
-      }
-    }
-  }
+  // Ozone se elige en la línea de comandos (scripts/start.mjs): appendSwitch llega
+  // demasiado tarde, la plataforma ya está decidida cuando corre este módulo, y el
+  // resultado es SIGSEGV antes de crear la ventana o una ventana sin frames.
 }

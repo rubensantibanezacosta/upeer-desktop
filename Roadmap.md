@@ -123,7 +123,8 @@ El detalle, orden de migración y matriz de pruebas está en [`../ROADMAP.md`](.
 - [x] **Velocidad y tiempo restante** en `TransferProgressBar` — `useTransferSpeed` (`speedBps`/`etaSeconds`) con ventana de muestras de 3 s
 - [x] **Estado 'Vaulted' para adjuntos** — actualización automática a doble tick gris tras replicación exitosa en bóvedas
 - [x] **Compatibilidad Nativa Wayland** — corrección de diálogos de archivos bloqueantes y habilitación de `--ozone-platform-hint=wayland`
-  - ⚠️ Electron 40.6.1 hace `SIGSEGV` antes de crear la ventana bajo Ozone/Wayland (Ubuntu 26.04 + mutter + NVIDIA; reproducible con una app Electron vacía). Por eso `processConfig` fija `ozone-platform=x11` (XWayland) por defecto. Para probar Wayland nativo: `UPEER_OZONE_PLATFORM=wayland pnpm start`; para dejar que Electron autodetecte: `UPEER_OZONE_PLATFORM=auto pnpm start`
+  - ⚠️ Electron 40.6.1 hace `SIGSEGV` antes de crear la ventana bajo Ozone/Wayland (Ubuntu 26.04 + mutter + NVIDIA; reproducible con una app Electron vacía). Por eso `pnpm start` arranca en X11 (XWayland) por defecto, añadiendo `--ozone-platform=x11` en la **línea de comandos**: `app.commandLine.appendSwitch()` llega tarde —cuando corre `processConfig` la plataforma ya está decidida— y el resultado es el mismo segfault. `scripts/start.mjs` elige la bandera: `UPEER_OZONE_PLATFORM=wayland pnpm start` para Wayland nativo, `UPEER_OZONE_PLATFORM=auto pnpm start` para dejar que Electron autodetecte.
+  - [ ] El binario empaquetado (`package`/`make`) no pasa por `scripts/start.mjs`, así que necesita la bandera en su `Exec` o en el lanzador del sistema. Sin ella vuelve el segfault.
   - ⚠️ Declarar `enable-features=VaapiVideoDecoder,VaapiVideoEncoder` junto a `disableHardwareAcceleration()` (obligatorio en Linux) deja al compositor sin frames: la ventana aparece en negro sin menú ni DevTools. No se declaran.
 
 ### UI / UX
