@@ -1,0 +1,39 @@
+{
+  "accountPublicKey": "7776e870b93354f2a0b24c23f2a36cc4e80e223218c1b97926fdd018396a2b9b",
+  "accountSecretKey": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f7776e870b93354f2a0b24c23f2a36cc4e80e223218c1b97926fdd018396a2b9b",
+  "chunkSize": 100,
+  "chunks": [
+    {
+      "index": 0,
+      "data": "AAh+JUCDuQFGUED70Fro791deDSjGxiMaA8whsQdAwUun8Af362ex4Pd/by6n34bp2AkKZHPg2N/wxZu5kVwL2Ji79v1IuDov0e+CTZIcoeYif8Sfu8dAwa16Md589Whlkl17g==",
+      "iv": "a0a1a2a3a4a5a6a7a8a9aaab",
+      "tag": "4dd68501278f4ff84c1c3cff923bc58d",
+      "chunkHash": "e8fd2c4f3a453f80113979c7496e61e5be565fcfae4e4e79ac26e5c3f9b53d0c"
+    },
+    {
+      "index": 1,
+      "data": "tOyHWAXZwDBzhqrnuN7Okk5xFa9t0C92WMV0ETuBgh4wR/Jeq15eL9tiqvbXoNDsJtFDosUVJ+gyHQOlLznO6NkysoJxNa9PeqWOvbRjwDarp79ymiHAT7NyuuCY3irgeVQipg==",
+      "iv": "b0b1b2b3b4b5b6b7b8b9babb",
+      "tag": "5301b431033f72b3f13015754ef0ea24",
+      "chunkHash": "062e7e023d0f49dd13af15faace1eb978af85ea0152d35c573d674be9feba517"
+    },
+    {
+      "index": 2,
+      "data": "9aQfJBEZWAHL/+CRp03Dyi/MHlrAKcJiF6vg7nW2Bex4jUdugqjNZn3HA7zqoX0dv3o=",
+      "iv": "c0c1c2c3c4c5c6c7c8c9cacb",
+      "tag": "2ba257c7d3c6977bb805bc48cb3dcd28",
+      "chunkHash": "c5f31639363198094a5ede44880a553995ac31945d0dffd7091d574743437592"
+    }
+  ],
+  "deviceEncryptedKey": "914f8fd262f78dc671dfee929a177e84ab5fabced6a6e87d4c2a664b888bfd74057d5c74929483f7f2c23c6c51653073ab26c4cbb3b872f67d6db78196509e4d2a3e0cf75b125239ed0990a70cc14e65",
+  "devicePublicKey": "2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d",
+  "deviceSecretKey": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d",
+  "encryptedKey": "9b7ab5180c7f5104b718768264d9e6db0b06781e7845d0336d454987f89a367f93e4dc95fd163946314f2afd2cbb14aeee2ca51d839232893e487b58843bf39d73c42e1b80e88c79d6059569a94a3998",
+  "fileHash": "d6f7163a36b1a3bad4314162bee53593563c196425f35a7a936e469b06b7b9a1",
+  "fileId": "6f1c2f5e-6b7a-4c2d-9d1e-2a3b4c5d6e7f",
+  "fileKey": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+  "fileName": "adjunto-grande.bin",
+  "fileSize": 250,
+  "mimeType": "application/octet-stream",
+  "totalChunks": 3
+}
