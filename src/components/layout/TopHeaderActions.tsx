@@ -13,6 +13,7 @@ interface TopHeaderActionsProps {
     onCallAudio?: () => void;
     onCallVideo?: () => void;
     isSelfChat?: boolean;
+    menu?: React.ReactNode;
 }
 
 export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
@@ -26,6 +27,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
     onCallAudio,
     onCallVideo,
     isSelfChat = false,
+    menu,
 }) => (
     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
         {status === 'incoming' && onAccept && (
@@ -57,7 +59,7 @@ export const TopHeaderActions: React.FC<TopHeaderActionsProps> = ({
                     </Tooltip>
                 )}
                 <Box sx={{ width: '1px', height: '24px', backgroundColor: 'divider', mx: 0.5 }} />
-                <IconButton aria-label="Más acciones" size="md" variant="plain" color="neutral"><MoreVertical style={{ fontSize: 22 }} /></IconButton>
+                {menu ?? <IconButton aria-label="Más acciones" size="md" variant="plain" color="neutral"><MoreVertical style={{ fontSize: 22 }} /></IconButton>}
             </>
         )}
     </Box>

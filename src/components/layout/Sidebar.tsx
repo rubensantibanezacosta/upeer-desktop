@@ -26,6 +26,7 @@ interface SidebarProps {
     typingStatus?: Record<string, NodeJS.Timeout>;
     onAddContact: (idAtAddress: string, name: string) => void;
     onCreateGroup?: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
+    onOpenAppLock?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onAddContact,
     typingStatus = {},
     onCreateGroup,
+    onOpenAppLock,
 }) => {
     const {
         sidebarView,
@@ -191,6 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onSearchChange={setSidebarSearch}
                     onSelectMessage={handleSelectMessage}
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
+                    onOpenAppLock={onOpenAppLock}
                     searchFocusToken={sidebarSearchFocusToken}
                     loading={isHydrating}
                 />

@@ -37,6 +37,7 @@ interface SidebarListPanelProps {
     onSearchChange: (value: string) => void;
     onSelectMessage: (msg: ChatMessage) => void;
     onOpenCreateGroup?: () => void;
+    onOpenAppLock?: () => void;
     searchFocusToken?: number;
     loading?: boolean;
 }
@@ -64,6 +65,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
     onSearchChange,
     onSelectMessage,
     onOpenCreateGroup,
+    onOpenAppLock,
     searchFocusToken,
     loading = false,
 }) => {
@@ -99,7 +101,7 @@ export const SidebarListPanel: React.FC<SidebarListPanelProps> = ({
 
     return (
         <>
-            <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} />
+            <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} onOpenAppLock={onOpenAppLock} />
             <SidebarSearch value={sidebarSearch} onChange={onSearchChange} activeFilter={sidebarFilter} onFilterChange={(filter) => onFilterChange(filter as SidebarFilter)} autoFocus={searchFocusToken !== undefined && searchFocusToken > 0} focusKey={searchFocusToken ? `search-${searchFocusToken}` : undefined} />
             <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 {emptyState ? (

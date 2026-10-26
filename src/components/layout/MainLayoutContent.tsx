@@ -5,6 +5,7 @@ import { ChatArea } from '../../features/chat/ChatArea.js';
 import { ChatSearchBar } from '../../features/chat/ChatSearchBar.js';
 import { IncomingRequestChat } from '../../features/chat/IncomingRequestChat.js';
 import { TopHeader } from './TopHeader.js';
+import { ChatHeaderMenu } from './ChatHeaderMenu.js';
 import { InputArea } from '../../features/chat/input/InputArea.js';
 import type { LinkPreview } from '../../types/chat.js';
 import type { ChatMessage, PendingFile } from '../../types/chat.js';
@@ -16,6 +17,7 @@ import { useCallStore } from '../../features/call/useCallStore.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { isContactUnread, isGroupUnread } from './chatUnread.js';
 import { useSharedMediaItems } from './contactInfoPanelSupport.js';
+import { exportChatTranscript } from '../../utils/exportChat.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';
 import { GroupInfoPanel } from './GroupInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
@@ -178,6 +180,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                         onCreateGroup={chatStore.handleCreateGroup}
                         onLeaveGroup={chatStore.handleLeaveGroup}
                         typingStatus={chatStore.typingStatus}
+                        onOpenAppLock={() => navigation.goToSettings('seguridad')}
                     />
 
                     <Box sx={{ flexGrow: 1, display: 'flex', height: '100%', minWidth: 0, backgroundColor: 'background.body', position: 'relative', overflow: 'hidden' }}>
@@ -199,6 +202,21 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onSearch={() => setIsChatSearchOpen(true)}
                                             onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members, activeGroupId)}
                                             onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup?.members, activeGroupId)}
+                                            menu={
+                                                <ChatHeaderMenu
+                                                    kind="group"
+                                                    chatId={activeGroupId}
+                                                    name={activeGroup?.name || 'este grupo'}
+                                                    isFavorite={!!activeGroup?.isFavorite}
+                                                    onOpenInfo={() => setIsGroupInfoOpen((value) => !value)}
+                                                    onSearch={() => setIsChatSearchOpen(true)}
+                                                    onToggleFavorite={() => void chatStore.handleToggleFavoriteGroup(activeGroupId)}
+                                                    onExport={() => exportChatTranscript({ chatName: activeGroup?.name || activeGroupId, meLabel: chatStore.myIdentity?.alias || 'Yo', messages: chatStore.groupChatHistory })}
+                                                    onCloseChat={() => chatStore.setActiveGroupId('')}
+                                                    onClearChat={() => handleClearChat(activeGroupId)}
+                                                    onLeaveGroup={() => void chatStore.handleLeaveGroup(activeGroupId)}
+                                                />
+                                            }
                                         />
                                     ) : (
                                         <TopHeader
@@ -217,6 +235,23 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onSearch={() => setIsChatSearchOpen(true)}
                                             onCallAudio={() => void startCall(targetUpeerId, 'audio')}
                                             onCallVideo={() => void startCall(targetUpeerId, 'video')}
+                                            menu={
+                                                <ChatHeaderMenu
+                                                    kind="contact"
+                                                    chatId={targetUpeerId}
+                                                    name={activeContact?.name || 'este contacto'}
+                                                    isFavorite={!!activeContact?.isFavorite}
+                                                    blocked={activeContact?.status === 'blocked'}
+                                                    onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
+                                                    onSearch={() => setIsChatSearchOpen(true)}
+                                                    onToggleFavorite={() => void chatStore.handleToggleFavorite(targetUpeerId)}
+                                                    onExport={() => exportChatTranscript({ chatName: activeContact?.name || targetUpeerId, meLabel: chatStore.myIdentity?.alias || 'Yo', messages: chatStore.chatHistory })}
+                                                    onCloseChat={() => chatStore.setTargetUpeerId('')}
+                                                    onClearChat={() => handleClearChat(targetUpeerId)}
+                                                    onDeleteChat={() => { void chatStore.handleClearChat(targetUpeerId); handleDeleteContact(targetUpeerId); }}
+                                                    onBlock={handleBlockContact}
+                                                />
+                                            }
                                         />
                                     )}
 

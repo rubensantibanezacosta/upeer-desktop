@@ -22,6 +22,7 @@ interface ChatActionsState {
     toggleGroup: (id: string, key: keyof ChatActionPrefs) => void;
     toggleMessage: (id: string, key: keyof MessageActionPrefs) => void;
     clearChat: (id: string, kind: 'contact' | 'group') => void;
+    markAllRead: () => void;
 }
 
 const emptyPrefs: ChatActionPrefs = { archived: false, muted: false, pinned: false, unread: false };
@@ -36,6 +37,9 @@ const toggleMessage = (prefs: Record<string, MessageActionPrefs>, id: string, ke
     const current = prefs[id] || { ...emptyMessagePrefs };
     return { ...prefs, [id]: { ...current, [key]: !current[key] } };
 };
+
+const markRead = (prefs: Record<string, ChatActionPrefs>): Record<string, ChatActionPrefs> =>
+    Object.fromEntries(Object.entries(prefs).map(([id, value]) => [id, { ...value, unread: false }]));
 
 export const useChatActionsStore = create<ChatActionsState>()(
     persist(
@@ -52,6 +56,10 @@ export const useChatActionsStore = create<ChatActionsState>()(
                 delete next[id];
                 return kind === 'contact' ? { contactPrefs: next } : { groupPrefs: next };
             }),
+            markAllRead: () => set((state) => ({
+                contactPrefs: markRead(state.contactPrefs),
+                groupPrefs: markRead(state.groupPrefs),
+            })),
         }),
         { name: 'chat-actions-prefs' }
     )
