@@ -13,6 +13,7 @@ import { ContactItemActions } from './ContactItemActions.js';
 import { formatContactTime, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
 import { TrustAvatarBadge } from './TrustAvatarBadge.js';
 import { useIsOnline } from '../../hooks/useIsOnline.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx } from './listRowMetrics.js';
 
 interface ContactItemProps {
     contact: Contact;
@@ -40,20 +41,19 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                 selected={isSelected}
                 onClick={() => onSelect(c.upeerId)}
                 sx={{
-                    height: '72px',
-                    px: 1.5,
+                    ...listRowButtonSx,
                     borderRadius: 0,
-                    margin: 0,
                     opacity: isPending ? 0.7 : 1
                 }}
             >
-                <ListItemDecorator sx={{ mr: 2 }}>
+                <ListItemDecorator sx={listRowDecoratorSx}>
                     <TrustAvatarBadge vouchScore={c.vouchScore}>
                         <Avatar
                             size="lg"
                             color={c.status === 'incoming' ? 'primary' : 'neutral'}
                             src={c.avatar || undefined}
                             variant="soft"
+                            sx={listRowAvatarSx}
                         >
                             {c.name[0]}
                         </Avatar>

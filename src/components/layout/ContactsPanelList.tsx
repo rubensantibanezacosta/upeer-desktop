@@ -13,6 +13,7 @@ import {
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import { SidebarSearch } from './SidebarSearch.js';
 import type { Contact } from '../../types/chat.js';
+import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx } from './listRowMetrics.js';
 
 type ContactsPanelFilter = 'all' | 'blocked';
 
@@ -75,7 +76,7 @@ export const ContactsPanelList: React.FC<ContactsPanelListProps> = ({
                 { label: 'Bloqueados', value: 'blocked' },
             ]}
         />
-        <List sx={{ '--ListItem-paddingY': '0px', p: 1, overflowY: 'auto', flexGrow: 1 }}>
+        <List sx={{ '--ListItem-paddingY': '0px', p: 0.5, overflowY: 'auto', flexGrow: 1 }}>
             {visibleContacts.length === 0 ? (
                 <Box sx={{ px: 3, py: 8, textAlign: 'center', color: 'text.tertiary' }}>
                     <PersonOffIcon sx={{ fontSize: 48, opacity: 0.35, mb: 1 }} />
@@ -92,18 +93,16 @@ export const ContactsPanelList: React.FC<ContactsPanelListProps> = ({
                             selected={activeContact?.upeerId === contact.upeerId}
                             onClick={() => onSelectContact(contact.upeerId)}
                             sx={{
-                                minHeight: '76px',
-                                px: 1.5,
+                                ...listRowButtonSx,
                                 borderRadius: '10px',
-                                margin: 0,
                                 transition: 'background-color 0.15s ease, border-color 0.15s ease',
                                 '&:hover': { backgroundColor: 'background.level1' },
                                 '&.Mui-selected': { backgroundColor: 'background.level1' },
                                 '&.Mui-selected:hover': { backgroundColor: 'background.level1' },
                             }}
                         >
-                            <ListItemDecorator sx={{ mr: 2 }}>
-                                <Avatar src={contact.avatar || undefined} size="lg" variant="soft">
+                            <ListItemDecorator sx={listRowDecoratorSx}>
+                                <Avatar src={contact.avatar || undefined} size="lg" variant="soft" sx={listRowAvatarSx}>
                                     {(contact.name || contact.upeerId).charAt(0).toUpperCase()}
                                 </Avatar>
                             </ListItemDecorator>
