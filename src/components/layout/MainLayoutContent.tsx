@@ -153,6 +153,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                 myAvatar={chatStore.myIdentity?.avatar}
                 myInitial={(chatStore.myIdentity?.alias || chatStore.myIdentity?.upeerId || '?').charAt(0).toUpperCase()}
                 activeView={navigation.appView}
+                activeSection={navigation.settingsSection}
                 activeCallKind={activeCallKind}
                 unreadChatCount={unreadChatCount}
                 onOpenChats={() => navigation.goToChat()}

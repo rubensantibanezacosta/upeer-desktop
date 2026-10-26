@@ -40,7 +40,7 @@ const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus; total: number }> = 
     </Box>
 );
 
-export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ onOpenDevices }) => {
+export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void; active?: boolean }> = ({ onOpenDevices, active = false }) => {
     const syncStatus = useChatStore((state) => state.syncStatus);
     const devices = syncStatus.devices ?? [];
     const total = devices.length;
@@ -59,7 +59,18 @@ export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void }> = ({ 
                 role="status"
                 aria-label={label}
                 onClick={onOpenDevices}
-                sx={{ display: 'flex', justifyContent: 'center', cursor: onOpenDevices ? 'pointer' : 'default' }}
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    cursor: onOpenDevices ? 'pointer' : 'default',
+                    backgroundColor: active ? 'primary.softBg' : 'transparent',
+                    transition: 'background-color 0.15s ease',
+                    '&:hover': onOpenDevices ? { backgroundColor: active ? 'primary.softActiveBg' : 'background.level2' } : undefined,
+                }}
             >
                 <Badge
                     badgeContent={total}

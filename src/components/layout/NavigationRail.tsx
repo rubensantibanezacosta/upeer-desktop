@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, IconButton, Avatar, Tooltip, Badge } from '@mui/joy';
 import { MessageCircle, CircleDashed, Users, Settings, Phone, Video } from 'lucide-react';
 import { SyncStatusIndicator } from './SyncStatusIndicator.js';
+import type { SettingsSection } from '../ui/settings/types.js';
 
 interface NavigationRailProps {
     myIp: string;
@@ -13,6 +14,7 @@ interface NavigationRailProps {
     onOpenIdentity?: () => void;
     onOpenDevices?: () => void;
     activeView?: 'chat' | 'calls' | 'settings';
+    activeSection?: SettingsSection | null;
     activeCallKind?: 'audio' | 'video';
     unreadChatCount?: number;
 }
@@ -27,9 +29,13 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     onOpenIdentity,
     onOpenDevices,
     activeView = 'chat',
+    activeSection = null,
     activeCallKind,
     unreadChatCount = 0,
-}) => (
+}) => {
+    const onProfileSection = activeView === 'settings' && activeSection === 'perfil';
+    const onDevicesSection = activeView === 'settings' && activeSection === 'dispositivos';
+    return (
     <Box sx={{
         width: '64px',
         minWidth: '64px',
@@ -94,7 +100,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <SyncStatusIndicator onOpenDevices={onOpenDevices} />
+            <SyncStatusIndicator onOpenDevices={onOpenDevices} active={onDevicesSection} />
             <Tooltip title="Ajustes" placement="right">
                 <IconButton
                     aria-label="Ajustes"
@@ -122,7 +128,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         fontWeight: 700,
                         fontSize: '14px',
                         border: '2px solid',
-                        borderColor: activeView === 'settings' ? 'primary.500' : 'transparent',
+                        borderColor: onProfileSection ? 'primary.500' : 'transparent',
                         transition: 'border-color 0.2s',
                     }}
                 >
@@ -131,4 +137,5 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             </Tooltip>
         </Box>
     </Box>
-);
+    );
+};
