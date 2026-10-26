@@ -7,6 +7,7 @@ import { getMyUPeerId } from '../../security/identity.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { info, error, debug, warn } from '../../security/secure-logger.js';
 import { SHARD_TTL_MS } from './manager.js';
+import { publishFileCustodianPointer, type FileCustodianEndpoint } from './filePointers.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 
 /**
@@ -184,6 +185,7 @@ export class ChunkVault {
             .sort((a, b) => (new Date(b.lastSeen || 0).getTime()) - (new Date(a.lastSeen || 0).getTime()));
 
         let remoteCopies = 0;
+        const acceptedCustodians = new Map<string, FileCustodianEndpoint>();
 
         for (let i = 0; i < shards.length; i++) {
             const shard = shards[i];
@@ -213,13 +215,10 @@ export class ChunkVault {
 
                     if (custodian.upeerId) {
                         await trackDistributedAsset(fileHash, cid, i, shards.length, custodian.upeerId, segIdx);
-
-                        const kademlia = (await import('../dht/shared.js')).getKademliaInstance();
-                        if (kademlia) {
-                            const { createVaultPointerKey } = await import('../dht/kademlia/store.js');
-                            const ptrKey = createVaultPointerKey(fileHash);
-                            kademlia.storeValue(ptrKey, { fileHash, custodians: [myId, custodian.upeerId], type: 'file-shards' }, myId).catch(() => { });
-                        }
+                        acceptedCustodians.set(custodian.address.toLowerCase(), {
+                            upeerId: custodian.upeerId,
+                            address: custodian.address,
+                        });
                     }
                 } catch (err) {
                     warn('Failed to store shard on remote custodian', {
@@ -240,6 +239,11 @@ export class ChunkVault {
                 fileTransferManager.notifyVaultProgress(fileId, progress, 100);
             }
         }
+
+        if (acceptedCustodians.size > 0) {
+            await publishFileCustodianPointer(recipientSid, fileHash, Array.from(acceptedCustodians.values()));
+        }
+
         return remoteCopies + shards.length;
     }
 }

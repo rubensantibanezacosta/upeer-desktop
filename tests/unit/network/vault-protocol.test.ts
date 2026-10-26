@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as vaultQuery from '../../../src/main_process/network/vault/protocol/query.js';
 import * as vaultHandlers from '../../../src/main_process/network/vault/protocol/handlers.js';
 import * as vaultDb from '../../../src/main_process/storage/vault/operations.js';
 import * as vouches from '../../../src/main_process/security/reputation/vouches.js';
@@ -7,6 +8,7 @@ import type { VaultQueryData, VaultStoreData } from '../../../src/main_process/n
 vi.mock('../../../src/main_process/storage/vault/operations.js', () => ({
     saveVaultEntry: vi.fn(),
     getVaultEntriesPageForRecipient: vi.fn(),
+    getVaultShardEntriesForFile: vi.fn().mockResolvedValue([]),
     deleteVaultEntry: vi.fn(),
     getSenderUsage: vi.fn(),
     renewVaultEntry: vi.fn(),
@@ -97,7 +99,7 @@ describe('Vault Protocol Handlers', () => {
             const entries = [{ id: 1, payloadHash: 'h1' }, { id: 2, payloadHash: 'h2' }];
             vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue(entries as never);
 
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
+            await vaultQuery.deliverVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 type: 'VAULT_DELIVERY',
@@ -109,7 +111,7 @@ describe('Vault Protocol Handlers', () => {
             const entries = Array.from({ length: 121 }, (_, index) => ({ id: index + 121, payloadHash: `h${index + 121}` }));
             vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue(entries as never);
 
-            await vaultHandlers.handleVaultQuery(senderSid, {
+            await vaultQuery.deliverVaultQuery(senderSid, {
                 requesterSid: senderSid,
                 timestamp: Date.now(),
                 afterId: 120,
@@ -128,7 +130,7 @@ describe('Vault Protocol Handlers', () => {
             const deviceId = 'ab'.repeat(32);
             vi.mocked(vaultDb.getVaultEntriesPageForRecipient).mockResolvedValue([] as never);
 
-            await vaultHandlers.handleVaultQuery(senderSid, {
+            await vaultQuery.deliverVaultQuery(senderSid, {
                 requesterSid: senderSid,
                 requesterDeviceId: deviceId,
                 timestamp: Date.now(),
@@ -147,7 +149,7 @@ describe('Vault Protocol Handlers', () => {
             };
             vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry as never);
 
-            await vaultHandlers.handleVaultQuery(senderSid, {
+            await vaultQuery.deliverVaultQuery(senderSid, {
                 requesterSid: senderSid,
                 requesterDeviceId: 'cd'.repeat(32),
                 timestamp: Date.now(),
@@ -158,7 +160,7 @@ describe('Vault Protocol Handlers', () => {
         });
 
         it('should refuse unauthorized query (senderSid != requesterSid)', async () => {
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: 'other', timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
+            await vaultQuery.deliverVaultQuery(senderSid, { requesterSid: 'other', timestamp: Date.now() } as VaultQueryData, '1.1.1.1', mockSendResponse);
             expect(mockSendResponse).not.toHaveBeenCalled();
         });
 
@@ -166,11 +168,66 @@ describe('Vault Protocol Handlers', () => {
             const entry = { payloadHash: 'h1', recipientSid: senderSid };
             vi.mocked(vaultDb.getVaultEntryByHash).mockResolvedValue(entry as never);
 
-            await vaultHandlers.handleVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now(), payloadHash: 'h1' } as VaultQueryData, '1.1.1.1', mockSendResponse);
+            await vaultQuery.deliverVaultQuery(senderSid, { requesterSid: senderSid, timestamp: Date.now(), payloadHash: 'h1' } as VaultQueryData, '1.1.1.1', mockSendResponse);
 
             expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
                 entries: [entry]
             }));
+        });
+
+        it('delivers the shards of a single file without paging the whole mailbox', async () => {
+            const shards = [
+                { payloadHash: `shard:${'f'.repeat(64)}:0:0`, recipientSid: senderSid },
+                { payloadHash: `shard:${'f'.repeat(64)}:0:1`, recipientSid: senderSid },
+            ];
+            vi.mocked(vaultDb.getVaultShardEntriesForFile).mockResolvedValue(shards as never);
+
+            await vaultQuery.deliverVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                timestamp: Date.now(),
+                fileHash: 'f'.repeat(64),
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(vaultDb.getVaultShardEntriesForFile).toHaveBeenCalledWith(senderSid, 'f'.repeat(64), null, undefined, 121);
+            expect(vaultDb.getVaultEntriesPageForRecipient).not.toHaveBeenCalled();
+            expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
+                entries: shards,
+                hasMore: false,
+            }));
+        });
+
+        it('pages the shards of a large file so the requester can continue', async () => {
+            const shards = Array.from({ length: 121 }, (_, index) => ({
+                id: 1000 + index,
+                payloadHash: `shard:${'f'.repeat(64)}:0:${index}`,
+                recipientSid: senderSid,
+            }));
+            vi.mocked(vaultDb.getVaultShardEntriesForFile).mockResolvedValue(shards as never);
+
+            await vaultQuery.deliverVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                timestamp: Date.now(),
+                fileHash: 'f'.repeat(64),
+                afterId: 999,
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(vaultDb.getVaultShardEntriesForFile).toHaveBeenCalledWith(senderSid, 'f'.repeat(64), null, 999, 121);
+            expect(mockSendResponse).toHaveBeenCalledWith('1.1.1.1', expect.objectContaining({
+                hasMore: true,
+                nextAfterId: 1119,
+            }));
+        });
+
+        it('stays silent for a file whose shards are not held here', async () => {
+            vi.mocked(vaultDb.getVaultShardEntriesForFile).mockResolvedValue([] as never);
+
+            await vaultQuery.deliverVaultQuery(senderSid, {
+                requesterSid: senderSid,
+                timestamp: Date.now(),
+                fileHash: 'f'.repeat(64),
+            } as VaultQueryData, '1.1.1.1', mockSendResponse);
+
+            expect(mockSendResponse).not.toHaveBeenCalled();
         });
     });
 

@@ -269,14 +269,16 @@ export async function handleVaultDelivery(
     sendVaultDeliveryAck(fromAddress, myDeviceId, processedAckHashes, sendResponse);
     if (data.hasMore === true && typeof data.nextAfterId === 'number') {
         const myId = getMyUPeerId();
+        const fileHash = typeof data.fileHash === 'string' && data.fileHash.length > 0 ? data.fileHash : undefined;
         sendResponse(fromAddress, {
             type: 'VAULT_QUERY',
             requesterSid: myId,
             ...(myDeviceId ? { requesterDeviceId: myDeviceId } : {}),
+            ...(fileHash ? { fileHash } : {}),
             afterId: data.nextAfterId,
         });
         touchVaultRecoverySource(recoverySourceKey, senderSid);
-        debug('Vault delivery: requesting next page', { afterId: data.nextAfterId, from: senderSid }, 'vault');
+        debug('Vault delivery: requesting next page', { afterId: data.nextAfterId, fileHash, from: senderSid }, 'vault');
         return;
     }
 

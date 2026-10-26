@@ -40,10 +40,12 @@ vi.mock('../../../src/main_process/network/handlers/groups.js');
 vi.mock('../../../src/main_process/network/handlers/reputation.js');
 vi.mock('../../../src/main_process/network/handlers/vault.js');
 vi.mock('../../../src/main_process/network/vault/protocol/handlers.js', () => ({
-    handleVaultQuery: vi.fn(),
     handleVaultAck: vi.fn(),
     handleVaultRenew: vi.fn(),
     handleVaultStore: vi.fn()
+}));
+vi.mock('../../../src/main_process/network/vault/protocol/query.js', () => ({
+    deliverVaultQuery: vi.fn()
 }));
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
     VaultManager: {
@@ -591,7 +593,8 @@ describe('network/handlers.ts - handlePacket', () => {
         await handlePacket(Buffer.from(JSON.stringify(packetStore)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
 
         const vaultRoot = await import('../../../src/main_process/network/vault/protocol/handlers.js');
-        expect(vaultRoot.handleVaultQuery).toHaveBeenCalled();
+        const vaultQuery = await import('../../../src/main_process/network/vault/protocol/query.js');
+        expect(vaultQuery.deliverVaultQuery).toHaveBeenCalled();
         expect(vaultRoot.handleVaultAck).toHaveBeenCalled();
         expect(vaultRoot.handleVaultStore).toHaveBeenCalled();
     });

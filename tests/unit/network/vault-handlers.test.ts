@@ -634,6 +634,21 @@ describe('Vault Delivery Handler', () => {
         }));
     });
 
+    it('keeps the fileHash when paging the shards of a file', async () => {
+        await handleVaultDelivery(custodianSid, {
+            entries: [],
+            hasMore: true,
+            nextAfterId: 77,
+            fileHash: 'a'.repeat(64),
+        }, mockWin, mockSendResponse, '7.8.9.10');
+
+        expect(mockSendResponse).toHaveBeenCalledWith('7.8.9.10', expect.objectContaining({
+            type: 'VAULT_QUERY',
+            afterId: 77,
+            fileHash: 'a'.repeat(64),
+        }));
+    });
+
     it('should continue and log error if an entry fails to process', async () => {
         const entries = [
             { senderSid: 'origin-id', data: 'not-hex' }, // Provocará error al parsear o buffer

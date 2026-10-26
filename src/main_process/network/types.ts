@@ -147,6 +147,7 @@ export interface VaultQueryData {
     offset?: number; // paginación: índice de inicio para la siguiente página
     afterId?: number;
     payloadHash?: string; // hash específico a consultar (para shards)
+    fileHash?: string; // shards de un archivo concreto, sin conocer los custodios
 }
 
 export interface VaultDeliveryData {

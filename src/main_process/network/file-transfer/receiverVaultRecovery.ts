@@ -4,6 +4,7 @@ import { debug, warn, error } from '../../security/secure-logger.js';
 import { getAssetShards } from '../../storage/vault/asset-operations.js';
 import { getVaultEntryByHash } from '../../storage/vault/operations.js';
 import { VAULT_REQUIRED_SHARDS, VAULT_SEGMENT_OVERHEAD, VAULT_SEGMENT_SIZE } from '../vault/chunk-vault.js';
+import { queryFileVaults } from '../vault/filePointers.js';
 import { ErasureCoder } from '../vault/redundancy/erasure.js';
 import { TransferPhase, type FileTransfer } from './types.js';
 import type { TransferManager } from './transfer-manager.js';
@@ -127,6 +128,7 @@ async function recoverReceivingTransfer(this: TransferManager, fileId: string): 
             .sort(([left], [right]) => left - right);
 
         if (!recoverableSegments.length) {
+            await queryFileVaults(transfer.fileHash);
             return;
         }
 

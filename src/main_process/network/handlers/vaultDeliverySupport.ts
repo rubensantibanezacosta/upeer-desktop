@@ -12,6 +12,7 @@ export type VaultDeliveryPayload = {
     hasMore?: unknown;
     nextOffset?: unknown;
     nextAfterId?: unknown;
+    fileHash?: unknown;
 };
 
 export type VaultOriginContact = {

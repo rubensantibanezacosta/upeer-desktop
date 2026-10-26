@@ -140,3 +140,11 @@ export function createVaultPointerKey(recipientSid: string, recipientDeviceId?: 
     hash.update(`vault-ptr-v2:${recipientSid}${deviceScope}:${dateSalt}`);
     return hash.digest().slice(0, ID_LENGTH_BYTES);
 }
+
+// Clave estable por archivo: el destinatario la deriva del fileHash del FILE_PROPOSAL para
+// localizar a los custodios de shards, que no son los mismos que los del proposal.
+export function createFileVaultPointerKey(recipientSid: string, fileHash: string): Buffer {
+    const hash = crypto.createHash('sha256');
+    hash.update(`vault-file-ptr-v1:${recipientSid}:${fileHash}`);
+    return hash.digest().slice(0, ID_LENGTH_BYTES);
+}

@@ -1,4 +1,4 @@
-import { eq, lt, sql, gt, and, isNull, or } from 'drizzle-orm';
+import { eq, lt, sql, gt, and, isNull, or, like } from 'drizzle-orm';
 import { getDb } from '../shared.js';
 import { vaultStorage } from '../schema.js';
 
@@ -113,6 +113,34 @@ export async function getVaultEntriesPageForRecipient(
         .where(and(...conditions))
         .orderBy(vaultStorage.id)
         .limit(limit);
+}
+
+/**
+ * Devuelve solo los shards de un archivo concreto. El receptor que vuelve a estar en
+ * línea no puede saber qué custodios recibieron los shards, así que pregunta por el
+ * `fileHash` en lugar de pedir la página entera y filtrar en memoria.
+ */
+export async function getVaultShardEntriesForFile(
+    recipientSid: string,
+    fileHash: string,
+    recipientDeviceId?: string | null,
+    afterId?: number,
+    limit?: number,
+) {
+    const db = getDb();
+    const now = Date.now();
+    const deviceCondition = getRecipientDeviceCondition(recipientDeviceId);
+    const conditions = [
+        eq(vaultStorage.recipientSid, recipientSid),
+        gt(vaultStorage.expiresAt, now),
+        like(vaultStorage.payloadHash, `shard:${fileHash}:%`),
+        ...(deviceCondition ? [deviceCondition] : []),
+        ...(typeof afterId === 'number' ? [gt(vaultStorage.id, afterId)] : []),
+    ];
+    const query = db.select().from(vaultStorage)
+        .where(and(...conditions))
+        .orderBy(vaultStorage.id);
+    return typeof limit === 'number' ? query.limit(limit) : query;
 }
 
 /**

@@ -144,7 +144,34 @@ describe('ChunkVault', () => {
         expect(remoteCustodians).toEqual(['custodian-1', 'custodian-3', 'custodian-1', 'custodian-3']);
         expect(remoteCustodians).not.toContain('custodian-2');
 
-        expect(storeValue).toHaveBeenCalledTimes(4);
-        expect(storeValue.mock.calls.every((call) => call[1].custodians.includes('custodian-2') === false)).toBe(true);
+        expect(storeValue).toHaveBeenCalledTimes(1);
+        const pointer = storeValue.mock.calls[0][1] as { fileHash: string; custodianEndpoints: Array<{ upeerId: string }> };
+        expect(pointer.fileHash).toBe('resilient-file-hash');
+        expect(pointer.custodianEndpoints.map((endpoint) => endpoint.upeerId)).toEqual(['custodian-1', 'custodian-3']);
+    });
+
+    it('publishes a single custodian pointer per file so an offline receiver can find the shards', async () => {
+        const { ChunkVault } = await import('../../../src/main_process/network/vault/chunk-vault.js');
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+        const dhtShared = await import('../../../src/main_process/network/dht/shared.js');
+
+        vi.mocked(contactsOps.getContacts).mockResolvedValue([
+            { upeerId: 'custodian-1', address: '200::1', status: 'connected', lastSeen: '2026-04-03T10:05:00.000Z' },
+            { upeerId: 'offline-friend', address: '200::9', status: 'offline', lastSeen: '2026-04-03T09:00:00.000Z' },
+        ] as never);
+        vi.mocked(transport.sendSecurePacket).mockResolvedValue(undefined as never);
+
+        const storeValue = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(dhtShared.getKademliaInstance).mockReturnValue({ storeValue } as never);
+
+        const shards = Array.from({ length: 8 }, (_, index) => Buffer.from((index + 1).toString(16).padStart(2, '0'), 'hex'));
+        await (ChunkVault as unknown as ChunkVaultInternals)._distributeShards('f'.repeat(64), shards, 'offline-recipient');
+
+        expect(storeValue).toHaveBeenCalledTimes(1);
+        const pointer = storeValue.mock.calls[0][1] as { custodians: string[]; custodianEndpoints: Array<{ address: string }> };
+        expect(pointer.custodians).toEqual(expect.arrayContaining(['my-id', 'custodian-1']));
+        expect(pointer.custodianEndpoints.map((endpoint) => endpoint.address)).toEqual(['200::1']);
+        expect(storeValue.mock.calls[0][2]).toBe('my-id');
     });
 });

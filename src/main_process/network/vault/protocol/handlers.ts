@@ -1,12 +1,9 @@
-import { VaultStoreData, VaultQueryData } from '../../types.js';
-import { saveVaultEntry, getVaultEntriesPageForRecipient, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
-import { security, network, warn, debug } from '../../../security/secure-logger.js';
+import { VaultStoreData } from '../../types.js';
+import { saveVaultEntry, deleteVaultEntry, getSenderUsage, renewVaultEntry, getVaultEntryByHash } from '../../../storage/vault/operations.js';
+import { security, warn, debug } from '../../../security/secure-logger.js';
 import { computeScore, issueVouch, VouchType } from '../../../security/reputation/vouches.js';
 import { VAULT_TTL_MS } from '../manager.js';
 import { normalizeVaultDeviceId } from '../deviceMailbox.js';
-
-/** Número máximo de entradas por respuesta VAULT_DELIVERY (anti-OOM) */
-const VAULT_DELIVERY_PAGE_SIZE = 120;
 
 type VaultResponsePacket = {
     type: string;
@@ -121,76 +118,6 @@ export async function handleVaultStore(senderSid: string, data: VaultStoreData, 
         }
     } catch (err) {
         warn('Failed to save vault entry', { hash: data.payloadHash, error: err }, 'vault');
-    }
-}
-
-/**
- * Handles VAULT_QUERY requests from users checking for their offline messages.
- * Verifies the requester's identity before delivering entries.
- */
-export async function handleVaultQuery(
-    senderSid: string,
-    data: VaultQueryData,
-    fromAddress: string,
-    sendResponse: VaultSendResponse
-) {
-    // SECURITY: Users can only query their OWN social ID
-    if (senderSid !== data.requesterSid) {
-        security('Unauthorized vault query attempt', {
-            sender: senderSid,
-            target: data.requesterSid,
-            ip: fromAddress
-        }, 'vault');
-        return;
-    }
-
-    const requesterDeviceId = normalizeVaultDeviceId(data.requesterDeviceId);
-
-    try {
-        // If a specific payloadHash is requested, return only that entry (if accessible)
-        if (data.payloadHash) {
-            const entry = await getVaultEntryByHash(data.payloadHash);
-            const targetsRequester = entry && (entry.recipientSid === data.requesterSid || entry.recipientSid === '*');
-            const targetsDevice = entry && (!entry.recipientDeviceId || entry.recipientDeviceId === requesterDeviceId);
-            if (targetsRequester && targetsDevice) {
-                // Return single entry as VAULT_DELIVERY
-                sendResponse(fromAddress, {
-                    type: 'VAULT_DELIVERY',
-                    entries: [entry],
-                    hasMore: false
-                });
-                return;
-            } else {
-                // Entry not found or not accessible
-                return;
-            }
-        }
-
-        const page = await getVaultEntriesPageForRecipient(
-            data.requesterSid,
-            data.afterId,
-            VAULT_DELIVERY_PAGE_SIZE + 1,
-            requesterDeviceId,
-        );
-
-        const hasMore = page.length > VAULT_DELIVERY_PAGE_SIZE;
-        const entries = page.slice(0, VAULT_DELIVERY_PAGE_SIZE);
-        const nextAfterId = hasMore ? entries[entries.length - 1]?.id : undefined;
-
-        network('Delivering vault entries', undefined, {
-            recipient: data.requesterSid,
-            count: entries.length,
-            hasMore,
-        }, 'vault');
-
-        sendResponse(fromAddress, {
-            type: 'VAULT_DELIVERY',
-            entries,
-            hasMore,
-            nextAfterId,
-        });
-    } catch (err) {
-        warn('Vault query processing failed', { error: err }, 'vault');
     }
 }
 

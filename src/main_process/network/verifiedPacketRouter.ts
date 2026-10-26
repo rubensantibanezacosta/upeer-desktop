@@ -8,6 +8,7 @@ import { handleReputationDeliver, handleReputationGossip, handleReputationReques
 import { handleSyncPulse } from './handlers/sync.js';
 import { handleCallPacket } from './call/callPacketHandler.js';
 import { handleVaultDelivery } from './handlers/vault.js';
+import type { VaultDeliveryPayload } from './handlers/vaultDeliverySupport.js';
 import type { GroupAckPayload, GroupMessagePayload, VaultQueryData, VaultStoreData } from './types.js';
 import type { GroupControlPacket } from './handlers/groupControlShared.js';
 import type { RatchetHeader } from '../security/ratchetShared.js';
@@ -153,13 +154,6 @@ type VaultAckPayload = {
 type VaultRenewPayload = {
     payloadHash: string;
     newExpiresAt: number;
-};
-
-type VaultDeliveryPayload = {
-    entries?: unknown;
-    hasMore?: unknown;
-    nextOffset?: unknown;
-    nextAfterId?: unknown;
 };
 
 type SyncPulsePayload = {
@@ -383,6 +377,7 @@ function toVaultDeliveryPayload(data: VerifiedPacketData): VaultDeliveryPayload 
         hasMore: data.hasMore,
         nextOffset: data.nextOffset,
         nextAfterId: data.nextAfterId,
+        fileHash: typeof data.fileHash === 'string' ? data.fileHash : undefined,
     };
 }
 
@@ -515,7 +510,7 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             await (await import('./vault/protocol/handlers.js')).handleVaultStore(upeerId, toVaultStorePayload(data, upeerId), rinfo.address, sendResponse);
             break;
         case 'VAULT_QUERY':
-            await (await import('./vault/protocol/handlers.js')).handleVaultQuery(upeerId, toVaultQueryPayload(data, upeerId), rinfo.address, sendResponse);
+            await (await import('./vault/protocol/query.js')).deliverVaultQuery(upeerId, toVaultQueryPayload(data, upeerId), rinfo.address, sendResponse);
             break;
         case 'VAULT_ACK':
             await (await import('./vault/protocol/handlers.js')).handleVaultAck(upeerId, toVaultAckPayload(data));
