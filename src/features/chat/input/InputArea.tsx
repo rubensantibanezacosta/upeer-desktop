@@ -129,35 +129,38 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
+            <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 0.5, height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
                 {isRecording ? (
                     <RecordingBar duration={duration} onCancel={cancelRecording} onSend={handleMicClick} disabled={disabled} isSending={isSending} canvasRef={canvasRef} />
                 ) : (
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.25,
-                        width: '100%',
-                        height: INPUT_PILL_HEIGHT,
-                        pl: 1.125,
-                        pr: 1.125,
-                        borderRadius: INPUT_PILL_RADIUS,
-                        backgroundColor: 'background.level1',
-                    }}>
-                        <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
-                        <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
-                        <RichInput
-                            value={message}
-                            onChange={handleChange}
-                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendClick()}
-                            placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
-                            autoComplete="off"
-                            disabled={disabled}
-                            autoFocus={!disabled}
-                            focusKey={focusKey}
-                            embedded
-                        />
-                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ '&:hover': { backgroundColor: 'background.level2' } }}>
+                    <>
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.25,
+                            flex: 1,
+                            minWidth: 0,
+                            height: INPUT_PILL_HEIGHT,
+                            pl: 1.125,
+                            pr: 0.75,
+                            borderRadius: INPUT_PILL_RADIUS,
+                            backgroundColor: 'background.level1',
+                        }}>
+                            <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
+                            <RichInput
+                                value={message}
+                                onChange={handleChange}
+                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendClick()}
+                                placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
+                                autoComplete="off"
+                                disabled={disabled}
+                                autoFocus={!disabled}
+                                focusKey={focusKey}
+                                embedded
+                            />
+                            <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
+                        </Box>
+                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ flexShrink: 0, '&:hover': { backgroundColor: 'background.level2' } }}>
                             {message
                                 ? (editingMessage
                                     ? <Send style={{ color: 'var(--joy-palette-warning-main)' }} />
@@ -165,7 +168,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 : <Mic style={{ color: 'var(--joy-palette-primary-main)' }} />
                             }
                         </IconButton>
-                    </Box>
+                    </>
                 )}
             </Box>
         </Box>

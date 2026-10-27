@@ -9,7 +9,7 @@ import {
     Dropdown,
     MenuButton
 } from '@mui/joy';
-import { Plus, Paperclip, Image, FileVideo, FileAudio, FileText, Share2 } from 'lucide-react';
+import { Paperclip, Image, FileVideo, FileAudio, FileText, Share2 } from 'lucide-react';
 
 
 export type AttachmentType =
@@ -102,7 +102,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                     }
                 }}
             >
-                <Plus />
+                <Paperclip />
             </MenuButton>
 
             <Menu
