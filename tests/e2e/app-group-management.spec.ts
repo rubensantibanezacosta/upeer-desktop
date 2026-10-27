@@ -154,3 +154,20 @@ test('envía un mensaje a un grupo con varios miembros y aparece en el historial
         return (state.messagesByChat?.['team-1'] ?? []).some((message) => message.message === 'Mensaje de escalabilidad');
     }).toBe(true);
 });
+
+test('abre la búsqueda de la conversación dentro del panel del grupo', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await mount(page, groupScenario());
+    await openGroup(page, 'Equipo QA');
+    await page.getByRole('button', { name: 'Buscar en el chat' }).click();
+
+    await expect(page.getByText('Buscar mensajes')).toBeVisible();
+    await page.getByLabel('Buscar mensajes en esta conversación').fill('Bienvenidos');
+
+    const results = page.getByRole('button', { name: /Ir al mensaje:/ });
+    await expect(results).toHaveCount(1);
+    await expect(page.getByText('1 resultado en toda la conversación')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Volver desde la búsqueda' }).click();
+    await expect(page.getByText('Info. del grupo')).toBeVisible();
+});
