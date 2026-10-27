@@ -84,23 +84,27 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, isMe, timestamp, 
             maxWidth: '320px',
         }}>
             <IconButton
+                aria-label={isPlaying ? 'Pausar nota de voz' : 'Reproducir nota de voz'}
                 variant="plain"
                 color={isMe ? 'neutral' : 'primary'}
                 onClick={handlePlayPause}
                 sx={{
                     color: isMe ? 'white' : 'primary.main',
-                    width: 32,
-                    height: 32,
+                    width: 28,
+                    height: 28,
+                    minWidth: 28,
+                    minHeight: 28,
+                    p: 0,
                     flexShrink: 0,
                     '&:hover': { bgcolor: isMe ? 'rgba(255,255,255,0.1)' : undefined }
                 }}
             >
                 {isLoading ? (
-                    <CircularProgress size="sm" variant="plain" sx={{ color: 'inherit' }} />
+                    <CircularProgress size="sm" variant="plain" sx={{ color: 'inherit', '--CircularProgress-size': '16px' }} />
                 ) : isPlaying ? (
-                    <Pause style={{ fontSize: 24 }} />
+                    <Pause style={{ fontSize: 16 }} />
                 ) : (
-                    <Play style={{ fontSize: 24 }} />
+                    <Play style={{ fontSize: 16 }} />
                 )}
             </IconButton>
 

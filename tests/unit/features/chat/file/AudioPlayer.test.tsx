@@ -57,13 +57,28 @@ describe('AudioPlayer', () => {
         const playHandler = ws.on.mock.calls.find((c: [string, () => void]) => c[0] === 'play')?.[1];
         act(() => playHandler?.());
         expect(screen.getByTestId('PauseIcon')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Pausar nota de voz' })).toBeTruthy();
 
         const audioprocess = ws.on.mock.calls.find((c: [string, () => void]) => c[0] === 'audioprocess')?.[1];
         act(() => audioprocess?.());
         expect(screen.getByText('0:30')).toBeTruthy();
 
-        fireEvent.click(screen.getByRole('button'));
+        fireEvent.click(screen.getByRole('button', { name: 'Pausar nota de voz' }));
         expect(ws.playPause).toHaveBeenCalled();
+    });
+
+    it('expone el botón de reproducir con nombre accesible y tamaño reducido', () => {
+        render(<AudioPlayer url="media:///tmp/a.webm" isMe={false} />);
+        const ws = wavesurferMocks.create.mock.results[0].value;
+        const readyHandler = ws.on.mock.calls.find((c: [string, () => void]) => c[0] === 'ready')?.[1];
+        act(() => readyHandler?.());
+
+        const button = screen.getByRole('button', { name: 'Reproducir nota de voz' });
+        expect(button).toBeTruthy();
+        expect(screen.getByTestId('PlayArrowIcon')).toBeTruthy();
+        const style = window.getComputedStyle(button);
+        expect(style.width).toBe('28px');
+        expect(style.height).toBe('28px');
     });
 
     it('detiene la reproducción al terminar y resetea el tiempo', () => {
