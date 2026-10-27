@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getMessages, searchMessages, getMessagesAround, getFileHistory, getOlderMessages } from '../../storage/messages/operations.js';
+import { getMessages, searchMessages, searchChatMessages, getMessagesAround, getFileHistory, getOlderMessages } from '../../storage/messages/operations.js';
 import {
   sendChatMessage,
   sendTypingIndicator,
@@ -29,6 +29,14 @@ export function registerMessageHandlers(): void {
   ipcMain.handle('get-messages', (_event, upeerId) => getMessages(upeerId));
   ipcMain.handle('search-messages', (_event, { query, limit, offset }) =>
     searchMessages(typeof query === 'string' ? query : '', normalizeSearchLimit(limit), normalizeSearchOffset(offset)));
+  ipcMain.handle('search-chat-messages', (_event, { chatUpeerId, query, limit, offset, from, to }) =>
+    searchChatMessages(
+      typeof chatUpeerId === 'string' ? chatUpeerId : '',
+      typeof query === 'string' ? query : '',
+      normalizeSearchLimit(limit),
+      normalizeSearchOffset(offset),
+      typeof from === 'number' && Number.isFinite(from) ? from : undefined,
+      typeof to === 'number' && Number.isFinite(to) ? to : undefined));
   ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
   ipcMain.handle('get-older-messages', (_event, { chatUpeerId, beforeTimestamp, limit }) =>
     getOlderMessages(chatUpeerId, typeof beforeTimestamp === 'number' ? beforeTimestamp : Date.now(), typeof limit === 'number' ? Math.min(Math.max(limit, 1), 200) : 50));

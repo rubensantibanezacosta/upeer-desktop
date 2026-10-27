@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Box } from '@mui/joy';
 import { Archive, BellOff, Heart, Share2, Eraser, Ban, LockOpen, UserMinus } from 'lucide-react';
 import { parseMessage } from '../../features/chat/message/messageItemSupport.js';
@@ -132,6 +132,23 @@ interface SlidingPanelViewProps {
     backgroundColor?: string;
     children: React.ReactNode;
 }
+
+export type ContactPanelView = 'main' | 'media' | 'cipher' | 'search';
+export type GroupPanelView = 'main' | 'media' | 'search';
+
+export const usePanelView = <T extends string>(
+    controlled: T | undefined,
+    onChange: ((view: T) => void) | undefined,
+    initial: T,
+): [T, (view: T) => void] => {
+    const [local, setLocal] = useState<T>(initial);
+    const view = controlled ?? local;
+    const setView = (next: T) => {
+        setLocal(next);
+        onChange?.(next);
+    };
+    return [view, setView];
+};
 
 export const SlidingPanelView: React.FC<SlidingPanelViewProps> = ({ active, direction, zIndex, backgroundColor, children }) => {
     const hiddenTransform = direction === 'left' ? 'translateX(-100%)' : 'translateX(100%)';

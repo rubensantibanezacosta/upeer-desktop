@@ -6,6 +6,8 @@ import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { SectionSeparator, actionButtonSx, actionsRowSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
+import { usePanelView, type GroupPanelView } from './contactInfoPanelSupport.js';
+import { ChatSearchView } from '../../features/chat/ChatSearchView.js';
 
 interface GroupMediaClickPayload {
     url: string;
@@ -29,12 +31,13 @@ interface GroupInfoPanelProps {
     onRemoveMember?: (memberId: string) => void;
     onCallAudio?: () => void;
     onCallVideo?: () => void;
-    onSearch?: () => void;
     callsUnavailable?: boolean;
+    view?: GroupPanelView;
+    onViewChange?: (view: GroupPanelView) => void;
 }
 
-export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember, onCallAudio, onCallVideo, onSearch, callsUnavailable = false }) => {
-    const [currentView, setCurrentView] = useState<'main' | 'media'>('main');
+export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember, onCallAudio, onCallVideo, callsUnavailable = false, view, onViewChange }) => {
+    const [currentView, setCurrentView] = usePanelView<GroupPanelView>(view, onViewChange, 'main');
     const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'leave' } | { type: 'transfer' | 'remove'; memberId: string } | null>(null);
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs[group.groupId]);
@@ -54,7 +57,11 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                 </IconButton>
                 <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del grupo</Typography>
             </Box>
-            {currentView === 'media' ? (
+            {currentView === 'search' ? (
+                <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <ChatSearchView conversationKey={group.groupId} onBack={() => setCurrentView('main')} />
+                </Box>
+            ) : currentView === 'media' ? (
                 <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
                     <ContactMediaExplorer items={sharedMedia} onBack={() => setCurrentView('main')} onOpenMedia={onOpenMedia ?? (() => undefined)} />
                 </Box>
@@ -83,7 +90,7 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                     </Tooltip>
                     <Tooltip title="Buscar en el chat" variant="soft">
                         <span>
-                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onSearch} sx={actionButtonSx}>
+                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={() => setCurrentView('search')} sx={actionButtonSx}>
                                 <Search style={{ fontSize: 20 }} />
                             </IconButton>
                         </span>

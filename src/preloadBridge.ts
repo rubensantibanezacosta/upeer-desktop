@@ -151,6 +151,7 @@ const messagingApi = {
     sendChatDelete: (upeerId: string, msgId: string) => ipcRenderer.invoke('send-chat-delete', { upeerId, msgId }),
     getMessages: (upeerId: string) => ipcRenderer.invoke('get-messages', upeerId),
     searchMessages: (query: string, limit?: number, offset?: number) => ipcRenderer.invoke('search-messages', { query, limit, offset }),
+    searchChatMessages: (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => ipcRenderer.invoke('search-chat-messages', { chatUpeerId, query, limit, offset, from: range?.from, to: range?.to }),
     getMessagesAround: (chatUpeerId: string, targetMsgId: string) => ipcRenderer.invoke('get-messages-around', { chatUpeerId, targetMsgId }),
     getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => ipcRenderer.invoke('get-older-messages', { chatUpeerId, beforeTimestamp, limit }),
     getFileHistory: (limit?: number) => ipcRenderer.invoke('get-file-history', { limit }),

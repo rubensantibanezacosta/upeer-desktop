@@ -7,7 +7,7 @@ describe('ContactInfoPanelMainView call and search actions', () => {
     it('invokes audio call, video call and chat search actions', () => {
         const onCallAudio = vi.fn();
         const onCallVideo = vi.fn();
-        const onSearch = vi.fn();
+        const onOpenSearch = vi.fn();
         render(
             <ContactInfoPanelMainView
                 contact={{ upeerId: 'peer-1', name: 'Ana', address: 'address', status: 'connected' }}
@@ -23,7 +23,7 @@ describe('ContactInfoPanelMainView call and search actions', () => {
                 onOpenCipher={vi.fn()}
                 onCallAudio={onCallAudio}
                 onCallVideo={onCallVideo}
-                onSearch={onSearch}
+                onOpenSearch={onOpenSearch}
                 callsUnavailable={false}
             />,
         );
@@ -34,6 +34,6 @@ describe('ContactInfoPanelMainView call and search actions', () => {
 
         expect(onCallAudio).toHaveBeenCalledOnce();
         expect(onCallVideo).toHaveBeenCalledOnce();
-        expect(onSearch).toHaveBeenCalledOnce();
+        expect(onOpenSearch).toHaveBeenCalledOnce();
     });
 });

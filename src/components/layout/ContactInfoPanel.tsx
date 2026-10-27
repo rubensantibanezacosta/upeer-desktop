@@ -8,7 +8,8 @@ import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactInfoCipherView } from './ContactInfoCipherView.js';
 import { ContactInfoDeleteDialog } from './ContactInfoDeleteDialog.js';
 import { ContactInfoPanelMainView } from './ContactInfoPanelMainView.js';
-import { buildContactInfoActions, SlidingPanelView, useSharedMediaItems } from './contactInfoPanelSupport.js';
+import { buildContactInfoActions, SlidingPanelView, usePanelView, useSharedMediaItems, type ContactPanelView } from './contactInfoPanelSupport.js';
+import { ChatSearchView } from '../../features/chat/ChatSearchView.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { usePrivacyStore } from '../../store/usePrivacyStore.js';
 import { visiblePresence } from '../../utils/presenceVisibility.js';
@@ -36,8 +37,9 @@ interface ContactInfoPanelProps {
     onFavorite?: () => void;
     onCallAudio?: () => void;
     onCallVideo?: () => void;
-    onSearch?: () => void;
     callsUnavailable?: boolean;
+    view?: ContactPanelView;
+    onViewChange?: (view: ContactPanelView) => void;
 }
 
 export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
@@ -56,11 +58,12 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     onFavorite,
     onCallAudio,
     onCallVideo,
-    onSearch,
     callsUnavailable,
+    view,
+    onViewChange,
 }) => {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'main' | 'media' | 'cipher'>('main');
+    const [currentView, setCurrentView] = usePanelView<ContactPanelView>(view, onViewChange, 'main');
     const [now, setNow] = useState(() => Date.now());
     const toggleContact = useChatActionsStore((state) => state.toggleContact);
     const archiveFallback = () => toggleContact(contact.upeerId, 'archived');
@@ -127,13 +130,17 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                         onOpenCipher={() => setCurrentView('cipher')}
                         onCallAudio={onCallAudio ?? (() => undefined)}
                         onCallVideo={onCallVideo ?? (() => undefined)}
-                        onSearch={onSearch ?? (() => undefined)}
+                        onOpenSearch={() => setCurrentView('search')}
                         callsUnavailable={callsUnavailable ?? false}
                     />
                 </SlidingPanelView>
 
                 <SlidingPanelView active={currentView === 'media'} direction="right" zIndex={10} backgroundColor="background.surface">
                     <ContactMediaExplorer items={sharedMedia} onBack={() => setCurrentView('main')} onOpenMedia={onOpenMedia} />
+                </SlidingPanelView>
+
+                <SlidingPanelView active={currentView === 'search'} direction="right" zIndex={10} backgroundColor="background.surface">
+                    <ChatSearchView conversationKey={contact.upeerId} onBack={() => setCurrentView('main')} />
                 </SlidingPanelView>
 
                 <SlidingPanelView active={currentView === 'cipher'} direction="right">

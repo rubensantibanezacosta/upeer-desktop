@@ -334,6 +334,32 @@ export function searchMessages(query: string, limit = 25, offset = 0) {
         .all();
 }
 
+export function searchChatMessages(chatUpeerId: string, query: string, limit = 40, offset = 0, fromTimestamp?: number, toTimestamp?: number) {
+    const db = getDb();
+    const schema = getSchema();
+    if (!query.trim() || !chatUpeerId) return [];
+    const escaped = query.replace(/[%_]/g, '\\$&');
+    const q = `%${escaped}%`;
+    const filters = [
+        eq(schema.messages.chatUpeerId, chatUpeerId),
+        like(schema.messages.message, q),
+        eq(schema.messages.isDeleted, false)
+    ];
+    if (typeof fromTimestamp === 'number') {
+        filters.push(gte(schema.messages.timestamp, fromTimestamp));
+    }
+    if (typeof toTimestamp === 'number') {
+        filters.push(lt(schema.messages.timestamp, toTimestamp));
+    }
+    return db.select()
+        .from(schema.messages)
+        .where(and(...filters))
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(limit)
+        .offset(offset)
+        .all();
+}
+
 export async function saveFileMessage(id: string, chatUpeerId: string, isMine: boolean, fileName: string, fileId: string, fileSize: number, mimeType: string, savedPath?: string, signature?: string, status: MessageDeliveryStatus = 'sent', senderUpeerId?: string, timestamp?: number, thumbnail?: string, caption?: string, isVoiceNote?: boolean) {
     const _db = getDb();
     const _schema = getSchema();

@@ -83,6 +83,7 @@ declare global {
             getMyNetworkAddress: () => Promise<string>;
             getMessages: (upeerId: string) => Promise<UpeerChatMessage[]>;
             searchMessages: (query: string, limit?: number, offset?: number) => Promise<UpeerChatMessage[]>;
+            searchChatMessages: (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
             getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => Promise<UpeerChatMessage[]>;
             getFileHistory: (limit?: number) => Promise<UpeerFileHistoryEntry[]>;

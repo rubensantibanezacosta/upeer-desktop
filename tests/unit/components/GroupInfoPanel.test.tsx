@@ -33,10 +33,9 @@ describe('GroupInfoPanel', () => {
         expect(screen.getByRole('button', { name: 'Añadir' })).toBeDefined();
     });
 
-    it('expone llamadas de voz, vídeo y búsqueda para el grupo', () => {
+    it('expone llamadas de voz y vídeo para el grupo', () => {
         const onCallAudio = vi.fn();
         const onCallVideo = vi.fn();
-        const onSearch = vi.fn();
         render(
             <GroupInfoPanel
                 group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'self', members: ['self', 'peer'], status: 'active' }}
@@ -46,17 +45,33 @@ describe('GroupInfoPanel', () => {
                 onInviteMembers={vi.fn()}
                 onCallAudio={onCallAudio}
                 onCallVideo={onCallVideo}
-                onSearch={onSearch}
             />,
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Llamar al grupo' }));
         fireEvent.click(screen.getByRole('button', { name: 'Videollamar al grupo' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Buscar en el chat' }));
 
         expect(onCallAudio).toHaveBeenCalledOnce();
         expect(onCallVideo).toHaveBeenCalledOnce();
-        expect(onSearch).toHaveBeenCalledOnce();
+    });
+
+    it('abre la búsqueda como vista del propio panel', () => {
+        render(
+            <GroupInfoPanel
+                group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'self', members: ['self', 'peer'], status: 'active' }}
+                contacts={[]}
+                currentUserId="self"
+                onClose={vi.fn()}
+                onInviteMembers={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Buscar en el chat' }));
+
+        expect(screen.getByText('Buscar mensajes')).toBeDefined();
+        expect(screen.getByLabelText('Buscar mensajes en esta conversación')).toBeDefined();
+        fireEvent.click(screen.getByRole('button', { name: 'Volver desde la búsqueda' }));
+        expect(screen.queryByLabelText('Buscar mensajes en esta conversación')).toBeNull();
     });
 
     it('cierra el panel y no muestra la acción de invitar a miembros si no eres administrador', () => {

@@ -31,7 +31,7 @@ interface ContactInfoPanelMainViewProps {
     onOpenCipher: () => void;
     onCallAudio: () => void;
     onCallVideo: () => void;
-    onSearch: () => void;
+    onOpenSearch: () => void;
     callsUnavailable: boolean;
 }
 
@@ -49,7 +49,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
     onOpenCipher,
     onCallAudio,
     onCallVideo,
-    onSearch,
+    onOpenSearch,
     callsUnavailable,
 }) => {
     const callsDisabled = callsUnavailable
@@ -103,7 +103,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                     </Tooltip>
                     <Tooltip title="Buscar en el chat" variant="soft">
                         <span>
-                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onSearch} sx={actionButtonSx}>
+                            <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onOpenSearch} sx={actionButtonSx}>
                                 <Search style={{ fontSize: 20 }} />
                             </IconButton>
                         </span>

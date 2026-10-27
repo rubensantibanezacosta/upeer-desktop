@@ -73,6 +73,14 @@ function searchScenario(): Parameters<typeof installUpeerBridge>[1] {
                     status: 'sent',
                     timestamp: now - 55_000,
                 },
+                ...Array.from({ length: 45 }, (_, index) => ({
+                    id: `alice-bulk-${index}`,
+                    upeerId: 'alice',
+                    message: `acero en el fondo ${index}`,
+                    isMine: index % 2 === 0,
+                    status: 'sent',
+                    timestamp: now - 120_000 - index * 60_000,
+                })),
             ],
             'grp-search-1': [
                 {
@@ -129,14 +137,15 @@ test('muestra estados sin resultados en búsqueda global y nuevo chat', async ({
     await expect(page.getByText('Sin resultados para "sin-coincidencias-contactos"')).toBeVisible();
 });
 
-test('el buscador de chat abre un panel lateral con resultados agrupados por día', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 720 });
+test('el buscador de chat vive dentro del panel de info y agrupa por día', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await mount(page, searchScenario());
     await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
     await page.getByRole('button', { name: 'Buscar en el chat' }).click();
 
+    await expect(page.getByText('Info. del contacto')).toBeHidden();
     await expect(page.getByText('Buscar mensajes')).toBeVisible();
-    await expect(page.getByText('Escribe para buscar en esta conversación')).toBeVisible();
+    await expect(page.getByText('Busca en toda la conversación')).toBeVisible();
 
     await page.getByLabel('Buscar mensajes en esta conversación').fill('aguja');
 
@@ -144,25 +153,24 @@ test('el buscador de chat abre un panel lateral con resultados agrupados por dí
     await expect(results.first()).toBeVisible();
     await expect(page.locator('svg.lucide-check-check').first()).toBeVisible();
     await expect(page.locator('svg.lucide-calendar-days')).toBeVisible();
+    await expect(page.getByText(/últimos 50/)).toHaveCount(0);
 
-    const panel = page.getByRole('complementary', { name: 'Buscador de la conversación' });
-    const layout = await panel.evaluate((element) => ({
+    const layout = await page.evaluate(() => ({
         page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        overflowing: Array.from(element.querySelectorAll('*'))
-            .filter((child) => child.scrollWidth - child.clientWidth > 2)
-            .map((child) => child.tagName.toLowerCase()),
-        panelHeight: Math.round(element.getBoundingClientRect().height),
-        viewportHeight: window.innerHeight,
+        panels: document.querySelectorAll('[aria-label="Volver desde la búsqueda"]').length,
     }));
 
     expect(layout.page).toBeLessThanOrEqual(0);
-    expect(layout.overflowing).toEqual([]);
-    expect(Math.abs(layout.panelHeight - layout.viewportHeight)).toBeLessThanOrEqual(1);
+    expect(layout.panels).toBe(1);
     await expect(results.first()).not.toContainText('📎');
+
+    await page.getByRole('button', { name: 'Volver desde la búsqueda' }).click();
+    await expect(page.getByText('Info. del contacto')).toBeVisible();
+    await expect(page.getByText('Busca en toda la conversación')).toBeHidden();
 });
 
-test('el calendario del panel filtra los resultados por día', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 720 });
+test('el calendario de la búsqueda filtra por el día elegido', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await mount(page, searchScenario());
     await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
     await page.getByRole('button', { name: 'Buscar en el chat' }).click();
@@ -172,10 +180,36 @@ test('el calendario del panel filtra los resultados por día', async ({ page }) 
     await expect(results).toHaveCount(2);
 
     const today = new Date();
-    const label = `Filtrar por ${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const dayLabel = `Filtrar por ${today.getDate()} de ${today.toLocaleDateString('es-ES', { month: 'long' })} ${today.getFullYear()}`;
     await page.getByRole('button', { name: 'Filtrar por fecha' }).click();
-    await page.getByRole('button', { name: label }).click();
+    await expect(page.getByText(/^octubre 2026$|^[a-z]+ \d{4}$/)).toBeVisible();
+    await page.getByRole('button', { name: dayLabel }).click();
 
+    const visibleDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    await expect(page.getByText(`Filtrando el ${visibleDay}`)).toBeVisible();
     await expect(results).toHaveCount(2);
-    await expect(page.getByText('No se han encontrado mensajes')).toHaveCount(0);
+
+    await page.getByLabel('Quitar el filtro de fecha activo').click();
+    await expect(page.getByText(`Filtrando el ${visibleDay}`)).toHaveCount(0);
+});
+
+test('la búsqueda de chat pagina con scroll infinito por toda la conversación', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await mount(page, searchScenario());
+    await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
+    await page.getByRole('button', { name: 'Buscar en el chat' }).click();
+    await page.getByLabel('Buscar mensajes en esta conversación').fill('acero en el fondo');
+
+    const results = page.getByRole('button', { name: /Ir al mensaje:/ });
+    await expect(results.first()).toBeVisible();
+    const firstCount = await results.count();
+    expect(firstCount).toBeLessThanOrEqual(40);
+
+    const scroller = page.getByLabel('Buscar mensajes en esta conversación').locator('xpath=../../..');
+    await scroller.evaluate((element) => {
+        const scrollable = Array.from(element.querySelectorAll('div')).find((child) => child.scrollHeight > child.clientHeight + 10) ?? element;
+        scrollable.scrollTop = scrollable.scrollHeight;
+    });
+    await expect(results).toHaveCount(45, { timeout: 5000 });
+    await expect(page.getByText('45 resultados en toda la conversación')).toBeVisible();
 });

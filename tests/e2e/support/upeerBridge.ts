@@ -172,6 +172,34 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             }
             state.groups.unshift(group);
         };
+        const searchChatMessages = (chatUpeerId: string, query: string, limit = 40, offset = 0, range?: { from: number; to: number }) => {
+            const normalizedQuery = query.trim().toLowerCase();
+            if (!normalizedQuery || !chatUpeerId) {
+                return [];
+            }
+            return (state.messagesByChat[chatUpeerId] ?? [])
+                .filter((message) => typeof message.message === 'string' && message.message.toLowerCase().includes(normalizedQuery))
+                .filter((message) => !message.isDeleted)
+                .filter((message) => !range || (message.timestamp >= range.from && message.timestamp < range.to))
+                .slice()
+                .sort((left, right) => right.timestamp - left.timestamp)
+                .slice(offset, offset + limit)
+                .map((message) => ({
+                    id: message.id,
+                    chatUpeerId,
+                    upeerId: message.upeerId,
+                    isMine: message.isMine,
+                    message: message.message,
+                    status: message.status,
+                    timestamp: message.timestamp,
+                    replyTo: message.replyTo,
+                    senderUpeerId: message.senderUpeerId,
+                    senderName: message.senderName,
+                    isEdited: message.isEdited,
+                    isDeleted: message.isDeleted,
+                    reactions: (message.reactions ?? []).flatMap((reaction) => reaction.users.map((upeerId) => ({ upeerId, emoji: reaction.emoji }))),
+                }));
+        };
         const searchMessages = (query: string, limit = 25, offset = 0) => {
             const normalizedQuery = query.trim().toLowerCase();
             if (!normalizedQuery) {
@@ -227,6 +255,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             getMessages: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
             getMessagesAround: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
             searchMessages: async (query: string, limit?: number, offset?: number) => deepClone(searchMessages(query, limit, offset)),
+            searchChatMessages: async (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => deepClone(searchChatMessages(chatUpeerId, query, limit, offset, range)),
             getDevices: async () => [],
             getMyDevices: async () => [],
             getBlockedContacts: async () => state.contacts.filter((contact) => contact.status === 'blocked'),
