@@ -39,7 +39,7 @@ export interface ChatState {
     pendingFiles: PendingFile[];
     isDragging: boolean;
     isHydrating: boolean;
-    historyLoading: boolean;
+    historyLoadingByChat: Record<string, boolean>;
     syncStatus: UpeerSyncStatus;
 }
 
@@ -51,7 +51,7 @@ export interface ChatActions {
     setMessage: (id: string, val: string) => void;
     setReplyToMessage: (id: string, val: ChatMessage | null) => void;
     setChatHistory: (history: ChatMessage[]) => void;
-    setHistoryLoading: (loading: boolean) => void;
+    setHistoryLoading: (chatId: string, loading: boolean) => void;
     setGroupChatHistory: (history: ChatMessage[]) => void;
     handleSearchGlobal: (query: string, chip: SidebarFilter) => Promise<void>;
     loadMoreSearchMessages: () => Promise<void>;

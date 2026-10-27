@@ -321,7 +321,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     activeTransfers={fileTransfer.allTransfers.filter((transfer: FileTransfer) => activeGroupId ? transfer.chatUpeerId === activeGroupId : transfer.upeerId === targetUpeerId)}
                                                     onTransferStateChange={chatStore.updateFileTransferMessage}
                                                     peerActivity={chatStore.peerActivity[activeGroupId || targetUpeerId] ?? null}
-                                                    loading={chatStore.historyLoading}
+                                                    loading={chatStore.historyLoadingByChat[activeGroupId || targetUpeerId] ?? false}
                                                 />
                                             </Box>
                                             <InputArea

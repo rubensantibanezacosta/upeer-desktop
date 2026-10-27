@@ -5,9 +5,24 @@ import type { ChatMessage, GroupRecord, RawChatMessage } from '../types/chat.js'
 
 let navGeneration = 0;
 
+const withLoading = (map: Record<string, boolean>, chatId: string, loading: boolean): Record<string, boolean> => {
+    const next = { ...map };
+    if (loading) {
+        next[chatId] = true;
+    } else {
+        delete next[chatId];
+    }
+    return next;
+};
+
 export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     setTargetUpeerId: (id: string) => {
-        set({ targetUpeerId: id, activeGroupId: '', isWindowedHistory: false, historyLoading: Boolean(id) });
+        set((state) => ({
+            targetUpeerId: id,
+            activeGroupId: '',
+            isWindowedHistory: false,
+            historyLoadingByChat: withLoading(state.historyLoadingByChat, id, Boolean(id)),
+        }));
         if (!id) {
             return;
         }
@@ -30,19 +45,24 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
                     message.status = 'read';
                 }
             });
-            set({
+            set((state) => ({
                 chatHistory: history.map(mapContactMessage),
                 isWindowedHistory: !!pendingScrollMsgId,
-                historyLoading: false,
-            });
+                historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false),
+            }));
         }).catch(() => {
             if (navGeneration !== generation) return;
-            set({ historyLoading: false });
+            set((state) => ({ historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false) }));
         });
     },
 
     setActiveGroupId: (id: string) => {
-        set({ activeGroupId: id, targetUpeerId: '', isWindowedHistory: false, historyLoading: Boolean(id) });
+        set((state) => ({
+            activeGroupId: id,
+            targetUpeerId: '',
+            isWindowedHistory: false,
+            historyLoadingByChat: withLoading(state.historyLoadingByChat, id, Boolean(id)),
+        }));
         if (!id) {
             return;
         }
@@ -53,7 +73,14 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
             window.upeer.getMessages(id).then((messages: RawChatMessage[]) => {
                 if (navGeneration !== generation) return;
                 const { contacts, myIdentity } = get();
-                set({ groupChatHistory: messages.reverse().map((message) => mapGroupMessage(id, message, contacts, myIdentity)), isWindowedHistory: false, historyLoading: false });
+                set((state) => ({
+                    groupChatHistory: messages.reverse().map((message) => mapGroupMessage(id, message, contacts, myIdentity)),
+                    isWindowedHistory: false,
+                    historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false),
+                }));
+            }).catch(() => {
+                if (navGeneration !== generation) return;
+                set((state) => ({ historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false) }));
             });
             return;
         }
@@ -75,10 +102,14 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
                 }
             });
             const { contacts, myIdentity } = get();
-            set({
+            set((state) => ({
                 groupChatHistory: history.map((message) => mapGroupMessage(id, message, contacts, myIdentity)),
                 isWindowedHistory: !!pendingScrollMsgId,
-            });
+                historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false),
+            }));
+        }).catch(() => {
+            if (navGeneration !== generation) return;
+            set((state) => ({ historyLoadingByChat: withLoading(state.historyLoadingByChat, id, false) }));
         });
     },
 
@@ -91,7 +122,9 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     })),
 
     setChatHistory: (history: ChatMessage[]) => set({ chatHistory: history }),
-    setHistoryLoading: (loading: boolean) => set({ historyLoading: loading }),
+    setHistoryLoading: (chatId: string, loading: boolean) => set((state) => ({
+        historyLoadingByChat: withLoading(state.historyLoadingByChat, chatId, loading),
+    })),
     setGroupChatHistory: (history: ChatMessage[]) => set({ groupChatHistory: history }),
 
     loadHistoryAround: async (targetMsgId: string) => {
