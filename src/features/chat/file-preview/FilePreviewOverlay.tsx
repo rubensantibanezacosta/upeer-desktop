@@ -8,6 +8,7 @@ import { DragDropPlaceholder } from './DragDropPlaceholder.js';
 import { FilePreviewVideoPlayer } from './FilePreviewVideoPlayer.js';
 import { FileInfo, getFileTypeIcon, useFilesPreview } from './filePreviewSupport.js';
 import { ImageEditStage } from './ImageEditStage.js';
+import { ATTACHMENT_SHEET_SX, SHEET_FOOTER_SX, SHEET_HEADER_SX } from './overlayStyle.js';
 import { EmojiPicker } from '../input/EmojiPicker.js';
 import { PdfPreview } from '../file/PdfPreview.js';
 import { getMimeType, isPdfFile } from '../../../utils/fileUtils.js';
@@ -67,12 +68,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
         onSend(filesToSend, thumbnails, caps);
     };
 
-    const sheetSx = {
-        position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 1300, display: 'flex', flexDirection: 'column' as const,
-        backgroundColor: 'rgba(var(--joy-palette-neutral-900Channel, 0 0 0) / 0.95)',
-        backdropFilter: 'blur(10px)',
-    };
+    const sheetSx = ATTACHMENT_SHEET_SX;
 
     // Empty drag-only state
     if (!currentFile) {
@@ -106,13 +102,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             )}
 
             {/* Header */}
-            <Box sx={{
-                p: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
-            }}>
+            <Box sx={SHEET_HEADER_SX}>
                 <IconButton aria-label="Cerrar adjuntos" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <X />
                 </IconButton>
@@ -158,7 +148,7 @@ export const FilePreviewOverlay: React.FC<FilePreviewOverlayProps> = ({
             </Box>
 
             {/* Footer */}
-            <Box sx={{ p: 2, backgroundColor: 'background.surface', borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={SHEET_FOOTER_SX}>
                 {/* Caption + Send */}
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                     <Box sx={{ width: '100%', maxWidth: 600, display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>

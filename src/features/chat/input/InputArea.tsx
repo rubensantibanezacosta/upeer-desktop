@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import { Camera, Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
-import { CameraCaptureModal } from './CameraCaptureModal.js';
+import { CameraCaptureOverlay } from '../file-preview/CameraCaptureOverlay.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { RecordingBar } from './RecordingBar.js';
 import { ReplyBar } from './ReplyBar.js';
@@ -44,6 +44,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const canvasRef = useRecordingWaveform(isRecording, stream);
     const [voiceError, setVoiceError] = useState<string | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
+    const [shots, setShots] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
     const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
 
@@ -53,6 +54,21 @@ export const InputArea: React.FC<InputAreaProps> = ({
     };
 
     const handleSendClick = () => onSend(linkPreview);
+
+    const openCamera = () => {
+        setShots([]);
+        setCameraOpen(true);
+    };
+
+    const closeCamera = () => {
+        setCameraOpen(false);
+        setShots([]);
+    };
+
+    const handleCapture = (dataUrl: string) => {
+        setShots((current) => [...current, dataUrl]);
+        void onCapturePhoto?.(dataUrl);
+    };
 
     const handleMicClick = async () => {
         if (!isRecording) {
@@ -162,7 +178,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 embedded
                             />
                             <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
-                            <IconButton aria-label="Abrir cámara" variant="plain" color="neutral" onClick={() => setCameraOpen(true)} disabled={disabled || !onCapturePhoto} sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}>
+                            <IconButton aria-label="Abrir cámara" variant="plain" color="neutral" onClick={openCamera} disabled={disabled || !onCapturePhoto} sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}>
                                 <Camera />
                             </IconButton>
                         </Box>
@@ -177,10 +193,11 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     </>
                 )}
             </Box>
-            <CameraCaptureModal
+            <CameraCaptureOverlay
                 open={cameraOpen}
-                onClose={() => setCameraOpen(false)}
-                onCapture={(dataUrl) => { void onCapturePhoto?.(dataUrl); }}
+                shots={shots}
+                onCapture={handleCapture}
+                onClose={closeCamera}
             />
         </Box>
     );
