@@ -183,6 +183,7 @@ async function applyGroupMessage(
           ? displayContent.slice(0, 77) + "..."
           : displayContent;
       showDesktopNotification({
+        kind: "messages",
         title: `${senderName} → ${groupName}`,
         body,
         onClick: () => {

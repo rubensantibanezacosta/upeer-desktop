@@ -4,9 +4,23 @@ import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { ToggleRow } from './shared.js';
 import { Bell, BellRing, UserPlus, Volume2 } from 'lucide-react';
 import { useNotificationStore } from '../../../store/useNotificationStore.js';
+import { pushNotificationPrefs } from '../../../store/notificationSync.js';
 
 export const SectionNotificaciones: React.FC = () => {
     const { msgNotif, reqNotif, sound, setMsgNotif, setReqNotif, setSound } = useNotificationStore();
+
+    const changeMessages = (value: boolean) => {
+        setMsgNotif(value);
+        pushNotificationPrefs({ messages: value });
+    };
+    const changeRequests = (value: boolean) => {
+        setReqNotif(value);
+        pushNotificationPrefs({ requests: value });
+    };
+    const changeSound = (value: boolean) => {
+        setSound(value);
+        pushNotificationPrefs({ sound: value });
+    };
 
     return (
         <SettingsSection
@@ -21,21 +35,21 @@ export const SectionNotificaciones: React.FC = () => {
                         label="Nuevos mensajes"
                         desc="Avisar cuando recibes un mensaje"
                         value={msgNotif}
-                        onChange={setMsgNotif}
+                        onChange={changeMessages}
                     />
                     <ToggleRow
                         icon={<UserPlus />}
                         label="Solicitudes de contacto"
                         desc="Avisar cuando alguien quiere contactarte"
                         value={reqNotif}
-                        onChange={setReqNotif}
+                        onChange={changeRequests}
                     />
                     <ToggleRow
                         icon={<Volume2 />}
                         label="Sonidos"
                         desc="Reproducir sonidos de notificación"
                         value={sound}
-                        onChange={setSound}
+                        onChange={changeSound}
                     />
                 </List>
             </SettingsCard>

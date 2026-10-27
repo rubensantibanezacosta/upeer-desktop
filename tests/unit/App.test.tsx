@@ -6,6 +6,8 @@ vi.stubGlobal('upeer', {
     isPinEnabled: vi.fn().mockResolvedValue(false),
     getPrivacyPrefs: vi.fn().mockResolvedValue({ readReceipts: true, onlineStatus: true, lastSeen: true }),
     setPrivacyPrefs: vi.fn(),
+    getNotificationPrefs: vi.fn().mockResolvedValue({ messages: true, requests: true, sound: true }),
+    setNotificationPrefs: vi.fn(),
     getMyNetworkAddress: vi.fn().mockResolvedValue('ygg:123'),
     onYggstackAddress: vi.fn(),
     onYggstackStatus: vi.fn(),

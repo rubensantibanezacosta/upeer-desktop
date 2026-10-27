@@ -7,6 +7,7 @@ import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
 import { hydratePrivacyPrefs } from './store/privacySync.js';
+import { hydrateNotificationPrefs } from './store/notificationSync.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -183,6 +184,9 @@ export default function App() {
     useEffect(() => {
         hydratePrivacyPrefs().catch((cause: unknown) => {
             console.warn('No se pudieron leer las preferencias de privacidad.', cause);
+        });
+        hydrateNotificationPrefs().catch((cause: unknown) => {
+            console.warn('No se pudieron leer las preferencias de notificación.', cause);
         });
     }, []);
 

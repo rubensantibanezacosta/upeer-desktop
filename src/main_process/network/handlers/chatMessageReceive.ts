@@ -124,6 +124,7 @@ export async function receiveChatMessage(
             const body = displayContent.startsWith('🔒') ? 'Nuevo mensaje cifrado'
                 : displayContent.length > 80 ? `${displayContent.slice(0, 77)}...` : displayContent;
             showDesktopNotification({
+                kind: 'messages',
                 title: contactName,
                 body,
                 onClick: () => {

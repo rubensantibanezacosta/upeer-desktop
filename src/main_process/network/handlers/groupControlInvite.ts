@@ -330,6 +330,7 @@ async function applyGroupInvite(
     const notifWin = getMainWindow();
     if (notifWin && !notifWin.isFocused()) {
       showDesktopNotification({
+        kind: "requests",
         title: "Nueva invitación de grupo",
         body: `${senderDisplayName} te añadió a ${groupName}`,
         onClick: () => {

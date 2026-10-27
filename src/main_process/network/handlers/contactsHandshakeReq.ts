@@ -10,6 +10,9 @@ import { issueVouch, VouchType, computeScore } from '../../security/reputation/v
 import { network, security, error, warn } from '../../security/secure-logger.js';
 import { runTransaction } from '../../storage/shared.js';
 import { computeKeyFingerprint } from '../../storage/contacts/keys.js';
+import { getMainWindow } from '../../core/windowManager.js';
+import { focusWindow } from '../../utils/windowFocus.js';
+import { showDesktopNotification } from '../../utils/desktopNotification.js';
 import {
     getSafeEphemeralPublicKey,
     hasValidHandshakeIdentity,
@@ -178,7 +181,7 @@ export async function handleHandshakeReq(
         return;
     }
 
-    win?.webContents.send('contact-request-received', {
+    const requestPayload = {
         upeerId: senderUpeerId,
         address: rinfo.address,
         alias: data.alias,
@@ -186,5 +189,21 @@ export async function handleHandshakeReq(
         publicKey,
         ephemeralPublicKey: data.ephemeralPublicKey,
         vouchScore,
-    });
+    };
+    win?.webContents.send('contact-request-received', requestPayload);
+
+    const notifWin = getMainWindow();
+    if (notifWin && !notifWin.isFocused()) {
+        showDesktopNotification({
+            kind: 'requests',
+            title: 'Solicitud de contacto',
+            body: `${data.alias || `Peer ${senderUpeerId.slice(0, 4)}`} quiere contactarte`,
+            onClick: () => {
+                const currentWin = getMainWindow();
+                if (!currentWin) return;
+                focusWindow(currentWin);
+                currentWin.webContents.send('contact-request-received', requestPayload);
+            },
+        });
+    }
 }

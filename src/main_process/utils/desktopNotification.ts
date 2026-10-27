@@ -1,18 +1,22 @@
 import { spawn } from 'node:child_process';
-import { Notification as ElectronNotification } from 'electron';
+import { Notification as ElectronNotification, shell } from 'electron';
 import { warn } from '../security/secure-logger.js';
+import { allowsNotification, notificationSoundEnabled, type NotificationKind } from '../security/notification-prefs.js';
 
 const IS_WAYLAND =
     process.platform === 'linux' &&
     (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 
 interface DesktopNotificationOptions {
+    kind: NotificationKind;
     title: string;
     body: string;
     onClick: () => void;
 }
 
 export function showDesktopNotification(opts: DesktopNotificationOptions): void {
+    if (!allowsNotification(opts.kind)) return;
+    playSound();
     if (IS_WAYLAND) {
         showWaylandNotification(opts);
         return;
@@ -20,7 +24,13 @@ export function showDesktopNotification(opts: DesktopNotificationOptions): void 
     showElectronNotification(opts);
 }
 
-function showWaylandNotification({ title, body, onClick }: DesktopNotificationOptions): void {
+function playSound(): void {
+    if (!notificationSoundEnabled()) return;
+    if (typeof shell?.beep !== 'function') return;
+    shell.beep();
+}
+
+function showWaylandNotification({ title, body, onClick, kind }: DesktopNotificationOptions): void {
     const args = [
         '--app-name', 'uPeer',
         '--action', 'default=Open',
@@ -49,7 +59,7 @@ function showWaylandNotification({ title, body, onClick }: DesktopNotificationOp
 
     proc.on('error', () => {
         warn('notify-send not available, falling back to Electron Notification', {}, 'notifications');
-        showElectronNotification({ title, body, onClick });
+        showElectronNotification({ title, body, onClick, kind });
     });
 }
 

@@ -264,6 +264,11 @@ const privacyApi = {
     setPrivacyPrefs: (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean }) => ipcRenderer.invoke('set-privacy-prefs', patch),
 };
 
+const notificationApi = {
+    getNotificationPrefs: () => ipcRenderer.invoke('get-notification-prefs'),
+    setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => ipcRenderer.invoke('set-notification-prefs', patch),
+};
+
 const eventApi = {
     onGroupUpdated: (callback: (data: GroupUpdatedPayload) => void) => subscribe<[GroupUpdatedPayload]>('group-updated', callback),
     onGroupMessage: (callback: (data: IncomingGroupMessageEvent) => void) => subscribe<[IncomingGroupMessageEvent]>('receive-group-message', callback),
@@ -320,5 +325,6 @@ export const buildPreloadBridge = () => ({
     ...networkApi,
     ...securityApi,
     ...privacyApi,
+    ...notificationApi,
     ...eventApi,
 });
