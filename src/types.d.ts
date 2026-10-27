@@ -121,6 +121,9 @@ declare global {
                 vaultBytes: number;
                 vaultEntries: number;
             }>;
+            listDatabaseBackups: () => Promise<{ backups: Array<{ name: string; bytes: number; createdAt: string }>; retentionDays: number }>;
+            restoreDatabaseBackup: (name: string) => Promise<{ restored: boolean; error?: string }>;
+            restartApp: () => Promise<{ success: boolean }>;
             setMyAlias: (alias: string) => Promise<{ success: boolean }>;
             setMyAvatar: (dataUrl: string) => Promise<{ success: boolean }>;
             // Identity / Wallet Auth

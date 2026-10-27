@@ -79,6 +79,7 @@ type Scenario = {
     myIdentity?: { upeerId: string; name: string; alias?: string; avatar?: string };
     myNetworkAddress?: string;
     networkStatus?: string;
+    databaseBackups?: Array<{ name: string; createdAt: string; bytes: number }>;
 };
 
 type BridgeState = {
@@ -112,6 +113,8 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             networkStatus: input.networkStatus ?? 'up',
             privacy: { readReceipts: true, onlineStatus: true, lastSeen: true },
             notifications: { messages: true, requests: true, sound: true },
+            databaseBackups: deepClone(input.databaseBackups ?? []),
+            restoredBackup: '',
         };
 
         const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -276,6 +279,14 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                 vaultBytes: 0,
                 vaultEntries: 0,
             }),
+            listDatabaseBackups: async () => ({ backups: state.databaseBackups, retentionDays: 7 }),
+            restoreDatabaseBackup: async (name: string) => {
+                const exists = state.databaseBackups.some((backup) => backup.name === name);
+                if (!exists) return { restored: false, error: 'Copia de seguridad no válida' };
+                state.restoredBackup = name;
+                return { restored: true };
+            },
+            restartApp: async () => ({ success: true }),
             getMyReputation: async () => ({ score: 0 }),
             getContactSecurity: async () => ({ hasSession: true, hasContactKey: true, safetyNumber: '11111 22222 33333 44444' }),
             getFileTransfers: async () => ({ success: true, transfers: deepClone(state.transfers) }),

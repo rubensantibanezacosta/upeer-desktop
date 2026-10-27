@@ -12,9 +12,9 @@ export type MessageType =
     | 'READ'
     | 'TYPING'
     | 'CHAT_CONTACT'
-    | 'CHAT_REACTION' // Preview for phase 11
-    | 'CHAT_DELETE'   // Preview for phase 11
-    | 'CHAT_UPDATE'   // Preview for phase 11
+    | 'CHAT_REACTION'
+    | 'CHAT_DELETE'
+    | 'CHAT_UPDATE'
     // File transfer messages
     | 'FILE_START'
     | 'FILE_CHUNK'

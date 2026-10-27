@@ -15,6 +15,7 @@ import {
 } from '@mui/joy';
 import { HardDrive, Monitor, MessagesSquare, Paperclip, DatabaseBackup, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
 import { CardGroupLabel, SettingsCard, SettingsSection } from './sectionShell.js';
+import { StorageBackupsCard } from './StorageBackupsCard.js';
 
 type StorageUsage = Awaited<ReturnType<NonNullable<Window['upeer']>['getStorageUsage']>>;
 
@@ -186,6 +187,8 @@ export const SectionAlmacenamiento: React.FC = () => {
                     )}
                 </Box>
             </SettingsCard>
+
+            <StorageBackupsCard />
 
             <Modal open={confirming} onClose={() => (clearing ? undefined : setConfirming(false))}>
                 <ModalDialog size="sm" sx={{ maxWidth: 420 }}>

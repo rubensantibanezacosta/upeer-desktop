@@ -61,6 +61,7 @@ describe('vector Go de handshake firmado por dispositivo', () => {
     });
 
     it('el PoW del vector sirve para un contacto nuevo', () => {
+        vi.useFakeTimers({ now: new Date(vector.now) });
         const proof = vector.request.packet.powProof;
         expect(typeof proof).toBe('string');
         expect(AdaptivePow.verifyLightProof(proof as string, vector.accountUpeerId)).toBe(true);
