@@ -1,15 +1,18 @@
 import { applyReactionUpdate } from './chatStoreSupport.js';
+import { createTypingThrottle } from './typingThrottle.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import type { LinkPreview } from '../types/chat.js';
 import type { ConversationActivitySignal } from '../types/chat.js';
+
+const shouldSendActivity = createTypingThrottle();
 
 export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
     handleTyping: (state: ConversationActivitySignal = 'typing') => {
         const { targetUpeerId, activeGroupId } = get();
         const conversationId = activeGroupId || targetUpeerId;
-        if (conversationId) {
-            window.upeer.sendTypingIndicator(conversationId, state);
-        }
+        if (!conversationId) return;
+        if (!shouldSendActivity(conversationId, state)) return;
+        window.upeer.sendTypingIndicator(conversationId, state);
     },
 
     handleCreateGroup: async (name: string, memberIds: string[], avatar?: string) => {

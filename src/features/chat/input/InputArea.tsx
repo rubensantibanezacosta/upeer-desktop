@@ -189,15 +189,14 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{ px: 2, py: `${CHAT_COMPOSER_STAGE_PADDING}px`, display: 'flex', alignItems: 'flex-end', gap: 0.5, minHeight: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
+            <Box sx={{ px: 2, py: `${CHAT_COMPOSER_STAGE_PADDING}px`, display: 'flex', alignItems: 'center', gap: 0.5, minHeight: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
                 <Box sx={{
                     display: 'flex',
-                    alignItems: 'flex-end',
+                    alignItems: 'center',
                     gap: 0.5,
                     flex: 1,
                     minWidth: 0,
                     minHeight: CHAT_COMPOSER_PILL_HEIGHT,
-                    py: `${CHAT_COMPOSER_PILL_PADDING}px`,
                     px: `${CHAT_COMPOSER_PILL_PADDING}px`,
                     borderRadius: INPUT_PILL_RADIUS,
                     backgroundColor: 'background.level1',
