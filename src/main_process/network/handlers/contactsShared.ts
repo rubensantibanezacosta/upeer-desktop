@@ -2,7 +2,7 @@ import { verify, getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { debug, security, warn } from '../../security/secure-logger.js';
 import { updateContactDeviceIdentity, updateContactSignedPreKey } from '../../storage/contacts/keys.js';
-import { hasDeviceHandshakeFields, parseDeviceHandshakeFields, toContactDeviceBinding } from '../../security/deviceMessaging.js';
+import { hasDeviceHandshakeFields, parseDeviceHandshakeFields, toContactDeviceBinding, verifyDeviceSignature } from '../../security/deviceMessaging.js';
 import { IdentityRateLimiter } from '../../security/identity-rate-limiter.js';
 
 export const rateLimiter = new IdentityRateLimiter();
@@ -70,6 +70,51 @@ export function verifyHandshakeAcceptSignature(data: HandshakePayload, signature
         Buffer.from(signature, 'hex'),
         Buffer.from(data.publicKey, 'hex')
     );
+}
+
+type HandshakeSignatureKind = 'request' | 'accept';
+
+function deviceSignatureCandidates(
+    data: HandshakePayload,
+    senderUpeerId: string,
+    senderYggAddress: string,
+    kind: HandshakeSignatureKind,
+): Record<string, unknown>[] {
+    const base: Record<string, unknown> = { ...data };
+    delete base.contactCache;
+    delete base.renewalToken;
+    const candidates: Record<string, unknown>[] = [];
+    candidates.push({ ...base, senderUpeerId, senderYggAddress });
+    candidates.push({ ...base, senderUpeerId });
+    if (kind === 'accept') candidates.push(base);
+    return candidates;
+}
+
+export function verifyHandshakeSignature(
+    data: HandshakePayload,
+    signature: string,
+    senderUpeerId: string,
+    senderYggAddress: string,
+    kind: HandshakeSignatureKind,
+): boolean {
+    const rootVerified = kind === 'request'
+        ? verifyHandshakeRequestSignature(data, signature, senderUpeerId, senderYggAddress)
+        : verifyHandshakeAcceptSignature(data, signature, senderUpeerId, senderYggAddress);
+    if (rootVerified) return true;
+
+    if (!hasDeviceHandshakeFields(data)) return false;
+    const fields = parseDeviceHandshakeFields(data, senderUpeerId);
+    if (!fields) {
+        security('Handshake firmado por dispositivo con certificado inválido', { upeerId: senderUpeerId, kind }, 'security');
+        return false;
+    }
+    return deviceSignatureCandidates(data, senderUpeerId, senderYggAddress, kind).some((candidate) => {
+        try {
+            return verifyDeviceSignature(Buffer.from(canonicalStringify(candidate)), signature, fields.devicePublicKey);
+        } catch {
+            return false;
+        }
+    });
 }
 
 export function hasValidHandshakeIdentity(data: HandshakePayload, senderUpeerId: string, ip: string, type: string): boolean {

@@ -1,0 +1,105 @@
+{
+  "generatedBy": "upper-transport-bridge",
+  "generatedAt": "2026-10-27",
+  "now": 1790812800000,
+  "senderYggAddress": "200::7",
+  "accountSecretKeySeed": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+  "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+  "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+  "deviceSecretKeySeed": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b",
+  "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+  "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+  "certificate": {
+    "version": 1,
+    "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+    "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+    "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+    "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+    "platform": "android",
+    "capabilities": [
+      "chat",
+      "dht"
+    ],
+    "issuedAt": 1790812800000,
+    "expiresAt": 1822348800000,
+    "epoch": 1,
+    "signature": "6f5a08db744b2eccd2f487cf2099ed0afa08066d88a5f2b2946eb7257c0a50601d1d86048c1180d6bf21e3c652b52d513ac89b49ef54fd25effc8f754d34e703"
+  },
+  "deviceSignedPreKey": {
+    "spkPub": "a652670bec1bfc6fe9c4bc71f42300ce349189510b951bbd925f3f1607b65002",
+    "spkSig": "43595a8bedd20a39247916c69cff6e55b4c168b1fce897891107e436540d4386726d8b12ac19379137aa81a9509895c2ab44aa2bcbd30544ddcfe496c32e6e06",
+    "spkId": 1790812800000,
+    "spkSk": "6ccb510ad216a9879ad1324aca21464b93721032bb3cc30ddf9b4e1d790f5d82"
+  },
+  "request": {
+    "packet": {
+      "alias": "móvil",
+      "deviceCertificate": {
+        "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+        "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+        "capabilities": [
+          "chat",
+          "dht"
+        ],
+        "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+        "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+        "epoch": 1,
+        "expiresAt": 1822348800000,
+        "issuedAt": 1790812800000,
+        "platform": "android",
+        "signature": "6f5a08db744b2eccd2f487cf2099ed0afa08066d88a5f2b2946eb7257c0a50601d1d86048c1180d6bf21e3c652b52d513ac89b49ef54fd25effc8f754d34e703",
+        "version": 1
+      },
+      "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+      "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+      "deviceSignedPreKey": {
+        "spkId": 1790812800000,
+        "spkPub": "a652670bec1bfc6fe9c4bc71f42300ce349189510b951bbd925f3f1607b65002",
+        "spkSig": "43595a8bedd20a39247916c69cff6e55b4c168b1fce897891107e436540d4386726d8b12ac19379137aa81a9509895c2ab44aa2bcbd30544ddcfe496c32e6e06"
+      },
+      "isInternalSync": false,
+      "powProof": "{\"s\":\"dba13374daf5f58823d7872aa4255046\",\"t\":1793132472}",
+      "publicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+      "senderUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+      "senderYggAddress": "200::7",
+      "signature": "6ae67a372a0f36e12a43168872eefaac2ecb44b087a0482ecfd3365acccc4d92ce77f20cfa2952dc6170be9868c2bf21004be8b705529a57d5ba49d96590da06",
+      "type": "HANDSHAKE_REQ"
+    },
+    "signature": "6ae67a372a0f36e12a43168872eefaac2ecb44b087a0482ecfd3365acccc4d92ce77f20cfa2952dc6170be9868c2bf21004be8b705529a57d5ba49d96590da06"
+  },
+  "accept": {
+    "packet": {
+      "alias": "móvil",
+      "deviceCertificate": {
+        "accountPublicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+        "accountUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+        "capabilities": [
+          "chat",
+          "dht"
+        ],
+        "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+        "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+        "epoch": 1,
+        "expiresAt": 1822348800000,
+        "issuedAt": 1790812800000,
+        "platform": "android",
+        "signature": "6f5a08db744b2eccd2f487cf2099ed0afa08066d88a5f2b2946eb7257c0a50601d1d86048c1180d6bf21e3c652b52d513ac89b49ef54fd25effc8f754d34e703",
+        "version": 1
+      },
+      "deviceId": "a49509f971a2e07b0b9831470785c2712804204271d8d4197662836fe5455069",
+      "devicePublicKey": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+      "deviceSignedPreKey": {
+        "spkId": 1790812800000,
+        "spkPub": "a652670bec1bfc6fe9c4bc71f42300ce349189510b951bbd925f3f1607b65002",
+        "spkSig": "43595a8bedd20a39247916c69cff6e55b4c168b1fce897891107e436540d4386726d8b12ac19379137aa81a9509895c2ab44aa2bcbd30544ddcfe496c32e6e06"
+      },
+      "isInternalSync": false,
+      "publicKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+      "senderUpeerId": "973317b3ac3a18c0c8485883a862c8c82983e43b4d3b15147f2ab4e6cb7747f6",
+      "senderYggAddress": "200::7",
+      "signature": "15ce96a9048b1946cbd6195c037a78eeaabd1c27d3d1b5606620bce29f7680f32685eb7d4a16d998855e0e448c3633eefcc0eab6c57c7a2fef0a61642cb2c30e",
+      "type": "HANDSHAKE_ACCEPT"
+    },
+    "signature": "15ce96a9048b1946cbd6195c037a78eeaabd1c27d3d1b5606620bce29f7680f32685eb7d4a16d998855e0e448c3633eefcc0eab6c57c7a2fef0a61642cb2c30e"
+  }
+}

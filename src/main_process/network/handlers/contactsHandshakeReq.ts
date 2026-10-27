@@ -20,7 +20,7 @@ import {
     maybeUpdateContactDeviceIdentity,
     maybeUpdateSignedPreKey,
     rateLimiter,
-    verifyHandshakeRequestSignature,
+    verifyHandshakeSignature,
 } from './contactsShared.js';
 
 type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
@@ -81,7 +81,7 @@ export async function handleHandshakeReq(
     const packetType = typeof data.type === 'string' ? data.type : 'HANDSHAKE_REQ';
     const verifiedData = { ...data, publicKey };
 
-    if (!verifyHandshakeRequestSignature(verifiedData, signature, senderUpeerId, senderYggAddress)) {
+    if (!verifyHandshakeSignature(verifiedData, signature, senderUpeerId, senderYggAddress, 'request')) {
         security('Invalid HANDSHAKE_REQ signature', { ip: rinfo.address }, 'network');
         return;
     }
