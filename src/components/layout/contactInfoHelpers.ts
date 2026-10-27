@@ -1,14 +1,5 @@
 import { BadgeCheck, CircleCheck, ShieldAlert, Shield, Sparkles } from 'lucide-react';
-import { Contact } from '../../types/chat.js';
 import { isPreviewableFile } from '../../utils/fileUtils.js';
-
-export const getStatusMeta = (contact: Contact, isOnline: boolean) => {
-    if (contact.status === 'blocked') return { label: 'Bloqueado', color: 'danger' as const };
-    if (contact.status === 'incoming') return { label: 'Solicitud recibida', color: 'primary' as const };
-    if (contact.status === 'pending') return { label: 'Pendiente', color: 'warning' as const };
-    if (isOnline || contact.status === 'connected') return { label: 'Disponible', color: 'success' as const };
-    return { label: 'Sin conexión', color: 'neutral' as const };
-};
 
 export const getTrustMeta = (score?: number) => {
     if (score === undefined) return null;

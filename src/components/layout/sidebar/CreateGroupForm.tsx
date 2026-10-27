@@ -6,6 +6,7 @@ import {
 import { Users, Search, Camera } from 'lucide-react';
 import { Contact } from '../../../types/chat.js';
 import { resizeImageToDataUrl } from '../../ui/settings/shared.js';
+import { ContactPresenceLabel } from '../ContactPresenceLabel.js';
 
 
 interface CreateGroupFormProps {
@@ -185,9 +186,7 @@ export const CreateGroupForm: React.FC<CreateGroupFormProps> = ({
                                         <Typography level="body-sm" sx={{ fontWeight: isChecked ? 600 : 400 }}>
                                             {c.name}
                                         </Typography>
-                                        <Typography level="body-xs" color="neutral" sx={{ ml: 'auto' }}>
-                                            {c.status === 'connected' ? 'Online' : 'Offline'}
-                                        </Typography>
+                                        <ContactPresenceLabel contact={c} sx={{ ml: 'auto' }} />
                                     </Box>
                                 </ListItem>
                             );

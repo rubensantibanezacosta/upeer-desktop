@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { PRESENCE_ONLINE_WINDOW_MS } from '../utils/presenceVisibility.js';
 
-const DEFAULT_ONLINE_WINDOW_MS = 65_000;
+const DEFAULT_ONLINE_WINDOW_MS = PRESENCE_ONLINE_WINDOW_MS;
 
 function lastSeenToMs(lastSeen?: string | number | Date | null): number | null {
     if (!lastSeen) return null;

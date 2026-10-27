@@ -98,7 +98,7 @@ test('muestra contactos online y offline en la ficha del contacto', async ({ pag
     await mount(page, baseScenario());
 
     await openContactInfo(page, 'Alice');
-    await expect(page.getByText('En línea').last()).toBeVisible();
+    await expect(page.getByText('En línea').filter({ visible: true }).last()).toBeVisible();
 
     await openContactInfo(page, 'Bob');
     await expect(page.getByText(/Última vez|Desconectado/).last()).toBeVisible();
@@ -108,7 +108,7 @@ test('oculta la presencia de los contactos cuando la privacidad lo pide', async 
     await mount(page, baseScenario());
 
     await page.locator('[aria-label="Abrir chat con Alice"]').first().click();
-    await expect(page.getByText('En línea').first()).toBeVisible();
+    await expect(page.getByText('En línea').filter({ visible: true }).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Ajustes' }).click();
     await page.getByText('Privacidad', { exact: true }).click();
@@ -285,4 +285,21 @@ test('puede reflejar un contacto que pasa a online tras refresco', async ({ page
     await openContactInfo(page, 'Alice');
     await openContactInfo(page, 'Bob');
     await expect(page.getByText('En línea').last()).toBeVisible();
+});
+
+test('la presencia sale de la actividad y no de la alcanzabilidad del nodo', async ({ page }) => {
+    const scenario = baseScenario();
+    const stale = new Date(now - 600_000).toISOString();
+    const fresh = new Date(now - 1_000).toISOString();
+    scenario.contacts = (scenario.contacts ?? []).map((contact) => (contact.upeerId === 'alice' || contact.upeerId === 'bob'
+        ? { ...contact, status: 'connected', lastSeen: fresh, lastActive: stale }
+        : contact));
+    await mount(page, scenario);
+
+    await page.locator('[aria-label="Abrir chat con Bob"]').first().click();
+    await expect(page.getByText('Desconectado').first()).toBeVisible();
+    await expect(page.getByText('En línea')).toHaveCount(0);
+
+    await openContactInfo(page, 'Bob');
+    await expect(page.getByText(/Última vez/).last()).toBeVisible();
 });

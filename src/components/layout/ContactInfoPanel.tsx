@@ -14,7 +14,7 @@ import { ChatStarredView } from '../../features/chat/ChatStarredView.js';
 import { collectStarred } from '../../features/chat/starredMessages.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { usePrivacyStore } from '../../store/usePrivacyStore.js';
-import { visiblePresence } from '../../utils/presenceVisibility.js';
+import { isWithinPresenceWindow, visiblePresence } from '../../utils/presenceVisibility.js';
 
 interface MediaClickPayload {
     url: string;
@@ -83,7 +83,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     const onlineStatusPref = usePrivacyStore((s) => s.onlineStatus);
     const lastSeenPref = usePrivacyStore((s) => s.lastSeen);
-    const presence = visiblePresence(!!contact.lastActive && (now - new Date(contact.lastActive).getTime()) < 65000, formatSeen(contact.lastSeen), {
+    const presence = visiblePresence(isWithinPresenceWindow(contact.lastActive, now), formatSeen(contact.lastActive), {
         onlineStatus: onlineStatusPref,
         lastSeen: lastSeenPref,
     });

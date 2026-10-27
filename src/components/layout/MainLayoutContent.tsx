@@ -24,7 +24,7 @@ import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
 import { MainLayoutPanels } from './MainLayoutPanels.js';
 import { usePrivacyStore } from '../../store/usePrivacyStore.js';
-import { visiblePresence } from '../../utils/presenceVisibility.js';
+import { isWithinPresenceWindow, visiblePresence } from '../../utils/presenceVisibility.js';
 import type { MainLayoutProps, PreviewableMedia } from './MainLayout.js';
 
 interface MainLayoutContentProps {
@@ -150,8 +150,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const onlineStatusPref = usePrivacyStore((state) => state.onlineStatus);
     const lastSeenPref = usePrivacyStore((state) => state.lastSeen);
     const headerPresence = visiblePresence(
-        !!activeContact?.lastActive && (Date.now() - new Date(activeContact.lastActive).getTime()) < 65000,
-        activeContact?.lastActive ?? activeContact?.lastSeen,
+        isWithinPresenceWindow(activeContact?.lastActive),
+        activeContact?.lastActive,
         { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref },
     );
     const [contactPanelView, setContactPanelView] = useState<ContactPanelView>('main');

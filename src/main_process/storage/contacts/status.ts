@@ -1,4 +1,5 @@
-import { getDb, getSchema, eq } from '../shared.js';
+import { isNull } from 'drizzle-orm';
+import { getDb, getSchema, eq, and, or, lt } from '../shared.js';
 
 export function updateContactStatus(upeerId: string, status: 'pending' | 'incoming' | 'connected') {
     const db = getDb();
@@ -18,7 +19,10 @@ export function updateLastActive(upeerId: string, activeAt: number) {
 
     return db.update(schema.contacts)
         .set({ lastActive: iso })
-        .where(eq(schema.contacts.upeerId, upeerId))
+        .where(and(
+            eq(schema.contacts.upeerId, upeerId),
+            or(isNull(schema.contacts.lastActive), lt(schema.contacts.lastActive, iso))
+        ))
         .run();
 }
 

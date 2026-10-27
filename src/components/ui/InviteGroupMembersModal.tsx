@@ -20,6 +20,7 @@ import {
 } from '@mui/joy';
 import { UserPlus, Search, X } from 'lucide-react';
 import { Contact, Group } from '../../types/chat.js';
+import { ContactPresenceLabel } from '../layout/ContactPresenceLabel.js';
 
 interface InviteGroupMembersModalProps {
     open: boolean;
@@ -206,9 +207,7 @@ export const InviteGroupMembersModal: React.FC<InviteGroupMembersModalProps> = (
                                                         {contact.name[0]}
                                                     </Avatar>
                                                     <Typography level="body-sm" sx={{ fontWeight: 500 }}>{contact.name}</Typography>
-                                                    <Typography level="body-xs" color="neutral" sx={{ ml: 'auto' }}>
-                                                        {contact.status === 'connected' ? 'Online' : 'Offline'}
-                                                    </Typography>
+                                                    <ContactPresenceLabel contact={contact} sx={{ ml: 'auto' }} />
                                                 </Box>
                                             </ListItem>
                                         );
