@@ -129,30 +129,53 @@ test('muestra estados sin resultados en búsqueda global y nuevo chat', async ({
     await expect(page.getByText('Sin resultados para "sin-coincidencias-contactos"')).toBeVisible();
 });
 
-test('los resultados del buscador de chat no desbordan el layout horizontal', async ({ page }) => {
+test('el buscador de chat abre un panel lateral con resultados agrupados por día', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 720 });
     await mount(page, searchScenario());
     await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
     await page.getByRole('button', { name: 'Buscar en el chat' }).click();
 
-    const input = page.getByLabel('Buscar mensajes en esta conversación');
-    await input.fill('aguja');
+    await expect(page.getByText('Buscar mensajes')).toBeVisible();
+    await expect(page.getByText('Escribe para buscar en esta conversación')).toBeVisible();
 
-    await expect(page.getByText(/^Tú · /).first()).toBeVisible();
+    await page.getByLabel('Buscar mensajes en esta conversación').fill('aguja');
+
     const results = page.getByRole('button', { name: /Ir al mensaje:/ });
     await expect(results.first()).toBeVisible();
+    await expect(page.locator('svg.lucide-check-check').first()).toBeVisible();
+    await expect(page.locator('svg.lucide-calendar-days')).toBeVisible();
 
-    const overflow = await page.evaluate(() => {
-        const button = document.querySelector('[aria-label^="Ir al mensaje:"]');
-        const list = button?.closest('ul') ?? null;
-        return {
-            page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-            listOverflowX: list ? window.getComputedStyle(list).overflowX : 'sin lista',
-        };
-    });
+    const panel = page.getByRole('complementary', { name: 'Buscador de la conversación' });
+    const layout = await panel.evaluate((element) => ({
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        overflowing: Array.from(element.querySelectorAll('*'))
+            .filter((child) => child.scrollWidth - child.clientWidth > 2)
+            .map((child) => child.tagName.toLowerCase()),
+        panelHeight: Math.round(element.getBoundingClientRect().height),
+        viewportHeight: window.innerHeight,
+    }));
 
-    expect(overflow.page).toBeLessThanOrEqual(0);
-    expect(overflow.listOverflowX).toBe('hidden');
-    await expect(page.locator('svg.lucide-message-square').first()).toBeVisible();
+    expect(layout.page).toBeLessThanOrEqual(0);
+    expect(layout.overflowing).toEqual([]);
+    expect(Math.abs(layout.panelHeight - layout.viewportHeight)).toBeLessThanOrEqual(1);
     await expect(results.first()).not.toContainText('📎');
+});
+
+test('el calendario del panel filtra los resultados por día', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 720 });
+    await mount(page, searchScenario());
+    await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
+    await page.getByRole('button', { name: 'Buscar en el chat' }).click();
+    await page.getByLabel('Buscar mensajes en esta conversación').fill('aguja');
+
+    const results = page.getByRole('button', { name: /Ir al mensaje:/ });
+    await expect(results).toHaveCount(2);
+
+    const today = new Date();
+    const label = `Filtrar por ${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    await page.getByRole('button', { name: 'Filtrar por fecha' }).click();
+    await page.getByRole('button', { name: label }).click();
+
+    await expect(results).toHaveCount(2);
+    await expect(page.getByText('No se han encontrado mensajes')).toHaveCount(0);
 });

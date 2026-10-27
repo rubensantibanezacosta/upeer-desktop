@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box } from '@mui/joy';
 import { Sidebar } from './Sidebar.js';
 import { ChatArea } from '../../features/chat/ChatArea.js';
-import { ChatSearchBar } from '../../features/chat/ChatSearchBar.js';
+import { ChatSearchPanel } from '../../features/chat/ChatSearchPanel.js';
 import { IncomingRequestChat } from '../../features/chat/IncomingRequestChat.js';
 import { TopHeader } from './TopHeader.js';
 import { ChatHeaderMenu } from './ChatHeaderMenu.js';
@@ -155,6 +155,19 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
         { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref },
     );
     const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
+    const openChatSearch = () => {
+        setIsChatSearchOpen(true);
+        setIsContactInfoOpen(false);
+        setIsGroupInfoOpen(false);
+    };
+    const toggleContactInfo = () => {
+        setIsContactInfoOpen((value) => !value);
+        setIsChatSearchOpen(false);
+    };
+    const toggleGroupInfo = () => {
+        setIsGroupInfoOpen((value) => !value);
+        setIsChatSearchOpen(false);
+    };
 
     return (
         <Box sx={{ display: 'flex', flexGrow: 1, minWidth: 0, width: '100%', height: '100vh', bgcolor: 'background.body', overflow: 'hidden' }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
@@ -209,9 +222,9 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             groupId={activeGroupId}
                                             onUpdateGroup={(fields) => chatStore.handleUpdateGroup(activeGroupId, fields)}
                                             onInviteMembers={() => setIsInviteGroupMembersOpen(true)}
-                                            onOpenInfo={() => setIsGroupInfoOpen((value) => !value)}
+                                            onOpenInfo={toggleGroupInfo}
                                             onDelete={() => chatStore.handleLeaveGroup(activeGroupId)}
-                                            onSearch={() => setIsChatSearchOpen(true)}
+                                            onSearch={openChatSearch}
                                             onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup?.members, activeGroupId)}
                                             onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup?.members, activeGroupId)}
                                             menu={
@@ -220,8 +233,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     chatId={activeGroupId}
                                                     name={activeGroup?.name || 'este grupo'}
                                                     isFavorite={!!activeGroup?.isFavorite}
-                                                    onOpenInfo={() => setIsGroupInfoOpen((value) => !value)}
-                                                    onSearch={() => setIsChatSearchOpen(true)}
+                                                    onOpenInfo={toggleGroupInfo}
+                                                    onSearch={openChatSearch}
                                                     onToggleFavorite={() => void chatStore.handleToggleFavoriteGroup(activeGroupId)}
                                                     onExport={() => exportChatTranscript({ chatName: activeGroup?.name || activeGroupId, meLabel: chatStore.myIdentity?.alias || 'Yo', messages: chatStore.groupChatHistory })}
                                                     onCloseChat={() => chatStore.setActiveGroupId('')}
@@ -243,8 +256,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             onDelete={() => handleClearChat(targetUpeerId)}
                                             onShare={() => navigation.setShareModalOpen(true)}
                                             onAccept={isIncomingRequest ? undefined : handleAcceptContact}
-                                            onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
-                                            onSearch={() => setIsChatSearchOpen(true)}
+                                            onOpenInfo={toggleContactInfo}
+                                            onSearch={openChatSearch}
                                             onCallAudio={() => void startCall(targetUpeerId, 'audio')}
                                             onCallVideo={() => void startCall(targetUpeerId, 'video')}
                                             menu={
@@ -254,8 +267,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     name={activeContact?.name || 'este contacto'}
                                                     isFavorite={!!activeContact?.isFavorite}
                                                     blocked={activeContact?.status === 'blocked'}
-                                                    onOpenInfo={() => setIsContactInfoOpen((value) => !value)}
-                                                    onSearch={() => setIsChatSearchOpen(true)}
+                                                    onOpenInfo={toggleContactInfo}
+                                                    onSearch={openChatSearch}
                                                     onToggleFavorite={() => void chatStore.handleToggleFavorite(targetUpeerId)}
                                                     onExport={() => exportChatTranscript({ chatName: activeContact?.name || targetUpeerId, meLabel: chatStore.myIdentity?.alias || 'Yo', messages: chatStore.chatHistory })}
                                                     onCloseChat={() => chatStore.setTargetUpeerId('')}
@@ -264,13 +277,6 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     onBlock={handleBlockContact}
                                                 />
                                             }
-                                        />
-                                    )}
-
-                                    {isChatSearchOpen && (
-                                        <ChatSearchBar
-                                            conversationKey={activeGroupId || targetUpeerId}
-                                            onClose={() => setIsChatSearchOpen(false)}
                                         />
                                     )}
 
@@ -361,6 +367,13 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                     )}
                                 </Box>
 
+                                {isChatSearchOpen && (
+                                    <ChatSearchPanel
+                                        conversationKey={activeGroupId || targetUpeerId}
+                                        onClose={() => setIsChatSearchOpen(false)}
+                                    />
+                                )}
+
                                 {!activeGroupId && activeContact && isContactInfoOpen && (
                                     <ContactInfoPanel
                                         contact={activeContact}
@@ -375,7 +388,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onOpenMedia={handleMediaClick}
                                         onCallAudio={() => void startCall(targetUpeerId, 'audio')}
                                         onCallVideo={() => void startCall(targetUpeerId, 'video')}
-                                        onSearch={() => setIsChatSearchOpen(true)}
+                                        onSearch={openChatSearch}
                                         callsUnavailable={callsUnavailable}
                                     />
                                 )}
@@ -390,7 +403,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onOpenMedia={handleMediaClick}
                                         onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup.members, activeGroupId)}
                                         onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup.members, activeGroupId)}
-                                        onSearch={() => setIsChatSearchOpen(true)}
+                                        onSearch={openChatSearch}
                                         callsUnavailable={callsUnavailable}
                                         onFavorite={() => chatStore.handleToggleFavoriteGroup(activeGroupId)}
                                         onClearChat={() => handleClearChat(activeGroupId)}
