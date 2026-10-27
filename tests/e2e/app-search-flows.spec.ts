@@ -213,3 +213,28 @@ test('la búsqueda de chat pagina con scroll infinito por toda la conversación'
     await expect(results).toHaveCount(45, { timeout: 5000 });
     await expect(page.getByText('45 resultados en toda la conversación')).toBeVisible();
 });
+
+test('los mensajes destacados se reúnen en el panel de info del chat', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await mount(page, searchScenario());
+    await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
+
+    await page.getByLabel('Abrir info del contacto Alice').click();
+    await page.getByRole('button', { name: 'Abrir mensajes destacados' }).click();
+    await expect(page.getByText('Aún no hay mensajes destacados')).toBeVisible();
+    await page.getByRole('button', { name: 'Volver a la ficha del contacto' }).click();
+
+    await page.locator('#msg-alice-other').hover();
+    await page.getByLabel('Abrir acciones del mensaje alice-other').click();
+    await page.getByRole('menuitem', { name: 'Destacar' }).click();
+
+    await page.getByRole('button', { name: 'Abrir mensajes destacados' }).click();
+    await expect(page.getByText('1 mensaje').last()).toBeVisible();
+    const entry = page.getByRole('button', { name: 'Ir al mensaje destacado: otro mensaje' });
+    await expect(entry).toBeVisible();
+    await expect(page.getByText('Aún no hay mensajes destacados')).toHaveCount(0);
+
+    await entry.click();
+    await expect(page.getByText('Info. del contacto')).toBeVisible();
+    await expect(page.locator('#msg-alice-other')).toBeVisible();
+});

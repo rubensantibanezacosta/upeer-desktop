@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, IconButton, List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
-import { X, Users, UserPlus, BellOff, Heart, Eraser, LogOut, ShieldCheck, UserMinus, Phone, Video, Search } from 'lucide-react';
+import { X, Users, UserPlus, BellOff, Heart, Eraser, LogOut, ShieldCheck, UserMinus, Phone, Video, Search, Star, ChevronRight } from 'lucide-react';
 import { Contact, Group } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { useChatStore } from '../../store/useChatStore.js';
 import { ContactMediaExplorer } from './ContactMediaExplorer.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { SectionSeparator, actionButtonSx, actionsRowSx, rowButtonSx, rowIconSx, rowsSx } from './infoPanelRows.js';
 import { usePanelView, type GroupPanelView } from './contactInfoPanelSupport.js';
 import { ChatSearchView } from '../../features/chat/ChatSearchView.js';
+import { ChatStarredView } from '../../features/chat/ChatStarredView.js';
+import { collectStarred } from '../../features/chat/starredMessages.js';
 
 interface GroupMediaClickPayload {
     url: string;
@@ -41,6 +44,9 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
     const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'leave' } | { type: 'transfer' | 'remove'; memberId: string } | null>(null);
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs[group.groupId]);
+    const messagePrefs = useChatActionsStore((state) => state.messagePrefs);
+    const chatHistory = useChatStore((state) => state.chatHistory);
+    const starredCount = collectStarred(chatHistory ?? [], messagePrefs).length;
     const members = group.members.map((memberId) => ({
         id: memberId,
         contact: contacts.find((contact) => contact.upeerId === memberId),
@@ -60,6 +66,10 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
             {currentView === 'search' ? (
                 <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
                     <ChatSearchView conversationKey={group.groupId} onBack={() => setCurrentView('main')} />
+                </Box>
+            ) : currentView === 'starred' ? (
+                <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <ChatStarredView onBack={() => setCurrentView('main')} />
                 </Box>
             ) : currentView === 'media' ? (
                 <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
@@ -150,6 +160,20 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                                 <Box sx={rowIconSx}><Heart style={{ fontSize: 20 }} fill={group.isFavorite ? 'currentColor' : 'none'} /></Box>
                             </ListItemDecorator>
                             <ListItemContent><Typography level="body-sm">{group.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}</Typography></ListItemContent>
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem sx={{ p: 0 }}>
+                        <ListItemButton aria-label="Abrir mensajes destacados" onClick={() => setCurrentView('starred')} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}>
+                                <Box sx={rowIconSx}><Star style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
+                            <ListItemContent>
+                                <Typography level="body-sm">Mensajes destacados</Typography>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                                    {starredCount === 1 ? '1 mensaje' : `${starredCount} mensajes`}
+                                </Typography>
+                            </ListItemContent>
+                            <ChevronRight style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)' }} />
                         </ListItemButton>
                     </ListItem>
                 </List>

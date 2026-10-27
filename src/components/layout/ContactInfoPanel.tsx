@@ -10,6 +10,8 @@ import { ContactInfoDeleteDialog } from './ContactInfoDeleteDialog.js';
 import { ContactInfoPanelMainView } from './ContactInfoPanelMainView.js';
 import { buildContactInfoActions, SlidingPanelView, usePanelView, useSharedMediaItems, type ContactPanelView } from './contactInfoPanelSupport.js';
 import { ChatSearchView } from '../../features/chat/ChatSearchView.js';
+import { ChatStarredView } from '../../features/chat/ChatStarredView.js';
+import { collectStarred } from '../../features/chat/starredMessages.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { usePrivacyStore } from '../../store/usePrivacyStore.js';
 import { visiblePresence } from '../../utils/presenceVisibility.js';
@@ -66,6 +68,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     const [currentView, setCurrentView] = usePanelView<ContactPanelView>(view, onViewChange, 'main');
     const [now, setNow] = useState(() => Date.now());
     const toggleContact = useChatActionsStore((state) => state.toggleContact);
+    const messagePrefs = useChatActionsStore((state) => state.messagePrefs);
     const archiveFallback = () => toggleContact(contact.upeerId, 'archived');
     const muteFallback = () => toggleContact(contact.upeerId, 'muted');
     const favoriteFallback = () => toggleContact(contact.upeerId, 'pinned');
@@ -88,6 +91,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     const lastSeenText = presence.lastSeen;
     const trust = getTrustMeta(contact.vouchScore);
     const sharedMedia = useSharedMediaItems(chatHistory, activeTransfers);
+    const starredCount = collectStarred(chatHistory, messagePrefs).length;
     const { utilityActions, dangerActions } = buildContactInfoActions({
         contact,
         onShare,
@@ -131,6 +135,8 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                         onCallAudio={onCallAudio ?? (() => undefined)}
                         onCallVideo={onCallVideo ?? (() => undefined)}
                         onOpenSearch={() => setCurrentView('search')}
+                        onOpenStarred={() => setCurrentView('starred')}
+                        starredCount={starredCount}
                         callsUnavailable={callsUnavailable ?? false}
                     />
                 </SlidingPanelView>
@@ -141,6 +147,10 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
                 <SlidingPanelView active={currentView === 'search'} direction="right" zIndex={10} backgroundColor="background.surface">
                     <ChatSearchView conversationKey={contact.upeerId} onBack={() => setCurrentView('main')} />
+                </SlidingPanelView>
+
+                <SlidingPanelView active={currentView === 'starred'} direction="right" zIndex={10} backgroundColor="background.surface">
+                    <ChatStarredView onBack={() => setCurrentView('main')} />
                 </SlidingPanelView>
 
                 <SlidingPanelView active={currentView === 'cipher'} direction="right">

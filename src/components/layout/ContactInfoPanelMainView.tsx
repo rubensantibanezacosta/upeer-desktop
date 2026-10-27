@@ -10,7 +10,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/joy';
-import { X, Lock, ChevronRight, Phone, Video, Search } from 'lucide-react';
+import { X, Lock, ChevronRight, Phone, Video, Search, Star } from 'lucide-react';
 import { Contact } from '../../types/chat.js';
 import { ContactMediaStrip, SharedMediaItem } from './ContactMediaStrip.js';
 import { ContactInfoHero } from './ContactInfoHero.js';
@@ -32,6 +32,8 @@ interface ContactInfoPanelMainViewProps {
     onCallAudio: () => void;
     onCallVideo: () => void;
     onOpenSearch: () => void;
+    onOpenStarred: () => void;
+    starredCount: number;
     callsUnavailable: boolean;
 }
 
@@ -50,6 +52,8 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
     onCallAudio,
     onCallVideo,
     onOpenSearch,
+    onOpenStarred,
+    starredCount,
     callsUnavailable,
 }) => {
     const callsDisabled = callsUnavailable
@@ -127,6 +131,20 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                             </ListItemButton>
                         </ListItem>
                     ))}
+                    <ListItem sx={{ p: 0 }}>
+                        <ListItemButton aria-label="Abrir mensajes destacados" onClick={onOpenStarred} sx={rowButtonSx}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}>
+                                <Box sx={rowIconSx}><Star style={{ fontSize: 20 }} /></Box>
+                            </ListItemDecorator>
+                            <ListItemContent>
+                                <Typography level="body-sm">Mensajes destacados</Typography>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                                    {starredCount === 1 ? '1 mensaje' : `${starredCount} mensajes`}
+                                </Typography>
+                            </ListItemContent>
+                            <ChevronRight style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)' }} />
+                        </ListItemButton>
+                    </ListItem>
                     <ListItem sx={{ p: 0 }}>
                         <ListItemButton aria-label="Abrir detalles de cifrado" onClick={onOpenCipher} sx={rowButtonSx}>
                             <ListItemDecorator sx={{ color: 'inherit' }}>

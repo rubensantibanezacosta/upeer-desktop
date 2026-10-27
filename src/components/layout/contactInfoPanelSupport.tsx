@@ -133,8 +133,8 @@ interface SlidingPanelViewProps {
     children: React.ReactNode;
 }
 
-export type ContactPanelView = 'main' | 'media' | 'cipher' | 'search';
-export type GroupPanelView = 'main' | 'media' | 'search';
+export type ContactPanelView = 'main' | 'media' | 'cipher' | 'search' | 'starred';
+export type GroupPanelView = 'main' | 'media' | 'search' | 'starred';
 
 export const usePanelView = <T extends string>(
     controlled: T | undefined,

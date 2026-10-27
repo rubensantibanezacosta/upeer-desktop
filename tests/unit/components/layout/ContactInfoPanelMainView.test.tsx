@@ -24,6 +24,8 @@ describe('ContactInfoPanelMainView call and search actions', () => {
                 onCallAudio={onCallAudio}
                 onCallVideo={onCallVideo}
                 onOpenSearch={onOpenSearch}
+                onOpenStarred={vi.fn()}
+                starredCount={0}
                 callsUnavailable={false}
             />,
         );
@@ -35,5 +37,35 @@ describe('ContactInfoPanelMainView call and search actions', () => {
         expect(onCallAudio).toHaveBeenCalledOnce();
         expect(onCallVideo).toHaveBeenCalledOnce();
         expect(onOpenSearch).toHaveBeenCalledOnce();
+    });
+
+    it('abre los mensajes destacados con su recuento', () => {
+        const onOpenStarred = vi.fn();
+        render(
+            <ContactInfoPanelMainView
+                contact={{ upeerId: 'peer-1', name: 'Ana', address: 'address', status: 'connected' }}
+                isOnline
+                lastSeenText={null}
+                trust={null}
+                sharedMedia={[]}
+                utilityActions={[]}
+                dangerActions={[]}
+                onClose={vi.fn()}
+                onOpenMedia={vi.fn()}
+                onViewAllMedia={vi.fn()}
+                onOpenCipher={vi.fn()}
+                onCallAudio={vi.fn()}
+                onCallVideo={vi.fn()}
+                onOpenSearch={vi.fn()}
+                onOpenStarred={onOpenStarred}
+                starredCount={3}
+                callsUnavailable={false}
+            />,
+        );
+
+        expect(screen.getByText('3 mensajes')).toBeDefined();
+        fireEvent.click(screen.getByRole('button', { name: 'Abrir mensajes destacados' }));
+
+        expect(onOpenStarred).toHaveBeenCalledOnce();
     });
 });
