@@ -25,6 +25,7 @@ import {
 import { unsealPacket } from './sealed.js';
 import { routeVerifiedPacket } from './verifiedPacketRouter.js';
 import { decodeBinaryCallMedia, isBinaryCallMedia } from './binaryCallMedia.js';
+import { pingActivity } from './handlers/pingPresence.js';
 import { routeEarlyPacket } from './earlyPacketRouter.js';
 import { verifyPacketSignature } from './signatureVerification.js';
 
@@ -267,15 +268,12 @@ export async function handlePacket(
                 queryOwnVaultsOnReconnect(upeerId);
             }
             updateLastSeen(upeerId);
-            const activeAt = Number(data.activeAt);
-            const lastActiveIso = Number.isFinite(activeAt) && activeAt > 0
-                ? new Date(Math.min(activeAt, Date.now())).toISOString()
-                : undefined;
-            if (lastActiveIso) await updateLastActive(upeerId, activeAt);
+            const activity = pingActivity(data.activeAt, Date.now());
+            if (activity) await updateLastActive(upeerId, activity.activeAtMs);
             win?.webContents.send('contact-presence', {
                 upeerId,
                 lastSeen: nowIso,
-                lastActive: lastActiveIso,
+                lastActive: activity?.lastActiveIso,
                 alias: data.alias as string | undefined,
                 avatar: data.avatar as string | undefined,
             });

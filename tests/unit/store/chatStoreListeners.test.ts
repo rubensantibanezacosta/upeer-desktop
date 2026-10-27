@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const onReceiveMock = vi.fn();
+const onPresenceMock = vi.fn();
 const refreshContactsMock = vi.fn();
 const sendReadReceiptMock = vi.fn();
 const getContactsMock = vi.fn();
@@ -26,7 +27,7 @@ const { playNotificationSoundMock, chatActionState } = vi.hoisted(() => ({
         onMessageReactionUpdated: vi.fn(),
         onMessageStatusUpdated: vi.fn(),
         onTyping: vi.fn(),
-        onPresence: vi.fn(),
+        onPresence: onPresenceMock,
         onKeyChangeAlert: vi.fn(),
         onContactUntrustworthy: vi.fn(),
         onChatCleared: vi.fn(),
@@ -49,6 +50,7 @@ import type { ChatMessage } from '../../../src/types/chat.js';
 describe('chatStoreListeners: onReceive con mensaje recuperado del vault', () => {
     beforeEach(() => {
         onReceiveMock.mockReset();
+        onPresenceMock.mockReset();
         refreshContactsMock.mockReset();
         sendReadReceiptMock.mockReset();
         playNotificationSoundMock.mockReset();
@@ -157,5 +159,52 @@ describe('chatStoreListeners: onReceive con mensaje recuperado del vault', () =>
 
         expect(playNotificationSoundMock).toHaveBeenCalledOnce();
         Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    });
+
+    it('actualiza lastActive sin borrar lastSeen cuando llega un PING con actividad', () => {
+        const set = vi.fn((fn: (s: { contacts: Record<string, unknown>[] }) => { contacts: Record<string, unknown>[] }) => fn({
+            contacts: [{ upeerId: 'peer-a', lastSeen: '2026-01-01T10:00:00.000Z', lastActive: '2026-01-01T10:00:00.000Z' }],
+        }));
+        const get = vi.fn(() => ({ targetUpeerId: 'peer-a', refreshContacts: refreshContactsMock }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        const handler = onPresenceMock.mock.calls[0][0];
+        handler({ upeerId: 'peer-a', lastActive: '2026-01-01T12:00:00.000Z' });
+
+        const next = (set.mock.calls[0][0] as (s: unknown) => { contacts: Record<string, unknown>[] })({
+            contacts: [{ upeerId: 'peer-a', lastSeen: '2026-01-01T10:00:00.000Z', lastActive: '2026-01-01T10:00:00.000Z' }],
+        });
+        expect(next.contacts[0]).toMatchObject({
+            lastSeen: '2026-01-01T10:00:00.000Z',
+            lastActive: '2026-01-01T12:00:00.000Z',
+        });
+    });
+
+    it('no toca la presencia cuando el evento solo trae datos de perfil', () => {
+        const set = vi.fn((fn: (s: { contacts: Record<string, unknown>[] }) => { contacts: Record<string, unknown>[] }) => fn({
+            contacts: [{ upeerId: 'peer-a', lastSeen: '2026-01-01T10:00:00.000Z', lastActive: '2026-01-01T10:00:00.000Z' }],
+        }));
+        const get = vi.fn(() => ({ targetUpeerId: 'peer-a', refreshContacts: refreshContactsMock }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        const handler = onPresenceMock.mock.calls[0][0];
+        handler({ upeerId: 'peer-a', alias: 'Alice' });
+
+        const next = (set.mock.calls[0][0] as (s: unknown) => { contacts: Record<string, unknown>[] })({
+            contacts: [{ upeerId: 'peer-a', lastSeen: '2026-01-01T10:00:00.000Z', lastActive: '2026-01-01T10:00:00.000Z' }],
+        });
+        expect(next.contacts[0]).toMatchObject({
+            lastSeen: '2026-01-01T10:00:00.000Z',
+            lastActive: '2026-01-01T10:00:00.000Z',
+        });
+    });
+
+    it('ignora eventos sin upeerId', () => {
+        const set = vi.fn();
+        const get = vi.fn(() => ({ targetUpeerId: 'peer-a', refreshContacts: refreshContactsMock }));
+        createChatListenerActions(set as never, get as never).initListeners();
+
+        onPresenceMock.mock.calls[0][0]({ lastActive: '2026-01-01T12:00:00.000Z' });
+        expect(set).not.toHaveBeenCalled();
     });
 });

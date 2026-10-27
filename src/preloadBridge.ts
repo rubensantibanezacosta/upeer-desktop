@@ -44,7 +44,10 @@ type MessageDeletedPayload = {
 
 type ContactPresencePayload = {
     upeerId: string;
-    lastSeen: string;
+    lastSeen?: string;
+    lastActive?: string;
+    alias?: string;
+    avatar?: string;
 };
 
 type HandshakeFinishedPayload = {

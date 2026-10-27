@@ -73,12 +73,20 @@ describe('ContactItem Component', () => {
         expect(screen.getByTestId('BadgeCheckIcon')).toBeDefined();
     });
 
-    it('shows online indicator when lastSeen is recent', () => {
-        const onlineContact: Contact = {
+    it('marca En línea cuando hay actividad reciente', () => {
+        render(<ContactItem {...defaultProps} contact={{ ...mockContact, lastMessage: '', lastActive: new Date().toISOString() }} />);
+        expect(screen.getByText('En línea')).toBeDefined();
+    });
+
+    it('no marca En línea cuando la actividad es antigua', () => {
+        const staleContact: Contact = {
             ...mockContact,
-            lastSeen: new Date().toISOString()
+            lastMessage: '',
+            lastSeen: new Date().toISOString(),
+            lastActive: new Date(Date.now() - 10 * 60_000).toISOString(),
         };
-        render(<ContactItem {...defaultProps} contact={onlineContact} />);
-        expect(screen.getByTestId('BadgeCheckIcon')).toBeDefined();
+        render(<ContactItem {...defaultProps} contact={staleContact} />);
+        expect(screen.queryByText('En línea')).toBeNull();
+        expect(screen.getByText('Desconectado')).toBeDefined();
     });
 });
