@@ -86,6 +86,23 @@ describe('CameraCaptureOverlay', () => {
         expect(onClose).toHaveBeenCalled();
     });
 
+    it('mantiene cuadrados y redondos los tres botones del pie', async () => {
+        setCamera(() => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream));
+        renderOverlay();
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Capturar foto' })).toBeEnabled());
+
+        const shapes = ['Girar cámara', 'Capturar foto', 'Terminar de hacer fotos'].map((name) => {
+            const style = window.getComputedStyle(screen.getByRole('button', { name }));
+            return { name, width: style.width, height: style.height, radius: style.borderRadius };
+        });
+
+        shapes.forEach((shape) => {
+            expect(shape.width).toBe(shape.height);
+            expect(shape.radius).toBe('50%');
+        });
+        expect(shapes.map((shape) => shape.width)).toEqual(['44px', '52px', '44px']);
+    });
+
     it('pide la cámara trasera por defecto y cambia a la frontal', async () => {
         const getUserMedia = vi.fn(() => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream));
         setCamera(getUserMedia);

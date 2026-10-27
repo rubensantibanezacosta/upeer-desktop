@@ -7,8 +7,30 @@ import { ATTACHMENT_SHEET_SX, CAMERA_SHEET_Z_INDEX, SHEET_FOOTER_SX, SHEET_HEADE
 
 const MAX_SIDE = 1600;
 const JPEG_QUALITY = 0.9;
-const SHUTTER_SIZE = 64;
-const THUMB_SIZE = 52;
+const ACTION_SIZE = 44;
+const SHUTTER_SIZE = 52;
+const ICON_SIZE = 24;
+const THUMB_SIZE = 44;
+
+const ROUND_ACTION_SX = {
+    width: ACTION_SIZE,
+    height: ACTION_SIZE,
+    minWidth: ACTION_SIZE,
+    minHeight: ACTION_SIZE,
+    paddingInline: 0,
+    borderRadius: '50%',
+    flexShrink: 0,
+};
+
+const SHUTTER_SX = {
+    ...ROUND_ACTION_SX,
+    width: SHUTTER_SIZE,
+    height: SHUTTER_SIZE,
+    minWidth: SHUTTER_SIZE,
+    minHeight: SHUTTER_SIZE,
+    border: '2px solid',
+    borderColor: 'divider',
+};
 
 interface CameraCaptureOverlayProps {
     open: boolean;
@@ -140,9 +162,9 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
             )}
 
             <Box sx={SHEET_FOOTER_SX}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                    <IconButton aria-label="Girar cámara" variant="plain" color="neutral" onClick={() => setFacing((current) => (current === 'environment' ? 'user' : 'environment'))} sx={{ width: SHUTTER_SIZE }}>
-                        <RefreshCw />
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                    <IconButton aria-label="Girar cámara" variant="plain" color="neutral" onClick={() => setFacing((current) => (current === 'environment' ? 'user' : 'environment'))} sx={ROUND_ACTION_SX}>
+                        <RefreshCw size={ICON_SIZE} />
                     </IconButton>
 
                     <IconButton
@@ -151,13 +173,13 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
                         color="primary"
                         onClick={capture}
                         disabled={!ready}
-                        sx={{ width: SHUTTER_SIZE, height: SHUTTER_SIZE, borderRadius: '50%', border: '3px solid', borderColor: 'divider' }}
+                        sx={SHUTTER_SX}
                     >
-                        <Camera />
+                        <Camera size={ICON_SIZE} />
                     </IconButton>
 
-                    <IconButton aria-label="Terminar de hacer fotos" variant="plain" color={shots.length > 0 ? 'success' : 'neutral'} onClick={onClose} disabled={shots.length === 0} sx={{ width: SHUTTER_SIZE }}>
-                        <Check />
+                    <IconButton aria-label="Terminar de hacer fotos" variant="plain" color={shots.length > 0 ? 'success' : 'neutral'} onClick={onClose} disabled={shots.length === 0} sx={ROUND_ACTION_SX}>
+                        <Check size={ICON_SIZE} />
                     </IconButton>
                 </Box>
 
