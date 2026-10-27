@@ -21,14 +21,15 @@ interface GroupItemProps {
     onLeaveGroup?: (groupId: string) => void;
     onClearChat?: (groupId: string) => void;
     highlight?: string;
+    searchRowId?: string;
 }
 
-export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onToggleFavorite, onLeaveGroup, onClearChat, highlight = '' }) => {
+export const GroupItem: React.FC<GroupItemProps> = ({ group, isSelected, onSelect, onToggleFavorite, onLeaveGroup, onClearChat, highlight = '', searchRowId }) => {
     const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
     const timeStr = formatGroupItemTime(group.lastMessageTime);
 
     return (
-        <ListItem sx={listRowListItemSx}>
+        <ListItem sx={listRowListItemSx} data-search-row={searchRowId} tabIndex={searchRowId ? -1 : undefined}>
             <ListItemButton
                 aria-label={`Abrir grupo ${group.name}`}
                 selected={isSelected}

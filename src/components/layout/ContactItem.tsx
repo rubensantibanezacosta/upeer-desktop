@@ -23,9 +23,10 @@ interface ContactItemProps {
     onClear: (id: string) => void;
     isTyping: boolean;
     highlight?: string;
+    searchRowId?: string;
 }
 
-export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '' }) => {
+export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '', searchRowId }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
     const isOnline = useIsOnline(c.lastActive);
     const isPending = c.status === 'pending' || c.status === 'incoming';
@@ -35,7 +36,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
     const isBold = c.status === 'incoming' || hasUnread;
 
     return (
-        <ListItem sx={listRowListItemSx}>
+        <ListItem sx={listRowListItemSx} data-search-row={searchRowId} tabIndex={searchRowId ? -1 : undefined}>
             <ListItemButton
                 aria-label={`Abrir chat con ${c.name}`}
                 selected={isSelected}

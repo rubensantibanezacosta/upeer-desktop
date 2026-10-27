@@ -78,7 +78,82 @@ describe('ChatListPanel empty state', () => {
             />,
         );
 
-        expect(screen.getByText('Mensajes')).toBeTruthy();
+        expect(screen.getByText('Mensajes · 1')).toBeTruthy();
         expect(screen.queryByText('Sin conversaciones')).toBeNull();
+    });
+});
+
+const anaContact = { upeerId: 'ana', name: 'Ana', address: '300::ana', status: 'connected' as const };
+
+describe('ChatListPanel navegación por teclado', () => {
+    const sections: SearchSection[] = [
+        { kind: 'contacts', total: 2, items: [{ contact: anaContact, subtitle: 'ana' }, { contact: { ...anaContact, upeerId: 'bea', name: 'Bea' }, subtitle: 'bea' }] },
+        { kind: 'messages', total: 1, items: [message('m1', 'Hola Ana')] },
+    ];
+
+    const renderSearch = (onSelectContact = vi.fn()) => {
+        render(
+            <ChatListPanel
+                {...baseProps}
+                entries={[{ kind: 'contact', contact: anaContact, time: 1 }]}
+                sidebarSearch="a"
+                searchSections={sections}
+                onSelectContact={onSelectContact}
+            />,
+        );
+        return onSelectContact;
+    };
+
+    it('la flecha abajo baja del buscador a la primera fila y recorre las demás', () => {
+        renderSearch();
+        const input = screen.getByPlaceholderText('Busca chats, contactos, grupos o mensajes');
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-search-row]'));
+        expect(document.activeElement).toBe(rows[0]);
+        fireEvent.keyDown(rows[0], { key: 'ArrowDown' });
+        expect(document.activeElement).toBe(rows[1]);
+        fireEvent.keyDown(rows[1], { key: 'ArrowUp' });
+        expect(document.activeElement).toBe(rows[0]);
+    });
+
+    it('Intro abre la fila enfocada', () => {
+        const onSelectContact = renderSearch();
+        const input = screen.getByPlaceholderText('Busca chats, contactos, grupos o mensajes');
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        const row = document.querySelector<HTMLElement>('[data-search-row]') as HTMLElement;
+        fireEvent.keyDown(row, { key: 'Enter' });
+        expect(onSelectContact).toHaveBeenCalledWith('ana');
+    });
+
+    it('Escape limpia el término sin salir del buscador', () => {
+        const onSearchChange = vi.fn();
+        render(
+            <ChatListPanel {...baseProps} sidebarSearch="a" searchSections={sections} onSearchChange={onSearchChange} />,
+        );
+        fireEvent.keyDown(screen.getByPlaceholderText('Busca chats, contactos, grupos o mensajes'), { key: 'Escape' });
+        expect(onSearchChange).toHaveBeenCalledWith('');
+    });
+});
+
+describe('ChatListPanel scroll de la lista', () => {
+    it('recupera la posición al vaciar la búsqueda', () => {
+        const entries = [{ kind: 'contact' as const, contact: anaContact, time: 1 }];
+        const { rerender } = render(<ChatListPanel {...baseProps} entries={entries} />);
+        const scroll = screen.getByTestId('chat-list-scroll');
+        let scrollTop = 0;
+        Object.defineProperty(scroll, 'scrollTop', {
+            configurable: true,
+            get: () => scrollTop,
+            set: (value: number) => { scrollTop = value; },
+        });
+
+        scrollTop = 240;
+        fireEvent.scroll(scroll);
+
+        rerender(<ChatListPanel {...baseProps} entries={entries} sidebarSearch="a" searchSections={[{ kind: 'contacts', total: 1, items: [{ contact: anaContact, subtitle: 'ana' }] }]} />);
+        scrollTop = 0;
+
+        rerender(<ChatListPanel {...baseProps} entries={entries} />);
+        expect(scrollTop).toBe(240);
     });
 });

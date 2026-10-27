@@ -19,6 +19,7 @@ interface SidebarSearchProps {
     showFilters?: boolean;
     autoFocus?: boolean;
     focusKey?: string;
+    onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 export const SidebarSearch: React.FC<SidebarSearchProps> = ({
@@ -31,6 +32,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
     showFilters = true,
     autoFocus = false,
     focusKey,
+    onKeyDown,
 }) => {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const availableFilters = filters ?? [
@@ -75,6 +77,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
                         value={value}
                         slotProps={{ input: { maxLength: 80, ref: inputRef } }}
                         onChange={(e) => onChange(e.target.value)}
+                        onKeyDown={onKeyDown}
                         sx={{
                             flexGrow: 1,
                             backgroundColor: 'transparent',

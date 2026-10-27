@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Box, List } from '@mui/joy';
 import { SidebarHeader } from '../SidebarHeader.js';
 import { SidebarSearch } from '../SidebarSearch.js';
 import { ContactItem } from '../ContactItem.js';
 import { GroupItem } from '../GroupItem.js';
 import { SearchResultsPanel } from './SearchResultsPanel.js';
+import { activateSearchRow, closestSearchRow, moveSearchFocus } from './searchKeyboard.js';
 import { SidebarEmptyStateView, resolveSidebarEmptyState } from './sidebarEmptyState.js';
 import { visibleSearchSections } from '../../../features/search/globalSearch.js';
 import type { ChatSearchItem, SearchSection } from '../../../features/search/globalSearch.js';
@@ -68,6 +69,45 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
     searchFocusToken,
 }) => {
     const term = sidebarSearch.trim();
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const savedScroll = useRef(0);
+
+    useLayoutEffect(() => {
+        if (term) return;
+        const container = scrollRef.current;
+        if (container) container.scrollTop = savedScroll.current;
+    }, [term]);
+
+    const handleListScroll = () => {
+        if (term) return;
+        savedScroll.current = scrollRef.current?.scrollTop ?? 0;
+    };
+
+    const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            if (moveSearchFocus(scrollRef.current, 1)) event.preventDefault();
+            return;
+        }
+        if (event.key === 'Escape' && sidebarSearch) {
+            event.preventDefault();
+            onSearchChange('');
+        }
+    };
+
+    const handleResultsKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        const row = closestSearchRow(event.target);
+        if (!row) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            moveSearchFocus(scrollRef.current, event.key === 'ArrowDown' ? 1 : -1, row);
+            return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            activateSearchRow(row);
+        }
+    };
+
     const sections = term ? visibleSearchSections(searchSections) : [];
     const searchPending = searchLoading.chats || searchLoading.contacts || searchLoading.groups || searchLoading.messages;
     const visibleCount = term
@@ -92,12 +132,19 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
             <SidebarSearch
                 value={sidebarSearch}
                 onChange={onSearchChange}
+                onKeyDown={handleSearchKeyDown}
                 activeFilter={sidebarFilter}
                 onFilterChange={(filter) => onFilterChange(filter as SidebarFilter)}
                 autoFocus={searchFocusToken !== undefined && searchFocusToken > 0}
                 focusKey={searchFocusToken ? `search-${searchFocusToken}` : undefined}
             />
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Box
+                ref={scrollRef}
+                onScroll={handleListScroll}
+                onKeyDown={term ? handleResultsKeyDown : undefined}
+                data-testid="chat-list-scroll"
+                sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}
+            >
                 {emptyState ? (
                     <SidebarEmptyStateView model={emptyState} />
                 ) : term ? (

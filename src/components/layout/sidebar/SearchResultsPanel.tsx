@@ -33,10 +33,10 @@ interface SearchResultsPanelProps {
     onLoadMoreMessages: () => void;
 }
 
-const sectionLabel = (label: string) => (
+const sectionLabel = (label: string, total: number) => (
     <Box sx={{ px: 2, pb: 0.5, pt: 2 }}>
         <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.5 }}>
-            {label}
+            {`${label} · ${total}`}
         </Typography>
     </Box>
 );
@@ -52,6 +52,8 @@ const sectionFooter = (label: string, onClick: () => void, loading = false) => (
 const messageRow = (msg: ChatMessage, query: string, onSelect: (msg: ChatMessage) => void) => (
     <ListItem
         key={msg.id}
+        data-search-row={msg.id}
+        tabIndex={-1}
         onClick={() => onSelect(msg)}
         sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'background.level1' }, px: 2, py: 1.5 }}
     >
@@ -102,12 +104,13 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
     <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
         {sections.map((section) => (
             <React.Fragment key={section.kind}>
-                {sectionLabel(SECTION_TITLES[section.kind])}
+                {sectionLabel(SECTION_TITLES[section.kind], section.total)}
                 {section.kind === 'chats' && section.items.map((item) => (item.kind === 'group'
                     ? (
                         <GroupItem
                             key={item.group.groupId}
                             group={item.group}
+                            searchRowId={item.group.groupId}
                             isSelected={selectedGroupId === item.group.groupId}
                             onSelect={onSelectGroup || (() => undefined)}
                             onToggleFavorite={onToggleFavoriteGroup}
@@ -120,6 +123,7 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
                         <ContactItem
                             key={item.contact.upeerId}
                             contact={item.contact}
+                            searchRowId={item.contact.upeerId}
                             isSelected={selectedId === item.contact.upeerId}
                             onSelect={onSelectContact}
                             onToggleFavorite={onToggleFavorite}
@@ -132,6 +136,7 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
                     <ContactItem
                         key={item.contact.upeerId}
                         contact={item.contact}
+                        searchRowId={item.contact.upeerId}
                         isSelected={selectedId === item.contact.upeerId}
                         onSelect={onSelectContact}
                         onToggleFavorite={onToggleFavorite}
@@ -144,6 +149,7 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
                     <React.Fragment key={item.group.groupId}>
                         <GroupItem
                             group={item.group}
+                            searchRowId={item.group.groupId}
                             isSelected={selectedGroupId === item.group.groupId}
                             onSelect={onSelectGroup || (() => undefined)}
                             onToggleFavorite={onToggleFavoriteGroup}
