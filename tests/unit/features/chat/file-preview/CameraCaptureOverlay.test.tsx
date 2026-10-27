@@ -98,26 +98,38 @@ describe('CameraCaptureOverlay', () => {
         await waitFor(() => expect(getUserMedia).toHaveBeenLastCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: 'user' }) })));
     });
 
-    it('se monta en el body para no quedar atrapado en el compositor', () => {
+    it('se monta en el mismo contenedor que el overlay de adjuntos para ocupar su misma caja', () => {
         setCamera(() => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream));
+        const pane = document.createElement('div');
         const composer = document.createElement('div');
         composer.style.position = 'absolute';
         composer.style.height = '68px';
-        document.body.appendChild(composer);
+        pane.appendChild(composer);
+        document.body.appendChild(pane);
 
         const onCapture = vi.fn();
         render(
-            <CameraCaptureOverlay open shots={[]} onCapture={onCapture} onClose={vi.fn()} />,
+            <CameraCaptureOverlay open shots={[]} onCapture={onCapture} onClose={vi.fn()} container={pane} />,
             { container: composer },
         );
 
         const close = screen.getByRole('button', { name: 'Cerrar cámara' });
         expect(composer.contains(close)).toBe(false);
         let top: HTMLElement = close;
+        while (top.parentElement && top.parentElement !== pane) top = top.parentElement;
+        expect(top.parentElement).toBe(pane);
+        expect(top.contains(document.querySelector('video'))).toBe(true);
+        pane.remove();
+    });
+
+    it('cae al body si no se le da contenedor', () => {
+        setCamera(() => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream));
+        render(<CameraCaptureOverlay open shots={[]} onCapture={vi.fn()} onClose={vi.fn()} />);
+
+        const close = screen.getByRole('button', { name: 'Cerrar cámara' });
+        let top: HTMLElement = close;
         while (top.parentElement && top.parentElement !== document.body) top = top.parentElement;
         expect(top.parentElement).toBe(document.body);
-        expect(top.contains(document.querySelector('video'))).toBe(true);
-        composer.remove();
     });
 
     it('engancha el stream al vídeo para que se vea lo que enfoca la cámara', async () => {

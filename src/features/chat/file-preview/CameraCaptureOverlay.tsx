@@ -15,9 +15,10 @@ interface CameraCaptureOverlayProps {
     shots: string[];
     onCapture: (dataUrl: string) => void;
     onClose: () => void;
+    container?: HTMLElement | null;
 }
 
-export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open, shots, onCapture, onClose }) => {
+export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open, shots, onCapture, onClose, container }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const [error, setError] = useState('');
@@ -103,7 +104,7 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
     };
 
     return createPortal(
-        <Sheet variant="solid" color="neutral" sx={{ ...ATTACHMENT_SHEET_SX, position: 'fixed', zIndex: CAMERA_SHEET_Z_INDEX }}>
+        <Sheet variant="solid" color="neutral" sx={{ ...ATTACHMENT_SHEET_SX, zIndex: CAMERA_SHEET_Z_INDEX }}>
             <Box sx={SHEET_HEADER_SX}>
                 <IconButton aria-label="Cerrar cámara" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <X />
@@ -180,6 +181,6 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
                 </Box>
             </Box>
         </Sheet>,
-        document.body,
+        container ?? document.body,
     );
 };

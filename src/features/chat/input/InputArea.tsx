@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import { Camera, Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
@@ -48,6 +48,12 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const [shots, setShots] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
     const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
+    const [layer, setLayer] = useState<HTMLElement | null>(null);
+
+    const attachLayer = useCallback((node: HTMLDivElement | null) => {
+        const parent = node?.parentElement ?? null;
+        setLayer((current) => (current === parent ? current : parent));
+    }, []);
 
     const handleChange = (val: string) => {
         setMessage(val);
@@ -94,7 +100,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const showPreviewBar = !isRecording && (linkPreview !== null || isLoadingPreview);
 
     return (
-        <Box sx={{
+        <Box ref={attachLayer} sx={{
             position: 'absolute',
             bottom: 0,
             left: 0,
@@ -223,6 +229,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 shots={shots}
                 onCapture={handleCapture}
                 onClose={closeCamera}
+                container={layer}
             />
         </Box>
     );
