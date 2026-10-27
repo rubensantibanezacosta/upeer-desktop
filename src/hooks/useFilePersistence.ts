@@ -93,6 +93,38 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         } catch (error) { console.error('Error opening native file dialog:', error); }
     };
 
+    const handleCapturePhoto = async (dataUrl: string) => {
+        if (!effectiveId) return;
+        const match = /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(dataUrl);
+        if (!match) {
+            console.error('La foto capturada no tiene un formato de datos válido');
+            return;
+        }
+        const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
+        const fileName = `foto-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
+        try {
+            setPreparingAttachments(true);
+            try {
+                const saved = await window.upeer.saveBufferToTemp({ base64: match[2], fileName });
+                if (!saved.success || !saved.path) {
+                    throw new Error(saved.error || 'No se pudo guardar la foto capturada');
+                }
+                setPendingFiles([...pendingFiles, {
+                    path: saved.path,
+                    name: fileName,
+                    size: Math.round((match[2].length * 3) / 4),
+                    type: `image/${match[1]}`,
+                    lastModified: Date.now(),
+                }]);
+                setFilePickerOpen(true);
+            } finally {
+                setPreparingAttachments(false);
+            }
+        } catch (error) {
+            console.error('Error saving captured photo:', error);
+        }
+    };
+
     const handleFileSubmit = async (files: PendingFile[], thumbnails?: (string | undefined)[], captions?: string[]) => {
         if (!effectiveId) return;
         for (let i = 0; i < files.length; i++) {
@@ -186,6 +218,7 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         handleDragLeave,
         handleDrop,
         handleAttachFile,
+        handleCapturePhoto,
         handleFileSubmit,
         handleSendVoiceNote
     };

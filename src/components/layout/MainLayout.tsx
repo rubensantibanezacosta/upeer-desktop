@@ -41,6 +41,7 @@ export interface MainLayoutProps {
     handleSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleAttachFile: (type: AttachmentType) => void | Promise<void>;
+    handleCapturePhoto: (dataUrl: string) => void | Promise<void>;
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
     currentReplyToMessage: ChatMessage | null;
@@ -74,7 +75,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     isDragging, handleDragOver, handleDragLeave, handleDrop,
     activeContact, activeGroup, isIncomingRequest,
     targetUpeerId, activeGroupId, message, setMessage,
-    handleSend, handleSendGroupMessage, handleAttachFile, handleTyping, handleScrollToMessage,
+    handleSend, handleSendGroupMessage, handleAttachFile, handleCapturePhoto, handleTyping, handleScrollToMessage,
     currentReplyToMessage, setReplyToMessage,
     handleAcceptContact, handleDeleteContact, handleToggleFavorite, handleClearChat, handleBlockContact,
     handleReaction, handleUpdateMessage, handleDeleteMessage, handleMediaClick,
@@ -158,6 +159,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 handleSend={handleSend}
                 handleSendGroupMessage={handleSendGroupMessage}
                 handleAttachFile={handleAttachFile}
+                handleCapturePhoto={handleCapturePhoto}
                 handleTyping={handleTyping}
                 handleScrollToMessage={handleScrollToMessage}
                 currentReplyToMessage={currentReplyToMessage}

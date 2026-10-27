@@ -43,6 +43,7 @@ interface MainLayoutContentProps {
     handleSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleAttachFile: MainLayoutProps['handleAttachFile'];
+    handleCapturePhoto: MainLayoutProps['handleCapturePhoto'];
     handleTyping: () => void;
     handleScrollToMessage: (id: string) => void;
     currentReplyToMessage: ChatMessage | null;
@@ -93,6 +94,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     handleSend,
     handleSendGroupMessage,
     handleAttachFile,
+    handleCapturePhoto,
     handleTyping,
     handleScrollToMessage,
     currentReplyToMessage,
@@ -310,6 +312,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 }
                                                 onTyping={handleTyping}
                                                 onAttachFile={handleAttachFile}
+                                                onCapturePhoto={handleCapturePhoto}
                                                 allowContactShare={!activeGroupId && !!targetUpeerId}
                                                 onSendVoiceNote={handleSendVoiceNote}
                                                 disabled={(activeGroupId ? activeGroup?.status !== 'active' : !targetUpeerId) || (targetUpeerId ? !['connected', 'offline', 'disconnected'].includes(activeContact?.status ?? '') : false)}

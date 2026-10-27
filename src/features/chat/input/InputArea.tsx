@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
-import { Send, Mic, Pencil, X } from 'lucide-react';
+import { Camera, Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
+import { CameraCaptureModal } from './CameraCaptureModal.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { RecordingBar } from './RecordingBar.js';
 import { ReplyBar } from './ReplyBar.js';
@@ -27,6 +28,7 @@ interface InputAreaProps {
     editingMessage?: { id?: string; message: string } | null;
     onCancelEdit?: () => void;
     onAttachFile?: (type: AttachmentType) => void;
+    onCapturePhoto?: (dataUrl: string) => void | Promise<void>;
     allowContactShare?: boolean;
     onScrollToMessage?: (msgId: string) => void;
     onSendVoiceNote?: (file: File) => Promise<void>;
@@ -36,11 +38,12 @@ interface InputAreaProps {
 export const InputArea: React.FC<InputAreaProps> = ({
     message, setMessage, onSend, onTyping, disabled,
     replyToMessage, onCancelReply, editingMessage, onCancelEdit,
-    onAttachFile, allowContactShare = false, onScrollToMessage, onSendVoiceNote, focusKey
+    onAttachFile, allowContactShare = false, onScrollToMessage, onSendVoiceNote, focusKey, onCapturePhoto
 }) => {
     const { isRecording, duration, stream, startRecording, stopRecording, cancelRecording } = useAudioRecorder();
     const canvasRef = useRecordingWaveform(isRecording, stream);
     const [voiceError, setVoiceError] = useState<string | null>(null);
+    const [cameraOpen, setCameraOpen] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
 
@@ -159,6 +162,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 embedded
                             />
                             <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
+                            <IconButton aria-label="Abrir cámara" variant="plain" color="neutral" onClick={() => setCameraOpen(true)} disabled={disabled || !onCapturePhoto} sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}>
+                                <Camera />
+                            </IconButton>
                         </Box>
                         <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ flexShrink: 0, '&:hover': { backgroundColor: 'background.level2' } }}>
                             {message
@@ -171,6 +177,11 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     </>
                 )}
             </Box>
+            <CameraCaptureModal
+                open={cameraOpen}
+                onClose={() => setCameraOpen(false)}
+                onCapture={(dataUrl) => { void onCapturePhoto?.(dataUrl); }}
+            />
         </Box>
     );
 };

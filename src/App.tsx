@@ -102,7 +102,7 @@ export default function App() {
     const fileTransfer = useFileTransfer(chatStore.updateFileTransferMessage, handleIncomingTransferStarted);
 
     const {
-        handleAttachFile, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave, handleSendVoiceNote
+        handleAttachFile, handleCapturePhoto, handleFileSubmit, handleDrop, handleDragOver, handleDragLeave, handleSendVoiceNote
     } = useFilePersistence(fileTransfer);
 
     const hydrateInitialShell = React.useCallback(async () => {
@@ -293,6 +293,7 @@ export default function App() {
                     handleSend={(linkPreview?: LinkPreview | null) => chatStore.handleSend(linkPreview)}
                     handleSendGroupMessage={(linkPreview?: LinkPreview | null) => chatStore.handleSendGroupMessage(message, linkPreview)}
                     handleAttachFile={handleAttachFile}
+                    handleCapturePhoto={handleCapturePhoto}
                     handleTyping={handleTyping}
                     handleScrollToMessage={handleScrollToMessage}
                     currentReplyToMessage={chatStore.activeGroupId ? (chatStore.replyByConversation[chatStore.activeGroupId] || null) : (chatStore.replyByConversation[chatStore.targetUpeerId] || null)}
