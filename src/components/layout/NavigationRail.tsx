@@ -4,6 +4,18 @@ import { MessageCircle, CircleDashed, Users, Settings, Phone, Video } from 'luci
 import { SyncStatusIndicator } from './SyncStatusIndicator.js';
 import type { SettingsSection } from '../ui/settings/types.js';
 
+const RAIL_ITEM_SIZE = 40;
+
+const railItemSx = {
+    width: RAIL_ITEM_SIZE,
+    height: RAIL_ITEM_SIZE,
+    minWidth: RAIL_ITEM_SIZE,
+    minHeight: RAIL_ITEM_SIZE,
+    p: 0,
+    borderRadius: '50%',
+    flexShrink: 0,
+};
+
 interface NavigationRailProps {
     myIp: string;
     myAvatar?: string | null;
@@ -58,7 +70,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'chat' ? 'soft' : 'plain'}
                         color={activeView === 'chat' ? 'primary' : 'neutral'}
                         onClick={onOpenChats}
-                        sx={{ borderRadius: '50%' }}
+                        sx={railItemSx}
                     >
                         <Badge
                             badgeContent={unreadChatCount > 99 ? '99+' : unreadChatCount}
@@ -79,7 +91,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                         variant={activeView === 'calls' ? 'soft' : 'plain'}
                         color={activeView === 'calls' ? 'primary' : 'neutral'}
                         onClick={onOpenCalls}
-                        sx={{ borderRadius: '50%' }}
+                        sx={railItemSx}
                     >
                         {activeCallKind === 'video'
                             ? <Video style={{ fontSize: 22, color: 'var(--joy-palette-success-400)' }} />
@@ -88,12 +100,12 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                 </Box>
             </Tooltip>
             <Tooltip title="Actualizaciones" placement="right">
-                <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
+                <IconButton variant="plain" color="neutral" sx={railItemSx}>
                     <CircleDashed style={{ fontSize: 22 }} />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Comunidades" placement="right">
-                <IconButton variant="plain" color="neutral" sx={{ borderRadius: '50%' }}>
+                <IconButton variant="plain" color="neutral" sx={railItemSx}>
                     <Users style={{ fontSize: 22 }} />
                 </IconButton>
             </Tooltip>
@@ -107,7 +119,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     variant={activeView === 'settings' ? 'soft' : 'plain'}
                     color={activeView === 'settings' ? 'primary' : 'neutral'}
                     onClick={onOpenSettings}
-                    sx={{ borderRadius: '50%' }}
+                    sx={railItemSx}
                 >
                     <Settings style={{ fontSize: 22 }} />
                 </IconButton>
@@ -119,14 +131,13 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                     src={myAvatar || undefined}
                     onClick={onOpenIdentity}
                     sx={{
+                        ...railItemSx,
                         cursor: 'pointer',
                         mt: 1,
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
+                        boxSizing: 'border-box',
                         background: myAvatar ? 'transparent' : 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
                         fontWeight: 700,
-                        fontSize: '14px',
+                        fontSize: '15px',
                         border: '2px solid',
                         borderColor: onProfileSection ? 'primary.500' : 'transparent',
                         transition: 'border-color 0.2s',

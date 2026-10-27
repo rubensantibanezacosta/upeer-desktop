@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Input, List, ListItem, ListItemButton, ListItemContent, Typography, IconButton, Chip, CircularProgress } from '@mui/joy';
-import { Search, X, MessageSquare } from 'lucide-react';
+import { Search, X, MessageSquare, Paperclip, Mic, UserRound } from 'lucide-react';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
+import { summarizeSearchResult, type SearchResultKind } from './searchResultMeta.js';
 
 interface ChatSearchBarProps {
     conversationKey: string;
@@ -11,18 +12,18 @@ interface ChatSearchBarProps {
 interface SearchResult {
     id: string;
     message: string;
+    summary: ReturnType<typeof summarizeSearchResult>;
     timestamp: number;
     isMine: boolean;
 }
 
 const IN_CHAT_SEARCH_LIMIT = 50;
 
-const excerpt = (raw: string): string => {
-    if (raw.startsWith('{') && raw.endsWith('}')) {
-        return '📎 Archivo adjunto';
-    }
-    const singleLine = raw.replace(/\s+/g, ' ').trim();
-    return singleLine.length > 140 ? `${singleLine.slice(0, 140)}…` : singleLine;
+const RESULT_ICONS: Record<SearchResultKind, React.ComponentType<{ style?: React.CSSProperties }>> = {
+    text: MessageSquare,
+    file: Paperclip,
+    voice: Mic,
+    card: UserRound,
 };
 
 const fmtTime = (ts: number): string =>
@@ -56,6 +57,7 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
                         .map((row) => ({
                             id: row.id as string,
                             message: row.message || '',
+                            summary: summarizeSearchResult(row.message || ''),
                             timestamp: Number(row.timestamp),
                             isMine: !!row.isMine,
                         }));
@@ -98,8 +100,10 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
             flexDirection: 'column',
             gap: 1,
             flexShrink: 0,
+            minWidth: 0,
+            overflow: 'hidden',
         }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                 <Input
                     aria-label="Buscar mensajes en esta conversación"
                     size="sm"
@@ -130,26 +134,29 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
             )}
 
             {results.length > 0 && (
-                <List sx={{ p: 0, '--ListItem-paddingY': '0px', maxHeight: 280, overflowY: 'auto' }}>
-                    {results.map((result) => (
-                        <ListItem key={result.id} sx={{ p: 0 }}>
-                            <ListItemButton
-                                aria-label={`Ir al mensaje: ${excerpt(result.message)}`}
-                                onClick={() => openResult(result.id)}
-                                sx={{ px: 1, py: 0.75, borderRadius: 'sm', gap: 1 }}
-                            >
-                                <MessageSquare style={{ fontSize: 18, color: 'var(--joy-palette-text-tertiary)', flexShrink: 0 }} />
-                                <ListItemContent sx={{ minWidth: 0 }}>
-                                    <Typography level="body-xs" noWrap sx={{ color: result.isMine ? 'primary.500' : 'neutral' }}>
-                                        {result.isMine ? 'Tú' : 'Contacto'} · {fmtTime(result.timestamp)}
-                                    </Typography>
-                                    <Typography level="body-sm" noWrap color="neutral">
-                                        {excerpt(result.message)}
-                                    </Typography>
-                                </ListItemContent>
-                            </ListItemButton>
-                        </ListItem>
-                    ))}
+                <List sx={{ p: 0, '--ListItem-paddingY': '0px', maxHeight: 280, overflowY: 'auto', overflowX: 'hidden', minWidth: 0, width: '100%' }}>
+                    {results.map((result) => {
+                        const Icon = RESULT_ICONS[result.summary.kind];
+                        return (
+                            <ListItem key={result.id} sx={{ p: 0, minWidth: 0 }}>
+                                <ListItemButton
+                                    aria-label={`Ir al mensaje: ${result.summary.label}`}
+                                    onClick={() => openResult(result.id)}
+                                    sx={{ px: 1, py: 0.75, borderRadius: 'sm', gap: 1, minWidth: 0, overflow: 'hidden', alignItems: 'flex-start' }}
+                                >
+                                    <Icon style={{ fontSize: 18, marginTop: 2, color: 'var(--joy-palette-text-tertiary)', flexShrink: 0 }} />
+                                    <ListItemContent sx={{ minWidth: 0, overflow: 'hidden' }}>
+                                        <Typography level="body-xs" noWrap sx={{ color: result.isMine ? 'primary.500' : 'neutral' }}>
+                                            {result.isMine ? 'Tú' : 'Contacto'} · {fmtTime(result.timestamp)}
+                                        </Typography>
+                                        <Typography level="body-sm" noWrap color="neutral" sx={{ display: 'block' }}>
+                                            {result.summary.label}
+                                        </Typography>
+                                    </ListItemContent>
+                                </ListItemButton>
+                            </ListItem>
+                        );
+                    })}
                 </List>
             )}
         </Box>

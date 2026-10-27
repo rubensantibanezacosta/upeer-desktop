@@ -65,6 +65,14 @@ function searchScenario(): Parameters<typeof installUpeerBridge>[1] {
                     status: 'sent',
                     timestamp: now - 60_000,
                 },
+                {
+                    id: 'alice-long',
+                    upeerId: 'alice',
+                    message: `${'texto larguísimo sin espacios '.repeat(8)}aguja larga`,
+                    isMine: true,
+                    status: 'sent',
+                    timestamp: now - 55_000,
+                },
             ],
             'grp-search-1': [
                 {
@@ -119,4 +127,32 @@ test('muestra estados sin resultados en búsqueda global y nuevo chat', async ({
     await page.getByRole('button', { name: 'Nuevo chat' }).click();
     await page.getByRole('textbox', { name: 'Buscar contactos' }).first().fill('sin-coincidencias-contactos');
     await expect(page.getByText('Sin resultados para "sin-coincidencias-contactos"')).toBeVisible();
+});
+
+test('los resultados del buscador de chat no desbordan el layout horizontal', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 720 });
+    await mount(page, searchScenario());
+    await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
+    await page.getByRole('button', { name: 'Buscar en el chat' }).click();
+
+    const input = page.getByLabel('Buscar mensajes en esta conversación');
+    await input.fill('aguja');
+
+    await expect(page.getByText(/^Tú · /).first()).toBeVisible();
+    const results = page.getByRole('button', { name: /Ir al mensaje:/ });
+    await expect(results.first()).toBeVisible();
+
+    const overflow = await page.evaluate(() => {
+        const button = document.querySelector('[aria-label^="Ir al mensaje:"]');
+        const list = button?.closest('ul') ?? null;
+        return {
+            page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            listOverflowX: list ? window.getComputedStyle(list).overflowX : 'sin lista',
+        };
+    });
+
+    expect(overflow.page).toBeLessThanOrEqual(0);
+    expect(overflow.listOverflowX).toBe('hidden');
+    await expect(page.locator('svg.lucide-message-square').first()).toBeVisible();
+    await expect(results.first()).not.toContainText('📎');
 });

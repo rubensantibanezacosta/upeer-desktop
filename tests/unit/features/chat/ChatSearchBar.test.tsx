@@ -47,7 +47,8 @@ describe('ChatSearchBar', () => {
         const items = await screen.findAllByRole('button');
         const labels = items.map((item) => item.getAttribute('aria-label') || '');
         expect(labels.some((label) => label.includes('Hola, ¿cómo estás?'))).toBe(true);
-        expect(labels.some((label) => label.includes('Archivo adjunto'))).toBe(true);
+        expect(labels.some((label) => label.includes('doc.pdf'))).toBe(true);
+        expect(document.body.textContent).not.toContain('📎');
         expect(labels.some((label) => label.includes('otra conversación'))).toBe(false);
         expect(labels.some((label) => label.includes('eliminado'))).toBe(false);
     });
