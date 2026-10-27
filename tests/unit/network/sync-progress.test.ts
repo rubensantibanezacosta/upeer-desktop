@@ -16,7 +16,8 @@ const base = {
     historyDone: 0,
     historyTotal: 0,
     historyKnown: false,
-    pendingMessages: 0,
+    pendingOutbound: 0,
+    pendingInbound: 0,
     pendingFiles: 0,
 };
 
@@ -35,20 +36,23 @@ describe('computeSyncProgress', () => {
         expect(progress.detail).toBe('250 de 1000 mensajes');
     });
 
-    it('suma los mensajes por enviar y los archivos en curso al detalle', () => {
+    it('separa lo que falta por enviar de lo que falta por recibir', () => {
         const progress = computeSyncProgress({
             ...base,
             historyDone: 5,
             historyTotal: 10,
             historyKnown: true,
-            pendingMessages: 3,
+            pendingOutbound: 3,
+            pendingInbound: 5,
             pendingFiles: 2,
         });
-        expect(progress.detail).toBe('5 de 10 mensajes · 3 mensajes por enviar · 2 archivos en curso');
+        expect(progress.pendingOutbound).toBe(3);
+        expect(progress.pendingInbound).toBe(5);
+        expect(progress.detail).toBe('5 de 10 mensajes · 3 mensajes por enviar · 5 mensajes por recibir · 2 archivos en curso');
     });
 
     it('usa singular cuando solo hay una unidad pendiente', () => {
-        const progress = computeSyncProgress({ ...base, pendingMessages: 1, pendingFiles: 1 });
+        const progress = computeSyncProgress({ ...base, pendingOutbound: 1, pendingFiles: 1 });
         expect(progress.detail).toBe('Conectando con tus dispositivos · 1 mensaje por enviar · 1 archivo en curso');
     });
 

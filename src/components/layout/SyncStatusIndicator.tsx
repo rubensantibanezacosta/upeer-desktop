@@ -20,7 +20,18 @@ const platformLabel = (platform: string): string => (
     platform === 'android' || platform === 'ios' ? 'Móvil' : 'Escritorio'
 );
 
-const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus; total: number }> = ({ status, total }) => (
+export const pendingLines = (status: UpeerSyncStatus): string[] => {
+    const outbound = status.progress?.pendingOutbound ?? status.pendingEvents;
+    const inbound = status.progress?.pendingInbound ?? 0;
+    const lines: string[] = [];
+    if (outbound > 0) lines.push(`${outbound} por enviar`);
+    if (inbound > 0) lines.push(`${inbound} por recibir`);
+    return lines;
+};
+
+const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus; total: number }> = ({ status, total }) => {
+    const lines = pendingLines(status);
+    return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, maxWidth: 300 }}>
         <Typography level="body-sm" sx={{ fontWeight: 600 }}>
             {total === 1 ? 'Este es el único dispositivo de tu cuenta' : `${total} dispositivos en tu cuenta`}
@@ -33,12 +44,13 @@ const SyncStatusTooltip: React.FC<{ status: UpeerSyncStatus; total: number }> = 
                 </Typography>
             </Box>
         ))}
-        {status.pendingEvents > 0 && (
-            <Typography level="body-xs">{status.pendingEvents} evento(s) sin confirmar</Typography>
-        )}
+        {lines.map((line) => (
+            <Typography key={line} level="body-xs">{line}</Typography>
+        ))}
         <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>Pulsa para gestionar los dispositivos</Typography>
     </Box>
-);
+    );
+};
 
 export const SyncStatusIndicator: React.FC<{ onOpenDevices?: () => void; active?: boolean }> = ({ onOpenDevices, active = false }) => {
     const syncStatus = useChatStore((state) => state.syncStatus);

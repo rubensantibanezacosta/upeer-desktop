@@ -35,7 +35,8 @@ const IDLE_PROGRESS: SyncProgressView = {
     historyDone: 0,
     historyTotal: 0,
     historyKnown: false,
-    pendingMessages: 0,
+    pendingOutbound: 0,
+    pendingInbound: 0,
     pendingFiles: 0,
     headline: 'Sin dispositivos que sincronizar',
     detail: 'Este equipo es el único de la cuenta',
@@ -68,7 +69,8 @@ export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView
         historyDone: history.done,
         historyTotal: history.total,
         historyKnown: history.known,
-        pendingMessages: status.pendingMessages ?? 0,
+        pendingOutbound: status.pendingMessages ?? 0,
+        pendingInbound: history.known ? Math.max(0, history.total - history.done) : 0,
         pendingFiles: Math.max(0, Math.trunc(extras.activeFiles ?? 0)),
     });
     return { ...status, ...phase, devices: buildDevices(status), progress };

@@ -5,7 +5,8 @@ export type SyncProgressInput = {
     historyDone: number;
     historyTotal: number;
     historyKnown: boolean;
-    pendingMessages: number;
+    pendingOutbound: number;
+    pendingInbound: number;
     pendingFiles: number;
 };
 
@@ -15,7 +16,8 @@ export type SyncProgressView = {
     historyDone: number;
     historyTotal: number;
     historyKnown: boolean;
-    pendingMessages: number;
+    pendingOutbound: number;
+    pendingInbound: number;
     pendingFiles: number;
     headline: string;
     detail: string;
@@ -40,9 +42,11 @@ function buildDetail(input: SyncProgressInput, determinate: boolean): string {
     if (determinate) parts.push(`${done} de ${plural(total, 'mensaje', 'mensajes')}`);
     else if (done > 0) parts.push(`${plural(done, 'mensaje sincronizado', 'mensajes sincronizados')}`);
     else parts.push('Conectando con tus dispositivos');
-    const pendingMessages = safeCount(input.pendingMessages);
+    const pendingOutbound = safeCount(input.pendingOutbound);
+    const pendingInbound = safeCount(input.pendingInbound);
     const pendingFiles = safeCount(input.pendingFiles);
-    if (pendingMessages > 0) parts.push(`${plural(pendingMessages, 'mensaje', 'mensajes')} por enviar`);
+    if (pendingOutbound > 0) parts.push(`${plural(pendingOutbound, 'mensaje', 'mensajes')} por enviar`);
+    if (pendingInbound > 0) parts.push(`${plural(pendingInbound, 'mensaje', 'mensajes')} por recibir`);
     if (pendingFiles > 0) parts.push(`${plural(pendingFiles, 'archivo', 'archivos')} en curso`);
     return parts.join(' · ');
 }
@@ -58,7 +62,8 @@ export function computeSyncProgress(input: SyncProgressInput): SyncProgressView 
         historyDone,
         historyTotal,
         historyKnown: input.historyKnown,
-        pendingMessages: safeCount(input.pendingMessages),
+        pendingOutbound: safeCount(input.pendingOutbound),
+        pendingInbound: safeCount(input.pendingInbound),
         pendingFiles: safeCount(input.pendingFiles),
         headline: input.phase === 'syncing' ? 'Sincronizando tus dispositivos…' : '¡Al día!',
         detail: buildDetail(input, determinate),

@@ -4,6 +4,8 @@ import { getMyAccountRegistry } from '../../../src/main_process/network/accountR
 import { getDeviceIdentity } from '../../../src/main_process/security/deviceIdentity.js';
 import { getSyncStatus } from '../../../src/main_process/storage/sync/status.js';
 import { getMyUPeerId } from '../../../src/main_process/security/identity.js';
+import { recordHistoryPage, resetHistoryWork } from '../../../src/main_process/network/sync/historyProgress.js';
+import { resetSyncProgressMemory } from '../../../src/main_process/network/sync/progress.js';
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: vi.fn(() => 'a'.repeat(64)),
@@ -89,5 +91,48 @@ describe('getSyncStatusView', () => {
             devices: [accountDevice('local-device', 'desktop')],
         } as never);
         expect(getSyncStatusView().devices).toHaveLength(1);
+    });
+});
+
+describe('getSyncStatusView: pendientes por dirección', () => {
+    beforeEach(() => {
+        resetHistoryWork();
+        resetSyncProgressMemory();
+    });
+
+    it('separa lo que falta por enviar de lo que falta por recibir', () => {
+        vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+        vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+        vi.mocked(getSyncStatus).mockReturnValue({
+            state: 'pending',
+            pendingEvents: 3,
+            pendingMessages: 3,
+            pendingMetadata: 0,
+            pendingEntityIds: ['m1'],
+            peers: [{ deviceId: 'remote-device', state: 'pending', ackSequence: 1, lastSeen: Date.now(), historyCompleted: false }],
+        });
+        recordHistoryPage('remote-device', 10, 40);
+
+        const view = getSyncStatusView();
+
+        expect(view.progress.pendingOutbound).toBe(3);
+        expect(view.progress.pendingInbound).toBe(40);
+        expect(view.progress.detail).toContain('3 mensajes por enviar');
+        expect(view.progress.detail).toContain('40 mensajes por recibir');
+    });
+
+    it('no inventa entrantes cuando el par no anunció el total', () => {
+        vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+        vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+        vi.mocked(getSyncStatus).mockReturnValue({
+            state: 'idle',
+            pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
+            pendingEntityIds: [],
+            peers: [],
+        });
+
+        expect(getSyncStatusView().progress.pendingInbound).toBe(0);
     });
 });

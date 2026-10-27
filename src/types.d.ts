@@ -56,7 +56,8 @@ declare global {
         historyDone: number;
         historyTotal: number;
         historyKnown: boolean;
-        pendingMessages: number;
+        pendingOutbound: number;
+        pendingInbound: number;
         pendingFiles: number;
         headline: string;
         detail: string;

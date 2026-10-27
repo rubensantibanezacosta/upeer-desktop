@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SyncStatusIndicator } from '../../../../src/components/layout/SyncStatusIndicator.js';
+import { SyncStatusIndicator, pendingLines } from '../../../../src/components/layout/SyncStatusIndicator.js';
 import { useChatStore } from '../../../../src/store/useChatStore.js';
 
 const initialSyncStatus = useChatStore.getState().syncStatus;
@@ -25,7 +25,8 @@ const baseStatus: UpeerSyncStatus = {
         historyDone: 0,
         historyTotal: 0,
         historyKnown: false,
-        pendingMessages: 0,
+        pendingOutbound: 0,
+        pendingInbound: 0,
         pendingFiles: 0,
         headline: 'Sin dispositivos que sincronizar',
         detail: 'Este equipo es el único de la cuenta',
@@ -91,5 +92,17 @@ describe('SyncStatusIndicator', () => {
         render(<SyncStatusIndicator />);
         expect(screen.getByLabelText('3 dispositivos en tu cuenta, 1 conectado')).toBeTruthy();
         expect(screen.getByText('3')).toBeTruthy();
+    });
+
+    it('distingue los pendientes por dirección', () => {
+        expect(pendingLines({
+            ...baseStatus,
+            pendingEvents: 2,
+            progress: { ...baseStatus.progress, pendingOutbound: 2, pendingInbound: 30 },
+        })).toEqual(['2 por enviar', '30 por recibir']);
+    });
+
+    it('no enseña una dirección cuando no hay pendientes', () => {
+        expect(pendingLines(baseStatus)).toEqual([]);
     });
 });
