@@ -5,12 +5,15 @@ import { EMOJI_CATEGORIES, RECENT_KEY, RECENT_LABEL, STORAGE_KEY, TAB_KEYS, push
 import { CHAT_COMPOSER_ICON_SIZE } from './composerLayout.js';
 import { COMPOSER_ACTION_BUTTON_SX } from './composerActions.js';
 
+const keepComposerFocus = (event: React.MouseEvent) => event.preventDefault();
+
 interface EmojiPickerProps {
     onSelect: (emoji: string) => void;
+    onFocusComposer?: () => void;
     disabled?: boolean;
 }
 
-export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = false }) => {
+export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onFocusComposer, disabled = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<number>(0);
@@ -58,10 +61,12 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
     return (
         <Box ref={containerRef} sx={{ position: 'relative' }}>
             <IconButton
+                aria-label="Abrir emojis"
                 variant="plain"
                 color="neutral"
                 disabled={disabled}
                 onClick={() => setIsOpen(!isOpen)}
+                onMouseDown={keepComposerFocus}
                 sx={{ ...COMPOSER_ACTION_BUTTON_SX, '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
             >
                 <Smile size={CHAT_COMPOSER_ICON_SIZE} />
@@ -99,10 +104,14 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                     {!search && (
                         <Tabs
                             value={activeTab}
-                            onChange={(_e, val) => setActiveTab(val as number)}
+                            onChange={(_e, val) => {
+                                setActiveTab(val as number);
+                                onFocusComposer?.();
+                            }}
                             sx={{ backgroundColor: 'transparent' }}
                         >
                             <TabList
+                                onMouseDown={keepComposerFocus}
                                 sx={{
                                     px: 1,
                                     py: 0.5,
@@ -153,6 +162,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                                 <Box
                                     key={`${emoji}-${i}`}
                                     onClick={() => handleEmojiClick(emoji)}
+                                    onMouseDown={keepComposerFocus}
                                     sx={{
                                         width: 36,
                                         height: 36,

@@ -45,4 +45,31 @@ describe('EmojiPicker', () => {
         expect(screen.getByText('Resultados de búsqueda')).toBeInTheDocument();
         expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     });
+
+    it('no roba el foco del compositor al abrir el panel ni al elegir un emoji', () => {
+        const onSelect = vi.fn();
+        render(<EmojiPicker onSelect={onSelect} />);
+        fireEvent.click(screen.getByRole('button'));
+
+        const toggle = screen.getByRole('button', { name: 'Abrir emojis' });
+        expect(pressWithoutFocus(toggle)).toBe(true);
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Emoticonos' }));
+        expect(pressWithoutFocus(screen.getByText('😀'))).toBe(true);
+    });
+
+    it('devuelve el foco al compositor al cambiar de pestaña', () => {
+        const onFocusComposer = vi.fn();
+        render(<EmojiPicker onSelect={vi.fn()} onFocusComposer={onFocusComposer} />);
+        fireEvent.click(screen.getByRole('button'));
+        fireEvent.click(screen.getByRole('tab', { name: 'Emoticonos' }));
+
+        expect(onFocusComposer).toHaveBeenCalledTimes(1);
+    });
 });
+
+const pressWithoutFocus = (element: Element): boolean => {
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+};

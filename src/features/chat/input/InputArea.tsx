@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import { Camera, Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
@@ -6,7 +6,7 @@ import { CameraCaptureOverlay } from '../file-preview/CameraCaptureOverlay.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { RecordingBar } from './RecordingBar.js';
 import { ReplyBar } from './ReplyBar.js';
-import { RichInput } from './RichInput.js';
+import { RichInput, type RichInputHandle } from './RichInput.js';
 import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
 import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
@@ -49,6 +49,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const [isSending, setIsSending] = useState(false);
     const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
     const [layer, setLayer] = useState<HTMLElement | null>(null);
+    const richInputRef = useRef<RichInputHandle | null>(null);
 
     const attachLayer = useCallback((node: HTMLDivElement | null) => {
         const parent = node?.parentElement ?? null;
@@ -171,8 +172,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         <RecordingBar duration={duration} onCancel={cancelRecording} canvasRef={canvasRef} />
                     ) : (
                         <>
-                            <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
+                            <EmojiPicker onSelect={(emoji) => richInputRef.current?.insertText(emoji)} onFocusComposer={() => richInputRef.current?.focus()} disabled={disabled} />
                             <RichInput
+                                ref={richInputRef}
                                 value={message}
                                 onChange={handleChange}
                                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendClick()}

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useLayoutEffect, useEffect } from 'react';
+import React, { forwardRef, useRef, useCallback, useImperativeHandle, useLayoutEffect, useEffect } from 'react';
 import { Box } from '@mui/joy';
 import { INPUT_PILL_RADIUS, INPUT_PILL_HEIGHT } from '../../../inputShape.js';
 
@@ -31,9 +31,14 @@ function mdToHtml(text: string): string {
 }
 
 function getOffset(el: HTMLElement): number {
+    return caretOffset(el) ?? 0;
+}
+
+function caretOffset(el: HTMLElement): number | null {
     const sel = window.getSelection();
-    if (!sel?.rangeCount) return 0;
+    if (!sel?.rangeCount) return null;
     const range = sel.getRangeAt(0);
+    if (!el.contains(range.endContainer)) return null;
     const pre = document.createRange();
     pre.selectNodeContents(el);
     pre.setEnd(range.endContainer, range.endOffset);
@@ -75,6 +80,11 @@ function setOffset(el: HTMLElement, offset: number): void {
     }
 }
 
+export interface RichInputHandle {
+    insertText: (text: string) => void;
+    focus: () => void;
+}
+
 interface RichInputProps {
     value: string;
     onChange: (value: string) => void;
@@ -87,18 +97,59 @@ interface RichInputProps {
     embedded?: boolean;
 }
 
-export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown, placeholder, disabled, autoFocus = false, focusKey, embedded = false }) => {
+export const RichInput = forwardRef<RichInputHandle, RichInputProps>(function RichInput({ value, onChange, onKeyDown, placeholder, disabled, autoFocus = false, focusKey, embedded = false }, handle) {
     const ref = useRef<HTMLDivElement>(null);
     const composing = useRef(false);
     const fromInput = useRef(false);
+    const caret = useRef<number | null>(null);
+    const pendingCaret = useRef<number | null>(null);
 
     useLayoutEffect(() => {
         const el = ref.current;
-        if (!el || fromInput.current) return;
-        if ((el.textContent ?? '') !== value) {
+        if (!el) return;
+        if (!fromInput.current && (el.textContent ?? '') !== value) {
             el.innerHTML = mdToHtml(value);
         }
+        if (pendingCaret.current !== null) {
+            setOffset(el, pendingCaret.current);
+            pendingCaret.current = null;
+        }
     }, [value]);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const remember = () => {
+            const offset = caretOffset(el);
+            if (offset !== null) caret.current = offset;
+        };
+        document.addEventListener('selectionchange', remember);
+        return () => document.removeEventListener('selectionchange', remember);
+    }, []);
+
+    useImperativeHandle(handle, () => ({
+        insertText: (text: string) => {
+            const el = ref.current;
+            if (!el || disabled) return;
+            const offset = Math.min(caret.current ?? value.length, value.length);
+            const next = `${value.slice(0, offset)}${text}${value.slice(offset)}`;
+            caret.current = offset + text.length;
+            pendingCaret.current = offset + text.length;
+            el.focus({ preventScroll: true });
+            if (next === value) {
+                setOffset(el, offset + text.length);
+                pendingCaret.current = null;
+                return;
+            }
+            onChange(next);
+        },
+        focus: () => {
+            const el = ref.current;
+            if (!el) return;
+            el.focus({ preventScroll: true });
+            if (caret.current !== null) setOffset(el, Math.min(caret.current, (el.textContent ?? '').length));
+        },
+    }), [disabled, onChange, value]);
 
     useEffect(() => {
         if (!autoFocus || disabled) return;
@@ -191,4 +242,4 @@ export const RichInput: React.FC<RichInputProps> = ({ value, onChange, onKeyDown
             />
         </Box>
     );
-};
+});
