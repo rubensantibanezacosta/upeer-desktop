@@ -15,6 +15,7 @@ import { startDhtSearch } from '../dht/core.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { compressMessage } from '../../utils/messageCompression.js';
 import { sendConnectedChatMessage } from './chatDirectDelivery.js';
+import type { ConversationActivitySignal } from '../../../types/chat.js';
 import {
     emitMessageStatusUpdated,
     getFanOutAddresses,
@@ -148,12 +149,12 @@ export async function sendChatMessage(
     return { id: msgId, savedMessage: payload, timestamp };
 }
 
-export async function sendTypingIndicator(upeerId: string): Promise<void> {
+export async function sendTypingIndicator(upeerId: string, state: ConversationActivitySignal = 'typing'): Promise<void> {
     if (upeerId.startsWith('grp-')) {
         const group = await getGroupById(upeerId) as GroupRecordLike | null;
         if (!group || group.status === 'removed' || group.status === 'invited') return;
         const myId = getMyUPeerId();
-        const data = { type: 'TYPING', groupId: upeerId };
+        const data = { type: 'TYPING', groupId: upeerId, state };
         for (const memberId of group.members) {
             if (memberId === myId) continue;
             const contact = await getContactByUpeerId(memberId) as ChatContactRecord | undefined;
@@ -169,6 +170,6 @@ export async function sendTypingIndicator(upeerId: string): Promise<void> {
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
     if (!contact || contact.status !== 'connected' || !contact.publicKey) return;
     for (const address of getFanOutAddresses(contact)) {
-        sendSecurePacket(address, { type: 'TYPING' }, contact.publicKey);
+        sendSecurePacket(address, { type: 'TYPING', state }, contact.publicKey);
     }
 }

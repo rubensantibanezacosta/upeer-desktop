@@ -16,7 +16,7 @@ import { CallHost } from './features/call/CallHost.js';
 import { StartupRecoveryOverlay } from './components/layout/mainLayoutHelpers.js';
 import { SyncBlockingOverlay } from './components/layout/SyncBlockingOverlay.js';
 import type { PreviewableMedia } from './components/layout/MainLayout.js';
-import type { ChatMessage, LinkPreview, MediaItem } from './types/chat.js';
+import type { ChatMessage, ConversationActivitySignal, LinkPreview, MediaItem } from './types/chat.js';
 import { isPreviewableFile } from './utils/fileUtils.js';
 
 const YGGSTACK_STATUSES: YggNetworkStatus[] = ['connecting', 'up', 'down', 'reconnecting'];
@@ -250,7 +250,10 @@ export default function App() {
         }
     };
 
-    const handleTyping = () => { if (chatStore.targetUpeerId) window.upeer.sendTypingIndicator(chatStore.targetUpeerId); };
+    const handleTyping = (state: ConversationActivitySignal = 'typing') => {
+        const conversationId = chatStore.activeGroupId || chatStore.targetUpeerId;
+        if (conversationId) void window.upeer.sendTypingIndicator(conversationId, state);
+    };
 
     const handleScrollToMessage = (msgId: string) => {
         const element = document.getElementById(`msg-${msgId}`);

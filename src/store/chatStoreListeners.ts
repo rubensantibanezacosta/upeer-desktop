@@ -5,6 +5,7 @@ import { usePrivacyStore } from './usePrivacyStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
+import { registerTypingActivityListener } from './chatStoreActivity.js';
 import type { ChatMessage, IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, KeyChangeAlert, UntrustworthyInfo } from '../types/chat.js';
 
 export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
@@ -146,22 +147,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
             }));
         });
 
-        window.upeer.onTyping((data) => {
-            const { upeerId } = data;
-            set((state) => {
-                if (state.typingStatus[upeerId]) {
-                    clearTimeout(state.typingStatus[upeerId]);
-                }
-                const timeout = setTimeout(() => {
-                    set((currentState) => {
-                        const typingStatus = { ...currentState.typingStatus };
-                        delete typingStatus[upeerId];
-                        return { typingStatus };
-                    });
-                }, 3000);
-                return { typingStatus: { ...state.typingStatus, [upeerId]: timeout } };
-            });
-        });
+        registerTypingActivityListener(set);
 
         window.upeer.onGroupMessage((data: IncomingGroupMessageEvent) => {
             get().refreshGroups();

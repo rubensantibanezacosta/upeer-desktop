@@ -13,6 +13,7 @@ import type { GroupAckPayload, GroupMessagePayload, VaultQueryData, VaultStoreDa
 import type { GroupControlPacket } from './handlers/groupControlShared.js';
 import type { RatchetHeader } from '../security/ratchetShared.js';
 import { handleDrResetPacket } from './handlers/drResetRoute.js';
+import type { ConversationActivitySignal } from '../../types/chat.js';
 
 const vaultQueryThrottle = new Map<string, number>();
 
@@ -234,6 +235,13 @@ function toGroupContact(contact: VerifiedContact, address: string): { name?: str
         alias: contact.alias,
         address: contact.address ?? address,
     };
+}
+
+function toConversationActivitySignal(value: unknown): ConversationActivitySignal {
+    if (value === 'recording' || value === 'stop') {
+        return value;
+    }
+    return 'typing';
 }
 
 function toChatIncomingPayload(data: VerifiedPacketData): ChatIncomingPayload {
@@ -531,7 +539,11 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             handleChatAck(upeerId, { ...toChatAckPayload(data), status: 'read' }, win);
             break;
         case 'TYPING':
-            win?.webContents.send('peer-typing', { upeerId: upeerId });
+            win?.webContents.send('peer-typing', {
+                upeerId,
+                groupId: typeof data.groupId === 'string' ? data.groupId : undefined,
+                state: toConversationActivitySignal(data.state),
+            });
             break;
         case 'CHAT_CONTACT':
             await handleChatContact(upeerId, toChatContactPacket(data), win, signature, rinfo.address, sendResponse);

@@ -1,3 +1,7 @@
+export type ConversationActivity = 'typing' | 'recording';
+
+export type ConversationActivitySignal = ConversationActivity | 'stop';
+
 export interface LinkPreview {
     url: string;
     title?: string;

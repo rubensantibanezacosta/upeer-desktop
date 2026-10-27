@@ -97,7 +97,7 @@ declare global {
             getBlockedContacts: () => Promise<UpeerContact[]>;
             getContactSecurity: (upeerId: string) => Promise<{ hasSession: boolean; hasContactKey: boolean; safetyNumber: string }>;
             sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: import('./types/chat.js').LinkPreview | null, messageId?: string) => Promise<{ id: string; savedMessage: string; timestamp: number } | undefined>;
-            sendTypingIndicator: (upeerId: string) => Promise<void>;
+            sendTypingIndicator: (upeerId: string, state?: import('./types/chat.js').ConversationActivitySignal) => Promise<void>;
             markUserActive: () => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: { name: string; address: string; upeerId?: string; publicKey?: string; avatar?: string }) => Promise<string>;
@@ -157,7 +157,7 @@ declare global {
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => UpeerUnsubscribe;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => UpeerUnsubscribe;
             onKeyChangeAlert: (callback: (data: import('./types/chat.js').KeyChangeAlert) => void) => UpeerUnsubscribe;
-            onTyping: (callback: (data: { upeerId: string, groupId?: string }) => void) => UpeerUnsubscribe;
+            onTyping: (callback: (data: { upeerId: string, groupId?: string, state?: import('./types/chat.js').ConversationActivitySignal }) => void) => UpeerUnsubscribe;
             onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => UpeerUnsubscribe;
             onReputationUpdated: (callback: () => void) => UpeerUnsubscribe;
             // File transfer API (Phase 16)

@@ -3,11 +3,12 @@ import { Box, IconButton } from '@mui/joy';
 import { CHAT_COMPOSER_OVERLAY_HEIGHT } from './input/composerLayout.js';
 import { EmptyChat } from './EmptyChat.js';
 import { MessageItem } from './message/MessageItem.js';
+import { TypingIndicator } from './message/TypingIndicator.js';
 import { ChevronDown } from 'lucide-react';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
-import type { ChatMessage, Contact, TransferMessageUpdates } from '../../types/chat.js';
+import type { ChatMessage, Contact, ConversationActivity, TransferMessageUpdates } from '../../types/chat.js';
 import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
 
 interface MediaClickPayload {
@@ -33,10 +34,11 @@ interface ChatAreaProps {
     onMediaClick?: (media: MediaClickPayload) => void;
     isGroup?: boolean;
     onTransferStateChange?: (fileId: string, updates: TransferMessageUpdates) => void;
+    peerActivity?: ConversationActivity | null;
     loading?: boolean;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, loading = false }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, peerActivity = null, loading = false }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
@@ -138,9 +140,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 flexGrow: 1,
                 backgroundColor: 'background.body',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                px: 4,
+                pt: 2,
+                pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
+                boxSizing: 'border-box'
             }}>
-                <EmptyChat loading={loading} />
+                {peerActivity ? (
+                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                        <TypingIndicator activity={peerActivity} />
+                    </Box>
+                ) : (
+                    <EmptyChat loading={loading} />
+                )}
             </Box>
         );
     }
@@ -159,11 +171,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                 backgroundColor: 'background.body',
                 px: 4,
                 pt: 2,
-                pb: `${CHAT_COMPOSER_OVERLAY_HEIGHT}px`,
+                pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
                 gap: 0,
                 boxSizing: 'border-box'
             }}
         >
+            {peerActivity && <TypingIndicator activity={peerActivity} />}
             {reversedHistory.map((msg, index) => {
                 const nextMsg = reversedHistory[index + 1];
                 const prevMsg = index > 0 ? reversedHistory[index - 1] : undefined;
@@ -215,7 +228,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                     onClick={scrollToBottom}
                     sx={{
                         position: 'absolute',
-                        bottom: 24,
+                        bottom: `calc(var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px) + 8px)`,
                         right: 48,
                         borderRadius: 'md',
                         boxShadow: 'md',

@@ -91,10 +91,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
     })();
 
     const bubbleShape = bubbleRadiusSx(resolveBubbleCorners({ isMine: isMe, isFirstInGroupChain, isLastInGroupChain }));
+    const isPendingSend = isMe && msg.status === 'sending';
 
     return (
         <Box
             id={`msg-${msg.id}`}
+            className={isPendingSend ? 'chat-bubble-enter' : undefined}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             sx={{
@@ -103,6 +105,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: isMe ? 'flex-end' : 'flex-start',
+                transformOrigin: 'right bottom',
                 mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 1 : 0.5,
             }}
         >

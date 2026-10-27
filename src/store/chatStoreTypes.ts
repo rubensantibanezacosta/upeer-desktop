@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { ChatMessage, Contact, Group, IncomingRequest, KeyChangeAlert, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
+import type { ChatMessage, Contact, ConversationActivity, ConversationActivitySignal, Group, IncomingRequest, KeyChangeAlert, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
 
 export interface ChatState {
     myIdentity: MyIdentity | null;
@@ -15,6 +15,7 @@ export interface ChatState {
     messagesByConversation: Record<string, string>;
     replyByConversation: Record<string, ChatMessage | null>;
     typingStatus: Record<string, NodeJS.Timeout>;
+    peerActivity: Record<string, ConversationActivity>;
     incomingRequests: Record<string, IncomingRequest>;
     untrustworthyAlert: UntrustworthyInfo | null;
     untrustworthyAlerts: Record<string, UntrustworthyInfo>;
@@ -50,7 +51,7 @@ export interface ChatActions {
     handleReaction: (msgId: string, emoji: string, remove: boolean) => void;
     handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (msgId: string) => void;
-    handleTyping: () => void;
+    handleTyping: (state?: ConversationActivitySignal) => void;
     handleCreateGroup: (name: string, memberIds: string[], avatar?: string) => Promise<{ success: boolean; groupId: string }>;
     handleUpdateGroup: (groupId: string, fields: { name?: string, avatar?: string | null }) => Promise<void>;
     handleInviteGroupMembers: (groupId: string, memberIds: string[]) => Promise<void>;

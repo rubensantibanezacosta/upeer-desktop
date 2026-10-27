@@ -1,3 +1,5 @@
+import type { ConversationActivitySignal } from './chat.js';
+
 export interface ContactPresenceEvent {
     upeerId: string;
     lastSeen: string;
@@ -79,6 +81,8 @@ export interface MessageStatusUpdatedEvent {
 
 export interface PeerTypingEvent {
     upeerId: string;
+    groupId?: string;
+    state?: ConversationActivitySignal;
 }
 
 export interface GroupUpdatedEvent {

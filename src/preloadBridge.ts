@@ -1,5 +1,5 @@
 import { ipcRenderer, webUtils } from 'electron';
-import type { IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, LinkPreview, TransferMessageUpdates } from './types/chat.js';
+import type { IncomingContactRequestEvent, IncomingDirectMessageEvent, IncomingGroupMessageEvent, ConversationActivitySignal, LinkPreview, TransferMessageUpdates } from './types/chat.js';
 
 type ContactCardPayload = {
     name: string;
@@ -142,7 +142,7 @@ const contactApi = {
 
 const messagingApi = {
     sendMessage: (upeerId: string, message: string, replyTo?: string, linkPreview?: LinkPreview | null, messageId?: string) => ipcRenderer.invoke('send-p2p-message', { upeerId, message, replyTo, linkPreview, messageId }),
-    sendTypingIndicator: (upeerId: string) => ipcRenderer.invoke('send-typing-indicator', { upeerId }),
+    sendTypingIndicator: (upeerId: string, state?: ConversationActivitySignal) => ipcRenderer.invoke('send-typing-indicator', { upeerId, state }),
     markUserActive: () => ipcRenderer.invoke('mark-user-active'),
     sendReadReceipt: (upeerId: string, id: string) => ipcRenderer.invoke('send-read-receipt', { upeerId, id }),
     sendContactCard: (targetUpeerId: string, contact: ContactCardPayload) => ipcRenderer.invoke('send-contact-card', { targetUpeerId, contact }),
@@ -278,7 +278,7 @@ const eventApi = {
     onMessageDeleted: (callback: (data: MessageDeletedPayload) => void) => subscribe<[MessageDeletedPayload]>('message-deleted', callback),
     onChatCleared: (callback: (data: { upeerId: string }) => void) => subscribe<[{ upeerId: string }]>('chat-cleared', (data) => callback(data)),
     onMessageStatusUpdated: (callback: (data: { id: string; status: string }) => void) => subscribe<[{ id: string; status: string }]>('message-status-updated', (data) => callback(data)),
-    onTyping: (callback: (data: { upeerId: string }) => void) => subscribe<[{ upeerId: string }]>('peer-typing', (data) => callback(data)),
+    onTyping: (callback: (data: { upeerId: string; groupId?: string; state?: ConversationActivitySignal }) => void) => subscribe<[{ upeerId: string; groupId?: string; state?: ConversationActivitySignal }]>('peer-typing', (data) => callback(data)),
     onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => subscribe<[{ upeerId?: string; groupId?: string }]>('focus-conversation', (data) => callback(data)),
     onFileTransferStarted: (callback: (data: TransferMessageUpdates) => void) => subscribe<[TransferMessageUpdates]>('file-transfer-started', callback),
     onFileTransferProgress: (callback: (data: TransferMessageUpdates) => void) => subscribe<[TransferMessageUpdates]>('file-transfer-progress', callback),

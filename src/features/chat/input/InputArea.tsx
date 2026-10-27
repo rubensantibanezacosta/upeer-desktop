@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/joy';
 import { Camera, Send, Mic, Pencil, X } from 'lucide-react';
 import { AttachmentButton, AttachmentType } from './AttachmentButton.js';
@@ -11,10 +11,10 @@ import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
 import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
-import { CHAT_COMPOSER_BAR_HEIGHT, CHAT_COMPOSER_ICON_SIZE, CHAT_COMPOSER_PILL_HEIGHT, CHAT_COMPOSER_PILL_PADDING, CHAT_COMPOSER_SEND_SIZE, CHAT_COMPOSER_STAGE_PADDING } from './composerLayout.js';
+import { CHAT_COMPOSER_BAR_HEIGHT, CHAT_COMPOSER_ICON_SIZE, CHAT_COMPOSER_OVERLAY_GAP, CHAT_COMPOSER_PILL_HEIGHT, CHAT_COMPOSER_PILL_PADDING, CHAT_COMPOSER_SEND_SIZE, CHAT_COMPOSER_STAGE_PADDING } from './composerLayout.js';
 import { COMPOSER_ACTION_BUTTON_SX } from './composerActions.js';
 import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
-import type { LinkPreview } from '../../../types/chat.js';
+import type { ConversationActivitySignal, LinkPreview } from '../../../types/chat.js';
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al enviar la nota de voz';
 
@@ -22,7 +22,7 @@ interface InputAreaProps {
     message: string;
     setMessage: (msg: string) => void;
     onSend: (linkPreview?: LinkPreview | null) => void | Promise<void>;
-    onTyping?: () => void;
+    onActivity?: (state: ConversationActivitySignal) => void;
     disabled: boolean;
     replyToMessage?: { id?: string; message: string; isMine: boolean; senderName?: string } | null;
     onCancelReply?: () => void;
@@ -37,7 +37,7 @@ interface InputAreaProps {
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
-    message, setMessage, onSend, onTyping, disabled,
+    message, setMessage, onSend, onActivity, disabled,
     replyToMessage, onCancelReply, editingMessage, onCancelEdit,
     onAttachFile, allowContactShare = false, onScrollToMessage, onSendVoiceNote, focusKey, onCapturePhoto
 }) => {
@@ -50,18 +50,51 @@ export const InputArea: React.FC<InputAreaProps> = ({
     const { linkPreview, isLoadingPreview, dismissPreview } = useInputPreview(message);
     const [layer, setLayer] = useState<HTMLElement | null>(null);
     const richInputRef = useRef<RichInputHandle | null>(null);
+    const composerRef = useRef<HTMLDivElement | null>(null);
+    const activityRef = useRef(onActivity);
+    activityRef.current = onActivity;
+
+    useEffect(() => {
+        if (!isRecording) return;
+        activityRef.current?.('recording');
+        const heartbeat = setInterval(() => activityRef.current?.('recording'), 2000);
+        return () => {
+            clearInterval(heartbeat);
+            activityRef.current?.('stop');
+        };
+    }, [isRecording]);
 
     const attachLayer = useCallback((node: HTMLDivElement | null) => {
+        composerRef.current = node;
         const parent = node?.parentElement ?? null;
         setLayer((current) => (current === parent ? current : parent));
     }, []);
 
+    useEffect(() => {
+        const node = composerRef.current;
+        if (!node) return;
+        const sync = () => {
+            document.documentElement.style.setProperty('--upeer-composer-height', `${node.offsetHeight + CHAT_COMPOSER_OVERLAY_GAP}px`);
+        };
+        sync();
+        if (typeof ResizeObserver === 'undefined') return () => document.documentElement.style.removeProperty('--upeer-composer-height');
+        const observer = new ResizeObserver(sync);
+        observer.observe(node);
+        return () => {
+            observer.disconnect();
+            document.documentElement.style.removeProperty('--upeer-composer-height');
+        };
+    }, []);
+
     const handleChange = (val: string) => {
         setMessage(val);
-        if (onTyping) onTyping();
+        if (onActivity) onActivity('typing');
     };
 
-    const handleSendClick = () => onSend(linkPreview);
+    const handleSendClick = () => {
+        onSend(linkPreview);
+        if (onActivity) onActivity('stop');
+    };
 
     const openCamera = () => {
         setShots([]);
@@ -156,14 +189,15 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{ px: 2, py: `${CHAT_COMPOSER_STAGE_PADDING}px`, display: 'flex', alignItems: 'center', gap: 0.5, height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
+            <Box sx={{ px: 2, py: `${CHAT_COMPOSER_STAGE_PADDING}px`, display: 'flex', alignItems: 'flex-end', gap: 0.5, minHeight: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
                 <Box sx={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-end',
                     gap: 0.5,
                     flex: 1,
                     minWidth: 0,
-                    height: CHAT_COMPOSER_PILL_HEIGHT,
+                    minHeight: CHAT_COMPOSER_PILL_HEIGHT,
+                    py: `${CHAT_COMPOSER_PILL_PADDING}px`,
                     px: `${CHAT_COMPOSER_PILL_PADDING}px`,
                     borderRadius: INPUT_PILL_RADIUS,
                     backgroundColor: 'background.level1',
@@ -177,8 +211,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 ref={richInputRef}
                                 value={message}
                                 onChange={handleChange}
-                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendClick()}
-                                placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje...'}
+                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && handleSendClick()}
+                                placeholder={editingMessage ? 'Edita tu mensaje...' : 'Escribe un mensaje'}
                                 autoComplete="off"
                                 disabled={disabled}
                                 autoFocus={!disabled}

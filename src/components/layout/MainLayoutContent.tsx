@@ -44,7 +44,7 @@ interface MainLayoutContentProps {
     handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleAttachFile: MainLayoutProps['handleAttachFile'];
     handleCapturePhoto: MainLayoutProps['handleCapturePhoto'];
-    handleTyping: () => void;
+    handleTyping: MainLayoutProps['handleTyping'];
     handleScrollToMessage: (id: string) => void;
     currentReplyToMessage: ChatMessage | null;
     setReplyToMessage: (id: string, msg: ChatMessage | null) => void;
@@ -226,7 +226,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
                                             isOnline={activeContact?.lastActive ? (new Date().getTime() - new Date(activeContact.lastActive).getTime()) < 65000 : undefined}
-                                            isTyping={!!chatStore.typingStatus[targetUpeerId]}
+                                            activity={chatStore.peerActivity[targetUpeerId]}
                                             status={activeContact?.status}
                                             lastSeen={activeContact?.lastActive ?? activeContact?.lastSeen}
                                             vouchScore={effectiveVouchScore}
@@ -299,6 +299,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     onMediaClick={handleMediaClick}
                                                     activeTransfers={fileTransfer.allTransfers.filter((transfer: FileTransfer) => activeGroupId ? transfer.chatUpeerId === activeGroupId : transfer.upeerId === targetUpeerId)}
                                                     onTransferStateChange={chatStore.updateFileTransferMessage}
+                                                    peerActivity={chatStore.peerActivity[activeGroupId || targetUpeerId] ?? null}
                                                     loading={chatStore.historyLoading}
                                                 />
                                             </Box>
@@ -310,7 +311,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     ? async (linkPreview?: LinkPreview | null) => { if (editingMessage.id) handleUpdateMessage(editingMessage.id, message, linkPreview); setEditingMessage(null); setMessage(''); }
                                                     : (activeGroupId ? handleSendGroupMessage : handleSend)
                                                 }
-                                                onTyping={handleTyping}
+                                                onActivity={handleTyping}
                                                 onAttachFile={handleAttachFile}
                                                 onCapturePhoto={handleCapturePhoto}
                                                 allowContactShare={!activeGroupId && !!targetUpeerId}

@@ -167,6 +167,35 @@ describe('useChatStore groups integration', () => {
         expect(state.replyByConversation['grp-1']).toBeNull();
     });
 
+    it('inserta el mensaje de grupo de forma optimista antes de la confirmación', async () => {
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+        let resolveSend: ((result: { id: string; timestamp: number; savedMessage: string }) => void) | undefined;
+        getUpeerMock().sendGroupMessage = vi.fn().mockImplementation(() => new Promise((resolve) => { resolveSend = resolve; }));
+        getUpeerMock().getGroups.mockResolvedValue([{ groupId: 'grp-1', members: [] }]);
+
+        useChatStore.setState({
+            activeGroupId: 'grp-1',
+            myIdentity,
+            groupChatHistory: [],
+            messagesByConversation: { 'grp-1': 'hola' },
+            replyByConversation: { 'grp-1': null },
+        });
+
+        const pendingSend = useChatStore.getState().handleSendGroupMessage('hola');
+
+        const optimistic = useChatStore.getState().groupChatHistory;
+        expect(optimistic).toHaveLength(1);
+        expect(optimistic[0]).toMatchObject({ message: 'hola', status: 'sending' });
+        expect(useChatStore.getState().messagesByConversation['grp-1']).toBe('');
+
+        resolveSend?.({ id: 'real-1', timestamp: optimistic[0].date, savedMessage: 'hola' });
+        await pendingSend;
+
+        expect(useChatStore.getState().groupChatHistory).toEqual([
+            expect.objectContaining({ id: 'real-1', status: 'sent' }),
+        ]);
+    });
+
     it('keeps local direct sends ordered by sent timestamp', async () => {
         const { useChatStore } = await import('../../../src/store/useChatStore.js');
 

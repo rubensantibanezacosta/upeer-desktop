@@ -96,6 +96,7 @@ describe('orden cronológico al responder a un mensaje anterior', () => {
         const pendingMessage = useChatStore.getState().chatHistory[0];
         expect(pendingMessage.message).toBe('mensaje durante llamada');
         expect(pendingMessage.id).toEqual(expect.any(String));
+        expect(pendingMessage.status).toBe('sending');
 
         resolveSend?.({ id: pendingMessage.id as string, savedMessage: 'mensaje durante llamada', timestamp: pendingMessage.date });
         await pendingSend;

@@ -42,7 +42,7 @@ export interface MainLayoutProps {
     handleSendGroupMessage: (linkPreview?: LinkPreview | null) => void | Promise<void>;
     handleAttachFile: (type: AttachmentType) => void | Promise<void>;
     handleCapturePhoto: (dataUrl: string) => void | Promise<void>;
-    handleTyping: () => void;
+    handleTyping: (state?: import('../../types/chat.js').ConversationActivitySignal) => void;
     handleScrollToMessage: (id: string) => void;
     currentReplyToMessage: ChatMessage | null;
     setReplyToMessage: (id: string, msg: ChatMessage | null) => void;

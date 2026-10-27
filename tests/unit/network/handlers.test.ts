@@ -633,7 +633,15 @@ describe('network/handlers.ts - handlePacket', () => {
 
         const typingPacket = { type: 'TYPING', senderUpeerId: 'peer1', signature: 'sig' };
         await handlePacket(Buffer.from(JSON.stringify(typingPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
-        expect(mockWin.webContents.send).toHaveBeenCalledWith('peer-typing', { upeerId: 'peer1' });
+        expect(mockWin.webContents.send).toHaveBeenCalledWith('peer-typing', { upeerId: 'peer1', groupId: undefined, state: 'typing' });
+
+        const recordingPacket = { type: 'TYPING', senderUpeerId: 'peer1', signature: 'sig', state: 'recording' };
+        await handlePacket(Buffer.from(JSON.stringify(recordingPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+        expect(mockWin.webContents.send).toHaveBeenCalledWith('peer-typing', { upeerId: 'peer1', groupId: undefined, state: 'recording' });
+
+        const groupTypingPacket = { type: 'TYPING', senderUpeerId: 'peer1', signature: 'sig', groupId: 'grp-1' };
+        await handlePacket(Buffer.from(JSON.stringify(groupTypingPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);
+        expect(mockWin.webContents.send).toHaveBeenCalledWith('peer-typing', { upeerId: 'peer1', groupId: 'grp-1', state: 'typing' });
 
         const reactionPacket = { type: 'CHAT_REACTION', senderUpeerId: 'peer1', signature: 'sig', emoji: '👍' };
         await handlePacket(Buffer.from(JSON.stringify(reactionPacket)), mockRinfo, mockWin, mockSendResponse, mockStartDhtSearch);

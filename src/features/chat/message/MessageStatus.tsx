@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box } from '@mui/joy';
 import { IconButton } from '@mui/joy';
-import { Check, CheckCheck, RotateCcw, CloudUpload } from 'lucide-react';
+import { Check, CheckCheck, Clock, RotateCcw, CloudUpload } from 'lucide-react';
 import { useChatStore } from '../../../store/useChatStore.js';
 
 interface MessageStatusProps {
@@ -29,6 +29,21 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, messageId,
             >
                 <RotateCcw style={{ fontSize: 14 }} />
             </IconButton>
+        );
+    }
+
+    if (status === 'sending') {
+        return (
+            <Box component="span" aria-label="Estado del mensaje: enviando" sx={{ display: 'inline-flex', alignItems: 'center' }}>
+                <Clock
+                    style={{
+                        fontSize: 14,
+                        flexShrink: 0,
+                        color: 'var(--joy-palette-text-tertiary)',
+                        opacity: 0.8,
+                    }}
+                />
+            </Box>
         );
     }
 

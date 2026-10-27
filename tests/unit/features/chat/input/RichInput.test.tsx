@@ -1,6 +1,6 @@
 import React, { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 
 import { RichInput, type RichInputHandle } from '../../../../../src/features/chat/input/RichInput';
 
@@ -94,5 +94,58 @@ describe('RichInput', () => {
         act(() => ref.current?.insertText('😀'));
 
         expect(onChange).not.toHaveBeenCalled();
+    });
+
+    describe('saltos de línea', () => {
+        const renderControlled = (initial = 'hola mundo') => {
+            const onKeyDown = vi.fn();
+            const ref = createRef<RichInputHandle>();
+            const Controlled = () => {
+                const [value, setValue] = React.useState(initial);
+                return <RichInput ref={ref} value={value} onChange={setValue} onKeyDown={onKeyDown} />;
+            };
+            const { container } = render(<Controlled />);
+            const editor = container.querySelector('[contenteditable]') as HTMLElement;
+            return { editor, onKeyDown };
+        };
+
+        it('inserta un salto de línea con Ctrl+Enter sin enviar', () => {
+            const { editor, onKeyDown } = renderControlled();
+            placeCaret(editor, 5);
+
+            fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+
+            expect(editor.textContent).toBe('hola \nmundo');
+            expect(onKeyDown).not.toHaveBeenCalled();
+        });
+
+        it('inserta un salto de línea con Shift+Enter sin enviar', () => {
+            const { editor, onKeyDown } = renderControlled();
+            placeCaret(editor, 4);
+
+            fireEvent.keyDown(editor, { key: 'Enter', shiftKey: true });
+
+            expect(editor.textContent).toBe('hola\n mundo');
+            expect(onKeyDown).not.toHaveBeenCalled();
+        });
+
+        it('deja que Enter envíe el mensaje', () => {
+            const { editor, onKeyDown } = renderControlled();
+
+            fireEvent.keyDown(editor, { key: 'Enter' });
+
+            expect(onKeyDown).toHaveBeenCalledTimes(1);
+            expect(editor.textContent).toBe('hola mundo');
+        });
+
+        it('mantiene el foco y el cursor tras el salto de línea', () => {
+            const { editor } = renderControlled();
+            placeCaret(editor, 5);
+
+            fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+
+            expect(document.activeElement).toBe(editor);
+            expect(window.getSelection()?.getRangeAt(0).endOffset).toBe(6);
+        });
     });
 });

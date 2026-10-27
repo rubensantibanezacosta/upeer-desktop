@@ -26,7 +26,7 @@ export function registerMessageHandlers(): void {
     await sendChatMessage(upeerId, { content: message, linkPreview }, replyTo, messageId)
   );
 
-  ipcMain.handle('send-typing-indicator', (_event, { upeerId }) => sendTypingIndicator(upeerId));
+  ipcMain.handle('send-typing-indicator', (_event, { upeerId, state }) => sendTypingIndicator(upeerId, state));
   ipcMain.handle('mark-user-active', () => markLocalActive());
 
   ipcMain.handle('send-read-receipt', (_event, { upeerId, id }) => sendReadReceipt(upeerId, id));

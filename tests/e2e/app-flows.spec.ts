@@ -119,6 +119,14 @@ test('envía mensajes directos, renderiza preview y recibe eventos en tiempo rea
 
     await emitBridgeEvent(page, 'onTyping', { upeerId: 'alice' });
     await expect(page.getByText(/escribiendo/i).first()).toBeVisible();
+    await expect(page.getByTestId('chat-activity')).toHaveAttribute('aria-label', 'Escribiendo');
+
+    await emitBridgeEvent(page, 'onTyping', { upeerId: 'alice', state: 'recording' });
+    await expect(page.getByText('Grabando audio...')).toBeVisible();
+    await expect(page.getByTestId('chat-activity')).toHaveAttribute('aria-label', 'Grabando nota de voz');
+
+    await emitBridgeEvent(page, 'onTyping', { upeerId: 'alice', state: 'stop' });
+    await expect(page.getByTestId('chat-activity')).toHaveCount(0);
 
     await emitBridgeEvent(page, 'onReceive', {
         id: 'alice-live-1',

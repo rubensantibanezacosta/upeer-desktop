@@ -1,4 +1,4 @@
-import type { LinkPreview } from './chat.js';
+import type { ConversationActivitySignal, LinkPreview } from './chat.js';
 
 export interface SendMessageRequest {
     upeerId: string;
@@ -16,6 +16,7 @@ export interface SendMessageResponse {
 
 export interface SendTypingIndicatorRequest {
     upeerId: string;
+    state?: ConversationActivitySignal;
 }
 
 export interface SendTypingIndicatorResponse {

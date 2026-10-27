@@ -15,7 +15,7 @@ declare global {
             acceptContactRequest: (upeerId: string, publicKey: string) => Promise<{ success: boolean }>;
             deleteContact: (upeerId: string) => Promise<any>;
             sendMessage: (upeerId: string, message: string, replyTo?: string) => Promise<string>;
-            sendTypingIndicator: (upeerId: string) => Promise<void>;
+            sendTypingIndicator: (upeerId: string, state?: import('./types/chat.js').ConversationActivitySignal) => Promise<void>;
             sendReadReceipt: (upeerId: string, id: string) => Promise<void>;
             sendContactCard: (targetUpeerId: string, contact: any) => Promise<string>;
             sendChatReaction: (upeerId: string, msgId: string, emoji: string, remove: boolean) => Promise<void>;
@@ -32,7 +32,7 @@ declare global {
             onContactRequest: (callback: (data: { upeerId: string, address: string, alias?: string, publicKey: string }) => void) => void;
             onHandshakeFinished: (callback: (data: { upeerId: string }) => void) => void;
             onContactUntrustworthy: (callback: (data: { upeerId: string, address: string, alias?: string, reason: string }) => void) => void;
-            onTyping: (callback: (data: { upeerId: string }) => void) => void;
+            onTyping: (callback: (data: { upeerId: string, groupId?: string, state?: import('./types/chat.js').ConversationActivitySignal }) => void) => void;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: any[]; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;

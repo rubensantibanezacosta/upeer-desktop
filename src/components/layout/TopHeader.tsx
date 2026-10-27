@@ -11,6 +11,7 @@ import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
 import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
 import { formatTopHeaderLastSeen, TopHeaderAvatar } from './topHeaderSupport.js';
+import type { ConversationActivity } from '../../types/chat.js';
 
 interface TopHeaderProps {
     contactName?: string;
@@ -19,7 +20,7 @@ interface TopHeaderProps {
     onShare?: () => void;
     onAccept?: () => void;
     isOnline?: boolean;
-    isTyping?: boolean;
+    activity?: ConversationActivity;
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
     lastSeen?: string;
     onShowSecurity?: () => void;
@@ -39,9 +40,10 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-    contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, isTyping, status, lastSeen, onShowSecurity: _onShowSecurity,
+    contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, activity, status, lastSeen, onShowSecurity: _onShowSecurity,
     isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo, onSearch, onCallAudio, onCallVideo, isSelfChat, menu
 }) => {
+    const isPeerActive = !!activity;
     const avatarFileRef = useRef<HTMLInputElement>(null);
     const [editingName, setEditingName] = useState(false);
     const [nameValue, setNameValue] = useState('');
@@ -151,12 +153,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     {contactName && (
                         <Typography
                             level="body-xs"
-                            color={isTyping ? "primary" : "neutral"}
-                            sx={{ fontWeight: isTyping ? 500 : 400 }}
+                            color={isPeerActive ? "primary" : "neutral"}
+                            sx={{ fontWeight: isPeerActive ? 500 : 400 }}
                         >
                             {isGroup
                                 ? `${memberCount ?? 0} miembro${(memberCount ?? 0) !== 1 ? 's' : ''}`
-                                : (isTyping ? 'Escribiendo...' : (
+                                : (isPeerActive ? (activity === 'recording' ? 'Grabando audio...' : 'Escribiendo...') : (
                                     status === 'pending' ? 'Esperando que acepte...' :
                                         status === 'incoming' ? 'Solicitud de contacto' :
                                             (isOnline ? 'En línea' : (lastSeen ? `Última vez ${formatTopHeaderLastSeen(lastSeen)}` : 'Desconectado'))

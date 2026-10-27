@@ -66,6 +66,76 @@ body {
   animation: highlight-message 2.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@keyframes chat-bubble-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 34px, 0) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.chat-bubble-enter {
+  animation: chat-bubble-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chat-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0) scale(0.82);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1);
+  }
+}
+
+@keyframes chat-recording-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes chat-recording-ring {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.7);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble-enter {
+    animation: none;
+  }
+
+  .chat-typing-dot,
+  .chat-recording-icon {
+    animation: none !important;
+  }
+}
+
 /* Los iconos de Lucide heredan tamaño y color del contenedor, como los de MUI.
    1.5rem replica el tamaño por defecto de SvgIcon; un `font-size` en el contenedor
    o en el propio svg lo sobreescribe igual que antes. */

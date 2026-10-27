@@ -15,6 +15,7 @@ export function resetAccountStores(): void {
         messagesByConversation: {},
         replyByConversation: {},
         typingStatus: {},
+        peerActivity: {},
         incomingRequests: {},
         untrustworthyAlert: null,
         untrustworthyAlerts: {},
