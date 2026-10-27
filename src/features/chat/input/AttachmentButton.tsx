@@ -10,6 +10,8 @@ import {
     MenuButton
 } from '@mui/joy';
 import { Paperclip, Image, FileVideo, FileAudio, FileText, Share2 } from 'lucide-react';
+import { CHAT_COMPOSER_ICON_SIZE } from './composerLayout.js';
+import { COMPOSER_ACTION_BUTTON_SX } from './composerActions.js';
 
 
 export type AttachmentType =
@@ -94,6 +96,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                         color: "neutral",
                         disabled: disabled,
                         sx: {
+                            ...COMPOSER_ACTION_BUTTON_SX,
                             '&:hover': {
                                 backgroundColor: 'background.level2',
                                 color: 'primary.plainColor'
@@ -102,7 +105,7 @@ export const AttachmentButton: React.FC<AttachmentButtonProps> = ({
                     }
                 }}
             >
-                <Paperclip />
+                <Paperclip size={CHAT_COMPOSER_ICON_SIZE} />
             </MenuButton>
 
             <Menu

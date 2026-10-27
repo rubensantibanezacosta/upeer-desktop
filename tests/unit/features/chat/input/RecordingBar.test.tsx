@@ -5,7 +5,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 vi.mock('lucide-react', async (importOriginal) => ({
     ...(await importOriginal<typeof import('lucide-react')>()),
     Trash2: () => <span data-testid="DeleteIcon" />,
-    Send: () => <span data-testid="SendIcon" />,
 }));
 
 import { RecordingBar } from '../../../../../src/features/chat/input/RecordingBar';
@@ -13,47 +12,26 @@ import { RecordingBar } from '../../../../../src/features/chat/input/RecordingBa
 const canvasRef = { current: document.createElement('canvas') } as React.RefObject<HTMLCanvasElement | null>;
 
 describe('RecordingBar', () => {
-    it('muestra la duración formateada y el botón de cancelar', () => {
-        render(
-            <RecordingBar duration={65} onCancel={vi.fn()} onSend={vi.fn()} disabled={false} isSending={false} canvasRef={canvasRef} />
-        );
+    it('muestra la duración formateada y el botón de descartar', () => {
+        render(<RecordingBar duration={65} onCancel={vi.fn()} canvasRef={canvasRef} />);
         expect(screen.getByText('1:05')).toBeTruthy();
         expect(screen.getByTestId('DeleteIcon')).toBeTruthy();
     });
 
-    it('llama a onCancel al pulsar eliminar', () => {
+    it('llama a onCancel al pulsar descartar', () => {
         const onCancel = vi.fn();
-        render(
-            <RecordingBar duration={0} onCancel={onCancel} onSend={vi.fn()} disabled={false} isSending={false} canvasRef={canvasRef} />
-        );
-        fireEvent.click(screen.getByTestId('DeleteIcon'));
+        render(<RecordingBar duration={0} onCancel={onCancel} canvasRef={canvasRef} />);
+        fireEvent.click(screen.getByLabelText('Descartar nota de voz'));
         expect(onCancel).toHaveBeenCalled();
     });
 
-    it('llama a onSend al pulsar enviar', () => {
-        const onSend = vi.fn();
-        render(
-            <RecordingBar duration={3} onCancel={vi.fn()} onSend={onSend} disabled={false} isSending={false} canvasRef={canvasRef} />
-        );
-        fireEvent.click(screen.getByTestId('SendIcon').closest('button') as HTMLButtonElement);
-        expect(onSend).toHaveBeenCalled();
-    });
-
-    it('deshabilita el envío mientras está enviando', () => {
-        const onSend = vi.fn();
-        render(
-            <RecordingBar duration={3} onCancel={vi.fn()} onSend={onSend} disabled={false} isSending canvasRef={canvasRef} />
-        );
-        const sendBtn = screen.getByText('…').closest('button') as HTMLButtonElement;
-        expect(sendBtn).toBeDisabled();
-        fireEvent.click(sendBtn);
-        expect(onSend).not.toHaveBeenCalled();
+    it('no pinta el botón de enviar: vive fuera de la píldora', () => {
+        render(<RecordingBar duration={3} onCancel={vi.fn()} canvasRef={canvasRef} />);
+        expect(screen.queryByTestId('SendIcon')).toBeNull();
     });
 
     it('formatea duraciones de menos de un minuto', () => {
-        render(
-            <RecordingBar duration={9} onCancel={vi.fn()} onSend={vi.fn()} disabled={false} isSending={false} canvasRef={canvasRef} />
-        );
+        render(<RecordingBar duration={9} onCancel={vi.fn()} canvasRef={canvasRef} />);
         expect(screen.getByText('0:09')).toBeTruthy();
     });
 });

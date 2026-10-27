@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { IconButton, Box, Input, Typography, Tabs, TabList, Tab, Sheet } from '@mui/joy';
 import { Smile, Search, Clock } from 'lucide-react';
 import { EMOJI_CATEGORIES, RECENT_KEY, RECENT_LABEL, STORAGE_KEY, TAB_KEYS, pushRecentEmoji, searchEmojis } from './emojiData.js';
+import { CHAT_COMPOSER_ICON_SIZE } from './composerLayout.js';
+import { COMPOSER_ACTION_BUTTON_SX } from './composerActions.js';
 
 interface EmojiPickerProps {
     onSelect: (emoji: string) => void;
@@ -60,9 +62,9 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                 color="neutral"
                 disabled={disabled}
                 onClick={() => setIsOpen(!isOpen)}
-                sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
+                sx={{ ...COMPOSER_ACTION_BUTTON_SX, '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
             >
-                <Smile />
+                <Smile size={CHAT_COMPOSER_ICON_SIZE} />
             </IconButton>
 
             {isOpen && (

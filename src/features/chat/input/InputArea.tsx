@@ -11,8 +11,9 @@ import { LinkPreviewCard } from '../message/LinkPreviewCard.js';
 import { useAudioRecorder } from '../../../hooks/useAudioRecorder.js';
 import { useRecordingWaveform } from '../../../hooks/useRecordingWaveform.js';
 import { useInputPreview } from '../../../hooks/useInputPreview.js';
-import { CHAT_COMPOSER_BAR_HEIGHT } from './composerLayout.js';
-import { INPUT_PILL_RADIUS, INPUT_PILL_HEIGHT } from '../../../inputShape.js';
+import { CHAT_COMPOSER_BAR_HEIGHT, CHAT_COMPOSER_ICON_SIZE, CHAT_COMPOSER_PILL_HEIGHT, CHAT_COMPOSER_PILL_PADDING, CHAT_COMPOSER_SEND_SIZE, CHAT_COMPOSER_STAGE_PADDING } from './composerLayout.js';
+import { COMPOSER_ACTION_BUTTON_SX } from './composerActions.js';
+import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 import type { LinkPreview } from '../../../types/chat.js';
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error al enviar la nota de voz';
@@ -148,23 +149,22 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 </Box>
             )}
 
-            <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 0.5, height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
-                {isRecording ? (
-                    <RecordingBar duration={duration} onCancel={cancelRecording} onSend={handleMicClick} disabled={disabled} isSending={isSending} canvasRef={canvasRef} />
-                ) : (
-                    <>
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.25,
-                            flex: 1,
-                            minWidth: 0,
-                            height: INPUT_PILL_HEIGHT,
-                            pl: 1.125,
-                            pr: 0.75,
-                            borderRadius: INPUT_PILL_RADIUS,
-                            backgroundColor: 'background.level1',
-                        }}>
+            <Box sx={{ px: 2, py: `${CHAT_COMPOSER_STAGE_PADDING}px`, display: 'flex', alignItems: 'center', gap: 0.5, height: `${CHAT_COMPOSER_BAR_HEIGHT}px`, boxSizing: 'border-box' }}>
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    flex: 1,
+                    minWidth: 0,
+                    height: CHAT_COMPOSER_PILL_HEIGHT,
+                    px: `${CHAT_COMPOSER_PILL_PADDING}px`,
+                    borderRadius: INPUT_PILL_RADIUS,
+                    backgroundColor: 'background.level1',
+                }}>
+                    {isRecording ? (
+                        <RecordingBar duration={duration} onCancel={cancelRecording} canvasRef={canvasRef} />
+                    ) : (
+                        <>
                             <EmojiPicker onSelect={(emoji) => setMessage(message + emoji)} disabled={disabled} />
                             <RichInput
                                 value={message}
@@ -178,20 +178,45 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 embedded
                             />
                             <AttachmentButton onSelect={(type) => { if (onAttachFile) onAttachFile(type); }} disabled={disabled} allowContactShare={allowContactShare} />
-                            <IconButton aria-label="Abrir cámara" variant="plain" color="neutral" onClick={openCamera} disabled={disabled || !onCapturePhoto} sx={{ '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}>
-                                <Camera />
+                            <IconButton
+                                aria-label="Abrir cámara"
+                                variant="plain"
+                                color="neutral"
+                                onClick={openCamera}
+                                disabled={disabled || !onCapturePhoto}
+                                sx={{ ...COMPOSER_ACTION_BUTTON_SX, '&:hover': { backgroundColor: 'background.level2', color: 'primary.plainColor' } }}
+                            >
+                                <Camera size={CHAT_COMPOSER_ICON_SIZE} />
                             </IconButton>
-                        </Box>
-                        <IconButton aria-label={message ? 'Enviar mensaje' : 'Grabar nota de voz'} variant="plain" color="neutral" onClick={message ? handleSendClick : handleMicClick} disabled={disabled} sx={{ flexShrink: 0, '&:hover': { backgroundColor: 'background.level2' } }}>
-                            {message
-                                ? (editingMessage
-                                    ? <Send style={{ color: 'var(--joy-palette-warning-main)' }} />
-                                    : <Send style={{ color: 'var(--joy-palette-primary-main)' }} />)
-                                : <Mic style={{ color: 'var(--joy-palette-primary-main)' }} />
-                            }
-                        </IconButton>
-                    </>
-                )}
+                        </>
+                    )}
+                </Box>
+                <IconButton
+                    aria-label={isRecording ? 'Enviar nota de voz' : message ? 'Enviar mensaje' : 'Grabar nota de voz'}
+                    variant="plain"
+                    color="neutral"
+                    onClick={message && !isRecording ? handleSendClick : handleMicClick}
+                    disabled={disabled || (isRecording && isSending)}
+                    sx={{
+                        '--IconButton-size': `${CHAT_COMPOSER_SEND_SIZE}px`,
+                        minWidth: CHAT_COMPOSER_SEND_SIZE,
+                        minHeight: CHAT_COMPOSER_SEND_SIZE,
+                        paddingInline: 0,
+                        flexShrink: 0,
+                        '&:hover': { backgroundColor: 'background.level2' },
+                    }}
+                >
+                    {isRecording
+                        ? (isSending
+                            ? <Typography level="body-xs" sx={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>…</Typography>
+                            : <Send size={CHAT_COMPOSER_ICON_SIZE} style={{ color: 'var(--joy-palette-primary-main)' }} />)
+                        : message
+                            ? (editingMessage
+                                ? <Send size={CHAT_COMPOSER_ICON_SIZE} style={{ color: 'var(--joy-palette-warning-main)' }} />
+                                : <Send size={CHAT_COMPOSER_ICON_SIZE} style={{ color: 'var(--joy-palette-primary-main)' }} />)
+                            : <Mic size={CHAT_COMPOSER_ICON_SIZE} style={{ color: 'var(--joy-palette-primary-main)' }} />
+                    }
+                </IconButton>
             </Box>
             <CameraCaptureOverlay
                 open={cameraOpen}
