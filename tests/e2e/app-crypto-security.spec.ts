@@ -105,6 +105,8 @@ test('crea una identidad nueva desde la frase semilla y entra en la app', async 
     await mount(page, baseScenario(), { identity: { locked: true, mnemonicMode: false, mnemonic: defaultMnemonic } });
 
     await page.getByRole('button', { name: 'Crear cuenta nueva' }).click();
+    await expect(page.getByText('Cambia de identidad en este dispositivo')).toBeVisible();
+    await page.getByRole('button', { name: 'Crear cuenta nueva' }).click();
     await page.getByRole('button', { name: 'Generar mis 12 palabras' }).click();
     await page.getByRole('button', { name: 'Mostrar palabras' }).click();
     await expect(page.getByText('alpha')).toBeVisible();
@@ -148,12 +150,14 @@ test('protege el borrado local y solo elimina con el PIN correcto', async ({ pag
     await fillPinInputs(page, '2468');
     await expect(page.getByText('Introduce tu PIN de acceso para continuar')).toHaveCount(0);
     await openSecuritySettings(page);
-    await page.getByRole('button', { name: 'Eliminar cuenta y datos locales' }).click();
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await expect(page.getByText('Cerrar sesión en este equipo')).toBeVisible();
     await fillPinInputs(page, '1111');
     await expect(page.getByText('PIN incorrecto')).toBeVisible();
     await expect(await readDeleteCount(page)).toBe(0);
     await page.getByRole('button', { name: 'Cancelar' }).click();
-    await page.getByRole('button', { name: 'Eliminar cuenta y datos locales' }).click();
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await expect(page.getByText('Cerrar sesión en este equipo')).toBeVisible();
     await fillPinInputs(page, '2468');
     await expect.poll(async () => {
         try {
@@ -164,14 +168,18 @@ test('protege el borrado local y solo elimina con el PIN correcto', async ({ pag
     }).toBe(1);
 });
 
-test('cierra la sesión local y muestra el flujo para cambiar o recuperar identidad', async ({ page }) => {
-    await mount(page, baseScenario(), { identity: { locked: false, mnemonicMode: true, mnemonic: defaultMnemonic } });
+test('cierra la sesión local borrando los datos del equipo', async ({ page }) => {
+    await mount(page, baseScenario(), {
+        identity: { locked: false, mnemonicMode: true, mnemonic: defaultMnemonic },
+        localActions: { confirmResponse: true },
+    });
 
     await page.getByRole('button', { name: 'Ajustes' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
-    await expect(page.getByText('Crea una cuenta solo tuya')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Crear cuenta nueva' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Ya tengo una cuenta' })).toBeVisible();
+    await expect(page.getByText('Cerrar sesión en este equipo')).toBeVisible();
+    await page.getByRole('button', { name: 'Borrar los datos y cerrar sesión' }).click();
+    await expect.poll(async () => await readDeleteCount(page)).toBe(1);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('permite borrar la identidad local desde AppLock para usar otra cuenta', async ({ page }) => {

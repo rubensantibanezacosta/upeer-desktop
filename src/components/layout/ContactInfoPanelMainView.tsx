@@ -119,7 +119,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                 <List sx={rowsSx}>
                     {utilityActions.map((action) => (
                         <ListItem key={action.key} sx={{ p: 0 }}>
-                            <ListItemButton disabled={action.disabled} onClick={action.onClick} sx={rowButtonSx}>
+                            <ListItemButton disabled={action.disabled} onClick={() => action.onClick?.()} sx={rowButtonSx}>
                                 <ListItemDecorator sx={{ color: 'inherit' }}>
                                     <Box sx={rowIconSx}>{action.icon}</Box>
                                 </ListItemDecorator>
@@ -146,7 +146,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                 <List sx={rowsSx}>
                     {dangerActions.map((action) => (
                         <ListItem key={action.key} sx={{ p: 0 }}>
-                            <ListItemButton onClick={action.onClick} sx={{ ...rowButtonSx, '&:hover': { backgroundColor: 'background.level1' } }}>
+                            <ListItemButton onClick={() => action.onClick()} sx={{ ...rowButtonSx, '&:hover': { backgroundColor: 'background.level1' } }}>
                                 <ListItemDecorator sx={{ color: action.color }}>
                                     <Box sx={{ ...rowIconSx, color: action.color }}>{action.icon}</Box>
                                 </ListItemDecorator>

@@ -129,6 +129,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                 onChange={(e) => setNameValue(e.target.value)}
                                 onBlur={commitNameEdit}
                                 onKeyDown={(e) => {
+                                    e.stopPropagation();
                                     if (e.key === 'Enter') commitNameEdit();
                                     if (e.key === 'Escape') setEditingName(false);
                                 }}

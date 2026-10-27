@@ -12,6 +12,7 @@ type Contact = {
     lastMessage?: string | null;
     lastMessageTime?: string | null;
     lastSeen?: string | null;
+    lastActive?: string | null;
     vouchScore?: number;
 };
 
@@ -221,6 +222,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                 vaultEntries: 0,
             }),
             getMyReputation: async () => ({ score: 0 }),
+            getContactSecurity: async () => ({ hasSession: true, hasContactKey: true, safetyNumber: '11111 22222 33333 44444' }),
             getFileTransfers: async () => ({ success: true, transfers: deepClone(state.transfers) }),
             openFileDialog: async () => state.fileDialogQueue.shift() ?? { success: true, canceled: true, files: [] },
             fetchOgPreview: async (url: string) => state.linkPreviews[url] ?? null,
@@ -365,6 +367,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             setPin: async () => ({ success: true }),
             disablePin: async () => ({ success: true }),
             verifyPin: async () => ({ success: true }),
+            deleteIdentity: async () => ({ success: true }),
             onGroupUpdated: register('onGroupUpdated'),
             onGroupMessage: register('onGroupMessage'),
             onGroupInvite: register('onGroupInvite'),

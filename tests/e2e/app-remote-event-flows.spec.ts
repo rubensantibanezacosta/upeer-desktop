@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { emitBridgeEvent, installUpeerBridge, patchBridgeGroup } from './support/upeerBridge.js';
+import { emitBridgeEvent, installUpeerBridge, patchBridgeGroup, readBridgeState } from './support/upeerBridge.js';
 
 const now = Date.now();
 
@@ -98,10 +98,13 @@ test('refleja delivered y read remotos en mensajes propios', async ({ page }) =>
     const latestBubble = page.getByText('Mensaje para estados').last().locator('..').locator('..');
     await expect(page.getByLabel('Estado del mensaje: enviado').last()).toBeVisible();
 
-    await emitBridgeEvent(page, 'onMessageDelivered', { id: 'e2e-msg-1', upeerId: 'alice' });
+    const sentState = await readBridgeState(page);
+    const sentId = sentState.messagesByChat.alice?.at(-1)?.id ?? '';
+
+    await emitBridgeEvent(page, 'onMessageDelivered', { id: sentId, upeerId: 'alice' });
     await expect(page.getByLabel('Estado del mensaje: entregado').last()).toBeVisible();
 
-    await emitBridgeEvent(page, 'onMessageRead', { id: 'e2e-msg-1', upeerId: 'alice' });
+    await emitBridgeEvent(page, 'onMessageRead', { id: sentId, upeerId: 'alice' });
     await expect(page.getByLabel('Estado del mensaje: leído').last()).toBeVisible();
     await expect(latestBubble).toContainText('Mensaje para estados');
 });

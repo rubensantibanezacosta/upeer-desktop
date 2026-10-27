@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installUpeerBridge, readBridgeState } from './support/upeerBridge.js';
+import { openContactInfo } from './support/contactInfo.js';
 
 const now = Date.now();
 const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8sWQAAAAASUVORK5CYII=';
@@ -197,19 +198,18 @@ test('vacía el chat desde la ficha de contacto', async ({ page }) => {
 test('bloquea y desbloquea un contacto', async ({ page }) => {
     await mount(page, baseScenario());
 
-    await page.getByRole('button', { name: 'Contactos' }).click();
-    await page.getByLabel('Abrir ficha de Alice').click();
-    await page.getByRole('button', { name: 'Bloquear' }).click();
+    await openContactInfo(page, 'Alice');
+    await page.getByRole('button', { name: 'Bloquear a Alice' }).click();
     await expect.poll(async () => {
         const state = await readBridgeState(page);
         return state.contacts.find((contact) => contact.upeerId === 'alice')?.status ?? 'missing';
     }).toBe('blocked');
 
-    await page.getByRole('button', { name: 'Bloqueados' }).click();
-    await page.getByLabel('Abrir ficha de Alice').click();
+    await page.getByRole('button', { name: 'Ajustes' }).click();
+    await page.getByText('Bloqueados', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Desbloquear' })).toBeVisible();
     await page.getByRole('button', { name: 'Desbloquear' }).click();
-    await expect(page.getByText('No hay contactos bloqueados')).toBeVisible();
+    await expect(page.getByText('No has bloqueado a ningún usuario')).toBeVisible();
     await expect.poll(async () => {
         const state = await readBridgeState(page);
         return state.contacts.find((contact) => contact.upeerId === 'alice')?.status ?? 'missing';

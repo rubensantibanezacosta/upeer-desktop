@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { emitBridgeEvent, installUpeerBridge, patchBridgeContact, queueFileDialogResult, readBridgeState } from './support/upeerBridge.js';
+import { openContactInfo } from './support/contactInfo.js';
 
 const now = Date.now();
 
@@ -24,6 +25,7 @@ function baseScenario(): Parameters<typeof installUpeerBridge>[1] {
                 status: 'connected',
                 publicKey: 'alice-pk',
                 lastSeen: new Date(now).toISOString(),
+                lastActive: new Date(now).toISOString(),
                 lastMessage: 'Hola',
                 lastMessageTime: new Date(now).toISOString(),
                 vouchScore: 80,
@@ -92,17 +94,14 @@ test('crea un contacto desde el estado vacío', async ({ page }) => {
     await expect(chatEditor(page)).toBeVisible();
 });
 
-test('muestra contactos online y offline en la agenda', async ({ page }) => {
+test('muestra contactos online y offline en la ficha del contacto', async ({ page }) => {
     await mount(page, baseScenario());
 
-    await page.getByRole('button', { name: 'Contactos' }).click();
-    await expect(page.getByText('Contactos').first()).toBeVisible();
+    await openContactInfo(page, 'Alice');
+    await expect(page.getByText('En línea').last()).toBeVisible();
 
-    await page.getByLabel('Abrir ficha de Alice').click();
-    await expect(page.getByText('En línea')).toBeVisible();
-
-    await page.getByLabel('Abrir ficha de Bob').click();
-    await expect(page.getByText(/Última vez|Desconectado/)).toBeVisible();
+    await openContactInfo(page, 'Bob');
+    await expect(page.getByText(/Última vez|Desconectado/).last()).toBeVisible();
 });
 
 test('envía mensajes directos, renderiza preview y recibe eventos en tiempo real', async ({ page }) => {
@@ -253,17 +252,17 @@ test('comparte una tarjeta de contacto en un chat directo', async ({ page }) => 
 test('puede reflejar un contacto que pasa a online tras refresco', async ({ page }) => {
     await mount(page, baseScenario());
 
-    await page.getByRole('button', { name: 'Contactos' }).click();
-    await page.getByText('Bob').first().click();
-    await expect(page.getByText(/Última vez|Desconectado/)).toBeVisible();
+    await openContactInfo(page, 'Bob');
+    await expect(page.getByText(/Última vez|Desconectado/).last()).toBeVisible();
 
     await patchBridgeContact(page, 'bob', {
         status: 'connected',
+        lastActive: new Date().toISOString(),
         lastSeen: new Date().toISOString(),
     });
     await emitBridgeEvent(page, 'onHandshakeFinished', { upeerId: 'bob' });
 
-    await page.getByText('Alice').first().click();
-    await page.getByText('Bob').first().click();
-    await expect(page.getByText('En línea')).toBeVisible();
+    await openContactInfo(page, 'Alice');
+    await openContactInfo(page, 'Bob');
+    await expect(page.getByText('En línea').last()).toBeVisible();
 });

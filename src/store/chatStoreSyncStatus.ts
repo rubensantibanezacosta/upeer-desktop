@@ -32,7 +32,7 @@ export const createSyncStatusActions = (set: ChatSet) => ({
         if (typeof window.upeer.getSyncStatus !== 'function') return;
         try {
             const syncStatus = await window.upeer.getSyncStatus();
-            set({ syncStatus });
+            set({ syncStatus: syncStatus ?? DISABLED_SYNC_STATUS });
         } catch (error) {
             console.error('[sync] no se pudo leer el estado de sincronización', error);
         }
