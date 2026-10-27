@@ -7,7 +7,7 @@ import { useChatStore } from '../../../../src/store/useChatStore.js';
 const initialSyncStatus = useChatStore.getState().syncStatus;
 
 const baseStatus: UpeerSyncStatus = {
-    state: 'disabled',
+    state: 'idle',
     phase: 'idle',
     devicesTotal: 0,
     devicesDone: 0,

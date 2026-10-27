@@ -1,7 +1,7 @@
 import type { ChatSet } from './chatStoreTypes.js';
 
-const DISABLED_SYNC_STATUS: UpeerSyncStatus = {
-    state: 'disabled',
+const IDLE_SYNC_STATUS: UpeerSyncStatus = {
+    state: 'idle',
     phase: 'idle',
     devicesTotal: 0,
     devicesDone: 0,
@@ -27,12 +27,12 @@ const DISABLED_SYNC_STATUS: UpeerSyncStatus = {
 };
 
 export const createSyncStatusActions = (set: ChatSet) => ({
-    syncStatus: DISABLED_SYNC_STATUS,
+    syncStatus: IDLE_SYNC_STATUS,
     refreshSyncStatus: async () => {
         if (typeof window.upeer.getSyncStatus !== 'function') return;
         try {
             const syncStatus = await window.upeer.getSyncStatus();
-            set({ syncStatus: syncStatus ?? DISABLED_SYNC_STATUS });
+            set({ syncStatus: syncStatus ?? IDLE_SYNC_STATUS });
         } catch (error) {
             console.error('[sync] no se pudo leer el estado de sincronización', error);
         }

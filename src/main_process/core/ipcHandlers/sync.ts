@@ -7,7 +7,7 @@ export function registerSyncHandlers(): void {
     ipcMain.handle('get-sync-status', () => {
         if (!getMyUPeerId()) {
             return {
-                state: 'disabled',
+                state: 'idle',
                 pendingEvents: 0,
                 pendingMessages: 0,
                 pendingMetadata: 0,

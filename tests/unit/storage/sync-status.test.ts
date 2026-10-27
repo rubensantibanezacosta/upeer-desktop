@@ -52,10 +52,10 @@ describe('Sync status', () => {
         mockGet.mockReturnValue({ total: 0 });
     });
 
-    it('reports disabled when there are no other own devices', () => {
+    it('reports idle when there are no other own devices', () => {
         vi.mocked(listSyncPeers).mockReturnValue([]);
         expect(getSyncStatus('a'.repeat(64))).toEqual({
-            state: 'disabled',
+            state: 'idle',
             pendingEvents: 0,
             pendingMessages: 0,
             pendingMetadata: 0,

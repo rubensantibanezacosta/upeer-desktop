@@ -181,7 +181,7 @@ export interface SyncPeerStateEvent {
 export type SyncPhaseEvent = 'idle' | 'syncing' | 'live';
 
 export interface SyncStatusEvent {
-    state: 'disabled' | 'pending' | 'synced';
+    state: 'idle' | 'pending' | 'synced';
     phase: SyncPhaseEvent;
     devicesTotal: number;
     devicesDone: number;

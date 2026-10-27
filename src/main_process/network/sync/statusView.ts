@@ -29,7 +29,7 @@ export type SyncStatusExtras = {
     activeFiles?: number;
 };
 
-const DISABLED_PROGRESS: SyncProgressView = {
+const IDLE_PROGRESS: SyncProgressView = {
     determinate: false,
     percent: 0,
     historyDone: 0,
@@ -42,7 +42,7 @@ const DISABLED_PROGRESS: SyncProgressView = {
 };
 
 const EMPTY: SyncStatusView = {
-    state: 'disabled',
+    state: 'idle',
     phase: 'idle',
     devicesTotal: 0,
     devicesDone: 0,
@@ -54,7 +54,7 @@ const EMPTY: SyncStatusView = {
     pendingEntityIds: [],
     peers: [],
     devices: [],
-    progress: DISABLED_PROGRESS,
+    progress: IDLE_PROGRESS,
 };
 
 export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView {

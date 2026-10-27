@@ -14,7 +14,7 @@ export type SyncPeerState = {
 };
 
 export type SyncStatus = {
-    state: 'disabled' | SyncEntityState;
+    state: 'idle' | SyncEntityState;
     pendingEvents: number;
     pendingMessages: number;
     pendingMetadata: number;
@@ -36,7 +36,7 @@ const MESSAGE_KINDS = new Set([
 export function getSyncStatus(upeerId: string): SyncStatus {
     const peers = listSyncPeers(upeerId);
     if (peers.length === 0) {
-        return { state: 'disabled', pendingEvents: 0, pendingMessages: 0, pendingMetadata: 0, pendingEntityIds: [], peers: [] };
+        return { state: 'idle', pendingEvents: 0, pendingMessages: 0, pendingMetadata: 0, pendingEntityIds: [], peers: [] };
     }
     const maxSequence = getMaxSyncSequence();
     const minAck = peers.reduce((lowest, peer) => Math.min(lowest, peer.ackSequence), maxSequence);

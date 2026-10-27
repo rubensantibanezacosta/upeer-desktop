@@ -35,7 +35,7 @@ describe('getSyncStatusView', () => {
         vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
         vi.mocked(getDeviceIdentity).mockReturnValue({ deviceId: 'local-device' } as never);
         vi.mocked(getSyncStatus).mockReturnValue({
-            state: 'disabled',
+            state: 'idle',
             pendingEvents: 0,
             pendingMessages: 0,
             pendingMetadata: 0,
