@@ -85,7 +85,7 @@ function searchScenario(): Parameters<typeof installUpeerBridge>[1] {
 }
 
 async function sidebarSearch(page: Page, text: string) {
-    await page.getByPlaceholder('Buscar un chat o iniciar uno nuevo').fill(text);
+    await page.getByPlaceholder('Busca chats, contactos, grupos o mensajes').fill(text);
 }
 
 test('abre un chat directo desde un resultado de búsqueda global', async ({ page }) => {
@@ -114,7 +114,7 @@ test('muestra estados sin resultados en búsqueda global y nuevo chat', async ({
     await mount(page, searchScenario());
 
     await sidebarSearch(page, 'sin-coincidencias-globales');
-    await expect(page.getByText('Sin resultados para "sin-coincidencias-globales"')).toBeVisible();
+    await expect(page.getByText('Nada coincide con "sin-coincidencias-globales".')).toBeVisible();
 
     await page.getByRole('button', { name: 'Nuevo chat' }).click();
     await page.getByRole('textbox', { name: 'Buscar contactos' }).first().fill('sin-coincidencias-contactos');
