@@ -97,4 +97,44 @@ describe('CameraCaptureOverlay', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Girar cámara' }));
         await waitFor(() => expect(getUserMedia).toHaveBeenLastCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: 'user' }) })));
     });
+
+    it('se monta en el body para no quedar atrapado en el compositor', () => {
+        setCamera(() => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream));
+        const composer = document.createElement('div');
+        composer.style.position = 'absolute';
+        composer.style.height = '68px';
+        document.body.appendChild(composer);
+
+        const onCapture = vi.fn();
+        render(
+            <CameraCaptureOverlay open shots={[]} onCapture={onCapture} onClose={vi.fn()} />,
+            { container: composer },
+        );
+
+        const close = screen.getByRole('button', { name: 'Cerrar cámara' });
+        expect(composer.contains(close)).toBe(false);
+        let top: HTMLElement = close;
+        while (top.parentElement && top.parentElement !== document.body) top = top.parentElement;
+        expect(top.parentElement).toBe(document.body);
+        expect(top.contains(document.querySelector('video'))).toBe(true);
+        composer.remove();
+    });
+
+    it('engancha el stream al vídeo para que se vea lo que enfoca la cámara', async () => {
+        const stream = { getTracks: () => [] } as unknown as MediaStream;
+        setCamera(() => Promise.resolve(stream));
+        let attached: unknown = null;
+        Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+            configurable: true,
+            get: () => attached,
+            set: (value: unknown) => { attached = value; },
+        });
+
+        renderOverlay();
+
+        await waitFor(() => expect(attached).toBe(stream));
+        const video = document.querySelector('video') as HTMLVideoElement;
+        expect(video).toHaveAttribute('playsinline');
+        expect(video).toHaveAttribute('autoplay');
+    });
 });

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Alert, Box, IconButton, Sheet, Typography } from '@mui/joy';
 import { Camera, Check, Film, RefreshCw, X } from 'lucide-react';
 
@@ -101,8 +102,8 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
         onCapture(canvas.toDataURL('image/jpeg', JPEG_QUALITY));
     };
 
-    return (
-        <Sheet variant="solid" color="neutral" sx={{ ...ATTACHMENT_SHEET_SX, zIndex: CAMERA_SHEET_Z_INDEX }}>
+    return createPortal(
+        <Sheet variant="solid" color="neutral" sx={{ ...ATTACHMENT_SHEET_SX, position: 'fixed', zIndex: CAMERA_SHEET_Z_INDEX }}>
             <Box sx={SHEET_HEADER_SX}>
                 <IconButton aria-label="Cerrar cámara" variant="plain" color="neutral" onClick={onClose} sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
                     <X />
@@ -112,10 +113,23 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
                 </Typography>
             </Box>
 
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4, overflow: 'hidden' }}>
-                <Box sx={{ width: '100%', maxWidth: 960, aspectRatio: '16 / 9', borderRadius: 'lg', overflow: 'hidden', backgroundColor: '#000', boxShadow: 'lg' }}>
-                    <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                </Box>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4, overflow: 'hidden', minHeight: 0 }}>
+                <Box
+                    component="video"
+                    ref={videoRef}
+                    muted
+                    playsInline
+                    autoPlay
+                    sx={{
+                        maxWidth: '90%',
+                        maxHeight: '60vh',
+                        objectFit: 'contain',
+                        backgroundColor: '#000',
+                        borderRadius: 'lg',
+                        boxShadow: 'lg',
+                        display: 'block',
+                    }}
+                />
             </Box>
 
             {error && (
@@ -165,6 +179,7 @@ export const CameraCaptureOverlay: React.FC<CameraCaptureOverlayProps> = ({ open
                     )}
                 </Box>
             </Box>
-        </Sheet>
+        </Sheet>,
+        document.body,
     );
 };
