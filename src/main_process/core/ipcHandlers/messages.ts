@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getMessages, searchMessages, searchChatMessages, getMessagesAround, getFileHistory, getOlderMessages } from '../../storage/messages/operations.js';
+import { getMessages, searchMessages, searchChatMessages, getMessagesAround, getMessagesByIds, getFileHistory, getOlderMessages } from '../../storage/messages/operations.js';
 import {
   sendChatMessage,
   sendTypingIndicator,
@@ -38,6 +38,8 @@ export function registerMessageHandlers(): void {
       typeof from === 'number' && Number.isFinite(from) ? from : undefined,
       typeof to === 'number' && Number.isFinite(to) ? to : undefined));
   ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
+  ipcMain.handle('get-messages-by-ids', (_event, { ids }) =>
+    getMessagesByIds(Array.isArray(ids) ? ids : []));
   ipcMain.handle('get-older-messages', (_event, { chatUpeerId, beforeTimestamp, limit }) =>
     getOlderMessages(chatUpeerId, typeof beforeTimestamp === 'number' ? beforeTimestamp : Date.now(), typeof limit === 'number' ? Math.min(Math.max(limit, 1), 200) : 50));
   ipcMain.handle('get-file-history', (_event, { limit }) => getFileHistory(typeof limit === 'number' ? Math.min(Math.max(limit, 1), 500) : 200));

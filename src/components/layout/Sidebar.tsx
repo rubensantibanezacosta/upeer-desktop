@@ -10,6 +10,7 @@ import { SubViewHeader } from './sidebar/SubViewHeader.js';
 import { AddContactForm } from './sidebar/AddContactForm.js';
 import { CreateGroupForm } from './sidebar/CreateGroupForm.js';
 import { ChatListPanel } from './sidebar/ChatListPanel.js';
+import { GlobalStarredView } from '../../features/chat/GlobalStarredView.js';
 import { SidebarNewChatPanel } from './sidebar/SidebarNewChatPanel.js';
 
 interface SidebarProps {
@@ -106,11 +107,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const handleOpenNew = () => openNewChat();
     const handleBack = () => backToList();
+    const openStarredChat = (chatId: string) => {
+        if (chatId.startsWith('grp-')) {
+            onSelectGroup?.(chatId);
+        } else {
+            onSelectContact(chatId);
+        }
+        backToList();
+    };
     const handleSelectExisting = (id: string) => { onSelectContact(id); backToList(); };
 
     const offset = (v: SidebarView): string => {
         if (sidebarView === v) return 'translateX(0)';
-        const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2 };
+        const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2, starred: 1 };
         return orderMap[sidebarView] > orderMap[v] ? 'translateX(-100%)' : 'translateX(100%)';
     };
 
@@ -167,6 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onLoadMoreMessages={() => void loadMoreSearchMessages()}
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                     onOpenAppLock={onOpenAppLock}
+                    onOpenStarred={() => setSidebarView('starred')}
                     searchFocusToken={sidebarSearchFocusToken}
                     loading={isHydrating}
                 />
@@ -200,6 +210,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         contacts={contacts}
                         onCreate={onCreateGroup}
                         onDone={() => setSidebarView('list')}
+                    />
+                )}
+            </Box>
+
+            <Box sx={panelSx('starred')}>
+                {sidebarView === 'starred' && (
+                    <GlobalStarredView
+                        contacts={contacts.map((contact) => ({ id: contact.upeerId, name: contact.name }))}
+                        groups={groups.map((group) => ({ id: group.groupId, name: group.name }))}
+                        onOpenChat={openStarredChat}
+                        onBack={handleBack}
                     />
                 )}
             </Box>

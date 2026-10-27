@@ -238,3 +238,28 @@ test('los mensajes destacados se reúnen en el panel de info del chat', async ({
     await expect(page.getByText('Info. del contacto')).toBeVisible();
     await expect(page.locator('#msg-alice-other')).toBeVisible();
 });
+
+test('la lista global de destacados reúne los de todos los chats', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await mount(page, searchScenario());
+
+    await page.getByRole('button', { name: 'Más opciones' }).click();
+    await page.getByRole('menuitem', { name: 'Mensajes destacados' }).click();
+    await expect(page.getByText('No hay mensajes destacados')).toBeVisible();
+    await page.getByRole('button', { name: 'Volver a los chats' }).click();
+    await expect(page.getByRole('button', { name: 'Abrir chat con Alice' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Abrir chat con Alice' }).click();
+    await page.locator('#msg-alice-other').hover();
+    await page.getByLabel('Abrir acciones del mensaje alice-other').click();
+    await page.getByRole('menuitem', { name: 'Destacar' }).click();
+
+    await page.getByRole('button', { name: 'Más opciones' }).click();
+    await page.getByRole('menuitem', { name: 'Mensajes destacados' }).click();
+    await expect(page.getByText('1 mensaje').first()).toBeVisible();
+    const starredEntry = page.getByRole('button', { name: 'Ir al mensaje destacado de Alice: otro mensaje' });
+    await expect(starredEntry).toBeVisible();
+
+    await starredEntry.click();
+    await expect(page.locator('#msg-alice-other')).toBeVisible();
+});

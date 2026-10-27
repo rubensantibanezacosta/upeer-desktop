@@ -254,6 +254,10 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             getGroups: async () => deepClone(state.groups),
             getMessages: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
             getMessagesAround: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
+            getMessagesByIds: async (ids: string[]) => {
+                const wanted = new Set(Array.isArray(ids) ? ids : []);
+                return deepClone(Object.values(state.messagesByChat).flat().filter((message) => wanted.has(message.id)));
+            },
             searchMessages: async (query: string, limit?: number, offset?: number) => deepClone(searchMessages(query, limit, offset)),
             searchChatMessages: async (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => deepClone(searchChatMessages(chatUpeerId, query, limit, offset, range)),
             getDevices: async () => [],

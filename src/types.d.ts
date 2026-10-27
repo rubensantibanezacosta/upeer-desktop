@@ -62,7 +62,7 @@ declare global {
         detail: string;
     };
     type UpeerSyncStatus = {
-        state: 'disabled' | 'pending' | 'synced';
+        state: 'idle' | 'pending' | 'synced';
         phase: UpeerSyncPhase;
         devicesTotal: number;
         devicesDone: number;
@@ -85,6 +85,7 @@ declare global {
             searchMessages: (query: string, limit?: number, offset?: number) => Promise<UpeerChatMessage[]>;
             searchChatMessages: (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
+            getMessagesByIds: (ids: string[]) => Promise<UpeerChatMessage[]>;
             getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => Promise<UpeerChatMessage[]>;
             getFileHistory: (limit?: number) => Promise<UpeerFileHistoryEntry[]>;
             getContacts: () => Promise<UpeerContact[]>;

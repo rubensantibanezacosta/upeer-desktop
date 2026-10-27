@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Dropdown, IconButton, ListDivider, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip, Typography } from '@mui/joy';
-import { ArrowLeft, CheckCheck, Lock, LogOut, MessageSquarePlus, MoreVertical, Users } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Lock, LogOut, MessageSquarePlus, MoreVertical, Star, Users } from 'lucide-react';
 import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
 import { SignOutFlow } from '../ui/settings/SignOutFlow.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
@@ -9,11 +9,12 @@ interface SidebarHeaderProps {
     onAddNew: () => void;
     onCreateGroup?: () => void;
     onOpenAppLock?: () => void;
+    onOpenStarred?: () => void;
 }
 
 const itemIcon = (icon: React.ReactNode) => <ListItemDecorator sx={{ color: 'inherit' }}>{icon}</ListItemDecorator>;
 
-export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew, onCreateGroup, onOpenAppLock }) => {
+export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew, onCreateGroup, onOpenAppLock, onOpenStarred }) => {
     const markAllRead = useChatActionsStore((state) => state.markAllRead);
     const [signOutOpen, setSignOutOpen] = useState(false);
 
@@ -51,6 +52,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ onAddNew, onCreate
                             {itemIcon(<CheckCheck style={{ fontSize: 18 }} />)}
                             Marcar todos como leídos
                         </MenuItem>
+                        {onOpenStarred && (
+                            <MenuItem onClick={onOpenStarred}>
+                                {itemIcon(<Star style={{ fontSize: 18 }} />)}
+                                Mensajes destacados
+                            </MenuItem>
+                        )}
                         <ListDivider />
                         {onOpenAppLock && (
                             <MenuItem onClick={onOpenAppLock}>

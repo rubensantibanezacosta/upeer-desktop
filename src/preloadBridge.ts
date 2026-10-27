@@ -153,6 +153,7 @@ const messagingApi = {
     searchMessages: (query: string, limit?: number, offset?: number) => ipcRenderer.invoke('search-messages', { query, limit, offset }),
     searchChatMessages: (chatUpeerId: string, query: string, limit?: number, offset?: number, range?: { from: number; to: number }) => ipcRenderer.invoke('search-chat-messages', { chatUpeerId, query, limit, offset, from: range?.from, to: range?.to }),
     getMessagesAround: (chatUpeerId: string, targetMsgId: string) => ipcRenderer.invoke('get-messages-around', { chatUpeerId, targetMsgId }),
+    getMessagesByIds: (ids: string[]) => ipcRenderer.invoke('get-messages-by-ids', { ids }),
     getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => ipcRenderer.invoke('get-older-messages', { chatUpeerId, beforeTimestamp, limit }),
     getFileHistory: (limit?: number) => ipcRenderer.invoke('get-file-history', { limit }),
 };

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { like, gte, lte, lt } from 'drizzle-orm';
+import { like, gte, lte, lt, inArray } from 'drizzle-orm';
 import { getDb, getSchema, eq, desc, and, runTransaction, sql } from '../shared.js';
 import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
@@ -248,6 +248,21 @@ export function getMessageById(id: string) {
     return db.select().from(schema.messages)
         .where(eq(schema.messages.id, id))
         .get();
+}
+
+export function getMessagesByIds(ids: string[]) {
+    const clean = ids.filter((id) => typeof id === 'string' && id.length > 0).slice(0, 500);
+    if (clean.length === 0) return [];
+    const db = getDb();
+    const schema = getSchema();
+
+    return db.select().from(schema.messages)
+        .where(and(
+            inArray(schema.messages.id, clean),
+            eq(schema.messages.isDeleted, false)
+        ))
+        .orderBy(desc(schema.messages.timestamp))
+        .all();
 }
 
 export function getMessagesAround(chatUpeerId: string, targetMsgId: string, context = 60) {

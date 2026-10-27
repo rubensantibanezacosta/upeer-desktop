@@ -3,7 +3,7 @@ import { SettingsSection } from '../components/ui/settings/types.js';
 import { MediaItem } from '../types/chat.js';
 
 // ── Tipos de vista de la sidebar ──────────────────────────────────────────────
-export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group';
+export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group' | 'starred';
 export type SidebarFilter = 'all' | 'unread' | 'favorites' | 'groups';
 export type AppView = 'chat' | 'calls' | 'settings';
 
