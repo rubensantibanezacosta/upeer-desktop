@@ -135,4 +135,20 @@ export const EMOJI_CATEGORIES: Record<string, EmojiCategory> = {
 };
 
 export const CATEGORY_KEYS = Object.keys(EMOJI_CATEGORIES);
+export const RECENT_KEY = 'recent';
+export const TAB_KEYS = [RECENT_KEY, ...CATEGORY_KEYS];
+export const RECENT_LABEL = 'Recientes';
 export const STORAGE_KEY = 'recentEmojis';
+export const RECENT_LIMIT = 32;
+
+export function searchEmojis(query: string): string[] {
+    const term = query.trim().toLowerCase();
+    if (!term) return [];
+    const matched = CATEGORY_KEYS.filter((key) => EMOJI_CATEGORIES[key].label.toLowerCase().includes(term));
+    if (matched.length > 0) return matched.flatMap((key) => EMOJI_CATEGORIES[key].emojis);
+    return CATEGORY_KEYS.flatMap((key) => EMOJI_CATEGORIES[key].emojis).filter((emoji) => emoji.includes(term));
+}
+
+export function pushRecentEmoji(recent: string[], emoji: string): string[] {
+    return [emoji, ...recent.filter((item) => item !== emoji)].slice(0, RECENT_LIMIT);
+}

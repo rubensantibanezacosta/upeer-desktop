@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { IconButton, Box, Input, Typography, Tabs, TabList, Tab, Sheet } from '@mui/joy';
 import { Smile, Search, Clock } from 'lucide-react';
-import { EMOJI_CATEGORIES, CATEGORY_KEYS, STORAGE_KEY } from './emojiData.js';
+import { EMOJI_CATEGORIES, RECENT_KEY, RECENT_LABEL, STORAGE_KEY, TAB_KEYS, pushRecentEmoji, searchEmojis } from './emojiData.js';
 
 interface EmojiPickerProps {
     onSelect: (emoji: string) => void;
@@ -35,7 +35,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
     }, [isOpen]);
 
     const addToRecent = (emoji: string) => {
-        const updated = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, 32);
+        const updated = pushRecentEmoji(recentEmojis, emoji);
         setRecentEmojis(updated);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     };
@@ -45,12 +45,13 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
         onSelect(emoji);
     };
 
-    const filteredEmojis = search.trim()
-        ? Object.values(EMOJI_CATEGORIES).flatMap(c => c.emojis).filter(e => e.includes(search))
-        : null;
+    const filteredEmojis = search.trim() ? searchEmojis(search) : null;
 
-    const currentCategory = CATEGORY_KEYS[activeTab];
-    const displayEmojis = filteredEmojis || EMOJI_CATEGORIES[currentCategory]?.emojis || [];
+    const currentCategory = TAB_KEYS[activeTab] ?? RECENT_KEY;
+    const isRecentTab = currentCategory === RECENT_KEY;
+    const displayEmojis = filteredEmojis ?? (isRecentTab ? recentEmojis : EMOJI_CATEGORIES[currentCategory]?.emojis ?? []);
+    const currentLabel = isRecentTab ? RECENT_LABEL : EMOJI_CATEGORIES[currentCategory]?.label ?? '';
+    const currentIcon = isRecentTab ? React.createElement(Clock, { style: { fontSize: 14 } }) : EMOJI_CATEGORIES[currentCategory]?.icon;
 
     return (
         <Box ref={containerRef} sx={{ position: 'relative' }}>
@@ -102,21 +103,27 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                             <TabList
                                 sx={{
                                     px: 1,
-                                    gap: 0,
-                                    justifyContent: 'space-between',
+                                    py: 0.5,
+                                    gap: 0.5,
+                                    flexWrap: 'nowrap',
+                                    overflowX: 'auto',
+                                    scrollbarWidth: 'none',
+                                    '&::-webkit-scrollbar': { display: 'none' },
                                     '& .MuiTab-root': {
-                                        minWidth: 32,
-                                        flex: 1,
-                                        py: 1,
-                                        borderRadius: 0,
+                                        minWidth: 34,
+                                        minHeight: 34,
+                                        flex: '0 0 auto',
+                                        px: 1,
+                                        py: 0,
+                                        borderRadius: 'sm',
                                         '&:hover': { bgcolor: 'background.level1' },
                                         '&.Mui-selected': { bgcolor: 'background.level2' }
                                     }
                                 }}
                             >
-                                {CATEGORY_KEYS.map((key, idx) => (
-                                    <Tab key={key} value={idx} sx={{ display: 'flex', justifyContent: 'center' }}>
-                                        {EMOJI_CATEGORIES[key].icon}
+                                {TAB_KEYS.map((key, idx) => (
+                                    <Tab key={key} value={idx} aria-label={key === RECENT_KEY ? RECENT_LABEL : EMOJI_CATEGORIES[key].label} sx={{ display: 'flex', justifyContent: 'center' }}>
+                                        {key === RECENT_KEY ? <Clock style={{ fontSize: 18 }} /> : EMOJI_CATEGORIES[key].icon}
                                     </Tab>
                                 ))}
                             </TabList>
@@ -124,43 +131,11 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                     )}
 
                     <Box sx={{ flexGrow: 1, overflow: 'auto', p: 1 }}>
-                        {!search && recentEmojis.length > 0 && activeTab === 0 && (
-                            <Box sx={{ mb: 1.5 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5, mb: 0.5 }}>
-                                    <Clock style={{ fontSize: 14, opacity: 0.6 }} />
-                                    <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 600 }}>
-                                        Usados recientemente
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-                                    {recentEmojis.map((emoji, i) => (
-                                        <Box
-                                            key={`recent-${i}`}
-                                            onClick={() => handleEmojiClick(emoji)}
-                                            sx={{
-                                                width: 36,
-                                                height: 36,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: 22,
-                                                cursor: 'pointer',
-                                                borderRadius: 'sm',
-                                                '&:hover': { bgcolor: 'background.level2' }
-                                            }}
-                                        >
-                                            {emoji}
-                                        </Box>
-                                    ))}
-                                </Box>
-                            </Box>
-                        )}
-
                         {!search && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5, mb: 0.5 }}>
-                                {EMOJI_CATEGORIES[currentCategory].icon}
+                                {currentIcon}
                                 <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 600 }}>
-                                    {EMOJI_CATEGORIES[currentCategory].label}
+                                    {currentLabel}
                                 </Typography>
                             </Box>
                         )}
@@ -191,9 +166,9 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, disabled = f
                                     {emoji}
                                 </Box>
                             ))}
-                            {search && displayEmojis.length === 0 && (
+                            {displayEmojis.length === 0 && (
                                 <Typography level="body-sm" sx={{ p: 2, opacity: 0.5, textAlign: 'center', width: '100%' }}>
-                                    No se encontraron emojis
+                                    {search ? 'No se encontraron emojis' : 'Todavía no has usado ningún emoji'}
                                 </Typography>
                             )}
                         </Box>
