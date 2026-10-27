@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isContactUnread, isGroupUnread } from '../../../../src/components/layout/chatUnread.js';
+import { isContactUnread, isGroupUnread } from '../../../../src/utils/chatUnread.js';
 import type { Contact, Group } from '../../../../src/types/chat.js';
 
 const contact = (overrides: Partial<Contact> = {}): Contact => ({

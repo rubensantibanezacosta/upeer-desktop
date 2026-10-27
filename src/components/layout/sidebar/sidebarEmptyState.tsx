@@ -14,6 +14,7 @@ interface SidebarEmptyStateCopy {
     title: string;
     subtitle: string;
     action?: SidebarEmptyStateAction;
+    secondaryAction?: SidebarEmptyStateAction;
 }
 
 export type SidebarEmptyStateModel =
@@ -73,13 +74,18 @@ export const resolveSidebarEmptyState = (input: SidebarEmptyStateInput): Sidebar
     const term = input.search.trim();
     if (input.visibleCount > 0) return null;
     if (input.loading) return { kind: 'loading', label: LOADING_LABEL };
-    if (term && input.sourceCount > 0) {
+    if (term && (input.filter !== 'all' || input.sourceCount > 0)) {
         return {
             kind: 'empty',
             icon: <SearchX style={{ fontSize: 'inherit' }} />,
             title: 'Sin coincidencias',
-            subtitle: `Ninguna conversación coincide con "${term}".`,
+            subtitle: input.filter === 'all'
+                ? `Nada coincide con "${term}".`
+                : `Nada coincide con "${term}" y el filtro activo.`,
             action: { label: 'Limpiar búsqueda', onClick: input.onClearSearch },
+            ...(input.filter === 'all'
+                ? {}
+                : { secondaryAction: { label: 'Quitar filtro', onClick: input.onShowAll } }),
         };
     }
     return { kind: 'empty', ...filterCopy(input.filter, input) };
@@ -88,5 +94,13 @@ export const resolveSidebarEmptyState = (input: SidebarEmptyStateInput): Sidebar
 export const SidebarEmptyStateView: React.FC<{ model: SidebarEmptyStateModel }> = ({ model }) => (
     model.kind === 'loading'
         ? <LoadingState label={model.label} />
-        : <EmptyState icon={model.icon} title={model.title} subtitle={model.subtitle} action={model.action} />
+        : (
+            <EmptyState
+                icon={model.icon}
+                title={model.title}
+                subtitle={model.subtitle}
+                action={model.action}
+                secondaryAction={model.secondaryAction}
+            />
+        )
 );

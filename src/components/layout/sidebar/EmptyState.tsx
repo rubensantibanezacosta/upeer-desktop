@@ -6,9 +6,10 @@ interface EmptyStateProps {
     title: string;
     subtitle: string;
     action?: { label: string; onClick: () => void };
+    secondaryAction?: { label: string; onClick: () => void };
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, action }) => (
+export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, action, secondaryAction }) => (
     <Box sx={{
         flex: 1,
         display: 'flex',
@@ -27,6 +28,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, a
         {action && (
             <Button size="sm" variant="soft" color="primary" onClick={action.onClick} sx={{ mt: 0.5 }}>
                 {action.label}
+            </Button>
+        )}
+        {secondaryAction && (
+            <Button size="sm" variant="plain" color="neutral" onClick={secondaryAction.onClick}>
+                {secondaryAction.label}
             </Button>
         )}
     </Box>

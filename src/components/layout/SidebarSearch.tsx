@@ -27,7 +27,7 @@ export const SidebarSearch: React.FC<SidebarSearchProps> = ({
     activeFilter = 'all',
     onFilterChange,
     filters,
-    placeholder = 'Buscar un chat o iniciar uno nuevo',
+    placeholder = 'Busca chats, contactos, grupos o mensajes',
     showFilters = true,
     autoFocus = false,
     focusKey,

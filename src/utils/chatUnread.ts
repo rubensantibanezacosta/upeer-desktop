@@ -1,4 +1,4 @@
-import type { Contact, Group } from '../../types/chat.js';
+import type { Contact, Group } from '../types/chat.js';
 
 interface UnreadPref {
     unread?: boolean;

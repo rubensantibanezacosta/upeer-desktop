@@ -15,6 +15,8 @@ interface SearchResult {
     isMine: boolean;
 }
 
+const IN_CHAT_SEARCH_LIMIT = 50;
+
 const excerpt = (raw: string): string => {
     if (raw.startsWith('{') && raw.endsWith('}')) {
         return '📎 Archivo adjunto';
@@ -44,7 +46,7 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({ conversationKey, o
         let cancelled = false;
         setLoading(true);
         const timer = window.setTimeout(() => {
-            window.upeer.searchMessages(trimmed)
+            window.upeer.searchMessages(trimmed, IN_CHAT_SEARCH_LIMIT, 0)
                 .then((rows) => {
                     if (cancelled) return;
                     const filtered = (rows || [])

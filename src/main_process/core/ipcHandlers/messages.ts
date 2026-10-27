@@ -11,12 +11,24 @@ import {
 } from '../../network/messaging/chat.js';
 import { markLocalActive } from '../../network/messaging/activity.js';
 
+const SEARCH_LIMIT_DEFAULT = 25;
+const SEARCH_LIMIT_MAX = 100;
+
+const normalizeSearchLimit = (limit: unknown): number => typeof limit === 'number' && Number.isFinite(limit)
+  ? Math.min(Math.max(Math.trunc(limit), 1), SEARCH_LIMIT_MAX)
+  : SEARCH_LIMIT_DEFAULT;
+
+const normalizeSearchOffset = (offset: unknown): number => typeof offset === 'number' && Number.isFinite(offset)
+  ? Math.max(Math.trunc(offset), 0)
+  : 0;
+
 /**
  * Registra los manejadores IPC relacionados con mensajes y chat
  */
 export function registerMessageHandlers(): void {
   ipcMain.handle('get-messages', (_event, upeerId) => getMessages(upeerId));
-  ipcMain.handle('search-messages', (_event, { query }) => searchMessages(query));
+  ipcMain.handle('search-messages', (_event, { query, limit, offset }) =>
+    searchMessages(typeof query === 'string' ? query : '', normalizeSearchLimit(limit), normalizeSearchOffset(offset)));
   ipcMain.handle('get-messages-around', (_event, { chatUpeerId, targetMsgId }) => getMessagesAround(chatUpeerId, targetMsgId));
   ipcMain.handle('get-older-messages', (_event, { chatUpeerId, beforeTimestamp, limit }) =>
     getOlderMessages(chatUpeerId, typeof beforeTimestamp === 'number' ? beforeTimestamp : Date.now(), typeof limit === 'number' ? Math.min(Math.max(limit, 1), 200) : 50));

@@ -167,7 +167,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             }
             state.groups.unshift(group);
         };
-        const searchMessages = (query: string) => {
+        const searchMessages = (query: string, limit = 25, offset = 0) => {
             const normalizedQuery = query.trim().toLowerCase();
             if (!normalizedQuery) {
                 return [];
@@ -175,6 +175,8 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             return Object.entries(state.messagesByChat)
                 .flatMap(([chatId, messages]) => messages.map((message) => ({ chatId, message })))
                 .filter(({ message }) => typeof message.message === 'string' && message.message.toLowerCase().includes(normalizedQuery))
+                .sort((left, right) => right.message.timestamp - left.message.timestamp)
+                .slice(offset, offset + limit)
                 .map(({ chatId, message }) => ({
                     id: message.id,
                     chatUpeerId: chatId,
@@ -201,7 +203,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             getGroups: async () => deepClone(state.groups),
             getMessages: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
             getMessagesAround: async (chatId: string) => deepClone(state.messagesByChat[chatId] ?? []),
-            searchMessages: async (query: string) => deepClone(searchMessages(query)),
+            searchMessages: async (query: string, limit?: number, offset?: number) => deepClone(searchMessages(query, limit, offset)),
             getDevices: async () => [],
             getMyDevices: async () => [],
             getBlockedContacts: async () => state.contacts.filter((contact) => contact.status === 'blocked'),

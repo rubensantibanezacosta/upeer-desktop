@@ -42,7 +42,7 @@ describe('ChatSearchBar', () => {
         fireEvent.change(screen.getByPlaceholderText('Buscar mensajes…'), { target: { value: 'hola' } });
 
         await waitFor(() => {
-            expect(window.upeer.searchMessages).toHaveBeenCalledWith('hola');
+            expect(window.upeer.searchMessages).toHaveBeenCalledWith('hola', 50, 0);
         });
         const items = await screen.findAllByRole('button');
         const labels = items.map((item) => item.getAttribute('aria-label') || '');

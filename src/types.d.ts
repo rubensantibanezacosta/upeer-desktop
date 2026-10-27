@@ -82,7 +82,7 @@ declare global {
             writeClipboardText: (text: string) => Promise<{ success: boolean; error?: string }>;
             getMyNetworkAddress: () => Promise<string>;
             getMessages: (upeerId: string) => Promise<UpeerChatMessage[]>;
-            searchMessages: (query: string) => Promise<UpeerChatMessage[]>;
+            searchMessages: (query: string, limit?: number, offset?: number) => Promise<UpeerChatMessage[]>;
             getMessagesAround: (chatUpeerId: string, targetMsgId: string) => Promise<UpeerChatMessage[]>;
             getOlderMessages: (chatUpeerId: string, beforeTimestamp: number, limit?: number) => Promise<UpeerChatMessage[]>;
             getFileHistory: (limit?: number) => Promise<UpeerFileHistoryEntry[]>;

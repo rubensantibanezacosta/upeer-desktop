@@ -1,6 +1,6 @@
 import { useNavigationStore } from './useNavigationStore.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
-import { buildSearchResults, mapContactMessage, mapGroupMessage } from './chatStoreSupport.js';
+import { mapContactMessage, mapGroupMessage } from './chatStoreSupport.js';
 import type { ChatMessage, GroupRecord, RawChatMessage } from '../types/chat.js';
 
 let navGeneration = 0;
@@ -93,16 +93,6 @@ export const createChatHistoryActions = (set: ChatSet, get: ChatGet) => ({
     setChatHistory: (history: ChatMessage[]) => set({ chatHistory: history }),
     setHistoryLoading: (loading: boolean) => set({ historyLoading: loading }),
     setGroupChatHistory: (history: ChatMessage[]) => set({ groupChatHistory: history }),
-
-    handleSearchGlobal: async (query: string) => {
-        if (!query.trim()) {
-            set({ searchResults: [] });
-            return;
-        }
-        const { contacts, groups } = get();
-        const raw = await window.upeer.searchMessages(query);
-        set({ searchResults: buildSearchResults(raw, contacts, groups) });
-    },
 
     loadHistoryAround: async (targetMsgId: string) => {
         const { targetUpeerId, activeGroupId, contacts, myIdentity } = get();

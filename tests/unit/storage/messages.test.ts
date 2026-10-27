@@ -690,21 +690,32 @@ describe('Storage - Message Operations', () => {
     });
 
     describe('searchMessages', () => {
-        it('should return empty array when no messages match', () => {
+        const chain = (rows: unknown[], whereSpy?: (condition: unknown) => void) => {
+            const all = vi.fn().mockReturnValue(rows);
+            const offset = vi.fn().mockReturnValue({ all });
+            const limit = vi.fn().mockReturnValue({ offset });
             mockDb.select.mockReturnValue({
                 from: vi.fn().mockReturnValue({
-                    where: vi.fn().mockReturnValue({
-                        orderBy: vi.fn().mockReturnValue({
-                            limit: vi.fn().mockReturnValue({
-                                all: vi.fn().mockReturnValue([])
-                            })
-                        })
+                    where: vi.fn().mockImplementation((condition: unknown) => {
+                        whereSpy?.(condition);
+                        return {
+                            orderBy: vi.fn().mockReturnValue({ limit })
+                        };
                     })
                 })
             });
+            return { limit, offset, all };
+        };
 
-            const result = searchMessages('nomatch');
-            expect(result).toEqual([]);
+        it('should return empty array when no messages match', () => {
+            chain([]);
+            expect(searchMessages('nomatch')).toEqual([]);
+        });
+
+        it('should return empty array without touching the database when the term is blank', () => {
+            const { all } = chain([{ id: 'msg-1' }]);
+            expect(searchMessages('   ')).toEqual([]);
+            expect(all).not.toHaveBeenCalled();
         });
 
         it('should return matching messages', () => {
@@ -712,35 +723,32 @@ describe('Storage - Message Operations', () => {
                 { id: 'msg-1', chatUpeerId: 'peer-1', message: 'hello world', timestamp: 1000 },
                 { id: 'msg-2', chatUpeerId: 'peer-2', message: 'hello there', timestamp: 900 },
             ];
-            mockDb.select.mockReturnValue({
-                from: vi.fn().mockReturnValue({
-                    where: vi.fn().mockReturnValue({
-                        orderBy: vi.fn().mockReturnValue({
-                            limit: vi.fn().mockReturnValue({
-                                all: vi.fn().mockReturnValue(mockMsgs)
-                            })
-                        })
-                    })
-                })
-            });
+            chain(mockMsgs);
 
             const result = searchMessages('hello');
             expect(result).toHaveLength(2);
             expect(result[0].id).toBe('msg-1');
         });
 
-        it('should respect custom limit', () => {
-            const limitMock = vi.fn().mockReturnValue({ all: vi.fn().mockReturnValue([]) });
-            mockDb.select.mockReturnValue({
-                from: vi.fn().mockReturnValue({
-                    where: vi.fn().mockReturnValue({
-                        orderBy: vi.fn().mockReturnValue({ limit: limitMock })
-                    })
-                })
-            });
+        it('should respect custom limit and offset', () => {
+            const { limit, offset } = chain([]);
+            searchMessages('hello', 10, 20);
+            expect(limit).toHaveBeenCalledWith(10);
+            expect(offset).toHaveBeenCalledWith(20);
+        });
 
-            searchMessages('hello', 10);
-            expect(limitMock).toHaveBeenCalledWith(10);
+        it('should default to the first page', () => {
+            const { limit, offset } = chain([]);
+            searchMessages('hello');
+            expect(limit).toHaveBeenCalledWith(25);
+            expect(offset).toHaveBeenCalledWith(0);
+        });
+
+        it('escapes LIKE wildcards in the term', () => {
+            let condition: { args?: Array<{ b?: string }> } | undefined;
+            chain([], (value) => { condition = value as typeof condition; });
+            searchMessages('100%_test');
+            expect(condition?.args?.[0]?.b).toBe('%100\\%\\_test%');
         });
     });
 

@@ -55,6 +55,20 @@ describe('sidebar empty state resolver', () => {
         expect(model.title).toBe('Sin coincidencias');
         expect(model.subtitle).toContain('"ana"');
         expect(model.action?.label).toBe('Limpiar búsqueda');
+        expect(model.secondaryAction?.label).toBe('Quitar filtro');
+    });
+
+    it('keeps both exits when the chip empties the search even without candidates', () => {
+        const model = emptyModel({ filter: 'unread', search: 'ana', sourceCount: 0 });
+        expect(model.title).toBe('Sin coincidencias');
+        expect(model.action?.label).toBe('Limpiar búsqueda');
+        expect(model.secondaryAction?.label).toBe('Quitar filtro');
+    });
+
+    it('offers only the search exit without a chip', () => {
+        const model = emptyModel({ search: 'ana', sourceCount: 3 });
+        expect(model.action?.label).toBe('Limpiar búsqueda');
+        expect(model.secondaryAction).toBeUndefined();
     });
 
     it('keeps the filter copy when the query is set but there is nothing to search', () => {

@@ -28,6 +28,7 @@ export interface ChatMessage {
     // Group message extras
     senderUpeerId?: string;
     senderName?: string;
+    senderDisplayName?: string;
     senderAvatar?: string;
     groupId?: string;
     isSystem?: boolean;

@@ -309,9 +309,10 @@ export function getOlderMessages(chatUpeerId: string, beforeTimestamp: number, l
     return purgeBrokenLegacySanitizedMessages(rows, db, schema);
 }
 
-export function searchMessages(query: string, limit = 25) {
+export function searchMessages(query: string, limit = 25, offset = 0) {
     const db = getDb();
     const schema = getSchema();
+    if (!query.trim()) return [];
     // BUG DB-SEARCH fix: escapar % y _ en el query de búsqueda.
     // LIKE trata % y _ como comodines, no como caracteres literales.
     // Sin escape, buscar "100%" coincidiría con cualquier mensaje que
@@ -329,6 +330,7 @@ export function searchMessages(query: string, limit = 25) {
         )
         .orderBy(desc(schema.messages.timestamp))
         .limit(limit)
+        .offset(offset)
         .all();
 }
 

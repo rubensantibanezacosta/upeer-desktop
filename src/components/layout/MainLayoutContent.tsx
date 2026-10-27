@@ -15,7 +15,7 @@ import { FilePreviewOverlay } from '../../features/chat/file-preview/FilePreview
 import { useCall } from '../../features/call/useCall.js';
 import { useCallStore } from '../../features/call/useCallStore.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
-import { isContactUnread, isGroupUnread } from './chatUnread.js';
+import { isContactUnread, isGroupUnread } from '../../utils/chatUnread.js';
 import { useSharedMediaItems } from './contactInfoPanelSupport.js';
 import { exportChatTranscript } from '../../utils/exportChat.js';
 import { ContactInfoPanel } from './ContactInfoPanel.js';

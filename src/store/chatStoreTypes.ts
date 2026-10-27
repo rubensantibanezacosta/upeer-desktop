@@ -1,5 +1,15 @@
 import type { StateCreator } from 'zustand';
 import type { ChatMessage, Contact, ConversationActivity, ConversationActivitySignal, Group, IncomingRequest, KeyChangeAlert, MyIdentity, PendingFile, TransferMessageUpdates, LinkPreview, UntrustworthyInfo } from '../types/chat.js';
+import type { SidebarFilter } from './useNavigationStore.js';
+import type { SearchSection } from '../features/search/globalSearch.js';
+
+export interface SearchSectionLoading {
+    chats: boolean;
+    contacts: boolean;
+    groups: boolean;
+    messages: boolean;
+}
+
 
 export interface ChatState {
     myIdentity: MyIdentity | null;
@@ -10,7 +20,13 @@ export interface ChatState {
     activeGroupId: string;
     chatHistory: ChatMessage[];
     groupChatHistory: ChatMessage[];
-    searchResults: ChatMessage[];
+    searchQuery: string;
+    searchChip: SidebarFilter;
+    searchSections: SearchSection[];
+    searchRawMessages: ChatMessage[];
+    searchMessageLimit: number;
+    searchContactLimit: number;
+    searchLoading: SearchSectionLoading;
     isWindowedHistory: boolean;
     messagesByConversation: Record<string, string>;
     replyByConversation: Record<string, ChatMessage | null>;
@@ -37,7 +53,9 @@ export interface ChatActions {
     setChatHistory: (history: ChatMessage[]) => void;
     setHistoryLoading: (loading: boolean) => void;
     setGroupChatHistory: (history: ChatMessage[]) => void;
-    handleSearchGlobal: (query: string) => Promise<void>;
+    handleSearchGlobal: (query: string, chip: SidebarFilter) => Promise<void>;
+    loadMoreSearchMessages: () => Promise<void>;
+    showAllSearchContacts: () => void;
     loadHistoryAround: (targetMsgId: string) => Promise<void>;
     reloadLatestHistory: () => Promise<void>;
     loadOlderHistory: () => Promise<void>;

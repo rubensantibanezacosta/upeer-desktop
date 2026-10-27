@@ -4,12 +4,12 @@ import { Group, Contact, ChatMessage } from '../../types/chat.js';
 import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
-import { isContactUnread, isGroupUnread } from './chatUnread.js';
-import { messageTimestampValue } from '../../utils/dateTime.js';
+import { chatChipTarget, matchesChip, type ChatSearchItem } from '../../features/search/globalSearch.js';
+import { buildSearchEntities } from '../../features/search/searchData.js';
 import { SubViewHeader } from './sidebar/SubViewHeader.js';
 import { AddContactForm } from './sidebar/AddContactForm.js';
 import { CreateGroupForm } from './sidebar/CreateGroupForm.js';
-import { SidebarListPanel } from './sidebar/SidebarListPanel.js';
+import { ChatListPanel } from './sidebar/ChatListPanel.js';
 import { SidebarNewChatPanel } from './sidebar/SidebarNewChatPanel.js';
 
 interface SidebarProps {
@@ -60,56 +60,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         backToList,
     } = useNavigationStore();
 
-    const { handleSearchGlobal, searchResults, isHydrating } = useChatStore();
+    const { handleSearchGlobal, searchSections, searchLoading, isHydrating, loadMoreSearchMessages, showAllSearchContacts } = useChatStore();
 
     useEffect(() => {
         const timer = setTimeout(() => {
             if (sidebarView === 'list') {
-                handleSearchGlobal(sidebarSearch);
+                handleSearchGlobal(sidebarSearch, sidebarFilter);
             }
-        }, 300);
+        }, 150);
         return () => clearTimeout(timer);
-    }, [sidebarSearch, sidebarView, handleSearchGlobal]);
+    }, [sidebarSearch, sidebarFilter, contacts, groups, sidebarView, handleSearchGlobal]);
 
     const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
 
-    const mergedList = useMemo(() => {
-        type Entry =
-            | { kind: 'group'; data: Group; time: number }
-            | { kind: 'contact'; data: Contact; time: number };
-
-        const q = sidebarSearch.trim().toLowerCase();
-
-        const entries: Entry[] = [
-            ...groups
-                .filter(g => sidebarFilter !== 'favorites' || !!g.isFavorite)
-                .filter(g => sidebarFilter !== 'unread' || isGroupUnread(g, groupPrefs[g.groupId]))
-                .filter(g => !q || g.name.toLowerCase().includes(q))
-                .map(g => ({
-                    kind: 'group' as const,
-                    data: g,
-                    time: messageTimestampValue(g.lastMessageTime),
-                })),
-            ...contacts
-                .filter(c => c.status !== 'blocked')
-                .filter(c => sidebarFilter !== 'favorites' || !!c.isFavorite)
-                .filter(c => sidebarFilter !== 'unread' || isContactUnread(c, contactPrefs[c.upeerId]))
-                .filter(c => !q || c.name?.toLowerCase().includes(q) || c.upeerId?.toLowerCase().includes(q))
-                .map(c => ({
-                    kind: 'contact' as const,
-                    data: c,
-                    time: messageTimestampValue(c.lastMessageTime),
-                })),
-        ];
-        return entries.sort((a, b) => b.time - a.time);
-    }, [groups, contacts, sidebarFilter, sidebarSearch, contactPrefs, groupPrefs]);
-
-    const filteredGroups = useMemo(() => {
-        if (sidebarFilter === 'unread' || sidebarFilter === 'favorites') return [];
-        const q = sidebarSearch.trim().toLowerCase();
-        return groups.filter(g => !q || g.name.toLowerCase().includes(q));
-    }, [groups, sidebarFilter, sidebarSearch]);
+    const chatEntries = useMemo<ChatSearchItem[]>(() => {
+        const entities = buildSearchEntities(contacts, groups, { contactPrefs, groupPrefs });
+        return entities.chats
+            .filter((entry) => matchesChip(sidebarFilter, chatChipTarget(entry)))
+            .sort((left, right) => Number(right.state.pinned) - Number(left.state.pinned) || right.time - left.time)
+            .map((entry) => (entry.kind === 'group' && entry.group
+                ? { kind: 'group', group: entry.group, time: entry.time }
+                : { kind: 'contact', contact: entry.contact as Contact, time: entry.time }));
+    }, [contacts, groups, sidebarFilter, contactPrefs, groupPrefs]);
 
     const searchedContacts = useMemo(() => {
         const q = newChatSearch.trim().toLowerCase();
@@ -170,16 +143,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             height: '100%',
         }}>
             <Box sx={panelSx('list')}>
-                <SidebarListPanel
-                    groups={groups}
-                    contacts={contacts}
-                    mergedList={mergedList}
-                    filteredGroups={filteredGroups}
+                <ChatListPanel
+                    entries={chatEntries}
                     sidebarSearch={sidebarSearch}
                     sidebarFilter={sidebarFilter}
                     selectedId={selectedId}
                     selectedGroupId={selectedGroupId}
-                    searchResults={searchResults}
+                    searchSections={searchSections}
+                    searchLoading={searchLoading}
                     typingStatus={typingStatus}
                     onSelectContact={onSelectContact}
                     onSelectGroup={onSelectGroup}
@@ -192,6 +163,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onFilterChange={setSidebarFilter}
                     onSearchChange={setSidebarSearch}
                     onSelectMessage={handleSelectMessage}
+                    onShowAllContacts={showAllSearchContacts}
+                    onLoadMoreMessages={() => void loadMoreSearchMessages()}
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                     onOpenAppLock={onOpenAppLock}
                     searchFocusToken={sidebarSearchFocusToken}

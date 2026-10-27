@@ -4,16 +4,29 @@ import {
     SEARCH_CONTACT_LIMIT,
     SEARCH_MESSAGE_LIMIT,
     buildSearchSections,
+    chatChipTarget,
+    contactChipTarget,
+    groupChipTarget,
     matchesChip,
     normalizeForSearch,
+    searchMessageText,
+    type ChatSearchItem,
+    type ConversationState,
+    type SearchChatEntry,
+    type SearchData,
     type SearchSection,
-    type SearchSources,
 } from '../../../../src/features/search/globalSearch';
 import type { ChatMessage, Contact, Group } from '../../../../src/types/chat';
-import type { SidebarFilter } from '../../../../src/store/useNavigationStore';
+
+const state = (overrides: Partial<ConversationState> = {}): ConversationState => ({
+    favorite: false,
+    pinned: false,
+    unread: false,
+    ...overrides,
+});
 
 const contact = (overrides: Partial<Contact> & { upeerId: string }): Contact => ({
-    address: '200::1',
+    address: `300::${overrides.upeerId}`,
     name: overrides.upeerId,
     status: 'connected',
     ...overrides,
@@ -36,191 +49,242 @@ const message = (overrides: Partial<ChatMessage> & { id: string }): ChatMessage 
     ...overrides,
 } as ChatMessage);
 
-const sources = (overrides: Partial<SearchSources> = {}): SearchSources => ({
-    query: 'ana',
-    chip: 'all',
-    contacts: [],
-    groups: [],
-    conversationState: {},
-    messages: [],
-    ...overrides,
+const chat = (
+    kind: 'contact' | 'group',
+    id: string,
+    title: string,
+    time: number,
+    entity: Contact | Group,
+    chipState: ConversationState,
+): SearchChatEntry => (kind === 'contact'
+    ? { kind, id, title, time, contact: entity as Contact, state: chipState }
+    : { kind, id, title, time, group: entity as Group, state: chipState });
+
+const ana = contact({ upeerId: 'ana', name: 'Ana Torres', lastMessage: 'hola', lastMessageTime: '2026-10-01T10:00:00.000Z', lastMessageStatus: 'read' });
+const bruno = contact({ upeerId: 'bruno', name: 'Bruno Díaz', lastMessage: 'hey', lastMessageTime: '2026-10-02T10:00:00.000Z', lastMessageStatus: 'sent' });
+const inigo = contact({ upeerId: 'inigo', name: 'Íñigo Pérez', alias: 'Iñigo' });
+const bloqueado = contact({ upeerId: 'blocked', name: 'Ana Bloqueada', status: 'blocked', lastMessage: 'hola', lastMessageTime: '2026-10-09T10:00:00.000Z' });
+const equipo = group({ groupId: 'grp-equipo', name: 'Equipo de Ana', members: ['me', 'ana'], lastMessageTime: '2026-10-03T10:00:00.000Z' });
+const vecinos = group({ groupId: 'grp-vecinos', name: 'Vecinos', members: ['me', 'ana'], lastMessageTime: '2026-10-04T10:00:00.000Z' });
+
+const data = (messages: ChatMessage[] = []): SearchData => ({
+    chats: [
+        chat('contact', 'ana', 'Ana Torres', 1000, ana, state({ unread: false })),
+        chat('contact', 'bruno', 'Bruno Díaz', 2000, bruno, state({ unread: true, favorite: true, pinned: true })),
+        chat('group', 'grp-equipo', 'Equipo de Ana', 4000, equipo, state({ favorite: true })),
+        chat('group', 'grp-vecinos', 'Vecinos', 5000, vecinos, state()),
+    ],
+    contacts: [
+        { contact: ana, state: state() },
+        { contact: bruno, state: state({ unread: true, favorite: true }) },
+        { contact: inigo, state: state() },
+        { contact: bloqueado, state: state() },
+        { contact: contact({ upeerId: 'favorito', name: 'Favorito' }), state: state({ favorite: true }) },
+    ],
+    groups: [
+        { group: equipo, state: state({ favorite: true }) },
+        { group: vecinos, state: state() },
+    ],
+    messages,
 });
 
-const kindOf = (sections: SearchSection[], kind: SearchSection['kind']) => sections.find((section) => section.kind === kind);
+const messages = (): ChatMessage[] => [
+    message({ id: 'm1', upeerId: 'ana', message: 'Hola Ana', date: 3000 }),
+    message({ id: 'm2', upeerId: 'grp-equipo', groupId: 'grp-equipo', message: 'Reunión de Ana', date: 4000 }),
+    message({ id: 'm3', upeerId: 'ana', message: '{"type":"file","fileName":"ana.pdf"}', date: 5000 }),
+    message({ id: 'm4', upeerId: 'ana', message: '__SYS__|Ana se unió', date: 6000 }),
+    message({ id: 'm5', upeerId: 'grp-vecinos', groupId: 'grp-vecinos', message: 'Hola Ana y vecinos', date: 2000 }),
+    message({ id: 'm6', upeerId: 'blocked', message: 'Ana bloqueada dice hola', date: 7000 }),
+];
+
+const kinds = (sections: SearchSection[]) => sections.map((section) => section.kind);
+const messagesSection = (sections: SearchSection[]) => sections.find((section) => section.kind === 'messages');
+const messageIds = (sections: SearchSection[]) => {
+    const section = messagesSection(sections);
+    return section && section.kind === 'messages' ? section.items.map((item) => item.id) : [];
+};
+const chatIds = (sections: SearchSection[]) => {
+    const section = sections.find((item) => item.kind === 'chats');
+    return section && section.kind === 'chats' ? section.items.map((item: ChatSearchItem) => (item.kind === 'group' ? item.group.groupId : item.contact.upeerId)) : [];
+};
 
 describe('normalizeForSearch', () => {
-    it('quita diacríticos y mayúsculas', () => {
+    it('quita diacríticos, mayúsculas y espacios de los extremos', () => {
         expect(normalizeForSearch('  Café  ')).toBe('cafe');
         expect(normalizeForSearch('ÑANDÚ')).toBe('nandu');
     });
 });
 
-describe('matchesChip', () => {
-    const base = { isFavorite: false, unread: false, isGroup: false };
+describe('searchMessageText', () => {
+    it('descarta adjuntos y limpia el prefijo de sistema', () => {
+        expect(searchMessageText('{"type":"file"}')).toBeNull();
+        expect(searchMessageText('__SYS__|Ana se unió')).toBe('Ana se unió');
+        expect(searchMessageText('  ')).toBeNull();
+    });
+});
 
-    it('cada chip aplica su predicado y «Todos» no filtra', () => {
-        expect(matchesChip('all', base)).toBe(true);
-        expect(matchesChip('unread', { ...base, unread: true })).toBe(true);
-        expect(matchesChip('unread', base)).toBe(false);
-        expect(matchesChip('favorites', { ...base, isFavorite: true })).toBe(true);
-        expect(matchesChip('groups', { ...base, isGroup: true })).toBe(true);
-        expect(matchesChip('groups', base)).toBe(false);
+describe('matchesChip por tipo de entidad', () => {
+    it('aplica el mismo criterio a chats, contactos, grupos y mensajes', () => {
+        const empty = state();
+        const unread = state({ unread: true });
+        const favorite = state({ favorite: true });
+
+        expect(matchesChip('all', { kind: 'contact', state: empty })).toBe(true);
+        expect(matchesChip('unread', { kind: 'contact', state: unread })).toBe(true);
+        expect(matchesChip('favorites', { kind: 'contact', state: favorite })).toBe(true);
+        expect(matchesChip('groups', { kind: 'contact', state: favorite })).toBe(false);
+
+        expect(matchesChip('groups', { kind: 'group', state: empty })).toBe(true);
+        expect(matchesChip('unread', { kind: 'group', state: empty })).toBe(false);
+
+        expect(matchesChip('groups', { kind: 'message', state: empty, isGroup: true })).toBe(true);
+        expect(matchesChip('groups', { kind: 'message', state: empty, isGroup: false })).toBe(false);
+        expect(matchesChip('unread', { kind: 'message', state: unread, isGroup: false })).toBe(true);
+        expect(matchesChip('favorites', { kind: 'message', state: favorite, isGroup: true })).toBe(true);
+    });
+
+    it('mapea cada entrada a su sujeto de chip', () => {
+        const entries = data();
+        expect(chatChipTarget(entries.chats[0]).kind).toBe('contact');
+        expect(chatChipTarget(entries.chats[3]).kind).toBe('group');
+        expect(contactChipTarget(entries.contacts[0]).kind).toBe('contact');
+        expect(groupChipTarget(entries.groups[0]).kind).toBe('group');
     });
 });
 
 describe('buildSearchSections', () => {
-    const ana = contact({ upeerId: 'ana', name: 'Ana Torres', lastMessageTime: '2026-10-01T10:00:00.000Z' });
-    const bruno = contact({ upeerId: 'bruno', name: 'Bruno Anaya', lastMessageTime: '2026-10-02T10:00:00.000Z' });
-    const equipo = group({ groupId: 'grp-equipo', name: 'Equipo Ana', members: ['me', 'ana'], lastMessageTime: '2026-10-03T10:00:00.000Z' });
-    const vecinos = group({ groupId: 'grp-vecinos', name: 'Vecinos', members: ['me', 'ana'], lastMessageTime: '2026-10-04T10:00:00.000Z' });
-
     it('no devuelve secciones sin término', () => {
-        expect(buildSearchSections(sources({ query: '   ' }))).toEqual([]);
+        expect(buildSearchSections('   ', 'all', data(messages()))).toEqual([]);
     });
 
-    it('ordena las secciones siempre igual y omite las vacías', () => {
-        const sections = buildSearchSections(sources({
-            contacts: [ana, bruno, contact({ upeerId: 'x1', name: 'Anabel' })],
-            groups: [vecinos],
-            messages: [message({ id: 'm1', upeerId: 'ana' })],
-        }));
-
-        expect(sections.map((section) => section.kind)).toEqual(['chats', 'contacts', 'groups', 'messages']);
-        expect(sections.map((section) => section.kind)).not.toContain('llamadas');
+    it('mantiene el orden fijo de secciones', () => {
+        expect(kinds(buildSearchSections('ana', 'all', data(messages())))).toEqual(['chats', 'contacts', 'groups', 'messages']);
     });
 
-    it('un contacto con conversación solo aparece en Chats', () => {
-        const sections = buildSearchSections(sources({ contacts: [ana, bruno] }));
-        const chats = kindOf(sections, 'chats');
+    it('con «Todos» reparte chats, contactos, grupos y mensajes sin repetir elementos', () => {
+        const sections = buildSearchSections('ana', 'all', data(messages()));
+        expect(chatIds(sections)).toEqual(['grp-equipo', 'ana']);
 
-        expect(chats?.items).toHaveLength(2);
-        expect(kindOf(sections, 'contacts')).toBeUndefined();
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items.map((item) => item.contact.upeerId) : []).toEqual([]);
+
+        const groups = sections.find((section) => section.kind === 'groups');
+        expect(groups?.kind === 'groups' ? groups.items.map((item) => [item.group.groupId, item.sharedBy]) : []).toEqual([['grp-vecinos', 'Ana Torres']]);
+
+        expect(messageIds(sections)).toEqual(['m4', 'm2', 'm1', 'm5']);
+        expect(messageIds(sections)).not.toContain('m3');
+        expect(messageIds(sections)).not.toContain('m6');
     });
 
-    it('los contactos sin conversación se ordenan por coincidencia exacta y luego prefijo', () => {
-        const sections = buildSearchSections(sources({
-            query: 'ana',
-            contacts: [
-                contact({ upeerId: 'u1', name: 'Mariana' }),
-                contact({ upeerId: 'u2', name: 'Ana Belén' }),
-                contact({ upeerId: 'u3', name: 'Ana' }),
-            ],
-        }));
+    it('con «No leídos» solo deja conversaciones, contactos y mensajes de chats con no leídos', () => {
+        const sections = buildSearchSections('ana', 'unread', data(messages()));
+        expect(chatIds(sections)).toEqual([]);
+        expect(messageIds(sections)).toEqual([]);
 
-        const contacts = kindOf(sections, 'contacts');
-        expect(contacts && contacts.kind === 'contacts' && contacts.items.map((item) => item.contact.name))
-            .toEqual(['Ana', 'Ana Belén', 'Mariana']);
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items : []).toEqual([]);
+
+        const conNoLeidos = buildSearchSections('bruno', 'unread', data([
+            message({ id: 'm7', upeerId: 'bruno', message: 'Bruno hola', date: 1000 }),
+        ]));
+        expect(chatIds(conNoLeidos)).toEqual(['bruno']);
+        expect(messageIds(conNoLeidos)).toEqual(['m7']);
     });
 
-    it('«Grupos» oculta Contactos y solo deja conversaciones de grupo', () => {
-        const sections = buildSearchSections(sources({
-            chip: 'groups',
-            contacts: [ana],
-            groups: [equipo],
-            messages: [message({ id: 'm1', upeerId: 'ana' }), message({ id: 'm2', upeerId: 'grp-equipo', groupId: 'grp-equipo' })],
-        }));
+    it('con «Favoritos» filtra cada sujeto por su propio estado', () => {
+        const sections = buildSearchSections('ana', 'favorites', data(messages()));
+        expect(chatIds(sections)).toEqual(['grp-equipo']);
 
-        expect(kindOf(sections, 'contacts')).toBeUndefined();
-        const chats = kindOf(sections, 'chats');
-        expect(chats && chats.kind === 'chats' && chats.items.every((item) => item.kind === 'group')).toBe(true);
-        const messages = kindOf(sections, 'messages');
-        expect(messages && messages.kind === 'messages' && messages.items.map((item) => item.id)).toEqual(['m2']);
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items.map((item) => item.contact.upeerId) : []).toEqual([]);
+
+        const groups = sections.find((section) => section.kind === 'groups');
+        expect(groups?.kind === 'groups' ? groups.items.map((item) => item.group.groupId) : []).toEqual([]);
+        expect(messageIds(sections)).toEqual(['m2']);
     });
 
-    it('con «Grupos» los grupos que ya están en Chats no se repiten', () => {
-        const sections = buildSearchSections(sources({ chip: 'groups', groups: [equipo] }));
+    it('con «Grupos» oculta Contactos y deja solo grupos y sus mensajes', () => {
+        const sections = buildSearchSections('ana', 'groups', data(messages()));
+        expect(kinds(sections)).toEqual(['chats', 'contacts', 'groups', 'messages']);
+        expect(chatIds(sections)).toEqual(['grp-equipo']);
 
-        expect(kindOf(sections, 'chats')?.items).toHaveLength(1);
-        expect(kindOf(sections, 'groups')).toBeUndefined();
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.total).toBe(0);
+        expect(contacts?.items).toEqual([]);
+
+        const groups = sections.find((section) => section.kind === 'groups');
+        expect(groups?.kind === 'groups' ? groups.items.map((item) => item.group.groupId) : []).toEqual(['grp-vecinos']);
+
+        expect(messageIds(sections)).toEqual(['m2', 'm5']);
     });
 
-    it('«Grupos en común» suma los grupos de los contactos que coinciden', () => {
-        const sections = buildSearchSections(sources({ query: 'ana', contacts: [ana], groups: [vecinos] }));
-
-        const groups = kindOf(sections, 'groups');
-        expect(groups && groups.kind === 'groups' && groups.items).toEqual([{ group: vecinos, sharedBy: 'Ana Torres' }]);
-    });
-
-    it('«No leídos» filtra cada sección por el estado de su conversación', () => {
-        const sections = buildSearchSections(sources({
-            chip: 'unread',
-            contacts: [ana, bruno],
-            groups: [equipo],
-            conversationState: { bruno: { unread: true }, 'grp-equipo': { unread: true } },
-            messages: [message({ id: 'm1', upeerId: 'ana' }), message({ id: 'm2', upeerId: 'bruno' })],
-        }));
-
-        const chats = kindOf(sections, 'chats');
-        expect(chats && chats.kind === 'chats' && chats.items.map((item) => (item.kind === 'contact' ? item.contact.upeerId : item.group.groupId)))
-            .toEqual(['grp-equipo', 'bruno']);
-        const messages = kindOf(sections, 'messages');
-        expect(messages && messages.kind === 'messages' && messages.items.map((item) => item.id)).toEqual(['m2']);
-    });
-
-    it('«Favoritos» no oculta secciones pero las deja vacías sin favoritos', () => {
-        const sections = buildSearchSections(sources({
-            chip: 'favorites',
-            contacts: [ana],
-            groups: [equipo],
-            conversationState: { ana: { isFavorite: true } },
-        }));
-
-        const chats = kindOf(sections, 'chats');
-        expect(chats && chats.kind === 'chats' && chats.items).toHaveLength(1);
-        expect(kindOf(sections, 'contacts')).toBeUndefined();
-        expect(kindOf(sections, 'groups')).toBeUndefined();
-    });
-
-    it('fija los chats fijados por delante y luego ordena por recencia', () => {
-        const sections = buildSearchSections(sources({
-            query: 'a',
-            contacts: [ana, bruno],
-            conversationState: { ana: { pinned: true } },
-        }));
-
-        const chats = kindOf(sections, 'chats');
-        expect(chats && chats.kind === 'chats' && chats.items.map((item) => (item.kind === 'contact' ? item.contact.upeerId : '')))
-            .toEqual(['ana', 'bruno']);
-    });
-
-    it('excluye contactos bloqueados y limita contactos y mensajes contando antes del tope', () => {
-        const blocked = contact({ upeerId: 'u9', name: 'Ana bloqueada', status: 'blocked' });
-        const manyContacts = Array.from({ length: SEARCH_CONTACT_LIMIT + 2 }, (_, index) => contact({ upeerId: `x${index}`, name: `Contacto ${index}` }));
-        const manyMessages = Array.from({ length: SEARCH_MESSAGE_LIMIT + 5 }, (_, index) => message({ id: `m${index}`, upeerId: 'ana', date: index }));
-
-        const sections = buildSearchSections(sources({ query: 'a', contacts: [blocked, ...manyContacts], messages: manyMessages }));
-
-        const contacts = kindOf(sections, 'contacts');
-        expect(contacts && contacts.kind === 'contacts' && contacts.items).toHaveLength(SEARCH_CONTACT_LIMIT);
-        expect(contacts?.total).toBe(SEARCH_CONTACT_LIMIT + 2);
-        const messages = kindOf(sections, 'messages');
-        expect(messages && messages.kind === 'messages' && messages.items).toHaveLength(SEARCH_MESSAGE_LIMIT);
-        expect(messages?.total).toBe(SEARCH_MESSAGE_LIMIT + 5);
-        expect(messages && messages.kind === 'messages' && messages.items[0].id).toBe(`m${SEARCH_MESSAGE_LIMIT + 4}`);
-    });
-
-    it('busca sin acentos y por prefijo de upeerId', () => {
-        const accents = contact({ upeerId: 'zoe', name: 'Zoë Ñandú' });
-        const byId = contact({ upeerId: 'abc123def', name: 'Sin coincidencia' });
-
-        expect(buildSearchSections(sources({ query: 'zoe nandu', contacts: [accents, byId] }))[0]?.total).toBe(1);
-        expect(buildSearchSections(sources({ query: 'abc1', contacts: [accents, byId] }))[0]?.total).toBe(1);
-    });
-
-    it('aplica el mismo chip dentro y fuera de la búsqueda', () => {
-        const filtered: SidebarFilter[] = ['all', 'unread', 'favorites', 'groups'];
-        const state = { ana: { unread: true, isFavorite: true }, 'grp-equipo': { unread: true, isFavorite: true } };
-
-        filtered.forEach((chip) => {
-            const sections = buildSearchSections(sources({ chip, contacts: [ana], groups: [equipo], conversationState: state }));
-            const chatItems = sections.find((section) => section.kind === 'chats')?.items ?? [];
-            const expected = [
-                matchesChip(chip, { isFavorite: true, unread: true, isGroup: false }) ? 'ana' : null,
-                matchesChip(chip, { isFavorite: true, unread: true, isGroup: true }) ? 'grp-equipo' : null,
-            ].filter(Boolean);
-
-            expect(chatItems.map((item) => (item.kind === 'contact' ? item.contact.upeerId : item.group.groupId)).sort())
-                .toEqual(expected.sort());
+    it('aplica los topes por sección conservando el total', () => {
+        const muchos = Array.from({ length: 7 }, (_, index) => (
+            contact({ upeerId: `mateo-${index}`, name: `Mateo ${index}` })
+        ));
+        const chatty = Array.from({ length: 12 }, (_, index) => (
+            message({ id: `mm-${index}`, upeerId: 'mateo-0', message: `Mateo ${index}`, date: index })
+        ));
+        const sections = buildSearchSections('mateo', 'all', {
+            chats: [],
+            contacts: muchos.map((item) => ({ contact: item, state: state() })),
+            groups: [],
+            messages: chatty,
         });
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items.length : 0).toBe(SEARCH_CONTACT_LIMIT);
+        expect(contacts?.total).toBe(7);
+        expect(messageIds(sections)).toHaveLength(SEARCH_MESSAGE_LIMIT);
+        expect(messagesSection(sections)?.total).toBe(12);
+
+        const ampliadas = buildSearchSections('mateo', 'all', {
+            chats: [],
+            contacts: muchos.map((item) => ({ contact: item, state: state() })),
+            groups: [],
+            messages: chatty,
+        }, { contacts: 7, messages: 12 });
+        const contactosAmpliados = ampliadas.find((section) => section.kind === 'contacts');
+        expect(contactosAmpliados?.kind === 'contacts' ? contactosAmpliados.items.length : 0).toBe(7);
+        expect(messageIds(ampliadas)).toHaveLength(12);
+    });
+
+    it('ordena los chats por fijado y luego por recencia', () => {
+        const sections = buildSearchSections('ana', 'all', data());
+        expect(chatIds(sections)).toEqual(['grp-equipo', 'ana']);
+        const fijado = buildSearchSections('bruno', 'all', data());
+        expect(chatIds(fijado)).toEqual(['bruno']);
+    });
+
+    it('deja fuera a los contactos bloqueados', () => {
+        const sections = buildSearchSections('ana bloqueada', 'all', data(messages()));
+        expect(chatIds(sections)).toEqual([]);
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items : []).toEqual([]);
+        expect(messageIds(sections)).toEqual([]);
+    });
+
+    it('normaliza acentos en contactos y en mensajes', () => {
+        const sections = buildSearchSections('inigo', 'all', data([
+            message({ id: 'm8', upeerId: 'ana', message: 'Íñigo llamó', date: 100 }),
+        ]));
+        expect(chatIds(sections)).toEqual([]);
+        const contacts = sections.find((section) => section.kind === 'contacts');
+        expect(contacts?.kind === 'contacts' ? contacts.items.map((item) => item.contact.upeerId) : []).toEqual(['inigo']);
+        expect(messageIds(sections)).toEqual(['m8']);
+    });
+
+    it('no repite un grupo compartido con varios contactos que coinciden', () => {
+        const compartido = group({ groupId: 'grp-compartido', name: 'Compartido', members: ['me', 'ana', 'ana-2'] });
+        const sections = buildSearchSections('a', 'groups', {
+            chats: [],
+            contacts: [
+                { contact: ana, state: state() },
+                { contact: contact({ upeerId: 'ana-2', name: 'Ana Segunda' }), state: state() },
+            ],
+            groups: [{ group: compartido, state: state() }],
+            messages: [],
+        });
+        const groups = sections.find((section) => section.kind === 'groups');
+        expect(groups?.kind === 'groups' ? groups.items : []).toHaveLength(1);
     });
 });

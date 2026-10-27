@@ -3,33 +3,70 @@ import type { SidebarFilter } from '../../store/useNavigationStore.js';
 
 export const SEARCH_CONTACT_LIMIT = 5;
 export const SEARCH_MESSAGE_LIMIT = 10;
+export const SEARCH_MESSAGE_PAGE = 25;
 
-export interface ChipSubject {
-    isFavorite: boolean;
+export interface ConversationState {
+    favorite: boolean;
+    pinned: boolean;
     unread: boolean;
-    isGroup: boolean;
 }
 
-export const matchesChip = (chip: SidebarFilter, subject: ChipSubject): boolean => {
-    if (chip === 'unread') return subject.unread;
-    if (chip === 'favorites') return subject.isFavorite;
-    if (chip === 'groups') return subject.isGroup;
-    return true;
+export type ChipTarget =
+    | { kind: 'contact'; state: ConversationState }
+    | { kind: 'group'; state: ConversationState }
+    | { kind: 'message'; state: ConversationState; isGroup: boolean };
+
+export const matchesChip = (chip: SidebarFilter, target: ChipTarget): boolean => {
+    if (target.kind === 'message') {
+        return chip === 'groups'
+            ? target.isGroup
+            : matchesChip(chip, { kind: target.isGroup ? 'group' : 'contact', state: target.state });
+    }
+    if (chip === 'all') return true;
+    if (chip === 'groups') return target.kind === 'group';
+    return chip === 'favorites' ? target.state.favorite : target.state.unread;
 };
 
 export const normalizeForSearch = (value: string): string =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-interface ConversationState {
-    isFavorite?: boolean;
-    pinned?: boolean;
-    unread?: boolean;
+const SYSTEM_PREFIX = '__SYS__|';
+
+export const searchMessageText = (content: string | undefined): string | null => {
+    const raw = (content ?? '').trim();
+    if (!raw || raw.startsWith('{')) return null;
+    const text = raw.startsWith(SYSTEM_PREFIX) ? raw.slice(SYSTEM_PREFIX.length) : raw;
+    return text.trim() || null;
+};
+
+export interface SearchChatEntry {
+    kind: 'contact' | 'group';
+    id: string;
+    title: string;
+    time: number;
+    contact?: Contact;
+    group?: Group;
+    state: ConversationState;
 }
 
-interface ResolvedState {
-    isFavorite: boolean;
-    pinned: boolean;
-    unread: boolean;
+export interface SearchContactEntry {
+    contact: Contact;
+    state: ConversationState;
+}
+
+export interface SearchGroupEntry {
+    group: Group;
+    state: ConversationState;
+}
+
+export interface SearchEntities {
+    chats: SearchChatEntry[];
+    contacts: SearchContactEntry[];
+    groups: SearchGroupEntry[];
+}
+
+export interface SearchData extends SearchEntities {
+    messages: ChatMessage[];
 }
 
 export type ChatSearchItem =
@@ -52,21 +89,21 @@ export type SearchSection =
     | { kind: 'groups'; total: number; items: GroupSearchItem[] }
     | { kind: 'messages'; total: number; items: ChatMessage[] };
 
-export interface SearchSources {
-    query: string;
-    chip: SidebarFilter;
-    contacts: Contact[];
-    groups: Group[];
-    conversationState: Record<string, ConversationState>;
-    messages: ChatMessage[];
+export interface SearchLimits {
+    contacts?: number;
+    messages?: number;
 }
 
-const stateOf = (sources: SearchSources, id: string): ResolvedState => {
-    const state = sources.conversationState[id];
-    return { isFavorite: !!state?.isFavorite, pinned: !!state?.pinned, unread: !!state?.unread };
-};
+export const chatChipTarget = (entry: SearchChatEntry): ChipTarget => ({
+    kind: entry.kind === 'group' ? 'group' : 'contact',
+    state: entry.state,
+});
 
-const timeValue = (value: string | undefined): number => (value ? Date.parse(value) || 0 : 0);
+export const contactChipTarget = (entry: SearchContactEntry): ChipTarget => ({ kind: 'contact', state: entry.state });
+
+export const groupChipTarget = (entry: SearchGroupEntry): ChipTarget => ({ kind: 'group', state: entry.state });
+
+export const timeValue = (value: string | undefined): number => (value ? Date.parse(value) || 0 : 0);
 
 const contactNames = (contact: Contact): string[] =>
     [contact.name, contact.alias ?? ''].filter((value) => value.length > 0);
@@ -84,91 +121,123 @@ const contactRank = (contact: Contact, term: string): number => {
     return 2;
 };
 
-const groupMatches = (group: Group, term: string): boolean => normalizeForSearch(group.name).includes(term);
+const chatMatches = (entry: SearchChatEntry, term: string): boolean => {
+    if (entry.kind === 'contact' && entry.contact) return contactMatches(entry.contact, term);
+    return normalizeForSearch(entry.title).includes(term);
+};
 
 const hasConversation = (contact: Contact): boolean => Boolean(contact.lastMessage || contact.lastMessageTime);
 
-const messageChatId = (message: ChatMessage): string => message.groupId ?? message.upeerId;
-
-const buildChats = (sources: SearchSources, term: string): ChatSearchItem[] =>
-    [
-        ...sources.contacts
-            .filter((contact) => contact.status !== 'blocked' && hasConversation(contact) && contactMatches(contact, term))
-            .map((contact) => ({ kind: 'contact' as const, contact, time: timeValue(contact.lastMessageTime), id: contact.upeerId })),
-        ...sources.groups
-            .filter((group) => groupMatches(group, term))
-            .map((group) => ({ kind: 'group' as const, group, time: timeValue(group.lastMessageTime), id: group.groupId })),
-    ]
-        .map((entry) => ({ entry, state: stateOf(sources, entry.id) }))
-        .filter(({ entry, state }) => matchesChip(sources.chip, { ...state, isGroup: entry.kind === 'group' }))
-        .sort((left, right) => {
-            if (left.state.pinned !== right.state.pinned) return left.state.pinned ? -1 : 1;
-            return right.entry.time - left.entry.time;
-        })
-        .map(({ entry }) => (entry.kind === 'group'
+const buildChatRows = (data: SearchData, chip: SidebarFilter, term: string): ChatSearchItem[] =>
+    data.chats
+        .filter((entry) => entry.contact?.status !== 'blocked')
+        .filter((entry) => entry.kind === 'group' || (entry.contact ? hasConversation(entry.contact) : false))
+        .filter((entry) => matchesChip(chip, chatChipTarget(entry)) && chatMatches(entry, term))
+        .sort((left, right) => Number(right.state.pinned) - Number(left.state.pinned) || right.time - left.time)
+        .map((entry) => (entry.kind === 'group' && entry.group
             ? { kind: 'group', group: entry.group, time: entry.time }
-            : { kind: 'contact', contact: entry.contact, time: entry.time }));
+            : { kind: 'contact', contact: entry.contact as Contact, time: entry.time }));
 
-const buildGroups = (sources: SearchSources, term: string, usedChats: Set<string>): GroupSearchItem[] => {
-    const matchingContactIds = new Set(
-        sources.contacts.filter((contact) => contactMatches(contact, term)).map((contact) => contact.upeerId),
-    );
-    return sources.groups
-        .filter((group) => !usedChats.has(group.groupId))
-        .map((group) => {
-            const byName = groupMatches(group, term);
-            const sharedBy = byName
-                ? undefined
-                : sources.contacts.find((contact) => matchingContactIds.has(contact.upeerId) && group.members.includes(contact.upeerId))?.name;
-            return { group, byName, sharedBy };
+const buildContactRows = (data: SearchData, chip: SidebarFilter, term: string, usedChats: Set<string>, limit: number): SearchSection => {
+    if (chip === 'groups') return { kind: 'contacts', total: 0, items: [] };
+    const rows = data.contacts
+        .filter((entry) => entry.contact.status !== 'blocked')
+        .filter((entry) => !usedChats.has(entry.contact.upeerId))
+        .filter((entry) => matchesChip(chip, contactChipTarget(entry)) && contactMatches(entry.contact, term))
+        .sort((left, right) => contactRank(left.contact, term) - contactRank(right.contact, term)
+            || left.contact.name.localeCompare(right.contact.name));
+    return {
+        kind: 'contacts',
+        total: rows.length,
+        items: rows.slice(0, limit).map((entry) => ({
+            contact: entry.contact,
+            subtitle: entry.contact.alias && entry.contact.alias !== entry.contact.name
+                ? entry.contact.alias
+                : entry.contact.upeerId.slice(0, 12),
+        })),
+    };
+};
+
+const buildGroupRows = (data: SearchData, chip: SidebarFilter, term: string, usedChats: Set<string>): SearchSection => {
+    const matchingContacts = data.contacts
+        .filter((entry) => entry.contact.status !== 'blocked' && contactMatches(entry.contact, term))
+        .map((entry) => entry.contact);
+    const listed = new Set<string>();
+    const rows = data.groups
+        .filter((entry) => matchesChip(chip, groupChipTarget(entry)))
+        .filter((entry) => !usedChats.has(entry.group.groupId))
+        .map((entry) => {
+            if (normalizeForSearch(entry.group.name).includes(term)) return { group: entry.group, sharedBy: undefined };
+            const shared = matchingContacts.find((contact) => entry.group.members.includes(contact.upeerId));
+            return shared ? { group: entry.group, sharedBy: shared.name } : null;
         })
-        .filter((entry) => entry.byName || entry.sharedBy !== undefined)
-        .filter(({ group }) => matchesChip(sources.chip, { ...stateOf(sources, group.groupId), isGroup: true }))
-        .sort((left, right) => timeValue(right.group.lastMessageTime) - timeValue(left.group.lastMessageTime))
-        .map(({ group, sharedBy }) => ({ group, sharedBy }));
+        .filter((entry): entry is GroupSearchItem => entry !== null)
+        .filter((entry) => {
+            if (listed.has(entry.group.groupId)) return false;
+            listed.add(entry.group.groupId);
+            return true;
+        })
+        .sort((left, right) => timeValue(right.group.lastMessageTime) - timeValue(left.group.lastMessageTime));
+    return { kind: 'groups', total: rows.length, items: rows };
+};
+
+const conversationIndex = (data: SearchData): Map<string, { state: ConversationState; isGroup: boolean; blocked: boolean }> => {
+    const index = new Map<string, { state: ConversationState; isGroup: boolean; blocked: boolean }>();
+    data.chats.forEach((entry) => index.set(entry.id, {
+        state: entry.state,
+        isGroup: entry.kind === 'group',
+        blocked: entry.contact?.status === 'blocked',
+    }));
+    data.contacts.filter((entry) => entry.contact.status === 'blocked').forEach((entry) => index.set(entry.contact.upeerId, {
+        state: entry.state,
+        isGroup: false,
+        blocked: true,
+    }));
+    return index;
+};
+
+const messageMatchesChip = (
+    message: ChatMessage,
+    chip: SidebarFilter,
+    index: Map<string, { state: ConversationState; isGroup: boolean; blocked: boolean }>,
+): boolean => {
+    const chatId = message.groupId ?? message.upeerId;
+    const conversation = index.get(chatId);
+    if (!conversation) return chip === 'all';
+    if (conversation.blocked) return false;
+    return matchesChip(chip, { kind: 'message', state: conversation.state, isGroup: conversation.isGroup });
+};
+
+const buildMessageRows = (data: SearchData, chip: SidebarFilter, term: string, limit: number): SearchSection => {
+    const index = conversationIndex(data);
+    const rows = data.messages
+        .filter((message) => messageMatchesChip(message, chip, index))
+        .map((message) => ({ message, text: searchMessageText(message.message) }))
+        .filter((entry): entry is { message: ChatMessage; text: string } => entry.text !== null)
+        .filter((entry) => normalizeForSearch(entry.text).includes(term))
+        .sort((left, right) => (right.message.date ?? 0) - (left.message.date ?? 0))
+        .map((entry) => entry.message);
+    return { kind: 'messages', total: rows.length, items: rows.slice(0, limit) };
 };
 
 export const buildSearchSections = (
-    sources: SearchSources,
-    contactLimit = SEARCH_CONTACT_LIMIT,
-    messageLimit = SEARCH_MESSAGE_LIMIT,
+    query: string,
+    chip: SidebarFilter,
+    data: SearchData,
+    limits: SearchLimits = {},
 ): SearchSection[] => {
-    const term = normalizeForSearch(sources.query);
+    const term = normalizeForSearch(query);
     if (!term) return [];
 
-    const chats = buildChats(sources, term);
+    const chats = buildChatRows(data, chip, term);
     const usedChats = new Set(chats.map((item) => (item.kind === 'group' ? item.group.groupId : item.contact.upeerId)));
-
-    const contacts = sources.chip === 'groups'
-        ? []
-        : sources.contacts
-            .filter((contact) => contact.status !== 'blocked'
-                && !usedChats.has(contact.upeerId)
-                && contactMatches(contact, term)
-                && matchesChip(sources.chip, { ...stateOf(sources, contact.upeerId), isGroup: false }))
-            .sort((left, right) => contactRank(left, term) - contactRank(right, term) || left.name.localeCompare(right.name));
-
-    const messages = sources.messages
-        .filter((message) => matchesChip(sources.chip, {
-            ...stateOf(sources, messageChatId(message)),
-            isGroup: !!message.groupId,
-        }))
-        .slice()
-        .sort((left, right) => (right.date ?? 0) - (left.date ?? 0));
-
-    const groups = buildGroups(sources, term, usedChats);
-
     return [
         { kind: 'chats', total: chats.length, items: chats },
-        {
-            kind: 'contacts',
-            total: contacts.length,
-            items: contacts.slice(0, contactLimit).map((contact) => ({
-                contact,
-                subtitle: contact.alias && contact.alias !== contact.name ? contact.alias : contact.upeerId.slice(0, 12),
-            })),
-        },
-        { kind: 'groups', total: groups.length, items: groups },
-        { kind: 'messages', total: messages.length, items: messages.slice(0, messageLimit) },
-    ].filter((section) => section.total > 0) as SearchSection[];
+        buildContactRows(data, chip, term, usedChats, limits.contacts ?? SEARCH_CONTACT_LIMIT),
+        buildGroupRows(data, chip, term, usedChats),
+        buildMessageRows(data, chip, term, limits.messages ?? SEARCH_MESSAGE_LIMIT),
+    ];
 };
+
+export const visibleSearchSections = (sections: SearchSection[]): SearchSection[] =>
+    sections.filter((section) => section.items.length > 0);
