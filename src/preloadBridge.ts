@@ -259,6 +259,11 @@ const securityApi = {
     verifyPin: (args: { pin: string }) => ipcRenderer.invoke('verify-pin', args),
 };
 
+const privacyApi = {
+    getPrivacyPrefs: () => ipcRenderer.invoke('get-privacy-prefs'),
+    setPrivacyPrefs: (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean }) => ipcRenderer.invoke('set-privacy-prefs', patch),
+};
+
 const eventApi = {
     onGroupUpdated: (callback: (data: GroupUpdatedPayload) => void) => subscribe<[GroupUpdatedPayload]>('group-updated', callback),
     onGroupMessage: (callback: (data: IncomingGroupMessageEvent) => void) => subscribe<[IncomingGroupMessageEvent]>('receive-group-message', callback),
@@ -314,5 +319,6 @@ export const buildPreloadBridge = () => ({
     ...fileTransferApi,
     ...networkApi,
     ...securityApi,
+    ...privacyApi,
     ...eventApi,
 });

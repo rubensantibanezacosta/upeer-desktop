@@ -104,6 +104,26 @@ test('muestra contactos online y offline en la ficha del contacto', async ({ pag
     await expect(page.getByText(/Última vez|Desconectado/).last()).toBeVisible();
 });
 
+test('oculta la presencia de los contactos cuando la privacidad lo pide', async ({ page }) => {
+    await mount(page, baseScenario());
+
+    await page.locator('[aria-label="Abrir chat con Alice"]').first().click();
+    await expect(page.getByText('En línea').first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Ajustes' }).click();
+    await page.getByText('Privacidad', { exact: true }).click();
+    await page.getByText('Mostrar cuando estoy conectado', { exact: true }).click();
+    await expect.poll(async () => {
+        const state = await readBridgeState(page);
+        return state.privacy?.onlineStatus ?? 'missing';
+    }).toBe(false);
+
+    await page.getByRole('button', { name: 'Chats' }).click();
+    await page.locator('[aria-label="Abrir chat con Alice"]').first().click();
+    await expect(page.getByText('Desconectado').first()).toBeVisible();
+    await expect(page.getByText('En línea')).toHaveCount(0);
+});
+
 test('envía mensajes directos, renderiza preview y recibe eventos en tiempo real', async ({ page }) => {
     await mount(page, baseScenario());
 

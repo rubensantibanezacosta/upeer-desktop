@@ -13,6 +13,8 @@ import { ContactItemActions } from './ContactItemActions.js';
 import { formatContactTime, renderLastMessagePreview, renderMessageStatusIcon, renderPendingLabel } from './contactItemSupport.js';
 import { TrustAvatarBadge } from './TrustAvatarBadge.js';
 import { useIsOnline } from '../../hooks/useIsOnline.js';
+import { usePrivacyStore } from '../../store/usePrivacyStore.js';
+import { visiblePresence } from '../../utils/presenceVisibility.js';
 import { listRowAvatarSx, listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from './listRowMetrics.js';
 
 interface ContactItemProps {
@@ -28,7 +30,10 @@ interface ContactItemProps {
 
 export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '', searchRowId }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
-    const isOnline = useIsOnline(c.lastActive);
+    const onlineStatusPref = usePrivacyStore((s) => s.onlineStatus);
+    const lastSeenPref = usePrivacyStore((s) => s.lastSeen);
+    const presence = visiblePresence(useIsOnline(c.lastActive), null, { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref });
+    const isOnline = presence.isOnline;
     const isPending = c.status === 'pending' || c.status === 'incoming';
 
     const timeStr = isPending && c.status === 'incoming' ? formatContactTime(c.lastSeen) : formatContactTime(c.lastMessageTime);

@@ -6,6 +6,7 @@ import { useAppearanceStore, FONT_SIZE_PX } from './store/useAppearanceStore.js'
 import { useNavigationStore } from './store/useNavigationStore.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
+import { hydratePrivacyPrefs } from './store/privacySync.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -178,6 +179,12 @@ export default function App() {
             unsubscribeStatus();
         };
     }, [checkAuth, hydrateInitialShell, initListeners, setFirstConnect, setNetworkStatus, setYggAddress]);
+
+    useEffect(() => {
+        hydratePrivacyPrefs().catch((cause: unknown) => {
+            console.warn('No se pudieron leer las preferencias de privacidad.', cause);
+        });
+    }, []);
 
     useEffect(() => {
         const unsubscribeVaultRecovery = window.upeer.onVaultRecoveryStatus((payload) => {

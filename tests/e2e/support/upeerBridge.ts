@@ -86,6 +86,7 @@ type BridgeState = {
     groups: Group[];
     messagesByChat: Record<string, RawMessage[]>;
     transfers: Transfer[];
+    privacy: { readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean };
 };
 
 export async function installUpeerBridge(page: Page, scenario: Scenario): Promise<void> {
@@ -108,6 +109,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             myIdentity: input.myIdentity ?? { upeerId: selfId, name: 'E2E User', alias: 'E2E User' },
             myNetworkAddress: input.myNetworkAddress ?? '200:1111:2222:3333:4444:5555:6666:7777',
             networkStatus: input.networkStatus ?? 'up',
+            privacy: { readReceipts: true, onlineStatus: true, lastSeen: true },
         };
 
         const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -197,6 +199,15 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
 
         const bridge = {
             isPinEnabled: async () => false,
+            getPrivacyPrefs: async () => ({ ...state.privacy }),
+            setPrivacyPrefs: async (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean }) => {
+                state.privacy = {
+                    readReceipts: patch.readReceipts ?? state.privacy.readReceipts,
+                    onlineStatus: patch.onlineStatus ?? state.privacy.onlineStatus,
+                    lastSeen: patch.lastSeen ?? state.privacy.lastSeen,
+                };
+                return { ...state.privacy };
+            },
             identityStatus: async () => state.identityStatus,
             getMyNetworkAddress: async () => state.myNetworkAddress,
             getMyIdentity: async () => state.myIdentity,
@@ -407,7 +418,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                 queueFileDialogResult: (result: { success: boolean; canceled?: boolean; files?: PendingFile[] }) => state.fileDialogQueue.push(result),
                 patchContact: (upeerId: string, patch: Partial<Contact>) => addOrUpdateContact({ ...(state.contacts.find((item) => item.upeerId === upeerId) ?? { upeerId, name: upeerId, address: '', status: 'connected' }), ...patch }),
                 patchGroup: (groupId: string, patch: Partial<Group>) => addOrUpdateGroup({ ...(state.groups.find((item) => item.groupId === groupId) ?? { groupId, name: groupId, adminUpeerId: selfId, members: [selfId], status: 'active' }), ...patch }),
-                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers }),
+                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers, privacy: state.privacy }),
             },
         });
     }, scenario);

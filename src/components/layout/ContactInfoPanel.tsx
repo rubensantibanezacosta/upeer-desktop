@@ -10,6 +10,8 @@ import { ContactInfoDeleteDialog } from './ContactInfoDeleteDialog.js';
 import { ContactInfoPanelMainView } from './ContactInfoPanelMainView.js';
 import { buildContactInfoActions, SlidingPanelView, useSharedMediaItems } from './contactInfoPanelSupport.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { usePrivacyStore } from '../../store/usePrivacyStore.js';
+import { visiblePresence } from '../../utils/presenceVisibility.js';
 
 interface MediaClickPayload {
     url: string;
@@ -73,8 +75,14 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         return () => clearInterval(t);
     }, []);
 
-    const isOnline = !!contact.lastActive && (now - new Date(contact.lastActive).getTime()) < 65000;
-    const lastSeenText = formatSeen(contact.lastSeen);
+    const onlineStatusPref = usePrivacyStore((s) => s.onlineStatus);
+    const lastSeenPref = usePrivacyStore((s) => s.lastSeen);
+    const presence = visiblePresence(!!contact.lastActive && (now - new Date(contact.lastActive).getTime()) < 65000, formatSeen(contact.lastSeen), {
+        onlineStatus: onlineStatusPref,
+        lastSeen: lastSeenPref,
+    });
+    const isOnline = presence.isOnline;
+    const lastSeenText = presence.lastSeen;
     const trust = getTrustMeta(contact.vouchScore);
     const sharedMedia = useSharedMediaItems(chatHistory, activeTransfers);
     const { utilityActions, dangerActions } = buildContactInfoActions({

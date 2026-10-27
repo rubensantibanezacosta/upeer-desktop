@@ -4,6 +4,7 @@ import {
     sign,
 } from '../../security/identity.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { readReceiptsEnabled } from '../../security/privacy-prefs.js';
 import { getGroupById } from '../../storage/groups/operations.js';
 import {
     getMessageById,
@@ -48,6 +49,8 @@ export async function sendReadReceipt(upeerId: string, id: string): Promise<void
     if (await updateMessageStatus(id, 'read')) {
         await emitMessageStatusUpdated(id, 'read');
     }
+
+    if (!readReceiptsEnabled()) return;
 
     const msg = await getMessageById(id) as StoredMessageRecord | undefined;
     if (!msg) return;

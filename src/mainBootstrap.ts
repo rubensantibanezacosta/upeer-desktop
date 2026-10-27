@@ -11,6 +11,7 @@ import { registerGroupHandlers } from './main_process/core/ipcHandlers/groups.js
 import { registerIdentityHandlers } from './main_process/core/ipcHandlers/identity.js';
 import { registerMessageHandlers } from './main_process/core/ipcHandlers/messages.js';
 import { registerNetworkHandlers } from './main_process/core/ipcHandlers/network.js';
+import { registerPrivacyHandlers } from './main_process/core/ipcHandlers/privacy.js';
 import { registerSecurityHandlers } from './main_process/core/ipcHandlers/security.js';
 import { registerScreenShareHandlers } from './main_process/core/ipcHandlers/screenShare.js';
 import { registerVaultHandlers } from './main_process/core/ipcHandlers/vault.js';
@@ -48,6 +49,7 @@ export const registerIpcHandlers = () => {
     registerVaultHandlers();
     registerStorageHandlers();
     registerSecurityHandlers();
+    registerPrivacyHandlers();
     registerDeviceHandlers();
     registerEnrollmentHandlers();
     registerSyncHandlers();

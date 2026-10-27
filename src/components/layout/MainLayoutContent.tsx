@@ -23,6 +23,8 @@ import { GroupInfoPanel } from './GroupInfoPanel.js';
 import { KeyChangeAlertBanner } from './KeyChangeAlertBanner.js';
 import { DragOverlay, WelcomePlaceholder, getEditableMessageText } from './mainLayoutHelpers.js';
 import { MainLayoutPanels } from './MainLayoutPanels.js';
+import { usePrivacyStore } from '../../store/usePrivacyStore.js';
+import { visiblePresence } from '../../utils/presenceVisibility.js';
 import type { MainLayoutProps, PreviewableMedia } from './MainLayout.js';
 
 interface MainLayoutContentProps {
@@ -145,6 +147,13 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
     const keyChangeAlert = chatStore.keyChangeAlerts[targetUpeerId];
+    const onlineStatusPref = usePrivacyStore((state) => state.onlineStatus);
+    const lastSeenPref = usePrivacyStore((state) => state.lastSeen);
+    const headerPresence = visiblePresence(
+        !!activeContact?.lastActive && (Date.now() - new Date(activeContact.lastActive).getTime()) < 65000,
+        activeContact?.lastActive ?? activeContact?.lastSeen,
+        { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref },
+    );
     const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
 
     return (
@@ -225,10 +234,10 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         <TopHeader
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
-                                            isOnline={activeContact?.lastActive ? (new Date().getTime() - new Date(activeContact.lastActive).getTime()) < 65000 : undefined}
+                                            isOnline={headerPresence.isOnline}
                                             activity={chatStore.peerActivity[targetUpeerId]}
                                             status={activeContact?.status}
-                                            lastSeen={activeContact?.lastActive ?? activeContact?.lastSeen}
+                                            lastSeen={headerPresence.lastSeen ?? undefined}
                                             vouchScore={effectiveVouchScore}
                                             isSelfChat={targetUpeerId === chatStore.myIdentity?.upeerId}
                                             onDelete={() => handleClearChat(targetUpeerId)}

@@ -104,6 +104,10 @@ vi.mock('electron', () => ({
     },
 }));
 
+const privacy = vi.hoisted(() => ({ readReceiptsEnabled: vi.fn(() => true) }));
+
+vi.mock('../../../src/main_process/security/privacy-prefs.js', () => privacy);
+
 describe('no-pérdida de eventos de mutación (edición, borrado, reacción, read)', () => {
     const contactOps = async () => await import('../../../src/main_process/storage/contacts/operations.js');
     const transport = async () => await import('../../../src/main_process/network/server/transport.js');
@@ -218,6 +222,31 @@ describe('no-pérdida de eventos de mutación (edición, borrado, reacción, rea
     });
 
     it('persiste el receipt de lectura (READ) en vault', async () => {
+        vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(offlineContact as never);
+
+        const { sendReadReceipt } = await import('../../../src/main_process/network/messaging/chatInteractions.js');
+        await sendReadReceipt('bob', 'msg-1');
+
+        expect((await vault()).VaultManager.replicateToVaults).toHaveBeenCalledWith(
+            'bob',
+            expect.objectContaining({ type: 'READ', id: 'msg-1' }),
+        );
+    });
+
+    it('con las confirmaciones apagadas marca en local pero no envía ni replica el READ', async () => {
+        privacy.readReceiptsEnabled.mockReturnValue(false);
+        vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(connectedContact as never);
+
+        const { sendReadReceipt } = await import('../../../src/main_process/network/messaging/chatInteractions.js');
+        await sendReadReceipt('bob', 'msg-1');
+
+        expect((await messagesOps()).updateMessageStatus).toHaveBeenCalledWith('msg-1', 'read');
+        expect((await transport()).sendSecurePacket).not.toHaveBeenCalled();
+        expect((await vault()).VaultManager.replicateToVaults).not.toHaveBeenCalled();
+    });
+
+    it('al reactivar las confirmaciones el READ vuelve a salir', async () => {
+        privacy.readReceiptsEnabled.mockReturnValue(true);
         vi.mocked((await contactOps()).getContactByUpeerId).mockResolvedValue(offlineContact as never);
 
         const { sendReadReceipt } = await import('../../../src/main_process/network/messaging/chatInteractions.js');

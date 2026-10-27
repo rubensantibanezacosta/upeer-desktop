@@ -281,6 +281,9 @@ declare global {
             disablePin: (args: { pin: string }) => Promise<{ success: boolean; error?: string }>;
             verifyPin: (args: { pin: string }) => Promise<boolean>;
             getMnemonic: (pin: string) => Promise<{ success: boolean; mnemonic?: string; error?: string }>;
+            /** Preferencias de privacidad con efecto en el servicio */
+            getPrivacyPrefs: () => Promise<{ readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean }>;
+            setPrivacyPrefs: (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean }) => Promise<{ readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean }>;
             /** Assets internos */
             persistInternalAsset: (args: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             generateVideoThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
