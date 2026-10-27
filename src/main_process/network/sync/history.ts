@@ -13,6 +13,7 @@ import { sendEncryptedSync } from './transport.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
 import { forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
+import { carryHistoryCursor } from './historyCursor.js';
 
 const HISTORY_PAGE_SIZE = 50;
 const inFlight = new Set<string>();
@@ -63,12 +64,13 @@ export async function respondSyncHistory(
             }));
         }
     }
-    const remaining = nextRemaining(page.nextCursor, page.done);
+    const nextCursor = carryHistoryCursor(page.nextCursor, request.cursor);
+    const remaining = nextRemaining(nextCursor, page.done);
     recordHistoryServed(peer.deviceId, page.messages.length, remaining);
     await sendEncryptedSync(peer, 'SYNC_HISTORY_RES', {
         requestId: request.requestId,
         entries,
-        nextCursor: page.nextCursor,
+        nextCursor,
         done: page.done,
         pending: remaining,
     });
@@ -105,9 +107,10 @@ export async function applySyncHistoryResponse(
         });
         if (recorded) await applySyncEvent({ ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId }, win);
     }
-    updateSyncPeerHistory(peer.deviceId, payload.nextCursor, payload.done);
-    if (payload.done || !payload.nextCursor) recordHistoryComplete(peer.deviceId);
-    if (!payload.done && payload.nextCursor) {
+    const nextCursor = carryHistoryCursor(payload.nextCursor, peer.historyCursor);
+    updateSyncPeerHistory(peer.deviceId, nextCursor, payload.done);
+    if (payload.done || !nextCursor) recordHistoryComplete(peer.deviceId);
+    if (!payload.done && nextCursor) {
         const { getSyncPeer } = await import('../../storage/sync/peers.js');
         const refreshed = getSyncPeer(peer.deviceId);
         if (refreshed) await requestSyncHistory(refreshed);
