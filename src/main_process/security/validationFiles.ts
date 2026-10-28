@@ -32,6 +32,12 @@ type FileChunkAckPayload = {
     chunkIndex?: unknown;
 };
 
+type FileRequestPayload = {
+    fileId?: unknown;
+    messageId?: unknown;
+    chatUpeerId?: unknown;
+};
+
 export function validateFileProposal(data: FileProposalPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') return { valid: false, error: 'Invalid fileId' };
     if (!data.fileName || typeof data.fileName !== 'string') return { valid: false, error: 'Invalid fileName' };
@@ -119,6 +125,19 @@ export function validateFileDoneAck(data: FileAcceptPayload): ValidationResult {
 export function validateFileCancel(data: FileAcceptPayload): ValidationResult {
     if (!data.fileId || typeof data.fileId !== 'string') {
         return { valid: false, error: 'Invalid fileId' };
+    }
+    return { valid: true };
+}
+
+export function validateFileRequest(data: FileRequestPayload): ValidationResult {
+    if (!data.fileId || typeof data.fileId !== 'string' || data.fileId.length > 128) {
+        return { valid: false, error: 'Invalid fileId' };
+    }
+    if (data.messageId !== undefined && (typeof data.messageId !== 'string' || data.messageId.length > 100)) {
+        return { valid: false, error: 'Invalid messageId' };
+    }
+    if (data.chatUpeerId !== undefined && (typeof data.chatUpeerId !== 'string' || data.chatUpeerId.length > 128)) {
+        return { valid: false, error: 'Invalid chatUpeerId' };
     }
     return { valid: true };
 }

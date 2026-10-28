@@ -42,6 +42,7 @@ import {
     validateFileChunkAck,
     validateFileDoneAck,
     validateFileProposal,
+    validateFileRequest,
 } from './validationFiles.js';
 import {
     validateGroupAck,
@@ -118,6 +119,7 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     FILE_DONE_ACK: validateFileDoneAck,
     FILE_END: validateFileDoneAck,
     FILE_CANCEL: validateFileCancel,
+    FILE_REQUEST: validateFileRequest,
     VAULT_STORE: validateVaultStore,
     VAULT_QUERY: validateVaultQuery,
     VAULT_ACK: validateVaultAck,

@@ -6,6 +6,7 @@ import {
     validateFileChunkAck,
     validateFileDoneAck,
     validateFileCancel,
+    validateFileRequest,
 } from '../../../src/main_process/security/validationFiles.js';
 
 describe('validationFiles', () => {
@@ -89,6 +90,27 @@ describe('validationFiles', () => {
         it('rechaza campos inválidos', () => {
             expect(validateFileChunkAck({ fileId: '', chunkIndex: 3 }).valid).toBe(false);
             expect(validateFileChunkAck({ fileId: 'f1', chunkIndex: 'x' }).valid).toBe(false);
+        });
+    });
+
+    describe('validateFileRequest', () => {
+        it('acepta solo fileId', () => {
+            expect(validateFileRequest({ fileId: 'f1' }).valid).toBe(true);
+        });
+
+        it('acepta messageId y chatUpeerId opcionales', () => {
+            expect(validateFileRequest({ fileId: 'f1', messageId: 'm1', chatUpeerId: 'grp-1' }).valid).toBe(true);
+        });
+
+        it('rechaza fileId ausente, vacío o desmesurado', () => {
+            expect(validateFileRequest({}).valid).toBe(false);
+            expect(validateFileRequest({ fileId: '' }).valid).toBe(false);
+            expect(validateFileRequest({ fileId: 'x'.repeat(129) }).valid).toBe(false);
+        });
+
+        it('rechaza messageId y chatUpeerId inválidos', () => {
+            expect(validateFileRequest({ fileId: 'f1', messageId: 'x'.repeat(101) }).valid).toBe(false);
+            expect(validateFileRequest({ fileId: 'f1', chatUpeerId: 'x'.repeat(129) }).valid).toBe(false);
         });
     });
 });

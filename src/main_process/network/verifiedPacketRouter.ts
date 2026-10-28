@@ -589,6 +589,7 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
         case 'FILE_DONE_ACK':
         case 'FILE_END':
         case 'FILE_CANCEL':
+        case 'FILE_REQUEST':
             fileTransferManager.handleMessage(upeerId, rinfo.address, data);
             break;
         case 'GROUP_MSG':

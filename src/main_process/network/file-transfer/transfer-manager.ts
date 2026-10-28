@@ -15,6 +15,7 @@ import * as sender from './sender-logic.js';
 import { cleanupReceivedChunks } from './receiver-logic.js';
 import * as receiver from './receiver-logic.js';
 import * as vaultRecovery from './receiverVaultRecovery.js';
+import * as resend from './resend.js';
 
 type FileTransferPacket = {
     type: string;
@@ -94,6 +95,7 @@ export class TransferManager implements ITransferManager {
     public handleFileCancel = receiver.handleFileCancel;
     public handleHeartbeat = receiver.handleHeartbeat;
     public tryRecoverVaultTransferByFileHash = vaultRecovery.tryRecoverVaultTransferByFileHash;
+    public resendRequestedFile = resend.resendRequestedFile;
 
     public getAllTransfers() {
         return this.store.getAllTransfers();
@@ -217,6 +219,14 @@ export class TransferManager implements ITransferManager {
             case 'FILE_HEARTBEAT':
                 if (typeof data.fileId !== 'string') return;
                 this.handleHeartbeat(upeerId, address, { fileId: data.fileId, t: data.t });
+                break;
+            case 'FILE_REQUEST':
+                if (typeof data.fileId !== 'string') return;
+                await this.resendRequestedFile(upeerId, address, {
+                    fileId: data.fileId,
+                    messageId: typeof data.messageId === 'string' ? data.messageId : undefined,
+                    chatUpeerId: typeof data.chatUpeerId === 'string' ? data.chatUpeerId : undefined,
+                });
                 break;
         }
     }

@@ -21,6 +21,7 @@ export type MessageType =
     | 'FILE_END'
     | 'FILE_ACK'
     | 'FILE_CANCEL'
+    | 'FILE_REQUEST'
     // Kademlia DHT messages
     | 'DHT_PING'
     | 'DHT_PONG'

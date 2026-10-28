@@ -416,6 +416,53 @@ export interface FileHistoryEntry {
     category: FileHistoryCategory;
 }
 
+function parseFileEntry(row: MessageRow): FileHistoryEntry | null {
+    if (typeof row.message !== 'string' || !row.message.startsWith('{')) return null;
+
+    let parsed: {
+        type?: unknown;
+        fileId?: unknown;
+        fileName?: unknown;
+        fileSize?: unknown;
+        mimeType?: unknown;
+        savedPath?: unknown;
+        thumbnail?: unknown;
+        caption?: unknown;
+        isVoiceNote?: unknown;
+    };
+    try {
+        parsed = JSON.parse(row.message);
+    } catch {
+        return null;
+    }
+
+    if (parsed?.type !== 'file') return null;
+    if (typeof parsed.fileId !== 'string' || !parsed.fileId) return null;
+    if (typeof parsed.fileName !== 'string' || !parsed.fileName) return null;
+
+    const mimeType = typeof parsed.mimeType === 'string' ? parsed.mimeType : 'application/octet-stream';
+    const fileName = parsed.fileName;
+    const category = categorizeFile(mimeType, fileName);
+    const isVoiceNote = parsed.isVoiceNote === true;
+
+    return {
+        fileId: parsed.fileId,
+        messageId: row.id,
+        chatUpeerId: row.chatUpeerId,
+        senderUpeerId: row.senderUpeerId ?? undefined,
+        fileName,
+        fileSize: typeof parsed.fileSize === 'number' ? parsed.fileSize : 0,
+        mimeType,
+        savedPath: typeof parsed.savedPath === 'string' ? parsed.savedPath : undefined,
+        thumbnail: typeof parsed.thumbnail === 'string' ? parsed.thumbnail : undefined,
+        caption: typeof parsed.caption === 'string' ? parsed.caption : undefined,
+        isMine: row.isMine !== false,
+        isVoiceNote,
+        timestamp: row.timestamp,
+        category: isVoiceNote ? 'audio' : category,
+    };
+}
+
 export function getFileHistory(limit = 200): FileHistoryEntry[] {
     const db = getDb();
     const schema = getSchema();
@@ -430,53 +477,26 @@ export function getFileHistory(limit = 200): FileHistoryEntry[] {
     const entries: FileHistoryEntry[] = [];
 
     for (const row of rows) {
-        if (!row.message.startsWith('{')) continue;
-
-        let parsed: {
-            type?: unknown;
-            fileId?: unknown;
-            fileName?: unknown;
-            fileSize?: unknown;
-            mimeType?: unknown;
-            savedPath?: unknown;
-            thumbnail?: unknown;
-            caption?: unknown;
-            isVoiceNote?: unknown;
-        };
-        try {
-            parsed = JSON.parse(row.message);
-        } catch {
-            continue;
-        }
-
-        if (parsed?.type !== 'file') continue;
-        if (typeof parsed.fileId !== 'string' || !parsed.fileId) continue;
-        if (typeof parsed.fileName !== 'string' || !parsed.fileName) continue;
-
-        const mimeType = typeof parsed.mimeType === 'string' ? parsed.mimeType : 'application/octet-stream';
-        const fileName = parsed.fileName;
-        const category = categorizeFile(mimeType, fileName);
-        const isVoiceNote = parsed.isVoiceNote === true;
-
-        entries.push({
-            fileId: parsed.fileId,
-            messageId: row.id,
-            chatUpeerId: row.chatUpeerId,
-            senderUpeerId: row.senderUpeerId ?? undefined,
-            fileName,
-            fileSize: typeof parsed.fileSize === 'number' ? parsed.fileSize : 0,
-            mimeType,
-            savedPath: typeof parsed.savedPath === 'string' ? parsed.savedPath : undefined,
-            thumbnail: typeof parsed.thumbnail === 'string' ? parsed.thumbnail : undefined,
-            caption: typeof parsed.caption === 'string' ? parsed.caption : undefined,
-            isMine: row.isMine !== false,
-            isVoiceNote,
-            timestamp: row.timestamp,
-            category: isVoiceNote ? 'audio' : category,
-        });
+        const entry = parseFileEntry(row);
+        if (entry) entries.push(entry);
     }
 
     return entries;
+}
+
+export function findFileEntry(fileId: string): FileHistoryEntry | null {
+    if (typeof fileId !== 'string' || fileId.length === 0) return null;
+    const db = getDb();
+    const schema = getSchema();
+
+    const row = db.select()
+        .from(schema.messages)
+        .where(and(eq(schema.messages.isDeleted, false), like(schema.messages.message, `%"fileId":"${fileId}"%`)))
+        .orderBy(desc(schema.messages.timestamp))
+        .limit(1)
+        .get() as MessageRow | undefined;
+
+    return row ? parseFileEntry(row) : null;
 }
 
 export function categorizeFile(mimeType: string, fileName: string): FileHistoryCategory {

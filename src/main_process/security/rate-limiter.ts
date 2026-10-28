@@ -98,6 +98,7 @@ export class RateLimiter {
             'FILE_DONE': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_DONE_ACK': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
             'FILE_CANCEL': { windowMs: 60000, maxTokens: 50, refillRate: 50 / 60 },
+            'FILE_REQUEST': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
             // BUG DJ fix: SEALED no tenía regla → operaciones DH X25519 ilimitadas por IP.
             // 5000/s es suficiente para transferencias de archivos a máxima velocidad
             // (los FILE_CHUNK más su overhead SEALED) y bloquea floods sin autenticar.
