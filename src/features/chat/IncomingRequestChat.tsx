@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography, Button, Alert, Avatar } from '@mui/joy';
 import { UserPlus, ShieldCheck, TriangleAlert, Clock, Ban } from 'lucide-react';
 import type { UntrustworthyInfo } from '../../types/chat.js';
+import { getReputationWarning } from '../../utils/reputationWarning.js';
 
 interface IncomingRequestChatProps {
     contactName?: string;
@@ -10,7 +11,6 @@ interface IncomingRequestChatProps {
     onAccept: () => void;
     onReject: () => void;
     untrustworthyInfo?: UntrustworthyInfo | null;
-    /** Score G-Set CRDT (0-100, neutral=50). undefined si no hay datos aún. */
     vouchScore?: number;
 }
 
@@ -23,11 +23,8 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
     untrustworthyInfo,
     vouchScore,
 }) => {
-    // vouchScore: 0-100, neutral=50. undefined = sin datos (usuario nuevo).
-    const hasVouchData = vouchScore !== undefined;
-    const isUntrustworthy = !!untrustworthyInfo || (hasVouchData && vouchScore < 40);
-    const isTrusted = hasVouchData && vouchScore >= 65;
-    const isNew = !hasVouchData || vouchScore === 50;
+    const reputationWarning = getReputationWarning(vouchScore);
+    const isUntrustworthy = !!untrustworthyInfo || !!reputationWarning;
 
     const formatTimestamp = (ts?: number) => {
         if (!ts) return null;
@@ -104,33 +101,16 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 >
                     <Box>
                         <Typography level="title-sm">
-                            ¡Peligro! Reputación Negativa
+                            Reputación muy baja en la red
                         </Typography>
                         <Typography level="body-sm">
                             Este usuario ha sido penalizado por la red por comportamiento malicioso o fallos de integridad.
-                            {hasVouchData && <> Puntuación de la red: <strong>{vouchScore}/100</strong>.</>}{' '}
+                            {reputationWarning ? <> {reputationWarning.label}</> : null}{' '}
                             <strong>No se recomienda conectar.</strong>
                         </Typography>
                     </Box>
                 </Alert>
-            ) : isTrusted ? (
-                <Alert
-                    variant="soft"
-                    color="success"
-                    startDecorator={<ShieldCheck />}
-                    sx={{ mb: 4, maxWidth: 450, textAlign: 'left', borderRadius: 'md' }}
-                >
-                    <Box>
-                        <Typography level="title-sm">
-                            Identidad Conocida por la Red
-                        </Typography>
-                        <Typography level="body-sm">
-                            Este usuario tiene un historial positivo avalado por tus contactos directos.
-                            Puntuación de confianza: <strong>{vouchScore}/100</strong>.
-                        </Typography>
-                    </Box>
-                </Alert>
-            ) : isNew ? (
+            ) : (
                 <Alert
                     variant="soft"
                     color="neutral"
@@ -139,15 +119,15 @@ export const IncomingRequestChat: React.FC<IncomingRequestChatProps> = ({
                 >
                     <Box>
                         <Typography level="title-sm">
-                            Usuario Nuevo o Sin Historial
+                            Sin avisos de la red
                         </Typography>
                         <Typography level="body-sm">
-                            Ninguno de tus contactos ha avalado a este usuario aún. Puede ser normal para usuarios nuevos.
+                            Ninguno de tus contactos ha avalado a este usuario aún. Puede ser normal en usuarios nuevos.
                             Asegúrate de que sea quien dice ser por otro canal.
                         </Typography>
                     </Box>
                 </Alert>
-            ) : null}
+            )}
 
             <Box sx={{ display: 'flex', gap: 2, mt: 0 }}>
                 <Button

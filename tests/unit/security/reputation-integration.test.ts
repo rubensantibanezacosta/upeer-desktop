@@ -204,6 +204,16 @@ describe('Reputation - Vouches Integration', () => {
             expect(score).toBe(50);
         });
 
+        it('should return a neutral score for subjects that are not accounts', async () => {
+            const { computeScore } = await import('../../../src/main_process/security/reputation/vouches.js');
+            vi.mocked(storage.getVouchesForNode).mockClear();
+
+            expect(computeScore('grp-1234', new Set(['p1']))).toBe(50);
+            expect(computeScore('200:1234:5678::1', new Set(['p1']))).toBe(50);
+            expect(computeScore('   ', new Set(['p1']))).toBe(50);
+            expect(storage.getVouchesForNode).not.toHaveBeenCalled();
+        });
+
         it('should get score with direct contacts from DB', async () => {
             const { getVouchScore } = await import('../../../src/main_process/security/reputation/vouches.js');
             vi.mocked(contactsOps.getContacts).mockResolvedValue([

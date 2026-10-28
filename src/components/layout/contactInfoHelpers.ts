@@ -1,13 +1,10 @@
-import { BadgeCheck, CircleCheck, ShieldAlert, Shield, Sparkles } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { isPreviewableFile } from '../../utils/fileUtils.js';
+import { getReputationWarning } from '../../utils/reputationWarning.js';
 
 export const getTrustMeta = (score?: number) => {
-    if (score === undefined) return null;
-    if (score < 40) return { label: 'Baja reputación · Ten cuidado', Icon: ShieldAlert };
-    if (score >= 80) return { label: 'Alta reputación · Muy confiable', Icon: BadgeCheck };
-    if (score >= 65) return { label: 'Buena reputación · Confiable', Icon: CircleCheck };
-    if (score === 50) return { label: 'Sin historial en la red', Icon: Sparkles };
-    return { label: 'Reputación estándar', Icon: Shield };
+    const warning = getReputationWarning(score);
+    return warning ? { label: warning.label, Icon: ShieldAlert } : null;
 };
 
 export const formatSeen = (iso?: string): string | null => {

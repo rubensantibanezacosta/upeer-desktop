@@ -21,7 +21,8 @@ test('muestra advertencia fuerte para solicitudes no confiables', async ({ page 
     await emitBridgeEvent(page, 'onFocusConversation', { upeerId: 'eve' });
 
     await expect(page.getByRole('heading', { name: 'Solicitud de Contacto' })).toBeVisible();
-    await expect(page.getByText('¡Peligro! Reputación Negativa')).toBeVisible();
+    await expect(page.getByText('Reputación muy baja en la red')).toBeVisible();
+    await expect(page.getByText('Reputación baja en la red (15/100). Ten cuidado.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Aceptar con Precaución' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Bloquear' })).toBeVisible();
 });

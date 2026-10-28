@@ -352,7 +352,6 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 <FilePreviewOverlay
                                                     files={pendingFiles}
                                                     isDragging={isDragging}
-                                                    vouchScore={activeContact?.vouchScore}
                                                     onDragOver={handleDragOver}
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={handleDrop}

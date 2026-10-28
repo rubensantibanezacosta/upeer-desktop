@@ -44,29 +44,29 @@ export const InfoModal: React.FC<InfoModalProps> = ({ open, onClose, title, icon
 export const ReputacionModalContent: React.FC = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography level="body-sm" color="neutral">
-            La reputación es una puntuación que refleja cuán de fiar eres para el resto de personas
-            que usan la app. Cuanto más alta, mejor te tratan los demás: tus mensajes llegan antes
-            y con más fiabilidad.
+            La reputación es un criterio técnico interno que puntúa <strong>cuentas</strong>, no dispositivos
+            ni nodos: la misma cuenta vale lo mismo desde cualquier equipo suyo. Solo se te avisa cuando es
+            muy mala, porque una puntuación normal no es asunto de nadie.
         </Typography>
 
         <Divider />
 
         {[
             {
-                label: 'Confianza',
-                desc: 'Empieza en 50 para todo el mundo. Sube cuando mandas y recibes mensajes con normalidad, y cuando ayudas a guardar mensajes de otros mientras están desconectados. Baja si haces cosas raras como mandar spam.',
+                label: 'De dónde sale',
+                desc: 'De avales firmados que intercambian tus contactos directos: un mensaje entregado, un trozo de mensaje guardado mientras estabas desconectado, o una penalización por comportamiento malicioso o fallo de integridad.',
             },
             {
-                label: 'Actividad',
-                desc: 'Mide si has estado usando la app recientemente. Si llevas tiempo sin conectarte, este número baja. Vuelve a subir en cuanto retomes la actividad normal.',
+                label: 'Quién cuenta',
+                desc: 'Solo los avales de tus contactos directos, durante los últimos 30 días. Un desconocido no puede subir ni hundir tu puntuación.',
             },
             {
-                label: 'Contactos',
-                desc: 'Cuántos de tus contactos están conectados ahora mismo. Tener más contactos activos le da más peso a tu puntuación general.',
+                label: 'Cuándo se avisa',
+                desc: 'Únicamente por debajo de 40 sobre 100. El resto del tiempo no se muestra ninguna nota, ni la tuya ni la de los demás.',
             },
             {
-                label: 'Puntuación total',
-                desc: 'Un resumen de todo lo anterior junto. Es el número que ve la app para decidir con qué prioridad procesa tus mensajes.',
+                label: 'Para qué se usa',
+                desc: 'Para decidir con qué prioridad se procesan los paquetes de una cuenta y para marcar como sospechosa una solicitud de contacto antes de aceptarla.',
             },
         ].map(({ label, desc }) => (
             <Box key={label}>

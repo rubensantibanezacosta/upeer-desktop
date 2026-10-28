@@ -11,9 +11,10 @@ import {
     Tooltip,
     Typography,
 } from '@mui/joy';
-import { Pencil, Check, Copy, Fingerprint, QrCode, ShieldCheck, CloudCheck, BadgeCheck, CircleCheck, ShieldAlert, Info } from 'lucide-react';
+import { Pencil, Check, Copy, Fingerprint, QrCode, ShieldCheck, CloudCheck, ShieldAlert, Info } from 'lucide-react';
 import { CopyableField } from './shared.js';
 import { CardGroupLabel } from './sectionShell.js';
+import { getReputationWarning } from '../../../utils/reputationWarning.js';
 
 export type ReputationData = {
     vouchScore: number;
@@ -119,60 +120,47 @@ interface ProfileReputationSectionProps {
 }
 
 const reputationBadge = (myReputation: ReputationData | null): React.ReactNode => {
-    if (!myReputation) {
+    const warning = getReputationWarning(myReputation?.vouchScore);
+    if (!warning) {
         return undefined;
     }
-    const { vouchScore, connectionCount } = myReputation;
-    const isNew = vouchScore === 50 && connectionCount === 0;
-    let color: 'success' | 'primary' | 'neutral' | 'danger' = 'neutral';
-    let icon = <ShieldCheck style={{ fontSize: 12 }} />;
-    let label = isNew ? 'Sin historial' : 'Estándar';
-    if (!isNew) {
-        if (vouchScore >= 80) { color = 'success'; icon = <BadgeCheck style={{ fontSize: 12 }} />; label = 'Alta'; }
-        else if (vouchScore >= 65) { color = 'primary'; icon = <CircleCheck style={{ fontSize: 12 }} />; label = 'Buena'; }
-        else if (vouchScore < 40) { color = 'danger'; icon = <ShieldAlert style={{ fontSize: 12 }} />; label = 'Baja'; }
-    }
     return (
-        <Chip size="sm" color={color} variant="soft" startDecorator={icon} sx={{ fontSize: '11px' }}>{label}</Chip>
+        <Chip size="sm" color="danger" variant="soft" startDecorator={<ShieldAlert style={{ fontSize: 12 }} />} sx={{ fontSize: '11px' }}>
+            Baja
+        </Chip>
     );
 };
 
-export const ProfileReputationSection: React.FC<ProfileReputationSectionProps> = ({ myReputation, onToggleInfo }) => (
-    <Box>
-        <CardGroupLabel
-            icon={<ShieldCheck style={{ fontSize: 15 }} />}
-            title="Reputación"
-            badge={reputationBadge(myReputation)}
-            action={
-                <Tooltip title="¿Qué es la reputación?" variant="soft" size="sm">
-                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('reputacion')}><Info style={{ fontSize: 16 }} /></IconButton>
-                </Tooltip>
-            }
-        />
-        <Box sx={{ px: 0.5, pb: 1 }}>
-            {myReputation ? (() => {
-                const { vouchScore, connectionCount } = myReputation;
-                const barColor = vouchScore >= 80 ? 'success' : vouchScore >= 65 ? 'primary' : vouchScore < 40 ? 'danger' : 'neutral';
-                return (
-                    <>
-                        <LinearProgress determinate value={vouchScore} size="sm" color={barColor} sx={{ mb: 1.5, borderRadius: 'sm' }} />
-                        <Box sx={{ display: 'flex', gap: 5 }}>
-                            {[
-                                { label: 'Vouches', value: `${vouchScore}/100` },
-                                { label: 'Contactos', value: String(connectionCount) },
-                            ].map(({ label, value }) => (
-                                <Box key={label}>
-                                    <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</Typography>
-                                    <Typography level="body-sm" sx={{ fontWeight: 600 }}>{value}</Typography>
-                                </Box>
-                            ))}
-                        </Box>
-                    </>
-                );
-            })() : <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Cargando...</Typography>}
+export const ProfileReputationSection: React.FC<ProfileReputationSectionProps> = ({ myReputation, onToggleInfo }) => {
+    const warning = getReputationWarning(myReputation?.vouchScore);
+    const connectionCount = myReputation?.connectionCount ?? 0;
+    const summary = !myReputation
+        ? 'Cargando...'
+        : `${connectionCount} ${connectionCount === 1 ? 'contacto directo' : 'contactos directos'} en tu red. La reputación es un criterio interno que solo se avisa cuando es muy mala.`;
+    return (
+        <Box>
+            <CardGroupLabel
+                icon={<ShieldCheck style={{ fontSize: 15 }} />}
+                title="Reputación"
+                badge={reputationBadge(myReputation)}
+                action={
+                    <Tooltip title="¿Qué es la reputación?" variant="soft" size="sm">
+                        <IconButton size="sm" variant="plain" color="neutral" onClick={() => onToggleInfo('reputacion')}><Info style={{ fontSize: 16 }} /></IconButton>
+                    </Tooltip>
+                }
+            />
+            <Box sx={{ px: 0.5, pb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {warning ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'danger.500' }}>
+                        <ShieldAlert style={{ fontSize: 14 }} />
+                        <Typography level="body-xs" sx={{ fontWeight: 600 }}>{warning.label}</Typography>
+                    </Box>
+                ) : null}
+                <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>{summary}</Typography>
+            </Box>
         </Box>
-    </Box>
-);
+    );
+};
 
 interface ProfileVaultSectionProps {
     vaultStats: { count: number; sizeBytes: number } | null;

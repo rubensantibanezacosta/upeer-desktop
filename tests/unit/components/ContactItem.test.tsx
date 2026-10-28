@@ -5,7 +5,7 @@ import type { Contact } from '../../../src/types/chat.js';
 
 vi.mock('lucide-react', async (importOriginal) => ({
     ...(await importOriginal<typeof import('lucide-react')>()),
-    BadgeCheck: () => <div data-testid="BadgeCheckIcon" />,
+    ShieldAlert: () => <div data-testid="ShieldAlertIcon" />,
 }));
 
 import { ContactItem } from '../../../src/components/layout/ContactItem.js';
@@ -68,9 +68,15 @@ describe('ContactItem Component', () => {
         expect(screen.getByText(/escribiendo\.\.\./i)).toBeDefined();
     });
 
-    it('shows high reputation badge for high vouchScore', () => {
+    it('no pinta insignia de reputación cuando la puntuación es buena', () => {
         render(<ContactItem {...defaultProps} />);
-        expect(screen.getByTestId('BadgeCheckIcon')).toBeDefined();
+        expect(screen.queryByTestId('ShieldAlertIcon')).toBeNull();
+        expect(screen.queryByTestId('BadgeCheckIcon')).toBeNull();
+    });
+
+    it('solo avisa cuando la reputación es muy mala', () => {
+        render(<ContactItem {...defaultProps} contact={{ ...mockContact, vouchScore: 12 }} />);
+        expect(screen.getByTestId('ShieldAlertIcon')).toBeDefined();
     });
 
     it('marca En línea cuando hay actividad reciente', () => {

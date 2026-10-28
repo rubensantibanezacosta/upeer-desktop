@@ -37,7 +37,17 @@ export {
 /** Límite de vouches almacenados por emisor por día (anti-flood en DB) */
 const MAX_VOUCHES_PER_SENDER_PER_DAY = 200;
 const INTEGRITY_FAIL_WINDOW_MS = 60 * 60 * 1000;
+const NEUTRAL_SCORE = 50;
+const GROUP_ID = /^grp-/i;
+const IPV6_LIKE = /^[0-9a-f:]+$/i;
 const pendingIssuedVouchIds = new Set<string>();
+
+function isAccountSubject(toId: string): boolean {
+  const value = toId.trim();
+  if (!value) return false;
+  if (GROUP_ID.test(value)) return false;
+  return !(IPV6_LIKE.test(value) && value.includes(':'));
+}
 
 function getIssuedVouchTimestamp(type: VouchType, now: number): number {
     if (type === VouchType.HANDSHAKE) {
@@ -181,19 +191,24 @@ export async function saveIncomingVouch(vouch: ReputationVouch): Promise<boolean
  * Calcula el score cargando vouches de la DB y delegando en computeScorePure.
  * Sybil-resistant: sólo contribuyen vouches de contactos directos.
  *
- * @param toId             - upeerId del nodo a evaluar
+ * La reputación puntúa cuentas, no dispositivos ni nodos: la misma cuenta vale lo mismo
+ * desde cualquiera de sus equipos. Un identificador que no es una cuenta (un grupo o una
+ * dirección de nodo) no tiene reputación y devuelve el valor neutro sin consultar la base.
+ *
+ * @param toId             - upeerId de la cuenta a evaluar
  * @param directContactIds - Set de upeerIds de nuestros contactos directos
  */
 export function computeScore(
     toId: string,
     directContactIds: Set<string>,
 ): number {
+    if (!isAccountSubject(toId)) return NEUTRAL_SCORE;
     try {
         const since = Date.now() - THIRTY_DAYS_MS;
         const vouches = getVouchesForNode(toId, since);
         return computeScorePure(vouches as StoredVouch[], directContactIds);
     } catch {
-        return 50;
+        return NEUTRAL_SCORE;
     }
 }
 
@@ -218,7 +233,7 @@ export async function getVouchScore(toId: string): Promise<number> {
         const directContactIds = await getDirectContactIds();
         return computeScore(toId, directContactIds);
     } catch {
-        return 50;
+        return NEUTRAL_SCORE;
     }
 }
 

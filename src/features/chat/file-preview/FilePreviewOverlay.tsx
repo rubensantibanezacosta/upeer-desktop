@@ -20,7 +20,6 @@ interface FilePreviewOverlayProps {
     onAddMore: () => void;
     onRemove: (index: number) => void;
     isDragging?: boolean;
-    vouchScore?: number;
     onDragOver?: (e: React.DragEvent) => void;
     onDragLeave?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
