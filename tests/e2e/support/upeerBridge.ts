@@ -89,6 +89,7 @@ type BridgeState = {
     transfers: Transfer[];
     privacy: { readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean };
     notifications: { messages: boolean; requests: boolean; sound: boolean };
+    clipboard: string[];
 };
 
 export async function installUpeerBridge(page: Page, scenario: Scenario): Promise<void> {
@@ -115,6 +116,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             notifications: { messages: true, requests: true, sound: true },
             databaseBackups: deepClone(input.databaseBackups ?? []),
             restoredBackup: '',
+            clipboard: [] as string[],
         };
 
         const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -290,6 +292,10 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             getMyReputation: async () => ({ score: 0 }),
             getContactSecurity: async () => ({ hasSession: true, hasContactKey: true, safetyNumber: '11111 22222 33333 44444' }),
             getFileTransfers: async () => ({ success: true, transfers: deepClone(state.transfers) }),
+            writeClipboardText: async (text: string) => {
+                state.clipboard.push(text);
+                return { success: true };
+            },
             openFileDialog: async () => state.fileDialogQueue.shift() ?? { success: true, canceled: true, files: [] },
             fetchOgPreview: async (url: string) => state.linkPreviews[url] ?? null,
             getPathForFile: () => '',
@@ -473,7 +479,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                 queueFileDialogResult: (result: { success: boolean; canceled?: boolean; files?: PendingFile[] }) => state.fileDialogQueue.push(result),
                 patchContact: (upeerId: string, patch: Partial<Contact>) => addOrUpdateContact({ ...(state.contacts.find((item) => item.upeerId === upeerId) ?? { upeerId, name: upeerId, address: '', status: 'connected' }), ...patch }),
                 patchGroup: (groupId: string, patch: Partial<Group>) => addOrUpdateGroup({ ...(state.groups.find((item) => item.groupId === groupId) ?? { groupId, name: groupId, adminUpeerId: selfId, members: [selfId], status: 'active' }), ...patch }),
-                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers, privacy: state.privacy, notifications: state.notifications }),
+                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers, privacy: state.privacy, notifications: state.notifications, clipboard: state.clipboard }),
             },
         });
     }, scenario);

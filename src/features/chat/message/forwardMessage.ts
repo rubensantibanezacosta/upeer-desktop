@@ -105,3 +105,16 @@ export async function forwardMessageToTargets(message: string, targets: ForwardT
 
     return { forwarded, failed: targets.length - forwarded };
 }
+
+export async function forwardMessagesToTargets(messages: string[], targets: ForwardTarget[]) {
+    let forwarded = 0;
+    let failed = 0;
+
+    for (const message of messages) {
+        const result = await forwardMessageToTargets(message, targets);
+        forwarded += result.forwarded;
+        failed += result.failed;
+    }
+
+    return { forwarded, failed };
+}

@@ -19,8 +19,8 @@ interface MainLayoutOverlaysProps {
     activeGroup: MainLayoutProps['activeGroup'];
     isInviteGroupMembersOpen: boolean;
     setIsInviteGroupMembersOpen: (open: boolean) => void;
-    forwardingMsg: ChatMessage | null;
-    setForwardingMsg: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
+    forwardingMsgs: ChatMessage[];
+    setForwardingMsgs: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
     handleForward: (targets: ForwardTarget[]) => Promise<void>;
     handleReaction: (id: string, emoji: string, remove: boolean) => void;
     handleScrollToMessage: (id: string) => void;
@@ -36,8 +36,8 @@ export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
     activeGroup,
     isInviteGroupMembersOpen,
     setIsInviteGroupMembersOpen,
-    forwardingMsg,
-    setForwardingMsg,
+    forwardingMsgs,
+    setForwardingMsgs,
     handleForward,
     handleReaction,
     handleScrollToMessage,
@@ -48,7 +48,7 @@ export const MainLayoutOverlays: React.FC<MainLayoutOverlaysProps> = ({
         <ShareContactModal open={navigation.isShareModalOpen} onClose={() => navigation.setShareModalOpen(false)} contacts={chatStore.contacts} onShare={chatStore.handleShareContact} />
         <InviteGroupMembersModal open={isInviteGroupMembersOpen} onClose={() => setIsInviteGroupMembersOpen(false)} contacts={chatStore.contacts} group={activeGroup || null} onInvite={chatStore.handleInviteGroupMembers} />
         <CreateGroupModal open={navigation.isCreateGroupModalOpen} onClose={() => navigation.setCreateGroupModalOpen(false)} contacts={chatStore.contacts} onCreate={chatStore.handleCreateGroup} />
-        <ForwardModal open={!!forwardingMsg} onClose={() => setForwardingMsg(null)} contacts={chatStore.contacts} groups={chatStore.groups} onSend={handleForward} />
+        <ForwardModal open={forwardingMsgs.length > 0} onClose={() => setForwardingMsgs([])} contacts={chatStore.contacts} groups={chatStore.groups} onSend={handleForward} />
         {navigation.viewerMediaList.length > 0 && (
             <MediaViewerOverlay
                 items={navigation.viewerMediaList}

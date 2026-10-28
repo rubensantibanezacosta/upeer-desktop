@@ -10,6 +10,7 @@ import { LinkPreviewCard } from './LinkPreviewCard.js';
 import { MessageItemActions } from './MessageItemActions.js';
 import { parseMessage } from './messageItemSupport.js';
 import { bubbleRadiusSx, resolveBubbleCorners } from './bubbleShape.js';
+import { SelectionCheckbox, SelectionRow } from '../selection/SelectionRow.js';
 import type { FileTransfer } from '../../../hooks/fileTransferTypes.js';
 import type { ChatMessage, TransferMessageUpdates } from '../../../types/chat.js';
 
@@ -41,10 +42,14 @@ interface MessageItemProps {
     isFirstInGroupChain?: boolean;
     isLastInGroupChain?: boolean;
     onTransferStateChange?: (fileId: string, updates: TransferMessageUpdates) => void;
+    selectionMode?: boolean;
+    isSelected?: boolean;
+    onToggleSelect?: (id: string) => void;
+    onEnterSelection?: (id: string) => void;
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({
-    msg, onReply, onReact, onEdit, onDelete, onForward, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, isFirstInGroupChain = true, isLastInGroupChain = true, onTransferStateChange
+    msg, onReply, onReact, onEdit, onDelete, onForward, originalMessage, originalSenderName, activeTransfers = [], onScrollToMessage, onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, isFirstInGroupChain = true, isLastInGroupChain = true, onTransferStateChange, selectionMode = false, isSelected = false, onToggleSelect, onEnterSelection
 }) => {
     const isMe = msg.isMine;
     const [isHovered, setIsHovered] = useState(false);
@@ -94,22 +99,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
     const isPendingSend = isMe && msg.status === 'sending';
 
     return (
-        <Box
-            id={`msg-${msg.id}`}
-            className={isPendingSend ? 'chat-bubble-enter' : undefined}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            sx={{
-                alignSelf: 'stretch',
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: isMe ? 'flex-end' : 'flex-start',
-                transformOrigin: 'right bottom',
-                mb: msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 1 : 0.5,
-            }}
+        <SelectionRow
+            msgId={msg.id}
+            isSelected={isSelected}
+            selectionMode={selectionMode}
+            marginBottom={msg.reactions && msg.reactions.length > 0 ? 2.5 : isLastInGroupChain ? 1 : 0.5}
+            isPendingSend={isPendingSend}
+            onHoverChange={setIsHovered}
+            onToggleSelect={onToggleSelect}
         >
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1, width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                {selectionMode && <SelectionCheckbox msgId={msg.id} isSelected={isSelected} />}
                 {isGroup && !isMe && (
                     isLastInGroupChain ? (
                         <Avatar
@@ -249,7 +249,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
 
                         <MessageItemActions
                             msg={msg}
-                            isHovered={isHovered}
+                            isHovered={isHovered && !selectionMode}
                             emojiOpen={emojiOpen}
                             setEmojiOpen={setEmojiOpen}
                             emojiPickerRef={emojiPickerRef}
@@ -262,6 +262,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             onEdit={onEdit ? () => onEdit(msg) : undefined}
                             onForward={!msg.isDeleted && onForward ? () => onForward(msg) : undefined}
                             onDelete={() => msg.id && onDelete(msg.id)}
+                            onSelect={!selectionMode && msg.id && onEnterSelection ? () => onEnterSelection(msg.id as string) : undefined}
                             onDownload={isFile && fileData?.transferState === 'completed' && fileData.fileId ? async () => {
                                 const result = await window.upeer.showSaveDialog({
                                     defaultPath: fileData.fileName,
@@ -277,6 +278,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     </Box>
                 </Box>
             </Box>
-        </Box>
+        </SelectionRow>
     );
 });

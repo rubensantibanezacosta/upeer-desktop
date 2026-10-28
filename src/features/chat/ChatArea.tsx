@@ -7,6 +7,8 @@ import { TypingIndicator } from './message/TypingIndicator.js';
 import { ChevronDown } from 'lucide-react';
 import { useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
+import { SelectionToolbar } from './selection/SelectionToolbar.js';
+import { useMessageSelection } from './selection/useMessageSelection.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import type { ChatMessage, Contact, ConversationActivity, TransferMessageUpdates } from '../../types/chat.js';
 import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
@@ -27,6 +29,7 @@ interface ChatAreaProps {
     onEdit: (msg: ChatMessage) => void;
     onDelete: (msgId: string) => void;
     onForward?: (msg: ChatMessage) => void;
+    onForwardMany?: (msgs: ChatMessage[]) => void;
     activeTransfers?: FileTransfer[];
     onRetryMessage?: (msgId: string) => void;
     onRetryTransfer?: (fileId: string) => void;
@@ -38,7 +41,7 @@ interface ChatAreaProps {
     loading?: boolean;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, peerActivity = null, loading = false }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, onForwardMany, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, peerActivity = null, loading = false }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
@@ -119,6 +122,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
 
     const getMessageById = (id: string) => chatHistory.find(m => m.id === id);
 
+    const selection = useMessageSelection(chatHistory, { onDelete, onForwardMany });
+
     const getReplySenderName = (replyTo?: string) => {
         if (!replyTo) return undefined;
         const original = getMessageById(replyTo);
@@ -160,22 +165,34 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
     const reversedHistory = [...chatHistory].reverse();
 
     return (
-        <Box
-            ref={scrollRef}
-            sx={{
-                flexGrow: 1,
-                width: '100%',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column-reverse',
-                backgroundColor: 'background.body',
-                px: 4,
-                pt: 2,
-                pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
-                gap: 0,
-                boxSizing: 'border-box'
-            }}
-        >
+        <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 }}>
+            {selection.selectionMode && (
+                <SelectionToolbar
+                    summary={selection.summary}
+                    onClear={selection.clear}
+                    onStar={selection.star}
+                    onPin={selection.pin}
+                    onCopy={() => { void selection.copy(); }}
+                    onForward={selection.forward}
+                    onDelete={selection.remove}
+                />
+            )}
+            <Box
+                ref={scrollRef}
+                sx={{
+                    flexGrow: 1,
+                    width: '100%',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column-reverse',
+                    backgroundColor: 'background.body',
+                    px: 4,
+                    pt: 2,
+                    pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
+                    gap: 0,
+                    boxSizing: 'border-box'
+                }}
+            >
             {peerActivity && <TypingIndicator activity={peerActivity} />}
             {reversedHistory.map((msg, index) => {
                 const nextMsg = reversedHistory[index + 1];
@@ -209,6 +226,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                                 isFirstInGroupChain={isFirstInGroupChain}
                                 isLastInGroupChain={isLastInGroupChain}
                                 onTransferStateChange={onTransferStateChange}
+                                selectionMode={selection.selectionMode}
+                                isSelected={!!msg.id && selection.selected.has(msg.id)}
+                                onToggleSelect={selection.toggle}
+                                onEnterSelection={selection.enter}
                             />
                         ) : (
                             <ChatSystemMessage message={msg.message} />
@@ -238,6 +259,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
                     <ChevronDown />
                 </IconButton>
             )}
+            </Box>
         </Box>
     );
 };

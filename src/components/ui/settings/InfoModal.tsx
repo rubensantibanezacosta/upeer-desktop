@@ -99,20 +99,20 @@ export const AlmacenamientoModalContent: React.FC = () => (
 
         <Typography level="title-sm" sx={{ mt: 1 }}>Cuotas Dinámicas</Typography>
         <Typography level="body-xs">
-            El sistema no usa un límite global fijo, sino <b>cuotas basadas en la confianza (Vouch Score)</b> para proteger tu equipo:
+            El sistema no usa un límite global fijo, sino <b>cuotas basadas en la confianza</b> para proteger tu equipo:
         </Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 0.5 }}>
             <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1' }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Invitados</Typography>
+                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Desconocidos</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800 }}>50 MB</Typography>
             </Box>
             <Box sx={{ p: 1, borderRadius: 'sm', bgcolor: 'background.level1' }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Confiables</Typography>
+                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6 }}>Contactos</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800 }}>500 MB</Typography>
             </Box>
             <Box sx={{ gridColumn: 'span 2', p: 1, borderRadius: 'sm', bgcolor: 'primary.softBg' }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.main' }}>Amigos Íntimos (Score 80+)</Typography>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.main' }}>Contactos directos de mucha confianza</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 800, color: 'primary.main' }}>Hasta 2.5 GB por persona</Typography>
             </Box>
         </Box>

@@ -21,6 +21,7 @@ interface MessageItemActionsProps {
     onForward?: () => void;
     onDelete: () => void;
     onDownload?: () => void;
+    onSelect?: () => void;
 }
 
 export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
@@ -39,6 +40,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
     onForward,
     onDelete,
     onDownload,
+    onSelect,
 }) => {
     if (msg.isDeleted) {
         return null;
@@ -91,6 +93,7 @@ export const MessageItemActions: React.FC<MessageItemActionsProps> = ({
                 onForward={onForward}
                 onDelete={onDelete}
                 onDownload={onDownload}
+                onSelect={onSelect}
                 sx={{ position: 'static' }}
             />
         </Box>

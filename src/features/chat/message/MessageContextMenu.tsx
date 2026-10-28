@@ -8,7 +8,7 @@ import {
     Dropdown,
     MenuButton,
 } from '@mui/joy';
-import { Reply, ChevronDown, Download, Share2, Pin, Star, ThumbsDown, Trash2, Pencil } from 'lucide-react';
+import { Reply, ChevronDown, Download, Share2, Pin, Star, ThumbsDown, Trash2, Pencil, ListChecks } from 'lucide-react';
 import { useChatActionsStore } from '../../../store/useChatActionsStore.js';
 
 interface MessageContextMenuProps {
@@ -21,6 +21,7 @@ interface MessageContextMenuProps {
     onEdit?: () => void;
     onForward?: () => void;
     onDownload?: () => void;
+    onSelect?: () => void;
     sx?: React.CSSProperties;
 }
 
@@ -34,6 +35,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     onEdit,
     onForward,
     onDownload,
+    onSelect,
     sx,
 }) => {
     const msgPrefs = useChatActionsStore((state) => (msgId ? state.messagePrefs[msgId] : undefined));
@@ -103,6 +105,13 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                     <ListItemDecorator sx={{ color: 'inherit' }}><Share2 /></ListItemDecorator>
                     Reenviar
                 </MenuItem>
+
+                {onSelect && (
+                    <MenuItem onClick={() => setTimeout(() => onSelect(), 0)}>
+                        <ListItemDecorator sx={{ color: 'inherit' }}><ListChecks /></ListItemDecorator>
+                        Seleccionar
+                    </MenuItem>
+                )}
 
                 <ListDivider />
 

@@ -6,7 +6,7 @@ import type { ChatMessage, Contact, Group, PendingFile } from '../../types/chat.
 import { AppLock } from '../ui/AppLock.js';
 import { LoginScreen } from '../ui/LoginScreen.js';
 import { resetAccountStores } from '../../store/resetAccountStores.js';
-import { forwardMessageToTargets, type ForwardTarget } from '../../features/chat/message/forwardMessage.js';
+import { forwardMessagesToTargets, type ForwardTarget } from '../../features/chat/message/forwardMessage.js';
 import type { FileTransferController } from '../../hooks/useFileTransfer.js';
 import type { AppStore } from '../../store/useAppStore.js';
 import type { ChatStore } from '../../store/chatStoreTypes.js';
@@ -83,7 +83,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     isFilePickerOpen, isPreparingAttachments, setFilePickerOpen, pendingFiles, setPendingFiles, handleFileSubmit, handleSendVoiceNote,
     fileTransfer, editingMessage, setEditingMessage
 }) => {
-    const [forwardingMsg, setForwardingMsg] = useState<ChatMessage | null>(null);
+    const [forwardingMsgs, setForwardingMsgs] = useState<ChatMessage[]>([]);
     const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
     const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
     const [isInviteGroupMembersOpen, setIsInviteGroupMembersOpen] = useState(false);
@@ -133,8 +133,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     }
 
     const handleForward = async (targets: ForwardTarget[]) => {
-        if (!forwardingMsg) return;
-        await forwardMessageToTargets(forwardingMsg.message, targets);
+        if (forwardingMsgs.length === 0) return;
+        await forwardMessagesToTargets(forwardingMsgs.map((msg) => msg.message), targets);
         chatStore.refreshContacts();
         chatStore.refreshGroups();
     };
@@ -173,7 +173,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 handleUpdateMessage={handleUpdateMessage}
                 handleDeleteMessage={handleDeleteMessage}
                 handleMediaClick={handleMediaClick}
-                setForwardingMsg={setForwardingMsg}
+                setForwardingMsgs={setForwardingMsgs}
                 onLockSession={() => { setAuthenticated(false); navigation.goToChat(); }}
                 isFilePickerOpen={isFilePickerOpen}
                 isPreparingAttachments={isPreparingAttachments}
@@ -200,8 +200,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 activeGroup={activeGroup}
                 isInviteGroupMembersOpen={isInviteGroupMembersOpen}
                 setIsInviteGroupMembersOpen={setIsInviteGroupMembersOpen}
-                forwardingMsg={forwardingMsg}
-                setForwardingMsg={setForwardingMsg}
+                forwardingMsgs={forwardingMsgs}
+                setForwardingMsgs={setForwardingMsgs}
                 handleForward={handleForward}
                 handleReaction={handleReaction}
                 handleScrollToMessage={handleScrollToMessage}

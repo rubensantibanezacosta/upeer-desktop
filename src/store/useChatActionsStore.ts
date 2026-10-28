@@ -21,6 +21,7 @@ interface ChatActionsState {
     toggleContact: (id: string, key: keyof ChatActionPrefs) => void;
     toggleGroup: (id: string, key: keyof ChatActionPrefs) => void;
     toggleMessage: (id: string, key: keyof MessageActionPrefs) => void;
+    setMessageFlag: (id: string, key: keyof MessageActionPrefs, value: boolean) => void;
     clearChat: (id: string, kind: 'contact' | 'group') => void;
     markAllRead: () => void;
 }
@@ -50,6 +51,11 @@ export const useChatActionsStore = create<ChatActionsState>()(
             toggleContact: (id, key) => set((state) => ({ contactPrefs: toggle(state.contactPrefs, id, key) })),
             toggleGroup: (id, key) => set((state) => ({ groupPrefs: toggle(state.groupPrefs, id, key) })),
             toggleMessage: (id, key) => set((state) => ({ messagePrefs: toggleMessage(state.messagePrefs, id, key) })),
+            setMessageFlag: (id, key, value) => set((state) => {
+                const current = state.messagePrefs[id] || { ...emptyMessagePrefs };
+                if (current[key] === value) return state;
+                return { messagePrefs: { ...state.messagePrefs, [id]: { ...current, [key]: value } } };
+            }),
             clearChat: (id, kind) => set((state) => {
                 const prefs = kind === 'contact' ? state.contactPrefs : state.groupPrefs;
                 const next = { ...prefs };

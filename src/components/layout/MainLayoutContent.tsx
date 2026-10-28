@@ -59,7 +59,7 @@ interface MainLayoutContentProps {
     handleUpdateMessage: (id: string, msg: string, linkPreview?: LinkPreview | null) => void;
     handleDeleteMessage: (id: string) => void;
     handleMediaClick: (media: PreviewableMedia) => void;
-    setForwardingMsg: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
+    setForwardingMsgs: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
     onLockSession: () => void;
     isFilePickerOpen: boolean;
     isPreparingAttachments: boolean;
@@ -110,7 +110,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     handleUpdateMessage,
     handleDeleteMessage,
     handleMediaClick,
-    setForwardingMsg,
+    setForwardingMsgs,
     onLockSession,
     isFilePickerOpen,
     isPreparingAttachments,
@@ -313,7 +313,8 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                         setMessage(getEditableMessageText(msg.message));
                                                     }}
                                                     onDelete={handleDeleteMessage}
-                                                    onForward={(msg: ChatMessage) => setForwardingMsg(msg)}
+                                                    onForward={(msg: ChatMessage) => setForwardingMsgs([msg])}
+                                                    onForwardMany={(msgs: ChatMessage[]) => setForwardingMsgs(msgs)}
                                                     onRetryMessage={(msgId: string) => { void chatStore.handleRetryMessage(msgId); }}
                                                     onRetryTransfer={async (fileId: string) => { await fileTransfer.retryTransfer(fileId); }}
                                                     onCancelTransfer={(fileId: string) => fileTransfer.cancelTransfer(fileId, 'User cancelled')}
