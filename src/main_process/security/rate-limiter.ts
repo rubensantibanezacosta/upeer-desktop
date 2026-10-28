@@ -74,7 +74,8 @@ export class RateLimiter {
             'VAULT_ACK': { windowMs: 60000, maxTokens: 2000, refillRate: 2000 / 60 },
             'VAULT_RENEW': { windowMs: 60000, maxTokens: 600, refillRate: 600 / 60 },
 
-            // Reputation gossip
+            // Reputación y plazos de conservación
+            'RETENTION_SET': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
             'REPUTATION_GOSSIP': { windowMs: 60000, maxTokens: 5, refillRate: 5 / 60 },
             'REPUTATION_REQUEST': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },
             'REPUTATION_DELIVER': { windowMs: 60000, maxTokens: 10, refillRate: 10 / 60 },

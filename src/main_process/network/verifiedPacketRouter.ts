@@ -5,6 +5,7 @@ import { fileTransferManager } from './file-transfer/transfer-manager.js';
 import { handleChatAck, handleChatClear, handleChatContact, handleChatDelete, handleChatEdit, handleChatMessage, handleChatReaction } from './handlers/chat.js';
 import { handleGroupAck, handleGroupInvite, handleGroupLeave, handleGroupMessage, handleGroupUpdate } from './handlers/groups.js';
 import { handleReputationDeliver, handleReputationGossip, handleReputationRequest } from './handlers/reputation.js';
+import { handleRetentionSet } from './handlers/retention.js';
 import { handleSyncPulse } from './handlers/sync.js';
 import { handleCallPacket } from './call/callPacketHandler.js';
 import { handleVaultDelivery } from './handlers/vault.js';
@@ -443,6 +444,10 @@ function toSyncPulsePayload(data: VerifiedPacketData): SyncPulsePayload {
     };
 }
 
+function toRetentionSetPayload(data: VerifiedPacketData): { retention?: unknown } {
+    return { retention: data.retention };
+}
+
 function toReputationGossipPayload(data: VerifiedPacketData): ReputationGossipPayload {
     return { ids: data.ids };
 }
@@ -603,6 +608,9 @@ export async function routeVerifiedPacket(args: VerifiedPacketArgs): Promise<voi
             break;
         case 'SYNC_PULSE':
             await handleSyncPulse(upeerId, toSyncPulsePayload(data), win);
+            break;
+        case 'RETENTION_SET':
+            handleRetentionSet(upeerId, toRetentionSetPayload(data));
             break;
         case 'REPUTATION_GOSSIP':
             handleReputationGossip(upeerId, toReputationGossipPayload(data), sendResponse, rinfo);

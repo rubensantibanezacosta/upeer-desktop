@@ -2,6 +2,9 @@ import {
     isValidHexId,
     type ValidationResult,
 } from './validationShared.js';
+import { RETENTION_PRESETS } from '../../utils/retention.js';
+
+const RETENTION_IDS = new Set<string>(RETENTION_PRESETS.map((preset) => preset.id));
 
 type VaultStorePayload = {
     payloadHash?: unknown;
@@ -312,5 +315,15 @@ export function validateReputationDeliver(data: ReputationDeliverPayload): Valid
             return { valid: false, error: 'signature inválida' };
         }
     }
+    return { valid: true };
+}
+
+type RetentionSetPayload = {
+    retention?: unknown;
+};
+
+export function validateRetentionSet(data: RetentionSetPayload): ValidationResult {
+    if (typeof data.retention !== 'string') return { valid: false, error: 'retention debe ser texto' };
+    if (!RETENTION_IDS.has(data.retention)) return { valid: false, error: 'Plazo desconocido' };
     return { valid: true };
 }

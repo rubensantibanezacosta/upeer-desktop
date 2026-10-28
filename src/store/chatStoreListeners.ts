@@ -2,6 +2,7 @@ import { useNavigationStore } from './useNavigationStore.js';
 import { useNotificationStore } from './useNotificationStore.js';
 import { useChatActionsStore } from './useChatActionsStore.js';
 import { usePrivacyStore } from './usePrivacyStore.js';
+import { useChatRetentionStore } from './chatRetentionStore.js';
 import { playNotificationSound } from '../utils/notificationSound.js';
 import type { ChatGet, ChatSet } from './chatStoreTypes.js';
 import { applyReactionUpdate, formatMessageTimestamp, insertMessageChronologically } from './chatStoreSupport.js';
@@ -282,6 +283,10 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
 
         window.upeer.onReputationUpdated?.(() => {
             get().refreshContacts();
+        });
+
+        window.upeer.onRetentionUpdated?.(() => {
+            void useChatRetentionStore.getState().hydrate();
         });
     },
 });

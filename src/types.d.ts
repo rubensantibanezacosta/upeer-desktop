@@ -166,6 +166,7 @@ declare global {
             onTyping: (callback: (data: { upeerId: string, groupId?: string, state?: import('./types/chat.js').ConversationActivitySignal }) => void) => UpeerUnsubscribe;
             onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => UpeerUnsubscribe;
             onReputationUpdated: (callback: () => void) => UpeerUnsubscribe;
+            onRetentionUpdated: (callback: (data: { chatId: string; retention: string }) => void) => UpeerUnsubscribe;
             // File transfer API (Phase 16)
             openFileDialog: (options?: { title?: string; filters?: Array<{ name: string; extensions: string[] }>; defaultPath?: string; multiSelect?: boolean }) => Promise<{
                 success: boolean;

@@ -13,6 +13,7 @@ import {
     validateReputationGossip,
     validateReputationRequest,
     validateReputationDeliver,
+    validateRetentionSet,
 } from '../../../src/main_process/security/validationVaultGroups.js';
 
 const id64 = 'a'.repeat(64);
@@ -195,6 +196,20 @@ describe('validationVaultGroups (grupos y reputación)', () => {
             expect(validateReputationDeliver({ vouches: [{ ...vouch, type: '' }] }).valid).toBe(false);
             expect(validateReputationDeliver({ vouches: [{ ...vouch, timestamp: 'x' }] }).valid).toBe(false);
             expect(validateReputationDeliver({ vouches: [{ ...vouch, signature: 'short' }] }).valid).toBe(false);
+        });
+    });
+
+    describe('validateRetentionSet', () => {
+        it('acepta los plazos conocidos', () => {
+            for (const retention of ['off', '24h', '7d', '90d']) {
+                expect(validateRetentionSet({ retention }).valid).toBe(true);
+            }
+        });
+
+        it('rechaza plazos desconocidos y valores que no son texto', () => {
+            expect(validateRetentionSet({ retention: '1h' }).valid).toBe(false);
+            expect(validateRetentionSet({ retention: 24 }).valid).toBe(false);
+            expect(validateRetentionSet({}).valid).toBe(false);
         });
     });
 });

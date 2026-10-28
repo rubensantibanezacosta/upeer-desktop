@@ -295,6 +295,7 @@ const eventApi = {
     onHandshakeFinished: (callback: (data: HandshakeFinishedPayload) => void) => subscribe<[HandshakeFinishedPayload]>('contact-handshake-finished', callback),
     onContactUntrustworthy: (callback: (data: ContactUntrustworthyPayload) => void) => subscribe<[ContactUntrustworthyPayload]>('contact-untrustworthy', callback),
     onReputationUpdated: (callback: () => void) => subscribe('reputation-updated', () => callback()),
+    onRetentionUpdated: (callback: (data: { chatId: string; retention: string }) => void) => subscribe<[{ chatId: string; retention: string }]>('retention-updated', (data) => callback(data)),
     onKeyChangeAlert: (callback: (data: { upeerId: string; oldFingerprint: string; newFingerprint: string; alias: string }) => void) => subscribe<[{ upeerId: string; oldFingerprint: string; newFingerprint: string; alias: string }]>('key-change-alert', (data) => callback(data)),
     onMessageDelivered: (callback: (data: { id: string; upeerId: string }) => void) => subscribe<[{ id: string; upeerId: string }]>('message-delivered', (data) => callback(data)),
     onMessageRead: (callback: (data: { id: string; upeerId: string }) => void) => subscribe<[{ id: string; upeerId: string }]>('message-read', (data) => callback(data)),
