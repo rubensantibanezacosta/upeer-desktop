@@ -1,0 +1,7 @@
+{
+  "generatedBy": "upper/transport-bridge",
+  "senderKey": "3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4",
+  "plaintext": "Hola grupo, esto viaja con la clave del emisor",
+  "nonce": "3ac1a0eb4d39929c1264b79fa86526f95101ba6f6ccc0721",
+  "ciphertext": "c56f27e5d076234b440af2c1dd8c213692cea24fc11ea54b2bafc9f8b2a55a4f4660f185b69c8ef9038790174f64f2d8efff87bab3ecb3c0bf2828dc68b1"
+}
