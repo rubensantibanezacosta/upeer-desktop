@@ -5,13 +5,32 @@ import type { ConversationActivity } from '../../../types/chat.js';
 import { BUBBLE_RADIUS } from './bubbleShape.js';
 
 interface TypingIndicatorProps {
-    activity: ConversationActivity;
+    activity: ConversationActivity | null;
 }
 
 const DOT_DELAYS = ['0ms', '160ms', '320ms'];
+const ACTIVITY_SLOT_HEIGHT = 48;
 
 export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ activity }) => {
-    const isRecording = activity === 'recording';
+    const visible = activity === 'typing' || activity === 'recording';
+
+    return (
+        <Box
+            sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'flex-start',
+                width: '100%',
+                height: ACTIVITY_SLOT_HEIGHT,
+                flexShrink: 0,
+            }}
+        >
+            {visible ? <ActivityBubble recording={activity === 'recording'} /> : null}
+        </Box>
+    );
+};
+
+const ActivityBubble: React.FC<{ recording: boolean }> = ({ recording: isRecording }) => {
     const label = isRecording ? 'Grabando nota de voz' : 'Escribiendo';
 
     return (
@@ -26,7 +45,6 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ activity }) =>
                 display: 'flex',
                 justifyContent: 'flex-start',
                 width: '100%',
-                mb: 1,
                 transformOrigin: 'left bottom',
             }}
         >

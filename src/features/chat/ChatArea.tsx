@@ -158,13 +158,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, chatId, myIp: _
                 pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
                 boxSizing: 'border-box'
             }}>
-                {peerActivity ? (
-                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                        <TypingIndicator activity={peerActivity} />
-                    </Box>
-                ) : (
-                    <EmptyChat loading={loading} />
-                )}
+                <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                    {peerActivity ? null : <EmptyChat loading={loading} />}
+                    <TypingIndicator activity={peerActivity} />
+                </Box>
             </Box>
         );
     }
@@ -204,7 +201,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, chatId, myIp: _
                     chatStyleSx(chatStyleId),
                 ]}
             >
-            {peerActivity && <TypingIndicator activity={peerActivity} />}
+            <TypingIndicator activity={peerActivity} />
             {reversedHistory.map((msg, index) => {
                 const nextMsg = reversedHistory[index + 1];
                 const prevMsg = index > 0 ? reversedHistory[index - 1] : undefined;
