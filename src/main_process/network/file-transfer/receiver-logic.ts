@@ -1,6 +1,7 @@
 import type { FileHandle } from 'node:fs/promises';
-import { warn, error, debug } from '../../security/secure-logger.js';
+import { warn, error, debug, security } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
+import { getGroupById } from '../../storage/groups/operations.js';
 import { sign } from '../../security/identity.js';
 import { canonicalStringify } from '../utils.js';
 import { TransferPhase } from './types.js';
@@ -110,6 +111,18 @@ export async function handleFileProposal(this: TransferManager, upeerId: string,
         })) {
             warn('Invalid signature on file proposal', { upeerId, fileId: data.fileId }, 'file-transfer');
             return;
+        }
+
+        if (typeof data.chatUpeerId === 'string' && data.chatUpeerId.startsWith('grp-')) {
+            const group = getGroupById(data.chatUpeerId);
+            if (!group || group.status !== 'active' || !group.members.includes(upeerId)) {
+                security('File proposal filed into a group where the sender is not a member', {
+                    upeerId,
+                    fileId: data.fileId,
+                    groupId: data.chatUpeerId,
+                }, 'security');
+                return;
+            }
         }
 
         if (data.encryptedKey || data.deviceEncryptedKey) {

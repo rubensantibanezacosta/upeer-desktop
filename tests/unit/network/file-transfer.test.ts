@@ -41,6 +41,18 @@ vi.mock('../../../src/main_process/storage/shared.js', () => ({
     getDb: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
+    getGroupById: vi.fn((groupId: string) => (groupId === 'grp-123'
+        ? {
+            groupId: 'grp-123',
+            name: 'Equipo',
+            adminUpeerId: 'peer1',
+            members: ['peer1', 'my-peer-id'],
+            status: 'active',
+        }
+        : null)),
+}));
+
 vi.mock('../../../src/main_process/network/file-transfer/db-helper.js', () => ({
     saveTransferToDB: vi.fn(async () => { }),
     updateTransferMessageStatus: vi.fn(async () => true),
@@ -309,6 +321,59 @@ describe('TransferManager - Integration', () => {
                 message: expect.stringContaining('"isVoiceNote":true')
             })
         );
+    });
+
+    it('rechaza un adjunto dirigido a un grupo del que el emisor no es miembro', async () => {
+        const fileId = '550e8400-e29b-41d4-a716-446655440099';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'intruso.txt',
+            fileSize: 50,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'c'.repeat(64),
+            chatUpeerId: 'grp-ajeno',
+            signature: 'sig'
+        };
+
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        expect(manager.getTransfer(fileId, 'receiving')).toBeUndefined();
+        expect(mockSend).not.toHaveBeenCalledWith('addr1', expect.objectContaining({ type: 'FILE_ACCEPT' }), 'pubkey');
+    });
+
+    it('rechaza un adjunto dirigido a un grupo eliminado', async () => {
+        const { getGroupById } = await import('../../../src/main_process/storage/groups/operations.js');
+        vi.mocked(getGroupById).mockImplementationOnce(() => ({
+            groupId: 'grp-123',
+            name: 'Equipo',
+            adminUpeerId: 'peer1',
+            members: ['peer1', 'my-peer-id'],
+            status: 'removed',
+        }) as ReturnType<typeof getGroupById>);
+        const fileId = '550e8400-e29b-41d4-a716-4466554400aa';
+        const proposal = {
+            type: 'FILE_PROPOSAL',
+            fileId,
+            fileName: 'viejo.txt',
+            fileSize: 50,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'b'.repeat(64),
+            chatUpeerId: 'grp-123',
+            signature: 'sig'
+        };
+
+        vi.spyOn(manager.validator, 'validateIncomingFile').mockImplementation(() => undefined);
+
+        await manager.handleFileProposal('peer1', 'addr1', proposal);
+
+        expect(manager.getTransfer(fileId, 'receiving')).toBeUndefined();
     });
 
     it('should include group chat context in outgoing FILE_PROPOSAL', async () => {
