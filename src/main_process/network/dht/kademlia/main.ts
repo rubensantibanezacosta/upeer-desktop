@@ -5,6 +5,7 @@ import { BootstrapManager } from './bootstrap.js';
 import { ProtocolHandler } from './protocol.js';
 import { BOOTSTRAP_RETRY_MS } from './types.js';
 import { network, info, debug, warn } from '../../../security/secure-logger.js';
+import { noteLocationStoreTargets } from '../../locationStatus.js';
 
 // Main Kademlia DHT implementation
 export class KademliaDHT {
@@ -110,9 +111,10 @@ export class KademliaDHT {
     }
 
     // Store a value in the DHT
-    async storeValue(key: Buffer, value: unknown, publisher: string, signature?: string): Promise<void> {
-        await this.protocolHandler.storeValue(key, value, publisher, signature);
+    async storeValue(key: Buffer, value: unknown, publisher: string, signature?: string): Promise<number> {
+        const sent = await this.protocolHandler.storeValue(key, value, publisher, signature);
         this.stats.storeOperations++;
+        return sent;
     }
 
 
@@ -130,12 +132,13 @@ export class KademliaDHT {
             ? (locationBlock as { signature?: string }).signature
             : undefined;
 
-        await this.storeValue(
+        const sent = await this.storeValue(
             key,
             locationBlock,
             upeerId,
             signature
         );
+        if (upeerId === this.upeerId) noteLocationStoreTargets(sent);
         network('Stored location block in DHT', undefined, { upeerId }, 'kademlia');
     }
 

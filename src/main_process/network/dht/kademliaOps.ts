@@ -5,6 +5,7 @@ import { getMyUPeerId } from '../../security/identity.js';
 import { verifyRenewalToken } from '../utils.js';
 import { network, security, error } from '../../security/secure-logger.js';
 import { pendingQueries } from './pendingQueries.js';
+import { noteLocationError, noteLocationPublished, RENEWAL_THRESHOLD_MS } from '../locationStatus.js';
 import type { StoredValue, KademliaContact } from './kademlia/types.js';
 import type { KademliaContactInfo, LocationBlock } from '../types.js';
 
@@ -52,7 +53,13 @@ export async function publishLocationBlock(locationBlock: LocationBlock, getKade
     const kademlia = getKademliaInstance();
     if (!kademlia) return;
 
-    await kademlia.storeLocationBlock(kademlia.upeerId || getMyUPeerId(), locationBlock);
+    try {
+        await kademlia.storeLocationBlock(kademlia.upeerId || getMyUPeerId(), locationBlock);
+    } catch (err) {
+        noteLocationError('network', err);
+        throw err;
+    }
+    noteLocationPublished(locationBlock.dhtSeq, locationBlock.expiresAt ?? null);
     network('Published location block to Kademlia', undefined, {
         dhtSeq: locationBlock.dhtSeq,
         hasRenewalToken: !!locationBlock.renewalToken,
@@ -67,7 +74,7 @@ export async function performAutoRenewal(getKademliaInstance: () => RenewalKadem
     const allValues = getStoredValuesFromKademlia(kademlia);
     if (allValues.length === 0) return;
     const now = Date.now();
-    const renewalThreshold = 3 * 24 * 60 * 60 * 1000;
+    const renewalThreshold = RENEWAL_THRESHOLD_MS;
 
     for (const storedValue of allValues) {
         if (!isRenewableLocationBlock(storedValue.value)) continue;
@@ -85,6 +92,7 @@ export async function performAutoRenewal(getKademliaInstance: () => RenewalKadem
         if (!publisherContact?.publicKey) continue;
         if (!verifyRenewalToken(token, publisherContact.publicKey)) {
             security('Auto-renewal rejected: invalid renewal token signature', { publisher: storedValue.publisher }, 'dht');
+            noteLocationError('certificate', 'Token de renovación con firma no válida');
             continue;
         }
 

@@ -4,6 +4,7 @@ import { Globe, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { CopyableField } from './shared.js';
 import { CardGroupLabel, SettingsCard, SettingsSection } from './sectionShell.js';
 import { NetworkMap } from './NetworkMap.js';
+import { LocationStatusCard } from './LocationStatusCard.js';
 import type { Identity } from './types.js';
 import {
     LATENCY_MAX,
@@ -195,6 +196,8 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                     </Box>
                 </SettingsCard>
             )}
+
+            {isUp && <LocationStatusCard />}
 
             <SettingsCard>
                 <Box

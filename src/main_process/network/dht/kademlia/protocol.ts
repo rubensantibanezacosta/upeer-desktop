@@ -6,6 +6,7 @@ import { toKademliaId } from './types.js';
 import { warn, network } from '../../../security/secure-logger.js';
 import { randomBytes } from 'node:crypto';
 import { pendingQueries } from '../handlers.js';
+import { noteLocationStoreAck } from '../../locationStatus.js';
 
 type DhtPing = { type: 'DHT_PING'; queryId?: string };
 type DhtPong = { type: 'DHT_PONG'; nodeId: string; queryId?: string };
@@ -59,6 +60,8 @@ export class ProtocolHandler {
             case 'DHT_STORE':
                 return this.handleStore(senderUpeerId, data);
             case 'DHT_STORE_ACK':
+                this.noteStoreAck(data);
+                return null;
             case 'DHT_PONG':
                 return null;
             default:
@@ -143,10 +146,17 @@ export class ProtocolHandler {
         return { type: 'DHT_STORE_ACK', key: data.key, queryId: data.queryId };
     }
 
-    async storeValue(key: Buffer, value: unknown, publisher: string, signature?: string): Promise<void> {
+    private noteStoreAck(data: DhtStoreAck): void {
+        const ownKey = toKademliaId(this.upeerId).toString('hex');
+        if (data.key !== ownKey) return;
+        noteLocationStoreAck();
+    }
+
+    async storeValue(key: Buffer, value: unknown, publisher: string, signature?: string): Promise<number> {
         this.valueStore.set(key, value, publisher, signature);
 
         const closestContacts = this.routingTable.findClosestContacts(key.toString('hex'), K);
+        let sent = 0;
 
         for (const contact of closestContacts) {
             if (contact.upeerId === this.upeerId) continue;
@@ -161,10 +171,13 @@ export class ProtocolHandler {
                     signature
                 });
                 this.stats.messagesSent++;
+                sent++;
             } catch (error) {
                 warn('Failed to store value on contact', { contactId: contact.upeerId, error }, 'kademlia');
             }
         }
+
+        return sent;
     }
 
     async findValue(key: Buffer): Promise<StoredValue | null> {

@@ -3,6 +3,7 @@ import { verifyDeviceCertificate } from '../security/deviceIdentity.js';
 import { findAccountRegistry, verifyDeviceAdmission, type AccountRegistry } from './accountRegistry.js';
 import { getKademliaInstance } from './dht/shared.js';
 import { verifyLocationBlockWithDHT } from './locationBlocks.js';
+import { noteLocationError } from './locationStatus.js';
 import type { LocationBlock } from './types.js';
 
 const ACCOUNT_HEX = /^[0-9a-f]{64}$/i;
@@ -192,6 +193,7 @@ function allowGap(
 
 function deny(account: string, reason: string): never {
     decisions.delete(account);
+    noteLocationError('admission', reason);
     throw new ContactAdmissionError(reason);
 }
 

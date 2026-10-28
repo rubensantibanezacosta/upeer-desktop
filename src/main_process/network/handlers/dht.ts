@@ -7,6 +7,7 @@ import { upsertDevice } from '../../storage/devices-operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { verifyLocationBlock } from '../utils.js';
 import { network, security } from '../../security/secure-logger.js';
+import { noteDhtUpdateAccepted } from '../locationStatus.js';
 import type { DeviceMetadata, LocationBlock, RenewalToken } from '../types.js';
 
 type ContactRecord = {
@@ -75,6 +76,7 @@ export async function handleDhtUpdate(upeerId: string, contact: ContactRecord, d
 
     if (block.dhtSeq > (contact.dhtSeq || 0)) {
         network('Updating location', undefined, { upeerId, address: block.address, dhtSeq: block.dhtSeq }, 'dht');
+        noteDhtUpdateAccepted();
         // Multi-device persistence: save device info from block if available
         if (block.deviceId && block.deviceMeta) {
             upsertDevice(upeerId, block.deviceId, block.deviceMeta).catch(() => {

@@ -256,6 +256,7 @@ const callApi = {
 const networkApi = {
     fetchOgPreview: (url: string) => ipcRenderer.invoke('fetch-og-preview', { url }),
     getNetworkStats: () => ipcRenderer.invoke('get-network-stats'),
+    getLocationStatus: () => ipcRenderer.invoke('get-location-status'),
     getSyncStatus: () => ipcRenderer.invoke('get-sync-status'),
     restartYggstack: () => ipcRenderer.invoke('restart-yggstack'),
 };

@@ -11,6 +11,7 @@ import {
   getPeerPool,
   getSelfGeo
 } from '../../sidecars/peer-manager.js';
+import { getLocationStatusSnapshot } from '../../network/locationStatus.js';
 
 /**
  * Registra los manejadores IPC relacionados con red y yggstack
@@ -59,6 +60,8 @@ export function registerNetworkHandlers(): void {
 
   // Permite al usuario forzar un reinicio de yggstack desde la UI
   ipcMain.handle('restart-yggstack', async () => { await forceRestart(); });
+
+  ipcMain.handle('get-location-status', () => getLocationStatusSnapshot());
 
   ipcMain.handle('fetch-og-preview', async (_event, { url }) => {
     try {

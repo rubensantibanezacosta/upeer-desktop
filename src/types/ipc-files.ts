@@ -130,3 +130,14 @@ export interface OpenFileResponse {
     success: boolean;
     error?: string;
 }
+
+export interface GetLocationStatusResponse {
+    publishedAt: number | null;
+    lastSeq: number | null;
+    expiresAt: number | null;
+    nextRenewalAt: number | null;
+    storeTargets: number;
+    storeAcks: number;
+    lastDhtUpdateAt: number | null;
+    errors: Record<'certificate' | 'admission' | 'network', { at: number; message: string } | null>;
+}

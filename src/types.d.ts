@@ -235,6 +235,17 @@ declare global {
             }>;
             /** Fuerza un reinicio de yggstack desde la UI */
             restartYggstack: () => Promise<void>;
+            /** Estado de publicación de la ubicación propia en el DHT (observabilidad B7) */
+            getLocationStatus: () => Promise<{
+                publishedAt: number | null;
+                lastSeq: number | null;
+                expiresAt: number | null;
+                nextRenewalAt: number | null;
+                storeTargets: number;
+                storeAcks: number;
+                lastDhtUpdateAt: number | null;
+                errors: Record<'certificate' | 'admission' | 'network', { at: number; message: string } | null>;
+            }>;
             /** Callback cuando yggstack reporta su dirección IPv6 Yggdrasil asignada */
             onYggstackAddress: (callback: (address: string) => void) => UpeerUnsubscribe;
             /** Callback para cambios de estado de la red: 'connecting'|'up'|'down'|'reconnecting' */
