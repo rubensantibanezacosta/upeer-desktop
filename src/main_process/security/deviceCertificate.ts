@@ -73,6 +73,21 @@ export function parseCertificate(value: unknown): AccountDeviceCertificate | nul
     };
 }
 
+export function normalizeCapabilities(values: readonly string[]): string[] {
+    const seen = new Set<string>();
+    for (const value of values) {
+        const capability = value.trim().toLowerCase();
+        if (capability.length > 0) seen.add(capability);
+    }
+    return [...seen].sort();
+}
+
+export function sameCapabilities(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
+    const a = normalizeCapabilities(left ?? []);
+    const b = normalizeCapabilities(right ?? []);
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 export function certificatePayload(certificate: AccountDeviceCertificate): Record<string, unknown> {
     const payload: Record<string, unknown> = {
         version: certificate.version,

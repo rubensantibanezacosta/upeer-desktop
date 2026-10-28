@@ -4,7 +4,7 @@ import { getKademliaInstance } from './dht/shared.js';
 import { identityState } from '../security/identityState.js';
 import { getUPeerIdFromPublicKey, verify } from '../security/identityCrypto.js';
 import { debug, warn } from '../security/secure-logger.js';
-import { deriveDeviceId, type AccountDeviceCertificate } from '../security/deviceCertificate.js';
+import { deriveDeviceId, sameCapabilities, type AccountDeviceCertificate } from '../security/deviceCertificate.js';
 import {
     getDeviceIdentity,
     verifyDeviceCertificate,
@@ -199,7 +199,7 @@ export function verifyDeviceAdmission(
     if (device.devicePublicKey !== certificate.devicePublicKey) return false;
     if ((device.staticX25519PublicKey ?? '') !== (certificate.staticX25519PublicKey ?? '')) return false;
     if ((device.platform ?? '') !== (certificate.platform ?? '')) return false;
-    if (JSON.stringify(device.capabilities ?? []) !== JSON.stringify(certificate.capabilities ?? [])) return false;
+    if (!sameCapabilities(device.capabilities, certificate.capabilities)) return false;
     return device.authorizedAt === certificate.issuedAt &&
         device.expiresAt === certificate.expiresAt &&
         device.epoch === certificate.epoch;

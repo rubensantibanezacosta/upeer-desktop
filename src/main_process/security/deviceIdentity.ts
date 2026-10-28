@@ -15,6 +15,7 @@ import {
     identityPeriod,
     isHex,
     normalizeAddresses,
+    normalizeCapabilities,
     parseCertificate,
     type AccountDeviceCertificate,
 } from './deviceCertificate.js';
@@ -151,7 +152,7 @@ function buildIdentity(secretKey: Buffer, publicKey: Buffer, now: number, minimu
         deviceId,
         devicePublicKey,
         platform: process.platform,
-        capabilities: ['dht', 'location'],
+        capabilities: normalizeCapabilities(['dht', 'location']),
         issuedAt,
         expiresAt: issuedAt + 7 * 24 * 60 * 60 * 1000,
         epoch,

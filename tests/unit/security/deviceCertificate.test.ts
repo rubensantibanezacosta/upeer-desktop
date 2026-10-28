@@ -101,6 +101,32 @@ describe('device certificates and account registries', () => {
         expect(verifyDeviceAdmission({ ...certificate(), epoch: 5 }, registry(), now)).toBe(false);
     });
 
+    it('treats capabilities as a set when admitting a device', () => {
+        const parsedRegistry = verifyAccountRegistry(registry(), account, now);
+        if (!parsedRegistry) throw new Error('registry was rejected');
+
+        expect(verifyDeviceAdmission(
+            { ...certificate(), capabilities: ['location', 'dht'] },
+            parsedRegistry,
+            now,
+        )).toBe(true);
+        expect(verifyDeviceAdmission(
+            { ...certificate(), capabilities: ['DHT', ' location ', 'dht'] },
+            parsedRegistry,
+            now,
+        )).toBe(true);
+        expect(verifyDeviceAdmission(
+            { ...certificate(), capabilities: ['dht'] },
+            parsedRegistry,
+            now,
+        )).toBe(false);
+        expect(verifyDeviceAdmission(
+            { ...certificate(), capabilities: ['dht', 'location', 'vault'] },
+            parsedRegistry,
+            now,
+        )).toBe(false);
+    });
+
     it('normalizes and sorts location addresses', () => {
         expect(normalizeAddresses({
             address: '200::2',

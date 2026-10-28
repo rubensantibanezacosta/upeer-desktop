@@ -91,6 +91,13 @@ describe('identidad raíz con clave de dispositivo propia', () => {
         expect(stored?.secretKey).not.toBe(rootSecret.toString('hex'));
     });
 
+    it('emite el certificado con capacidades canónicas', () => {
+        const capabilities = getDeviceIdentity()?.certificate.capabilities;
+
+        expect(capabilities).toEqual(['dht', 'location']);
+        expect(capabilities).toEqual([...capabilities as string[]].sort());
+    });
+
     it('reutiliza la misma clave de dispositivo tras reiniciar', () => {
         const first = getDeviceIdentity();
         resetDeviceIdentityCache();
