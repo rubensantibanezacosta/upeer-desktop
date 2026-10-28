@@ -1,28 +1,30 @@
 import React from 'react';
-import { File, Image, FileVideo, FileAudio, FileText, Paperclip } from 'lucide-react';
+import { File, Image, FileVideo, FileAudio, FileText, Paperclip, type LucideIcon } from 'lucide-react';
 
-export const getFileIcon = (mimeType: string, fileName = '') => {
+export const LIST_PREVIEW_ICON_SIZE = 14;
+
+const pickFileIcon = (mimeType: string, fileName: string): LucideIcon => {
     const type = mimeType.toLowerCase();
     const name = fileName.toLowerCase();
 
     if (type.startsWith('image/')) {
-        return <Image />;
+        return Image;
     }
     if (type.startsWith('video/')) {
-        return <FileVideo />;
+        return FileVideo;
     }
     if (type.startsWith('audio/')) {
-        return <FileAudio />;
+        return FileAudio;
     }
 
     if (/\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) {
-        return <Image />;
+        return Image;
     }
     if (/\.(mp4|mov|avi|mkv|webm)$/.test(name)) {
-        return <FileVideo />;
+        return FileVideo;
     }
     if (/\.(mp3|wav|ogg|flac|m4a)$/.test(name)) {
-        return <FileAudio />;
+        return FileAudio;
     }
 
     if (
@@ -32,12 +34,16 @@ export const getFileIcon = (mimeType: string, fileName = '') => {
         type.includes('presentation') ||
         /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf)$/.test(name)
     ) {
-        return <FileText />;
+        return FileText;
     }
     if (type.includes('zip') || type.includes('rar') || type.includes('compressed') || /\.(zip|rar|7z|tar|gz)$/.test(name)) {
-        return <Paperclip />;
+        return Paperclip;
     }
 
-    return <File />;
+    return File;
 };
 
+export const getFileIcon = (mimeType: string, fileName = '', size = 24) => {
+    const Icon = pickFileIcon(mimeType, fileName);
+    return <Icon style={{ fontSize: size }} />;
+};

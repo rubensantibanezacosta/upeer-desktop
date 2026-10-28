@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/joy';
 import { Hourglass, Bell, Check, CheckCheck, CircleAlert, Mic } from 'lucide-react';
-import { getFileIcon } from '../../utils/fileIcons.js';
+import { getFileIcon, LIST_PREVIEW_ICON_SIZE } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
@@ -56,7 +56,7 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
             if (parsed.isVoiceNote) {
                 return (
                     <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                        <Mic style={{ fontSize: 16, opacity: 0.8 }} />
+                        <Mic style={{ fontSize: LIST_PREVIEW_ICON_SIZE, opacity: 0.8 }} />
                         <span>Nota de voz</span>
                     </Box>
                 );
@@ -64,7 +64,7 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
             return (
                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                     <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
-                        {getFileIcon(parsed.mimeType || '', parsed.fileName || '')}
+                        {getFileIcon(parsed.mimeType || '', parsed.fileName || '', LIST_PREVIEW_ICON_SIZE)}
                     </Box>
                     <span>{parsed.fileName}</span>
                 </Box>
@@ -81,7 +81,7 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
             return (
                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                     <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
-                        {getFileIcon(parts[4] || '', parts[2] || '')}
+                        {getFileIcon(parts[4] || '', parts[2] || '', LIST_PREVIEW_ICON_SIZE)}
                     </Box>
                     <span>{parts[2]}</span>
                 </Box>

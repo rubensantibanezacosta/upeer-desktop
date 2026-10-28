@@ -10,7 +10,7 @@ import { getUPeerIdFromPublicKey } from '../../../src/main_process/security/iden
 
 const ACCOUNT_SEED = 5;
 const DEVICE_SEED = 9;
-const NOW = Date.UTC(2026, 9, 27, 12, 0, 0);
+const NOW = Date.now();
 const ADDRESS = '200::a1';
 
 type KeyPair = { publicKey: string; secretKey: Buffer };

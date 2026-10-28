@@ -2,7 +2,7 @@ import React from 'react';
 import { Avatar, Box } from '@mui/joy';
 import { Check, CheckCheck, CircleAlert, Users, Mic } from 'lucide-react';
 import { Group } from '../../types/chat.js';
-import { getFileIcon } from '../../utils/fileIcons.js';
+import { getFileIcon, LIST_PREVIEW_ICON_SIZE } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
@@ -49,7 +49,7 @@ export const GroupItemStatusIcon: React.FC<{ group: Group }> = ({ group }) => {
 const renderGroupFilePreview = (fileName: string, mimeType: string) => (
     <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
         <Box component="span" sx={{ display: 'flex', opacity: 0.8 }}>
-            {getFileIcon(mimeType, fileName)}
+            {getFileIcon(mimeType, fileName, LIST_PREVIEW_ICON_SIZE)}
         </Box>
         <span>{fileName}</span>
     </Box>
@@ -70,7 +70,7 @@ export const renderGroupLastMessage = (group: Group, highlight: string) => {
                 if (parsed.isVoiceNote) {
                     return (
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                            <Mic style={{ fontSize: 16, opacity: 0.8 }} />
+                            <Mic style={{ fontSize: LIST_PREVIEW_ICON_SIZE, opacity: 0.8 }} />
                             <span>Nota de voz</span>
                         </Box>
                     );

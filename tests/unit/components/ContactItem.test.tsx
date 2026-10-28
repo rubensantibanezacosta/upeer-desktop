@@ -89,4 +89,24 @@ describe('ContactItem Component', () => {
         expect(screen.queryByText('En línea')).toBeNull();
         expect(screen.getByText('Desconectado')).toBeDefined();
     });
+
+    it('pinta el icono del tipo de adjunto al tamaño de la fila', () => {
+        const fileMessage = JSON.stringify({ type: 'file', fileName: 'informe.pdf', mimeType: 'application/pdf' });
+        const { container } = render(<ContactItem {...defaultProps} contact={{ ...mockContact, lastMessage: fileMessage }} />);
+        const icon = container.querySelector('svg.lucide');
+
+        expect(screen.getByText('informe.pdf')).toBeDefined();
+        expect(icon).not.toBeNull();
+        expect((icon as SVGElement).style.fontSize).toBe('14px');
+    });
+
+    it('pinta el icono de nota de voz al tamaño de la fila', () => {
+        const voiceMessage = JSON.stringify({ type: 'file', fileName: 'nota.m4a', mimeType: 'audio/mp4', isVoiceNote: true });
+        const { container } = render(<ContactItem {...defaultProps} contact={{ ...mockContact, lastMessage: voiceMessage }} />);
+        const icon = container.querySelector('svg.lucide');
+
+        expect(screen.getByText('Nota de voz')).toBeDefined();
+        expect(icon).not.toBeNull();
+        expect((icon as SVGElement).style.fontSize).toBe('14px');
+    });
 });
