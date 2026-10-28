@@ -19,7 +19,13 @@ export const useAppearanceStore = create<AppearanceState>()(
             setTheme: (v) => set({ theme: v }),
             setFontSize: (v) => set({ fontSize: v }),
         }),
-        { name: 'appearance-settings' }
+        {
+            name: 'appearance-settings',
+            migrate: (persisted) => {
+                const state = (persisted ?? {}) as Partial<AppearanceState>;
+                return { theme: state.theme ?? 'dark', fontSize: state.fontSize ?? 'medium' };
+            },
+        }
     )
 );
 
