@@ -6,7 +6,7 @@ import {
     sign,
 } from '../../security/identity.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
-import { signWithDevice } from '../../security/deviceMessaging.js';
+import { getDeviceMessagingIdentity, signWithDevice } from '../../security/deviceMessaging.js';
 import { warn } from '../../security/secure-logger.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { canonicalStringify } from '../utils.js';
@@ -39,11 +39,11 @@ export const hasDeviceDeliveryBinding = (contact: GroupDeliveryContact): boolean
 export const buildDeviceAwareGroupPacket = (
     packet: Record<string, unknown>,
     contact: GroupDeliveryContact,
-): Record<string, unknown> => (
-    hasDeviceDeliveryBinding(contact)
-        ? { ...packet, senderDeviceId: contact.deviceId }
-        : packet
-);
+): Record<string, unknown> => {
+    if (!hasDeviceDeliveryBinding(contact)) return packet;
+    const myDevice = getDeviceMessagingIdentity();
+    return myDevice ? { ...packet, senderDeviceId: myDevice.identity.deviceId } : packet;
+};
 
 export const getGroupRecipientPublicKey = (contact: GroupDeliveryContact): string | undefined => (
     hasDeviceDeliveryBinding(contact)
