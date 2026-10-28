@@ -21,6 +21,7 @@ export type AccountRegistryRevocation = {
 export type AuthorizedDeviceRecord = {
     deviceId: string;
     devicePublicKey: string;
+    staticX25519PublicKey?: string;
     platform?: string;
     capabilities?: string[];
     authorizedAt: number;
@@ -234,6 +235,10 @@ function parseDevices(value: unknown, now: number): AuthorizedDeviceRecord[] | n
         const entry = item as Record<string, unknown>;
         if (typeof entry.deviceId !== 'string' || !isHex(entry.deviceId, 32)) return null;
         if (typeof entry.devicePublicKey !== 'string' || !isHex(entry.devicePublicKey, 32)) return null;
+        if (entry.staticX25519PublicKey !== undefined && entry.staticX25519PublicKey !== ''
+            && (typeof entry.staticX25519PublicKey !== 'string' || !isHex(entry.staticX25519PublicKey, 32))) {
+            return null;
+        }
         if (entry.platform !== undefined && typeof entry.platform !== 'string') return null;
         if (entry.capabilities !== undefined) {
             if (!Array.isArray(entry.capabilities) || entry.capabilities.some(capability => typeof capability !== 'string')) {
@@ -248,6 +253,9 @@ function parseDevices(value: unknown, now: number): AuthorizedDeviceRecord[] | n
         devices.push({
             deviceId,
             devicePublicKey: entry.devicePublicKey.toLowerCase(),
+            staticX25519PublicKey: typeof entry.staticX25519PublicKey === 'string' && entry.staticX25519PublicKey !== ''
+                ? entry.staticX25519PublicKey.toLowerCase()
+                : undefined,
             platform: entry.platform as string | undefined,
             capabilities: entry.capabilities as string[] | undefined,
             authorizedAt: entry.authorizedAt,

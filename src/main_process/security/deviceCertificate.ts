@@ -12,6 +12,7 @@ export interface AccountDeviceCertificate {
     accountPublicKey: string;
     deviceId: string;
     devicePublicKey: string;
+    staticX25519PublicKey?: string;
     platform?: string;
     capabilities?: string[];
     issuedAt: number;
@@ -42,6 +43,10 @@ export function parseCertificate(value: unknown): AccountDeviceCertificate | nul
     if (typeof record.issuedAt !== 'number' || typeof record.expiresAt !== 'number') return null;
     if (typeof record.epoch !== 'number' || !Number.isInteger(record.epoch) || record.epoch < 0) return null;
     if (typeof record.signature !== 'string' || !isHex(record.signature, 64)) return null;
+    if (record.staticX25519PublicKey !== undefined && record.staticX25519PublicKey !== ''
+        && (typeof record.staticX25519PublicKey !== 'string' || !isHex(record.staticX25519PublicKey, 32))) {
+        return null;
+    }
     if (record.platform !== undefined && typeof record.platform !== 'string') return null;
     if (record.capabilities !== undefined) {
         if (!Array.isArray(record.capabilities) || record.capabilities.some(item => typeof item !== 'string')) {
@@ -56,6 +61,9 @@ export function parseCertificate(value: unknown): AccountDeviceCertificate | nul
         accountPublicKey: record.accountPublicKey.toLowerCase(),
         deviceId: record.deviceId.toLowerCase(),
         devicePublicKey: record.devicePublicKey.toLowerCase(),
+        staticX25519PublicKey: typeof record.staticX25519PublicKey === 'string' && record.staticX25519PublicKey !== ''
+            ? record.staticX25519PublicKey.toLowerCase()
+            : undefined,
         platform: record.platform as string | undefined,
         capabilities: record.capabilities as string[] | undefined,
         issuedAt: record.issuedAt,
@@ -76,6 +84,7 @@ export function certificatePayload(certificate: AccountDeviceCertificate): Recor
         expiresAt: certificate.expiresAt,
         epoch: certificate.epoch,
     };
+    if (certificate.staticX25519PublicKey) payload.staticX25519PublicKey = certificate.staticX25519PublicKey;
     if (certificate.platform) payload.platform = certificate.platform;
     if (certificate.capabilities?.length) payload.capabilities = [...certificate.capabilities];
     return payload;

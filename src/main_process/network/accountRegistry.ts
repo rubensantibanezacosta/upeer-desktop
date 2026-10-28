@@ -23,6 +23,7 @@ let lastPublishedSignature = '';
 export interface AccountRegistryDevice {
     deviceId: string;
     devicePublicKey: string;
+    staticX25519PublicKey?: string;
     platform?: string;
     capabilities?: string[];
     authorizedAt: number;
@@ -87,6 +88,7 @@ function mergeRegistryDevices(
         merged.set(device.deviceId, {
             deviceId: device.deviceId,
             devicePublicKey: device.devicePublicKey,
+            staticX25519PublicKey: device.staticX25519PublicKey,
             platform: device.platform,
             capabilities: device.capabilities,
             authorizedAt: device.authorizedAt,
@@ -195,11 +197,16 @@ export function verifyDeviceAdmission(
     const device = registry.devices.find(item => item.deviceId === certificate.deviceId);
     if (!device) return false;
     if (device.devicePublicKey !== certificate.devicePublicKey) return false;
+    if ((device.staticX25519PublicKey ?? '') !== (certificate.staticX25519PublicKey ?? '')) return false;
     if ((device.platform ?? '') !== (certificate.platform ?? '')) return false;
     if (JSON.stringify(device.capabilities ?? []) !== JSON.stringify(certificate.capabilities ?? [])) return false;
     return device.authorizedAt === certificate.issuedAt &&
         device.expiresAt === certificate.expiresAt &&
         device.epoch === certificate.epoch;
+}
+
+export function accountRegistrySignedPayload(registry: AccountRegistry): string {
+    return canonicalStringify(registryPayload(registry));
 }
 
 export function accountRegistryKey(accountUpeerId: string): Buffer {
@@ -246,6 +253,7 @@ function devicePayload(device: AccountRegistryDevice): Record<string, unknown> {
         expiresAt: device.expiresAt,
         epoch: device.epoch,
     };
+    if (device.staticX25519PublicKey) payload.staticX25519PublicKey = device.staticX25519PublicKey;
     if (device.platform) payload.platform = device.platform;
     if (device.capabilities?.length) payload.capabilities = [...device.capabilities];
     return payload;
@@ -289,6 +297,7 @@ function parseDevice(value: unknown, registryEpoch: number): AccountRegistryDevi
     if (deriveDeviceId(record.devicePublicKey) !== record.deviceId.toLowerCase()) return null;
     if (typeof record.authorizedAt !== 'number' || typeof record.expiresAt !== 'number') return null;
     if (typeof record.epoch !== 'number' || record.epoch < 0 || record.epoch > registryEpoch) return null;
+    if (record.staticX25519PublicKey !== undefined && !isOptionalHex(record.staticX25519PublicKey, 32)) return null;
     if (record.platform !== undefined && typeof record.platform !== 'string') return null;
     if (record.capabilities !== undefined) {
         if (!Array.isArray(record.capabilities) || record.capabilities.some(item => typeof item !== 'string')) {
@@ -298,6 +307,9 @@ function parseDevice(value: unknown, registryEpoch: number): AccountRegistryDevi
     return {
         deviceId: record.deviceId.toLowerCase(),
         devicePublicKey: record.devicePublicKey.toLowerCase(),
+        staticX25519PublicKey: typeof record.staticX25519PublicKey === 'string'
+            ? record.staticX25519PublicKey.toLowerCase()
+            : undefined,
         platform: record.platform as string | undefined,
         capabilities: record.capabilities as string[] | undefined,
         authorizedAt: record.authorizedAt,
@@ -317,5 +329,10 @@ function parseRevocation(value: unknown): AccountRevocation | null {
 
 function isHex(value: string, expectedBytes: number): boolean {
     return value.length === expectedBytes * 2 && /^[0-9a-f]+$/i.test(value);
+}
+
+function isOptionalHex(value: unknown, expectedBytes: number): boolean {
+    if (value === undefined || value === '') return true;
+    return typeof value === 'string' && isHex(value, expectedBytes);
 }
 
