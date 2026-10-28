@@ -3,7 +3,7 @@ import { SettingsSection } from '../components/ui/settings/types.js';
 import { MediaItem } from '../types/chat.js';
 
 // ── Tipos de vista de la sidebar ──────────────────────────────────────────────
-export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group' | 'starred';
+export type SidebarView = 'list' | 'new' | 'add-contact' | 'create-group' | 'starred' | 'lists';
 export type SidebarFilter = 'all' | 'unread' | 'favorites' | 'groups';
 export type AppView = 'chat' | 'calls' | 'settings';
 
@@ -18,6 +18,7 @@ interface NavigationState {
     // Sidebar
     sidebarView: SidebarView;
     sidebarFilter: SidebarFilter;
+    activeListId: string | null;
     newChatSearch: string;
     sidebarSearch: string; // Búsqueda en la lista principal
     sidebarSearchFocusToken: number;
@@ -54,6 +55,7 @@ interface NavigationActions {
     // Sidebar
     setSidebarView: (view: SidebarView) => void;
     setSidebarFilter: (filter: SidebarFilter) => void;
+    setActiveListId: (listId: string | null) => void;
     setNewChatSearch: (q: string) => void;
     setSidebarSearch: (q: string) => void;
     focusSidebarSearch: () => void;
@@ -87,6 +89,7 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     settingsSection: null,
     sidebarView: 'list',
     sidebarFilter: 'all',
+    activeListId: null,
     newChatSearch: '',
     sidebarSearch: '',
     sidebarSearchFocusToken: 0,
@@ -129,7 +132,8 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
 
     // ── Acciones sidebar
     setSidebarView: (view) => set({ sidebarView: view }),
-    setSidebarFilter: (filter) => set({ sidebarFilter: filter }),
+    setSidebarFilter: (filter) => set({ sidebarFilter: filter, activeListId: null }),
+    setActiveListId: (listId) => set({ activeListId: listId, sidebarFilter: 'all' }),
     setNewChatSearch: (q) => set({ newChatSearch: q }),
     setSidebarSearch: (q) => set({ sidebarSearch: q }),
     focusSidebarSearch: () => set((state) => ({
@@ -140,7 +144,7 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     })),
 
     openNewChat: () => set({ sidebarView: 'new', newChatSearch: '' }),
-    backToList: () => set({ sidebarView: 'list', newChatSearch: '', sidebarSearch: '' }),
+    backToList: () => set({ sidebarView: 'list', newChatSearch: '', sidebarSearch: '', activeListId: null }),
 
     // ── Acciones Modals
     setAddModalOpen: (open) => set({ isAddModalOpen: open }),

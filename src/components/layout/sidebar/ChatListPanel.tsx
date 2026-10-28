@@ -39,6 +39,7 @@ interface ChatListPanelProps {
     onOpenCreateGroup?: () => void;
     onOpenAppLock?: () => void;
     onOpenStarred?: () => void;
+    onOpenLists?: () => void;
     searchFocusToken?: number;
 }
 
@@ -68,6 +69,7 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
     onOpenCreateGroup,
     onOpenAppLock,
     onOpenStarred,
+    onOpenLists,
     searchFocusToken,
 }) => {
     const term = sidebarSearch.trim();
@@ -130,7 +132,7 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
 
     return (
         <>
-            <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} onOpenAppLock={onOpenAppLock} onOpenStarred={onOpenStarred} />
+            <SidebarHeader onAddNew={onOpenNew} onCreateGroup={onOpenCreateGroup} onOpenAppLock={onOpenAppLock} onOpenStarred={onOpenStarred} onOpenLists={onOpenLists} />
             <SidebarSearch
                 value={sidebarSearch}
                 onChange={onSearchChange}

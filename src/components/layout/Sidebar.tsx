@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { Box } from '@mui/joy';
+import { Box, IconButton, Typography } from '@mui/joy';
 import { Group, Contact, ChatMessage } from '../../types/chat.js';
 import { SidebarView, useNavigationStore } from '../../store/useNavigationStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
@@ -9,8 +9,12 @@ import { buildSearchEntities } from '../../features/search/searchData.js';
 import { SubViewHeader } from './sidebar/SubViewHeader.js';
 import { AddContactForm } from './sidebar/AddContactForm.js';
 import { CreateGroupForm } from './sidebar/CreateGroupForm.js';
+import { X } from 'lucide-react';
 import { ChatListPanel } from './sidebar/ChatListPanel.js';
 import { GlobalStarredView } from '../../features/chat/GlobalStarredView.js';
+import { ListsPanel } from './sidebar/ListsPanel.js';
+import { useChatListsStore } from '../../store/useChatListsStore.js';
+import { findChatList } from '../../utils/chatLists.js';
 import { SidebarNewChatPanel } from './sidebar/SidebarNewChatPanel.js';
 
 interface SidebarProps {
@@ -59,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setPendingScrollMsgId,
         openNewChat,
         backToList,
+        activeListId,
+        setActiveListId,
     } = useNavigationStore();
 
     const { handleSearchGlobal, searchSections, searchLoading, isHydrating, loadMoreSearchMessages, showAllSearchContacts } = useChatStore();
@@ -74,16 +80,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const contactPrefs = useChatActionsStore((state) => state.contactPrefs);
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs);
+    const chatLists = useChatListsStore((state) => state.lists);
+    const activeList = findChatList(chatLists, activeListId);
 
     const chatEntries = useMemo<ChatSearchItem[]>(() => {
         const entities = buildSearchEntities(contacts, groups, { contactPrefs, groupPrefs });
         return entities.chats
             .filter((entry) => matchesChip(sidebarFilter, chatChipTarget(entry)))
+            .filter((entry) => {
+                if (!activeList) return true;
+                const chatId = entry.kind === 'group' && entry.group ? entry.group.groupId : entry.contact?.upeerId;
+                return !!chatId && activeList.chatIds.includes(chatId);
+            })
             .sort((left, right) => Number(right.state.pinned) - Number(left.state.pinned) || right.time - left.time)
             .map((entry) => (entry.kind === 'group' && entry.group
                 ? { kind: 'group', group: entry.group, time: entry.time }
                 : { kind: 'contact', contact: entry.contact as Contact, time: entry.time }));
-    }, [contacts, groups, sidebarFilter, contactPrefs, groupPrefs]);
+    }, [contacts, groups, sidebarFilter, contactPrefs, groupPrefs, activeList]);
 
     const searchedContacts = useMemo(() => {
         const q = newChatSearch.trim().toLowerCase();
@@ -119,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const offset = (v: SidebarView): string => {
         if (sidebarView === v) return 'translateX(0)';
-        const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2, starred: 1 };
+        const orderMap: Record<SidebarView, number> = { list: 0, new: 1, 'add-contact': 2, 'create-group': 2, starred: 1, lists: 1 };
         return orderMap[sidebarView] > orderMap[v] ? 'translateX(-100%)' : 'translateX(100%)';
     };
 
@@ -148,10 +161,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             width: 400, minWidth: 400, flexShrink: 0,
             borderRight: '1px solid', borderColor: 'divider',
             backgroundColor: 'background.surface',
-            overflow: 'hidden',
+            overflow: 'clip',
             height: '100%',
         }}>
             <Box sx={panelSx('list')}>
+                {activeList && (
+                    <Box
+                        data-active-list={activeList.id}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.75, backgroundColor: 'background.level1' }}
+                    >
+                        <Typography level="body-xs" sx={{ flexGrow: 1, color: 'text.secondary' }}>
+                            Lista «{activeList.name}» · {activeList.chatIds.length === 1 ? '1 chat' : `${activeList.chatIds.length} chats`}
+                        </Typography>
+                        <IconButton
+                            size="sm"
+                            variant="plain"
+                            color="neutral"
+                            aria-label="Quitar el filtro de la lista"
+                            onClick={() => setActiveListId(null)}
+                        >
+                            <X style={{ fontSize: 16 }} />
+                        </IconButton>
+                    </Box>
+                )}
                 <ChatListPanel
                     entries={chatEntries}
                     sidebarSearch={sidebarSearch}
@@ -177,6 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onOpenCreateGroup={onCreateGroup ? () => setSidebarView('create-group') : undefined}
                     onOpenAppLock={onOpenAppLock}
                     onOpenStarred={() => setSidebarView('starred')}
+                    onOpenLists={() => setSidebarView('lists')}
                     searchFocusToken={sidebarSearchFocusToken}
                     loading={isHydrating}
                 />
@@ -210,6 +243,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         contacts={contacts}
                         onCreate={onCreateGroup}
                         onDone={() => setSidebarView('list')}
+                    />
+                )}
+            </Box>
+
+            <Box sx={panelSx('lists')}>
+                {sidebarView === 'lists' && (
+                    <ListsPanel
+                        chats={[
+                            ...contacts.filter((contact) => contact.status !== 'blocked').map((contact) => ({ id: contact.upeerId, name: contact.name })),
+                            ...groups.map((group) => ({ id: group.groupId, name: group.name })),
+                        ]}
+                        onApply={(listId) => { setActiveListId(listId); setSidebarView('list'); }}
+                        onBack={handleBack}
                     />
                 )}
             </Box>
