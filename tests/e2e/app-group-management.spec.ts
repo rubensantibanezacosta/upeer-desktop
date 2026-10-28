@@ -176,12 +176,12 @@ test('un grupo sin mensajes deja de cargar y muestra el estado vacío', async ({
     await mount(page, groupScenario());
     await openGroup(page, 'Infra');
 
-    await expect(page.getByText('Conversación Segura Activada')).toBeVisible();
+    await expect(page.getByText('Conversación segura activada')).toBeVisible();
     await expect(page.getByText('Cargando mensajes…')).toHaveCount(0);
 
     await openGroup(page, 'Equipo QA');
     await expect(page.getByText('Bienvenidos').first()).toBeVisible();
 
     await openGroup(page, 'Infra');
-    await expect(page.getByText('Conversación Segura Activada')).toBeVisible();
+    await expect(page.getByText('Conversación segura activada')).toBeVisible();
 });

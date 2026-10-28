@@ -12,6 +12,6 @@ describe('EmptyChat', () => {
 
     it('anuncia el vacío cuando la carga ha terminado', () => {
         render(<EmptyChat />);
-        expect(screen.getByText('Conversación Segura Activada')).toBeTruthy();
+        expect(screen.getByText('Conversación segura activada')).toBeTruthy();
     });
 });

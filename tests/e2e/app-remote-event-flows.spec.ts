@@ -125,7 +125,7 @@ test('vacía el chat cuando llega un evento remoto de chat cleared', async ({ pa
 
     await emitBridgeEvent(page, 'onChatCleared', { upeerId: 'alice' });
     await expect(page.getByText('Se va a borrar')).toHaveCount(0);
-    await expect(page.getByText('Conversación Segura Activada')).toBeVisible();
+    await expect(page.getByText('Conversación segura activada')).toBeVisible();
 });
 
 test('refresca lista y chat tras invitación y actualización remota de grupo', async ({ page }) => {

@@ -21,30 +21,31 @@ export const EmptyChat: React.FC<{ loading?: boolean }> = ({ loading = false }) 
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            opacity: 0.8,
             textAlign: 'center',
-            p: 4
+            px: 3,
         }}>
-            <Box sx={{
-                width: 100,
-                height: 100,
-                backgroundColor: 'background.level1',
-                borderRadius: 'xl',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 3,
-                border: '1px solid',
-                borderColor: 'divider'
-            }}>
-                <ShieldCheck style={{ fontSize: 48, color: 'var(--joy-palette-primary-500)' }} />
+            <Box sx={{ opacity: 0.8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{
+                    width: 100,
+                    height: 100,
+                    backgroundColor: 'background.level1',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mb: 3,
+                    border: '1px solid',
+                    borderColor: 'divider'
+                }}>
+                    <ShieldCheck style={{ fontSize: 48, color: 'var(--joy-palette-primary-500)' }} />
+                </Box>
+                <Typography level="h4" sx={{ fontWeight: 600, mb: 1 }}>
+                    Conversación segura activada
+                </Typography>
+                <Typography level="body-md" sx={{ maxWidth: 320, color: 'text.secondary', lineHeight: 1.6 }}>
+                    Aún no hay mensajes aquí. Envía el primero para comenzar esta conversación cifrada de extremo a extremo.
+                </Typography>
             </Box>
-            <Typography level="h4" sx={{ fontWeight: 600, mb: 1 }}>
-                Conversación Segura Activada
-            </Typography>
-            <Typography level="body-md" sx={{ maxWidth: 320, color: 'text.secondary', lineHeight: 1.6 }}>
-                Aún no hay mensajes aquí. Envía el primero para comenzar esta conversación cifrada de extremo a extremo.
-            </Typography>
         </Box>
     );
 };
