@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { serializeState, type RatchetState } from '../../security/ratchet.js';
 import { getDb, getSchema, runTransaction } from '../shared.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
+import { expiresAtForMessage } from '../retention/chatRetention.js';
 
 export type RatchetIncomingMessage = {
     id: string;
@@ -42,6 +43,7 @@ export function commitRatchetIncomingMessage(
             changes = db.insert(schema.messages).values({
                 ...message,
                 timestamp,
+                expiresAt: expiresAtForMessage(message.chatUpeerId, timestamp),
             }).onConflictDoUpdate({
                 target: schema.messages.id,
                 set: {

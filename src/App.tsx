@@ -8,6 +8,7 @@ import { useAppStore } from './store/useAppStore.js';
 import { useChatStore } from './store/useChatStore.js';
 import { hydratePrivacyPrefs } from './store/privacySync.js';
 import { hydrateNotificationPrefs } from './store/notificationSync.js';
+import { useChatRetentionStore } from './store/chatRetentionStore.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -188,6 +189,22 @@ export default function App() {
         hydrateNotificationPrefs().catch((cause: unknown) => {
             console.warn('No se pudieron leer las preferencias de notificación.', cause);
         });
+        void useChatRetentionStore.getState().hydrate();
+
+        const subscribeExpired = window.upeer?.onMessagesExpired;
+        const unsubscribeExpired = typeof subscribeExpired === 'function'
+            ? subscribeExpired(({ chatIds }) => {
+                const state = useChatStore.getState();
+                const activeChatId = state.activeGroupId || state.targetUpeerId;
+                if (activeChatId && chatIds.includes(activeChatId)) {
+                    void state.reloadLatestHistory();
+                }
+            })
+            : undefined;
+
+        return () => {
+            if (typeof unsubscribeExpired === 'function') unsubscribeExpired();
+        };
     }, []);
 
     useEffect(() => {

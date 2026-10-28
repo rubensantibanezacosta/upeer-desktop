@@ -5,6 +5,7 @@ import { like, gte, lte, lt, inArray } from 'drizzle-orm';
 import { getDb, getSchema, eq, desc, and, runTransaction, sql } from '../shared.js';
 import { updateMessageStatus, getMessageStatus, type MessageDeliveryStatus } from './status.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
+import { expiresAtForMessage } from '../retention/chatRetention.js';
 
 export { updateMessageStatus, getMessageStatus };
 
@@ -98,7 +99,8 @@ export async function saveMessage(id: string, chatUpeerId: string, isMine: boole
         replyTo,
         signature,
         status,
-        timestamp: messageTimestamp
+        timestamp: messageTimestamp,
+        expiresAt: expiresAtForMessage(chatUpeerId, messageTimestamp),
     }).onConflictDoUpdate({
         target: schema.messages.id,
         set: {

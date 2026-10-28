@@ -13,6 +13,7 @@ import { registerMessageHandlers } from './main_process/core/ipcHandlers/message
 import { registerNetworkHandlers } from './main_process/core/ipcHandlers/network.js';
 import { registerPrivacyHandlers } from './main_process/core/ipcHandlers/privacy.js';
 import { registerNotificationHandlers } from './main_process/core/ipcHandlers/notifications.js';
+import { registerRetentionHandlers } from './main_process/core/ipcHandlers/retention.js';
 import { registerSecurityHandlers } from './main_process/core/ipcHandlers/security.js';
 import { registerScreenShareHandlers } from './main_process/core/ipcHandlers/screenShare.js';
 import { registerVaultHandlers } from './main_process/core/ipcHandlers/vault.js';
@@ -52,6 +53,7 @@ export const registerIpcHandlers = () => {
     registerSecurityHandlers();
     registerPrivacyHandlers();
     registerNotificationHandlers();
+    registerRetentionHandlers();
     registerDeviceHandlers();
     registerEnrollmentHandlers();
     registerSyncHandlers();

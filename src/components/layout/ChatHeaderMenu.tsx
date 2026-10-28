@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Dropdown, IconButton, ListDivider, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip } from '@mui/joy';
-import { Ban, Bell, BellOff, Download, Eraser, Heart, Info, LogOut, MoreVertical, Palette, Search, Trash2, X } from 'lucide-react';
+import { Ban, Bell, BellOff, Download, Eraser, Heart, Info, LogOut, MoreVertical, Palette, Search, Timer, Trash2, X } from 'lucide-react';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { useAppearanceStore } from '../../store/useAppearanceStore.js';
+import { retentionFor, useChatRetentionStore } from '../../store/chatRetentionStore.js';
+import { retentionLabel } from '../../utils/retention.js';
 import { ConfirmActionDialog } from '../ui/ConfirmActionDialog.js';
 import { ChatStylePicker } from '../../features/chat/style/ChatStylePicker.js';
+import { TemporaryMessagesPicker } from '../../features/chat/retention/TemporaryMessagesPicker.js';
 
 type PendingAction = 'clear' | 'delete' | 'leave' | 'block';
 
@@ -90,8 +93,11 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
     const chatStyle = useAppearanceStore((state) => state.chatStyles[chatId]);
     const setChatStyle = useAppearanceStore((state) => state.setChatStyle);
+    const retention = useChatRetentionStore((state) => retentionFor(state.map, chatId));
+    const setRetention = useChatRetentionStore((state) => state.setRetention);
     const [pending, setPending] = useState<PendingAction | null>(null);
     const [styleOpen, setStyleOpen] = useState(false);
+    const [retentionOpen, setRetentionOpen] = useState(false);
     const muted = (kind === 'contact' ? contactPrefs?.muted : groupPrefs?.muted) ?? false;
 
     const toggleMuted = () => {
@@ -150,6 +156,10 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                         {itemIcon(<Palette style={{ fontSize: 18 }} />)}
                         Estilo del chat
                     </MenuItem>
+                    <MenuItem onClick={() => setRetentionOpen(true)}>
+                        {itemIcon(<Timer style={{ fontSize: 18 }} />)}
+                        {retention === 'off' ? 'Mensajes temporales' : `Mensajes temporales · ${retentionLabel(retention)}`}
+                    </MenuItem>
                     <ListDivider />
                     <MenuItem onClick={onCloseChat}>
                         {itemIcon(<X style={{ fontSize: 18 }} />)}
@@ -200,6 +210,16 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                     setStyleOpen(false);
                 }}
                 onClose={() => setStyleOpen(false)}
+            />
+
+            <TemporaryMessagesPicker
+                open={retentionOpen}
+                value={retention}
+                onSelect={(id) => {
+                    setRetentionOpen(false);
+                    void setRetention(chatId, id);
+                }}
+                onClose={() => setRetentionOpen(false)}
             />
         </>
     );

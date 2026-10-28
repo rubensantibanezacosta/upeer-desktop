@@ -23,6 +23,9 @@ vi.mock('drizzle-orm', () => ({
     like: (a: unknown, b: unknown) => ({ type: 'like', a, b }),
     gte: (a: unknown, b: unknown) => ({ type: 'gte', a, b }),
     lte: (a: unknown, b: unknown) => ({ type: 'lte', a, b }),
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', strings, values }),
+    integer: () => ({}),
+    text: () => ({}),
 }));
 
 vi.mock('../../../src/main_process/storage/shared.js', () => ({

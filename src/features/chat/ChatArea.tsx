@@ -13,7 +13,9 @@ import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import type { ChatMessage, Contact, ConversationActivity, TransferMessageUpdates } from '../../types/chat.js';
 import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
 import { chatStyleSx, resolveChatStyleId } from './style/chatStyle.js';
+import { ChatRetentionNotice } from './retention/ChatRetentionNotice.js';
 import { useAppearanceStore } from '../../store/useAppearanceStore.js';
+import { retentionFor, useChatRetentionStore } from '../../store/chatRetentionStore.js';
 
 interface MediaClickPayload {
     url: string;
@@ -51,6 +53,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, chatId, myIp: _
     const { pendingScrollMsgId, setPendingScrollMsgId } = useNavigationStore();
     const { isWindowedHistory, reloadLatestHistory, loadOlderHistory } = useChatStore();
     const chatStyleId = useAppearanceStore((state) => resolveChatStyleId(chatId ? state.chatStyles[chatId] : undefined));
+    const retention = useChatRetentionStore((state) => retentionFor(state.map, chatId));
     const pendingScrollRef = useRef(pendingScrollMsgId);
     const loadingOlderRef = useRef(false);
     pendingScrollRef.current = pendingScrollMsgId;
@@ -248,6 +251,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, chatId, myIp: _
                     </React.Fragment>
                 );
             })}
+
+            <ChatRetentionNotice retention={retention} />
 
             {showScrollButton && (
                 <IconButton

@@ -21,6 +21,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 let heartbeatInterval: NodeJS.Timeout | null = null;
 let dhtInterval: NodeJS.Timeout | null = null;
+let stopExpirySweeper: (() => void) | null = null;
 
 export function stopHeartbeat() {
   if (dhtInterval) {
@@ -31,6 +32,10 @@ export function stopHeartbeat() {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
     info('[Heartbeat] Intervalo detenido', {}, 'heartbeat');
+  }
+  if (stopExpirySweeper) {
+    stopExpirySweeper();
+    stopExpirySweeper = null;
   }
 }
 
@@ -66,6 +71,15 @@ export async function initializeApp(baseDir: string): Promise<void> {
 
   const mainWindow = await createMainWindow(baseDir, MAIN_WINDOW_VITE_DEV_SERVER_URL, MAIN_WINDOW_VITE_NAME);
   setMainWindow(mainWindow);
+
+  const { startExpirySweeper } = await import('../storage/retention/expirySweeper.js');
+  stopExpirySweeper = startExpirySweeper({
+    onExpired: (chatIds) => {
+      const win = getAllWindows()[0];
+      win?.webContents.send('messages-expired', { chatIds });
+    },
+  });
+
   onDeviceRegistryChanged(() => {
     const win = getAllWindows()[0];
     win?.webContents.send('authorized-devices-changed');

@@ -305,6 +305,10 @@ declare global {
             /** Preferencias de notificación con efecto en el servicio */
             getNotificationPrefs: () => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
             setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
+            /** Mensajes temporales por chat (solo este dispositivo) */
+            getChatRetention: () => Promise<{ map: Record<string, string>; presets: { id: string; label: string; ms: number }[] }>;
+            setChatRetention: (chatId: string, retention: string) => Promise<{ ok: boolean; map: Record<string, string>; expiredChats: string[] }>;
+            onMessagesExpired: (callback: (data: { chatIds: string[] }) => void) => UpeerUnsubscribe;
             /** Assets internos */
             persistInternalAsset: (args: { filePath: string; fileName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
             generateVideoThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;

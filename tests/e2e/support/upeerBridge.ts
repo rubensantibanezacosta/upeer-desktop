@@ -89,6 +89,7 @@ type BridgeState = {
     transfers: Transfer[];
     privacy: { readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean };
     notifications: { messages: boolean; requests: boolean; sound: boolean };
+    retention: Record<string, string>;
     clipboard: string[];
 };
 
@@ -114,6 +115,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             networkStatus: input.networkStatus ?? 'up',
             privacy: { readReceipts: true, onlineStatus: true, lastSeen: true },
             notifications: { messages: true, requests: true, sound: true },
+            retention: {} as Record<string, string>,
             databaseBackups: deepClone(input.databaseBackups ?? []),
             restoredBackup: '',
             clipboard: [] as string[],
@@ -251,6 +253,23 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                     sound: patch.sound ?? state.notifications.sound,
                 };
                 return { ...state.notifications };
+            },
+            getChatRetention: async () => ({
+                map: { ...state.retention },
+                presets: [
+                    { id: 'off', label: 'Desactivados', ms: 0 },
+                    { id: '24h', label: '24 horas', ms: 86_400_000 },
+                    { id: '7d', label: '7 días', ms: 604_800_000 },
+                    { id: '90d', label: '90 días', ms: 7_776_000_000 },
+                ],
+            }),
+            setChatRetention: async (chatId: string, retention: string) => {
+                if (!retention || retention === 'off') {
+                    delete state.retention[chatId];
+                } else {
+                    state.retention[chatId] = retention;
+                }
+                return { ok: true, map: { ...state.retention }, expiredChats: [] };
             },
             identityStatus: async () => state.identityStatus,
             getMyNetworkAddress: async () => state.myNetworkAddress,
@@ -457,6 +476,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             onMessageUpdated: register('onMessageUpdated'),
             onMessageDeleted: register('onMessageDeleted'),
             onChatCleared: register('onChatCleared'),
+            onMessagesExpired: register('onMessagesExpired'),
             onMessageStatusUpdated: register('onMessageStatusUpdated'),
             onTyping: register('onTyping'),
             onFocusConversation: register('onFocusConversation'),
@@ -479,7 +499,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
                 queueFileDialogResult: (result: { success: boolean; canceled?: boolean; files?: PendingFile[] }) => state.fileDialogQueue.push(result),
                 patchContact: (upeerId: string, patch: Partial<Contact>) => addOrUpdateContact({ ...(state.contacts.find((item) => item.upeerId === upeerId) ?? { upeerId, name: upeerId, address: '', status: 'connected' }), ...patch }),
                 patchGroup: (groupId: string, patch: Partial<Group>) => addOrUpdateGroup({ ...(state.groups.find((item) => item.groupId === groupId) ?? { groupId, name: groupId, adminUpeerId: selfId, members: [selfId], status: 'active' }), ...patch }),
-                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers, privacy: state.privacy, notifications: state.notifications, clipboard: state.clipboard }),
+                getState: (): BridgeState => deepClone({ contacts: state.contacts, groups: state.groups, messagesByChat: state.messagesByChat, transfers: state.transfers, privacy: state.privacy, notifications: state.notifications, retention: state.retention, clipboard: state.clipboard }),
             },
         });
     }, scenario);

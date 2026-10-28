@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { getDb, getSchema } from '../shared.js';
 import type { MessageDeliveryStatus } from '../messages/status.js';
+import { expiresAtForMessage } from '../retention/chatRetention.js';
 
 export type SyncedMessage = {
     id: string;
@@ -62,6 +63,7 @@ export function upsertSyncMessage(input: SyncedMessage): { applied: boolean; ins
             isDeleted: input.isDeleted,
             isEdited: input.isEdited,
             timestamp: input.timestamp,
+            expiresAt: expiresAtForMessage(input.chatUpeerId, input.timestamp),
         }).run();
         return { applied: true, inserted: true };
     }

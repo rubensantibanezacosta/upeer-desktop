@@ -279,6 +279,11 @@ const notificationApi = {
     setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => ipcRenderer.invoke('set-notification-prefs', patch),
 };
 
+const retentionApi = {
+    getChatRetention: () => ipcRenderer.invoke('get-chat-retention'),
+    setChatRetention: (chatId: string, retention: string) => ipcRenderer.invoke('set-chat-retention', { chatId, retention }),
+};
+
 const eventApi = {
     onGroupUpdated: (callback: (data: GroupUpdatedPayload) => void) => subscribe<[GroupUpdatedPayload]>('group-updated', callback),
     onGroupMessage: (callback: (data: IncomingGroupMessageEvent) => void) => subscribe<[IncomingGroupMessageEvent]>('receive-group-message', callback),
@@ -297,6 +302,7 @@ const eventApi = {
     onMessageUpdated: (callback: (data: MessageUpdatedPayload) => void) => subscribe<[MessageUpdatedPayload]>('message-updated', callback),
     onMessageDeleted: (callback: (data: MessageDeletedPayload) => void) => subscribe<[MessageDeletedPayload]>('message-deleted', callback),
     onChatCleared: (callback: (data: { upeerId: string }) => void) => subscribe<[{ upeerId: string }]>('chat-cleared', (data) => callback(data)),
+    onMessagesExpired: (callback: (data: { chatIds: string[] }) => void) => subscribe<[{ chatIds: string[] }]>('messages-expired', (data) => callback(data)),
     onMessageStatusUpdated: (callback: (data: { id: string; status: string }) => void) => subscribe<[{ id: string; status: string }]>('message-status-updated', (data) => callback(data)),
     onTyping: (callback: (data: { upeerId: string; groupId?: string; state?: ConversationActivitySignal }) => void) => subscribe<[{ upeerId: string; groupId?: string; state?: ConversationActivitySignal }]>('peer-typing', (data) => callback(data)),
     onFocusConversation: (callback: (data: { upeerId?: string; groupId?: string }) => void) => subscribe<[{ upeerId?: string; groupId?: string }]>('focus-conversation', (data) => callback(data)),
@@ -336,5 +342,6 @@ export const buildPreloadBridge = () => ({
     ...securityApi,
     ...privacyApi,
     ...notificationApi,
+    ...retentionApi,
     ...eventApi,
 });
