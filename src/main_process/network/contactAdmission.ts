@@ -7,6 +7,7 @@ import type { LocationBlock } from './types.js';
 
 const ACCOUNT_HEX = /^[0-9a-f]{64}$/i;
 const DECISION_TTL_MS = 60 * 1000;
+const LEGACY_GRACE_MS = 15 * 60 * 1000;
 const MAX_DECISIONS = 256;
 
 type LogFn = (message: string, data?: unknown, source?: string) => void;
@@ -39,7 +40,7 @@ export class ContactAdmissionError extends Error {
     }
 }
 
-const decisions = new Map<string, { epoch: number; expiresAt: number; deviceId: string; devicePublicKey: string }>();
+const decisions = new Map<string, { epoch: number; expiresAt: number; graceUntil: number; deviceId: string; devicePublicKey: string }>();
 const auditedLegacy = new Set<string>();
 
 export function resetContactAdmissionCache(): void {
@@ -70,7 +71,7 @@ export async function requireContactAdmission(
         && cached.devicePublicKey === expectedDevicePublicKey
         && now < cached.expiresAt) return;
 
-    const policy = options.policy ?? 'allow-with-audit';
+    const policy = options.policy ?? 'reject';
     const logWarn = options.warn ?? warn;
     const registry = await loadRegistry(options.findRegistry ?? findAccountRegistry, account, now, logWarn);
     const epoch = registry?.epoch ?? -1;
@@ -80,18 +81,18 @@ export async function requireContactAdmission(
         && cached.devicePublicKey === expectedDevicePublicKey
         && now < cached.expiresAt) return;
     if (!registry) {
-        allowLegacy(account, epoch, now + DECISION_TTL_MS, policy, 'account registry is unavailable', logWarn, expectedDeviceId, expectedDevicePublicKey);
+        allowGap(account, -1, now + DECISION_TTL_MS, policy, 'account registry is unavailable', logWarn, expectedDeviceId, expectedDevicePublicKey, now);
         return;
     }
     if (registry.expiresAt <= now) deny(account, 'account registry is expired');
 
     const location = await loadLocation(options.findLocation ?? findContactLocation, account, logWarn);
     if (!location) {
-        allowLegacy(account, registry.epoch, registry.expiresAt, policy, 'contact has no verified location', logWarn, expectedDeviceId, expectedDevicePublicKey);
+        allowGap(account, registry.epoch, registry.expiresAt, policy, 'contact has no verified location', logWarn, expectedDeviceId, expectedDevicePublicKey, now);
         return;
     }
     if (!location.deviceCertificate) {
-        allowLegacy(account, registry.epoch, registry.expiresAt, policy, 'contact location has no device certificate', logWarn, expectedDeviceId, expectedDevicePublicKey);
+        allowGap(account, registry.epoch, registry.expiresAt, policy, 'contact location has no device certificate', logWarn, expectedDeviceId, expectedDevicePublicKey, now);
         return;
     }
 
@@ -117,7 +118,7 @@ export async function requireContactAdmission(
     }
     if (!locationValid) deny(account, 'contact location is invalid');
 
-    remember(account, epoch, Math.min(now + DECISION_TTL_MS, registry.expiresAt), expectedDeviceId, expectedDevicePublicKey);
+    remember(account, epoch, Math.min(now + DECISION_TTL_MS, registry.expiresAt), expectedDeviceId, expectedDevicePublicKey, now);
 }
 
 async function loadRegistry(
@@ -153,7 +154,7 @@ async function findContactLocation(account: string): Promise<LocationBlock | nul
     return await kademlia.findLocationBlock(account) as LocationBlock | null;
 }
 
-function allowLegacy(
+function allowGap(
     account: string,
     epoch: number,
     expiresAt: number,
@@ -162,18 +163,31 @@ function allowLegacy(
     log: LogFn,
     deviceId: string,
     devicePublicKey: string,
+    now: number,
 ): void {
-    if (policy === 'reject') deny(account, reason);
-    const auditKey = `${account}:${epoch}`;
-    if (!auditedLegacy.has(auditKey)) {
-        if (auditedLegacy.size >= MAX_DECISIONS) {
-            const oldest = auditedLegacy.values().next().value;
-            if (oldest) auditedLegacy.delete(oldest);
+    if (policy === 'allow-with-audit') {
+        const auditKey = `${account}:${epoch}`;
+        if (!auditedLegacy.has(auditKey)) {
+            if (auditedLegacy.size >= MAX_DECISIONS) {
+                const oldest = auditedLegacy.values().next().value;
+                if (oldest) auditedLegacy.delete(oldest);
+            }
+            auditedLegacy.add(auditKey);
+            log(`Contacto admitido por política legacy: ${reason}`, { account, epoch }, 'security');
         }
-        auditedLegacy.add(auditKey);
-        log(`Contacto admitido por política legacy: ${reason}`, { account, epoch }, 'security');
+        remember(account, epoch, expiresAt, deviceId, devicePublicKey, now);
+        return;
     }
-    remember(account, epoch, expiresAt, deviceId, devicePublicKey);
+    const cached = decisions.get(account);
+    const sameDevice = cached
+        && cached.deviceId === deviceId
+        && cached.devicePublicKey === devicePublicKey;
+    if (!cached || !sameDevice || now >= cached.graceUntil) deny(account, reason);
+    log(
+        `Contacto admitido con la decisión previa: ${reason}`,
+        { account, epoch: cached.epoch, graceUntil: new Date(cached.graceUntil).toISOString() },
+        'security',
+    );
 }
 
 function deny(account: string, reason: string): never {
@@ -181,12 +195,19 @@ function deny(account: string, reason: string): never {
     throw new ContactAdmissionError(reason);
 }
 
-function remember(account: string, epoch: number, expiresAt: number, deviceId: string, devicePublicKey: string): void {
+function remember(
+    account: string,
+    epoch: number,
+    expiresAt: number,
+    deviceId: string,
+    devicePublicKey: string,
+    now: number,
+): void {
     if (!decisions.has(account) && decisions.size >= MAX_DECISIONS) {
         const oldest = decisions.keys().next().value;
         if (oldest) decisions.delete(oldest);
     }
-    decisions.set(account, { epoch, expiresAt, deviceId, devicePublicKey });
+    decisions.set(account, { epoch, expiresAt, graceUntil: now + LEGACY_GRACE_MS, deviceId, devicePublicKey });
 }
 
 function errorMessage(err: unknown): string {

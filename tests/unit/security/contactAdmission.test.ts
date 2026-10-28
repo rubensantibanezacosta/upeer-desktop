@@ -86,11 +86,75 @@ describe('contact admission before encryption', () => {
         expect(locationCalls).toBe(2);
     });
 
-    it('permite con auditoría un contacto sin registro y no repite el aviso dentro del TTL', async () => {
+    it('rechaza un contacto sin registro y sin decisión previa', async () => {
+        await expect(requireContactAdmission(account, publicKey, {
+            now,
+            findRegistry: async () => null,
+            warn: vi.fn(),
+            debug: vi.fn(),
+        })).rejects.toThrow('account registry is unavailable');
+    });
+
+    it('reutiliza la decisión previa durante la ventana de gracia y la rechaza al expirar', async () => {
+        const warn = vi.fn();
+        const admitted = {
+            now,
+            findRegistry: async () => registry,
+            findLocation: async () => location,
+            verifyLocation: async () => true,
+            warn,
+            debug: vi.fn(),
+        };
+
+        await requireContactAdmission(account, publicKey, admitted);
+        const unavailable = { ...admitted, findRegistry: async () => null };
+        await expect(requireContactAdmission(account, publicKey, unavailable)).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('decisión previa'),
+            expect.objectContaining({ account }),
+            'security',
+        );
+
+        resetContactAdmissionCache();
+        await requireContactAdmission(account, publicKey, admitted);
+        await expect(requireContactAdmission(account, publicKey, {
+            ...unavailable,
+            now: now + 16 * 60 * 1000,
+        })).rejects.toThrow('account registry is unavailable');
+    });
+
+    it('no reutiliza la decisión previa si el dispositivo anunciado cambia', async () => {
+        const admitted = {
+            now,
+            findRegistry: async () => registry,
+            findLocation: async () => location,
+            verifyLocation: async () => true,
+            warn: vi.fn(),
+            debug: vi.fn(),
+        };
+        const certificate = location.deviceCertificate as Record<string, unknown>;
+
+        await requireContactAdmission(account, publicKey, {
+            ...admitted,
+            expectedDevice: {
+                deviceId: String(certificate.deviceId),
+                devicePublicKey: String(certificate.devicePublicKey),
+            },
+        });
+
+        await expect(requireContactAdmission(account, publicKey, {
+            ...admitted,
+            findRegistry: async () => null,
+            expectedDevice: { deviceId: 'ab'.repeat(32) },
+        })).rejects.toThrow('account registry is unavailable');
+    });
+
+    it('admite con auditoría un contacto sin registro cuando la política lo permite', async () => {
         let registryCalls = 0;
         const warn = vi.fn();
         const options = {
             now,
+            policy: 'allow-with-audit' as const,
             findRegistry: async () => {
                 registryCalls += 1;
                 return null;
@@ -134,7 +198,7 @@ describe('contact admission before encryption', () => {
         expect(findLocation).not.toHaveBeenCalled();
     });
 
-    it('permite con auditoría un bloque legacy sin certificado y lo rechaza con fail-closed', async () => {
+    it('rechaza un bloque legacy sin certificado y conserva la vía permisiva explícita', async () => {
         const legacy = { ...location, deviceCertificate: undefined } as LocationBlock;
         const warn = vi.fn();
         const base = {
@@ -145,18 +209,29 @@ describe('contact admission before encryption', () => {
             debug: vi.fn(),
         };
 
-        await expect(requireContactAdmission(account, publicKey, base)).resolves.toBeUndefined();
+        await expect(requireContactAdmission(account, publicKey, base))
+            .rejects.toThrow('contact location has no device certificate');
+
+        resetContactAdmissionCache();
+        await expect(requireContactAdmission(account, publicKey, {
+            ...base,
+            policy: 'allow-with-audit',
+        })).resolves.toBeUndefined();
         expect(warn).toHaveBeenCalledWith(
             expect.stringContaining('no device certificate'),
             { account, epoch: registry.epoch },
             'security',
         );
+    });
 
-        resetContactAdmissionCache();
+    it('rechaza un contacto sin bloque de ubicación', async () => {
         await expect(requireContactAdmission(account, publicKey, {
-            ...base,
-            policy: 'reject',
-        })).rejects.toBeInstanceOf(ContactAdmissionError);
+            now,
+            findRegistry: async () => registry,
+            findLocation: async () => null,
+            warn: vi.fn(),
+            debug: vi.fn(),
+        })).rejects.toThrow('contact has no verified location');
     });
 
     it('rechaza un certificado no admitido o una ubicación inválida', async () => {
