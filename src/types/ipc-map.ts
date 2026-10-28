@@ -82,6 +82,7 @@ import type {
     SaveTransferredFileResponse,
     GetNetworkStatsResponse,
     GetLocationStatusResponse,
+    GetStreamPreviewResponse,
     RestartYggstackResponse,
     ShowSaveDialogOptions,
     ShowSaveDialogResponse,
@@ -186,6 +187,7 @@ export interface IPCMap {
     'save-transferred-file': { request: SaveTransferredFileRequest; response: SaveTransferredFileResponse };
     'get-network-stats': { request: void; response: GetNetworkStatsResponse };
     'get-location-status': { request: void; response: GetLocationStatusResponse };
+    'get-stream-preview': { request: { fileId: string }; response: GetStreamPreviewResponse };
     'get-sync-status': { request: void; response: SyncStatusEvent };
     'restart-yggstack': { request: void; response: RestartYggstackResponse };
     'show-save-dialog': { request: ShowSaveDialogOptions; response: ShowSaveDialogResponse };

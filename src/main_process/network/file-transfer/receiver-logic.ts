@@ -235,6 +235,10 @@ export async function acceptTransfer(this: TransferManager, fileId: string) {
 
 const _receivedChunks = new Map<string, Set<number>>();
 
+export function getReceivedChunks(fileId: string): ReadonlySet<number> | undefined {
+    return _receivedChunks.get(fileId);
+}
+
 export function cleanupReceivedChunks(fileId: string): void {
     _receivedChunks.delete(fileId);
 }

@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     Typography,
     IconButton,
     CircularProgress,
+    Button,
 } from '@mui/joy';
 import { RefreshCw, X, FileVideo, Image, Play } from 'lucide-react';
 import { MessageStatus } from '../message/MessageStatus.js';
 import { toMediaUrl } from '../../../utils/fileUtils.js';
 import { RichText } from '../../../components/ui/RichText.js';
+
+const STREAM_POLL_MS = 3_000;
 
 interface MediaFileMessageProps {
     fileId: string;
@@ -37,6 +40,7 @@ interface MediaFileMessageProps {
     filePath?: string;
 }
 
+type StreamPreview = { tempPath: string; contiguousBytes: number; totalBytes: number };
 export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     fileId,
     messageId,
@@ -66,6 +70,42 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
     const getFileExtension = () => {
         const parts = fileName.split('.');
         return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+    };
+
+    const [streamPreview, setStreamPreview] = useState<StreamPreview | null>(null);
+    const streamable = isVideo && !isTransferComplete && isTransferInProgress && transferState === 'active';
+
+    useEffect(() => {
+        if (!streamable) {
+            setStreamPreview(null);
+            return;
+        }
+        let cancelled = false;
+
+        const poll = async () => {
+            const result = await window.upeer?.getStreamPreview?.(fileId)?.catch(() => null) ?? null;
+            if (cancelled) return;
+            if (result?.success && result.tempPath && result.contiguousBytes) {
+                setStreamPreview({
+                    tempPath: result.tempPath,
+                    contiguousBytes: result.contiguousBytes,
+                    totalBytes: result.totalBytes ?? 0,
+                });
+            }
+        };
+
+        poll();
+        const timer = setInterval(poll, STREAM_POLL_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [streamable, fileId]);
+
+    const openStreamPreview = () => {
+        if (!streamPreview || !onMediaClick) return;
+        const url = `${toMediaUrl(streamPreview.tempPath)}?limit=${streamPreview.contiguousBytes}`;
+        onMediaClick({ url, name: fileName, mimeType, fileId });
     };
 
     return (
@@ -129,6 +169,29 @@ export const MediaFileMessage: React.FC<MediaFileMessageProps> = ({
                         {isVideo ? <FileVideo style={{ fontSize: 48 }} /> : <Image style={{ fontSize: 48 }} />}
                         <Typography level="body-xs" sx={{ mt: 1 }}>{getFileExtension()}</Typography>
                     </Box>
+                )}
+
+                {streamPreview && onMediaClick && (
+                    <Button
+                        size="sm"
+                        variant="solid"
+                        color="neutral"
+                        data-testid="stream-preview-chip"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            openStreamPreview();
+                        }}
+                        sx={{
+                            position: 'absolute', left: 8, bottom: 8, zIndex: 3,
+                            minHeight: 0, py: 0.35, px: 1,
+                            fontSize: '0.68rem',
+                            backgroundColor: 'rgba(0,0,0,0.62)',
+                            color: 'white',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.78)' },
+                        }}
+                    >
+                        Ver lo recibido
+                    </Button>
                 )}
 
                 {isVideo && isTransferComplete && (

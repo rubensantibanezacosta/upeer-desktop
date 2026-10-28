@@ -142,6 +142,27 @@ export function registerFileTransferHandlers(): void {
     }
   });
 
+  ipcMain.handle('get-stream-preview', (_event, { fileId }) => {
+    try {
+      if (typeof fileId !== 'string' || !fileId) return { success: false, error: 'Invalid file id' };
+      const direct = fileTransferManager.getStreamPreview(fileId);
+      const preview = direct ?? (() => {
+        const match = fileTransferManager.findTransfersByMessageId(fileId, 'receiving')[0];
+        return match ? fileTransferManager.getStreamPreview(match.fileId) : null;
+      })();
+      if (!preview) return { success: false };
+      return {
+        success: true,
+        tempPath: preview.tempPath,
+        contiguousBytes: preview.contiguousBytes,
+        totalBytes: preview.totalBytes,
+      };
+    } catch (err: unknown) {
+      logError('Error building stream preview', { err: String(err) }, 'file-transfer');
+      return { success: false };
+    }
+  });
+
   ipcMain.handle('save-transferred-file', async (event, { fileId, destinationPath }) => {
     try {
       // BUG AG fix: validar destinationPath antes de copiar.

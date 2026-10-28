@@ -8,6 +8,7 @@ import { fileTransferManager } from '../network/file-transfer/transfer-manager.j
 import { info, error as logError } from '../security/secure-logger.js';
 import { onYggstackAddress } from '../sidecars/yggstack.js';
 import { clearPendingScreenShare, setupScreenSharePicker } from './ipcHandlers/screenShare.js';
+import { resolveMediaRange } from './mediaRange.js';
 
 export const ensureInternalAssetsDir = () => {
     const internalAssetsDir = path.join(app.getPath('userData'), 'assets');
@@ -25,7 +26,7 @@ export const configureProxy = async () => {
     info('[Proxy] SOCKS5 configurado', { proxy: 'socks5://127.0.0.1:9050', bypass: 'localhost' }, 'proxy');
 };
 
-const buildMediaResponse = async (filePath: string, range: string | null) => {
+const buildMediaResponse = async (filePath: string, range: string | null, limit: number | null = null) => {
     const stats = await fs.promises.stat(filePath);
     const ext = path.extname(filePath).toLowerCase();
     const mimeMap: Record<string, string> = {
@@ -36,19 +37,12 @@ const buildMediaResponse = async (filePath: string, range: string | null) => {
     };
     const contentType = mimeMap[ext] || 'application/octet-stream';
 
-    let responseStatus = 200;
-    let start = 0;
-    let end = stats.size - 1;
-
-    if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        start = parseInt(parts[0], 10);
-        end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
-        responseStatus = 206;
-        info(`[Protocol] Serving 206 Partial Content: ${start}-${end}/${stats.size}`, {}, 'network');
-    } else {
-        info(`[Protocol] Serving 200 OK (Full File): ${stats.size} bytes`, {}, 'network');
+    const resolved = resolveMediaRange(stats.size, range, limit);
+    if (!resolved) {
+        return new Response('Range error', { status: 416 });
     }
+
+    const { status: responseStatus, start, end, size: maxSize } = resolved;
 
     const chunksize = (end - start) + 1;
     const stream = fs.createReadStream(filePath, { start, end });
@@ -60,7 +54,7 @@ const buildMediaResponse = async (filePath: string, range: string | null) => {
     };
 
     if (responseStatus === 206) {
-        headers['Content-Range'] = `bytes ${start}-${end}/${stats.size}`;
+        headers['Content-Range'] = `bytes ${start}-${end}/${maxSize}`;
     }
 
     return new Response(webStream, {
@@ -124,8 +118,10 @@ export const registerMediaProtocol = async () => {
             }
 
             info(`[Protocol] Requesting: ${filePath}, Range: ${request.headers.get('range') || 'none'}`, {}, 'network');
+            const limitParam = new URL(request.url).searchParams.get('limit');
+            const limit = limitParam ? Number.parseInt(limitParam, 10) : null;
             try {
-                return await buildMediaResponse(filePath, request.headers.get('range'));
+                return await buildMediaResponse(filePath, request.headers.get('range'), limit);
             } catch (error) {
                 info(`[Protocol] Error sirviendo ${filePath}: ${String(error)}`, {}, 'network');
                 return new Response('File error', { status: 404 });

@@ -192,6 +192,7 @@ declare global {
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
             retryFileTransfer: (fileId: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: UpeerTransfer[] | Record<string, UpeerTransfer>; error?: string }>;
+            getStreamPreview: (fileId: string) => Promise<{ success: boolean; tempPath?: string; contiguousBytes?: number; totalBytes?: number; error?: string }>;
             saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
             // BUG EC fix: nuevos métodos para descargar y abrir archivos recibidos
             showSaveDialog: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;

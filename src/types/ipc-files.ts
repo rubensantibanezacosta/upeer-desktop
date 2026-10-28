@@ -131,6 +131,13 @@ export interface OpenFileResponse {
     error?: string;
 }
 
+export interface GetStreamPreviewResponse {
+    success: boolean;
+    tempPath?: string;
+    contiguousBytes?: number;
+    totalBytes?: number;
+}
+
 export interface GetLocationStatusResponse {
     publishedAt: number | null;
     lastSeq: number | null;

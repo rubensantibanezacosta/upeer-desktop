@@ -215,6 +215,7 @@ const fileTransferApi = {
     cancelFileTransfer: (fileId: string, reason?: string) => ipcRenderer.invoke('cancel-file-transfer', { fileId, reason: reason || 'User cancelled' }),
     retryFileTransfer: (fileId: string) => ipcRenderer.invoke('retry-file-transfer', { fileId }),
     getFileTransfers: () => ipcRenderer.invoke('get-file-transfers'),
+    getStreamPreview: (fileId: string) => ipcRenderer.invoke('get-stream-preview', { fileId }),
     saveTransferredFile: (fileId: string, destinationPath: string) => ipcRenderer.invoke('save-transferred-file', { fileId, destinationPath }),
 };
 

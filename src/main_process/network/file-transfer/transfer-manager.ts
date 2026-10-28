@@ -8,6 +8,7 @@ import { FileChunker } from './chunker.js';
 import { TransferValidator } from './validator.js';
 import { UINotifier } from './ui-notifier.js';
 import { ITransferManager } from './interfaces.js';
+import { canStreamPreview, contiguousPrefix, isStreamableMime } from './streamPreview.js';
 
 // Import refactored logic
 import * as sender from './sender-logic.js';
@@ -100,6 +101,26 @@ export class TransferManager implements ITransferManager {
 
     public getTransfer(fileId: string, direction: 'sending' | 'receiving') {
         return this.store.getTransfer(fileId, direction);
+    }
+
+    public getStreamPreview(fileId: string) {
+        const transfer = this.store.getTransfer(fileId, 'receiving');
+        if (!transfer || transfer.state !== 'active' || !transfer.tempPath) return null;
+        if (!isStreamableMime(transfer.mimeType, transfer.fileName)) return null;
+
+        const prefix = contiguousPrefix(
+            receiver.getReceivedChunks(fileId),
+            transfer.chunkSize,
+            transfer.fileSize,
+        );
+        if (!canStreamPreview(prefix)) return null;
+
+        return {
+            fileId,
+            tempPath: transfer.tempPath,
+            contiguousBytes: prefix.bytes,
+            totalBytes: transfer.fileSize,
+        };
     }
 
     public findTransfersByMessageId(messageId: string, direction?: 'sending' | 'receiving') {
