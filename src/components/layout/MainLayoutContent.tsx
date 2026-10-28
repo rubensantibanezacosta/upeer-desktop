@@ -303,6 +303,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                 <ChatArea
                                                     key={activeGroupId || targetUpeerId}
                                                     chatHistory={activeGroupId ? chatStore.groupChatHistory : chatStore.chatHistory}
+                                                    chatId={activeGroupId || targetUpeerId}
                                                     isGroup={!!activeGroupId}
                                                     myIp={chatStore.networkAddress || ''}
                                                     contacts={chatStore.contacts.map((contact) => ({ address: contact.address, name: contact.name, upeerId: contact.upeerId }))}

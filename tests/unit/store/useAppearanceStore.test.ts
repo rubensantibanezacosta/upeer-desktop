@@ -55,4 +55,28 @@ describe('useAppearanceStore', () => {
         expect(store.getState().theme).toBe('light');
         expect(store.getState().fontSize).toBe('large');
     });
+
+    it('guarda el estilo por chat y lo borra al volver al predeterminado', async () => {
+        const store = await loadStore();
+
+        store.getState().setChatStyle('contact-1', 'ocean');
+        store.getState().setChatStyle('group-1', 'night');
+
+        expect(store.getState().chatStyles).toEqual({ 'contact-1': 'ocean', 'group-1': 'night' });
+
+        store.getState().setChatStyle('contact-1', 'default');
+
+        expect(store.getState().chatStyles).toEqual({ 'group-1': 'night' });
+    });
+
+    it('descarta estilos guardados que ya no existen', async () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            state: { theme: 'dark', fontSize: 'medium', chatStyles: { 'contact-1': 'ocean', 'contact-2': 'inventado', 'contact-3': 42 } },
+            version: 0,
+        }));
+
+        const store = await loadStore();
+
+        expect(store.getState().chatStyles).toEqual({ 'contact-1': 'ocean' });
+    });
 });

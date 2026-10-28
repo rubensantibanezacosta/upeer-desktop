@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Dropdown, IconButton, ListDivider, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip } from '@mui/joy';
-import { Ban, Bell, BellOff, Download, Eraser, Heart, Info, LogOut, MoreVertical, Search, Trash2, X } from 'lucide-react';
+import { Ban, Bell, BellOff, Download, Eraser, Heart, Info, LogOut, MoreVertical, Palette, Search, Trash2, X } from 'lucide-react';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
+import { useAppearanceStore } from '../../store/useAppearanceStore.js';
 import { ConfirmActionDialog } from '../ui/ConfirmActionDialog.js';
+import { ChatStylePicker } from '../../features/chat/style/ChatStylePicker.js';
 
 type PendingAction = 'clear' | 'delete' | 'leave' | 'block';
 
@@ -86,7 +88,10 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
     const groupPrefs = useChatActionsStore((state) => state.groupPrefs[chatId]);
     const toggleContact = useChatActionsStore((state) => state.toggleContact);
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
+    const chatStyle = useAppearanceStore((state) => state.chatStyles[chatId]);
+    const setChatStyle = useAppearanceStore((state) => state.setChatStyle);
     const [pending, setPending] = useState<PendingAction | null>(null);
+    const [styleOpen, setStyleOpen] = useState(false);
     const muted = (kind === 'contact' ? contactPrefs?.muted : groupPrefs?.muted) ?? false;
 
     const toggleMuted = () => {
@@ -141,6 +146,10 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                         {itemIcon(<Download style={{ fontSize: 18 }} />)}
                         Exportar chat
                     </MenuItem>
+                    <MenuItem onClick={() => setStyleOpen(true)}>
+                        {itemIcon(<Palette style={{ fontSize: 18 }} />)}
+                        Estilo del chat
+                    </MenuItem>
                     <ListDivider />
                     <MenuItem onClick={onCloseChat}>
                         {itemIcon(<X style={{ fontSize: 18 }} />)}
@@ -182,6 +191,16 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                     onConfirm={runPending}
                 />
             )}
+
+            <ChatStylePicker
+                open={styleOpen}
+                value={chatStyle}
+                onSelect={(id) => {
+                    setChatStyle(chatId, id);
+                    setStyleOpen(false);
+                }}
+                onClose={() => setStyleOpen(false)}
+            />
         </>
     );
 };

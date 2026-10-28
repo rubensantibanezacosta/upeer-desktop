@@ -12,6 +12,8 @@ import { useMessageSelection } from './selection/useMessageSelection.js';
 import type { FileTransfer } from '../../hooks/fileTransferTypes.js';
 import type { ChatMessage, Contact, ConversationActivity, TransferMessageUpdates } from '../../types/chat.js';
 import { ChatDateSeparator, ChatSystemMessage, highlightChatMessage } from './chatAreaSupport.js';
+import { chatStyleSx, resolveChatStyleId } from './style/chatStyle.js';
+import { useAppearanceStore } from '../../store/useAppearanceStore.js';
 
 interface MediaClickPayload {
     url: string;
@@ -22,6 +24,7 @@ interface MediaClickPayload {
 
 interface ChatAreaProps {
     chatHistory: ChatMessage[];
+    chatId?: string;
     myIp: string;
     contacts: Pick<Contact, 'address' | 'name' | 'upeerId'>[];
     onReply: (msg: ChatMessage) => void;
@@ -41,12 +44,13 @@ interface ChatAreaProps {
     loading?: boolean;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, onForwardMany, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, peerActivity = null, loading = false }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, chatId, myIp: _myIp, contacts: _contacts, onReply, onReact, onEdit, onDelete, onForward, onForwardMany, activeTransfers = [], onRetryMessage, onRetryTransfer, onCancelTransfer, onMediaClick, isGroup, onTransferStateChange, peerActivity = null, loading = false }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const lastMsgCount = useRef(chatHistory.length);
     const { pendingScrollMsgId, setPendingScrollMsgId } = useNavigationStore();
     const { isWindowedHistory, reloadLatestHistory, loadOlderHistory } = useChatStore();
+    const chatStyleId = useAppearanceStore((state) => resolveChatStyleId(chatId ? state.chatStyles[chatId] : undefined));
     const pendingScrollRef = useRef(pendingScrollMsgId);
     const loadingOlderRef = useRef(false);
     pendingScrollRef.current = pendingScrollMsgId;
@@ -179,19 +183,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chatHistory, myIp: _myIp, co
             )}
             <Box
                 ref={scrollRef}
-                sx={{
-                    flexGrow: 1,
-                    width: '100%',
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column-reverse',
-                    backgroundColor: 'background.body',
-                    px: 4,
-                    pt: 2,
-                    pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
-                    gap: 0,
-                    boxSizing: 'border-box'
-                }}
+                data-chat-style={chatStyleId}
+                sx={[
+                    {
+                        flexGrow: 1,
+                        width: '100%',
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column-reverse',
+                        backgroundColor: 'background.body',
+                        px: 4,
+                        pt: 2,
+                        pb: `var(--upeer-composer-height, ${CHAT_COMPOSER_OVERLAY_HEIGHT}px)`,
+                        gap: 0,
+                        boxSizing: 'border-box'
+                    },
+                    chatStyleSx(chatStyleId),
+                ]}
             >
             {peerActivity && <TypingIndicator activity={peerActivity} />}
             {reversedHistory.map((msg, index) => {
