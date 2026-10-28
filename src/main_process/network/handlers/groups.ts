@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { BrowserWindow } from "electron";
 import type { GroupMessagePayload, GroupAckPayload } from "../types.js";
 import { getMainWindow } from "../../core/windowManager.js";
-import { showDesktopNotification } from "../../utils/desktopNotification.js";
+import { showMessageNotification } from "../../utils/desktopNotification.js";
 import { focusWindow } from "../../utils/windowFocus.js";
 import { getGroupById } from "../../storage/groups/operations.js";
 import {
@@ -182,8 +182,8 @@ async function applyGroupMessage(
         : displayContent.length > 80
           ? displayContent.slice(0, 77) + "..."
           : displayContent;
-      showDesktopNotification({
-        kind: "messages",
+      showMessageNotification({
+        conversationId: groupId,
         title: `${senderName} → ${groupName}`,
         body,
         onClick: () => {

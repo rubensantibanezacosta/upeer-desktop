@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
 import { getMainWindow } from '../../core/windowManager.js';
-import { showDesktopNotification } from '../../utils/desktopNotification.js';
+import { showMessageNotification } from '../../utils/desktopNotification.js';
 import { focusWindow } from '../../utils/windowFocus.js';
 import { saveMessage, getMessageById } from '../../storage/messages/operations.js';
 import { getMyUPeerId } from '../../security/identity.js';
@@ -123,8 +123,8 @@ export async function receiveChatMessage(
             const contactName = contact?.name || contact?.alias || upeerId.slice(0, 8);
             const body = displayContent.startsWith('🔒') ? 'Nuevo mensaje cifrado'
                 : displayContent.length > 80 ? `${displayContent.slice(0, 77)}...` : displayContent;
-            showDesktopNotification({
-                kind: 'messages',
+            showMessageNotification({
+                conversationId: upeerId,
                 title: contactName,
                 body,
                 onClick: () => {

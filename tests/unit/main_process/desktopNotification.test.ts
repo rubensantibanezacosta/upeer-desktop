@@ -73,4 +73,30 @@ describe('desktopNotification (Electron/X11)', () => {
         showDesktopNotification({ kind: 'messages', title: 'T', body: 'B', onClick: () => {} });
         expect(beepMock).toHaveBeenCalledTimes(1);
     });
+
+    it('agrupa los mensajes antes de presentarlos', async () => {
+        vi.useFakeTimers();
+        const { showMessageNotification } = await import('../../../src/main_process/utils/desktopNotification.js');
+        showMessageNotification({ conversationId: 'u1', title: 'Ana', body: 'hola', onClick: () => {} });
+        showMessageNotification({ conversationId: 'u2', title: 'Beto', body: 'ey', onClick: () => {} });
+
+        expect(showMock).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(1000);
+        vi.useRealTimers();
+
+        expect(showMock).toHaveBeenCalledTimes(1);
+        expect(beepMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('no encola mensajes con los avisos de mensajes apagados', async () => {
+        vi.useFakeTimers();
+        prefs.allowsNotification.mockReturnValue(false);
+        const { showMessageNotification, flushMessageNotifications } = await import('../../../src/main_process/utils/desktopNotification.js');
+        showMessageNotification({ conversationId: 'u1', title: 'Ana', body: 'hola', onClick: () => {} });
+        flushMessageNotifications();
+        vi.useRealTimers();
+
+        expect(prefs.allowsNotification).toHaveBeenCalledWith('messages');
+        expect(showMock).not.toHaveBeenCalled();
+    });
 });

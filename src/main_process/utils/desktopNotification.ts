@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { Notification as ElectronNotification, shell } from 'electron';
 import { warn } from '../security/secure-logger.js';
 import { allowsNotification, notificationSoundEnabled, type NotificationKind } from '../security/notification-prefs.js';
+import { createNotificationQueue } from './notificationQueue.js';
 
 const IS_WAYLAND =
     process.platform === 'linux' &&
@@ -12,6 +13,31 @@ interface DesktopNotificationOptions {
     title: string;
     body: string;
     onClick: () => void;
+}
+
+interface MessageNotificationOptions {
+    conversationId: string;
+    title: string;
+    body: string;
+    onClick: () => void;
+}
+
+const messageQueue = createNotificationQueue({
+    present: group => showDesktopNotification({
+        kind: group.kind,
+        title: group.title,
+        body: group.body,
+        onClick: group.onClick,
+    }),
+});
+
+export function showMessageNotification(opts: MessageNotificationOptions): void {
+    if (!allowsNotification('messages')) return;
+    messageQueue.push({ kind: 'messages', ...opts });
+}
+
+export function flushMessageNotifications(): void {
+    messageQueue.flush();
 }
 
 export function showDesktopNotification(opts: DesktopNotificationOptions): void {
