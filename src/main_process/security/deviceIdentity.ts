@@ -245,6 +245,10 @@ function loadStoredIdentity(account: string, now: number): DeviceIdentity | null
     const stored = readStoredDeviceIdentity(account);
     if (!stored) return null;
     const { secretKey, publicKey, certificate } = stored;
+    if (identityState.secretKey && secretKey.equals(identityState.secretKey)) {
+        warn('La identidad de dispositivo guardada era la raíz; se emite una clave nueva', undefined, 'identity');
+        return null;
+    }
     if (!verifyDeviceCertificate(certificate, account, now)) {
         incrementDhtSeq();
         const rebuilt = buildIdentity(secretKey, publicKey, now, certificate.epoch + 1);
