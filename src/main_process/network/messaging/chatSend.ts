@@ -101,6 +101,12 @@ export async function sendChatMessage(
         return undefined;
     }
 
+    if (upeerId.toLowerCase() === selfId.toLowerCase()) {
+        const timestamp = Date.now();
+        await saveMessage(msgId, upeerId, true, payload, replyTo, '', 'read', selfId, timestamp);
+        return { id: msgId, savedMessage: payload, timestamp };
+    }
+
     const contact = await getContactByUpeerId(upeerId) as ChatContactRecord | undefined;
     if (!contact || !['pending', 'connected', 'offline', 'disconnected'].includes(contact.status ?? '')) return undefined;
 

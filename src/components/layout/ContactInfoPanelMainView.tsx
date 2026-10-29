@@ -92,20 +92,24 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                 />
 
                 <Box sx={actionsRowSx}>
-                    <Tooltip title="Llamar" variant="soft">
-                        <span>
-                            <IconButton aria-label="Llamar" variant="plain" disabled={callsDisabled} onClick={onCallAudio} sx={actionButtonSx}>
-                                <Phone style={{ fontSize: 20 }} />
-                            </IconButton>
-                        </span>
-                    </Tooltip>
-                    <Tooltip title="Videollamar" variant="soft">
-                        <span>
-                            <IconButton aria-label="Videollamar" variant="plain" disabled={callsDisabled} onClick={onCallVideo} sx={actionButtonSx}>
-                                <Video style={{ fontSize: 20 }} />
-                            </IconButton>
-                        </span>
-                    </Tooltip>
+                    {contact.isSelf ? null : (
+                        <>
+                            <Tooltip title="Llamar" variant="soft">
+                                <span>
+                                    <IconButton aria-label="Llamar" variant="plain" disabled={callsDisabled} onClick={onCallAudio} sx={actionButtonSx}>
+                                        <Phone style={{ fontSize: 20 }} />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
+                            <Tooltip title="Videollamar" variant="soft">
+                                <span>
+                                    <IconButton aria-label="Videollamar" variant="plain" disabled={callsDisabled} onClick={onCallVideo} sx={actionButtonSx}>
+                                        <Video style={{ fontSize: 20 }} />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
+                        </>
+                    )}
                     <Tooltip title="Buscar en el chat" variant="soft">
                         <span>
                             <IconButton aria-label="Buscar en el chat" variant="plain" onClick={onOpenSearch} sx={actionButtonSx}>

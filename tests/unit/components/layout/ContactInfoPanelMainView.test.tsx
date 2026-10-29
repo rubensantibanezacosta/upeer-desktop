@@ -69,7 +69,7 @@ describe('ContactInfoPanelMainView call and search actions', () => {
         expect(onOpenStarred).toHaveBeenCalledOnce();
     });
 
-    it('desactiva las llamadas cuando el contacto soy yo', () => {
+    it('no ofrece llamadas cuando el contacto soy yo', () => {
         const onCallAudio = vi.fn();
         render(
             <ContactInfoPanelMainView
@@ -93,9 +93,8 @@ describe('ContactInfoPanelMainView call and search actions', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Llamar' }));
-
-        expect(onCallAudio).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: 'Llamar' }).hasAttribute('disabled')).toBe(true);
+        expect(screen.queryByRole('button', { name: 'Llamar' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Videollamar' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Buscar en el chat' })).toBeDefined();
     });
 });

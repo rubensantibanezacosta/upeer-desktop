@@ -194,6 +194,32 @@ describe('network/messaging/chat.ts', () => {
         expect(startDhtSearch).toHaveBeenCalledWith('peer-offline', expect.any(Function));
     });
 
+    it('guarda en local el mensaje que me envio a mi mismo', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { sendChatMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue(undefined);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+
+        const result = await sendChatMessage('self-id', 'nota para mi', 'reply-9', 'msg-self');
+
+        expect(result).toEqual(expect.objectContaining({ id: 'msg-self', savedMessage: 'nota para mi' }));
+        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+            'msg-self',
+            'self-id',
+            true,
+            'nota para mi',
+            'reply-9',
+            '',
+            'read',
+            'self-id',
+            expect.any(Number)
+        );
+        expect(VaultManager.replicateToVaults).not.toHaveBeenCalled();
+    });
+
     it('does not send messages to blocked contacts', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
