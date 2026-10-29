@@ -10,10 +10,10 @@ interface Reaction {
 interface MessageReactionsProps {
     reactions: Reaction[];
     isMe: boolean;
-    onRemoveReact: (emoji: string) => void;
+    onToggleReact: (emoji: string, mine: boolean) => void;
 }
 
-export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, isMe, onRemoveReact }) => {
+export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, isMe, onToggleReact }) => {
     const myUpeerId = useChatStore((state) => state.myIdentity?.upeerId);
 
     if (!reactions || reactions.length === 0) return null;
@@ -52,7 +52,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({ reactions, i
             {Object.entries(grouped).map(([emoji, { count, hasMine }]) => (
                 <Box
                     key={emoji}
-                    onClick={() => onRemoveReact(emoji)}
+                    onClick={() => onToggleReact(emoji, hasMine)}
                     sx={{
                         px: 0.75,
                         height: '22px',

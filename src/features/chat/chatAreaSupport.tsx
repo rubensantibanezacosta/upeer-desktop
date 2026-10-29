@@ -19,6 +19,25 @@ export function parseCallSystemEvent(message: string): CallSystemEvent | null {
     return { kind: match[1] === 'Videollamada' ? 'video' : 'audio', duration: match[2], startedAt: match[3] ? Number(match[3]) : null, outcome: null };
 }
 
+const SYSTEM_PREFIX = '__SYS__|';
+const ACTOR_ID = /^[0-9a-f]{16,}(?=\s)/i;
+const ACTOR_PLACEHOLDER = 'Alguien';
+
+export function humanizeSystemActor(text: string): string {
+    return text.replace(ACTOR_ID, ACTOR_PLACEHOLDER);
+}
+
+export function systemPreviewText(message: string): string | null {
+    if (!message.startsWith(SYSTEM_PREFIX)) return null;
+    const text = humanizeSystemActor(message.slice(SYSTEM_PREFIX.length).trim());
+    if (!text) return null;
+    const callEvent = parseCallSystemEvent(text);
+    if (!callEvent) return text;
+    const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
+    if (callEvent.duration) return `${label} · ${callEvent.duration}`;
+    return callEvent.outcome === 'rejected' ? `${label} rechazada` : `${label} perdida`;
+}
+
 export const formatChatDateLabel = (date: number) => {
     const currentDate = new Date(date);
     const now = new Date();
@@ -99,7 +118,7 @@ export const ChatSystemMessage: React.FC<ChatSystemMessageProps> = ({ message })
                 userSelect: 'none',
             }}
         >
-            {message}
+            {humanizeSystemActor(message)}
         </Typography>
     </Box>
     );

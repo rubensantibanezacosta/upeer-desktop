@@ -9,6 +9,7 @@ import { security, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
 import { withGroupOperationLock } from '../groupOperationQueue.js';
 import { clearPendingGroupEncryptedOperations } from '../messaging/encryptedOperationRetry.js';
+import { groupActorName } from './groupActorName.js';
 
 async function applyGroupLeave(
     upeerId: string,
@@ -73,9 +74,9 @@ async function applyGroupLeave(
         updateGroupMembers(groupId, newMembers);
     }
 
-    const senderName = contact.name || upeerId;
+    const senderName = upeerId === myId ? null : await groupActorName(upeerId, contact.name);
     const systemMsgId = randomUUID();
-    const systemText = `${senderName} dejó el grupo`;
+    const systemText = senderName ? `${senderName} dejó el grupo` : 'Has salido del grupo';
     await saveMessage(systemMsgId, groupId, false, `__SYS__|${systemText}`, undefined, undefined, 'delivered');
 
     win?.webContents.send('group-updated', { groupId, members: newMembers });

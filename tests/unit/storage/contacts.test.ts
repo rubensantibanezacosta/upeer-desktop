@@ -57,6 +57,11 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
     isYggdrasilAddress: vi.fn(() => true),
 }));
 
+vi.mock('../../../src/main_process/storage/messages/latestReaction.js', () => ({
+    getLatestReactionByChat: () => new Map(),
+    reactionIsNewer: () => false,
+}));
+
 describe('Contacts Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();

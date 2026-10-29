@@ -1,7 +1,7 @@
 import { getDb, getSchema, eq, and } from '../shared.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
 
-export function saveReaction(messageId: string, upeerId: string, emoji: string) {
+export function saveReaction(messageId: string, upeerId: string, emoji: string, atMillis?: number) {
     const db = getDb();
     const schema = getSchema();
 
@@ -17,7 +17,7 @@ export function saveReaction(messageId: string, upeerId: string, emoji: string) 
             messageId,
             upeerId,
             emoji,
-            timestamp: Date.now()
+            timestamp: atMillis ?? Date.now()
         }).run();
         if ((result?.changes ?? 0) > 0) {
             emitSyncEvent('REACTION_SET', { messageId, upeerId, emoji, remove: false });

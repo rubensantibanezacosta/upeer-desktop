@@ -5,7 +5,7 @@ import { getFileIcon, LIST_PREVIEW_ICON_SIZE } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
-import { parseCallSystemEvent } from '../../features/chat/chatAreaSupport.js';
+import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 
 const parseJsonMessage = (message: string) => {
@@ -30,20 +30,22 @@ export const renderPendingLabel = (contact: Contact) => (
 );
 
 export const renderLastMessagePreview = (contact: Contact, highlight: string) => {
+    if (contact.latestReaction) {
+        const { emoji, message } = contact.latestReaction;
+        const inner = message ? renderLastMessagePreview({ ...contact, latestReaction: undefined, lastMessage: message }, highlight) : null;
+        return (
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                <span>{emoji}</span>
+                {typeof inner === 'string' ? (inner ? <span>{inner}</span> : null) : inner}
+            </Box>
+        );
+    }
     if (!contact.lastMessage) {
         return '';
     }
-    const systemMessage = contact.lastMessage.startsWith('__SYS__|')
-        ? contact.lastMessage.slice(8)
-        : contact.lastMessage;
-    const callEvent = parseCallSystemEvent(systemMessage);
-    if (callEvent) {
-        const label = callEvent.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
-        if (callEvent.duration) return `${label} · ${callEvent.duration}`;
-        return callEvent.outcome === 'rejected' ? `${label} rechazada` : `${label} perdida`;
-    }
-    if (systemMessage !== contact.lastMessage) {
-        return systemMessage;
+    const systemMessage = systemPreviewText(contact.lastMessage);
+    if (systemMessage) {
+        return highlight ? highlightText(systemMessage, highlight) : systemMessage;
     }
     const contactCardSummary = getContactCardSummary(contact.lastMessage);
     if (contactCardSummary) {
@@ -93,7 +95,7 @@ export const renderLastMessagePreview = (contact: Contact, highlight: string) =>
 };
 
 export const renderMessageStatusIcon = (contact: Contact) => {
-    if (!contact.lastMessageIsMine) {
+    if (contact.latestReaction || !contact.lastMessageIsMine) {
         return null;
     }
     if (contact.lastMessageStatus === 'failed') {

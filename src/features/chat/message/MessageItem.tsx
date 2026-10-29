@@ -243,7 +243,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             <MessageReactions
                                 reactions={msg.reactions || []}
                                 isMe={isMe}
-                                onRemoveReact={(emoji) => msg.id && onReact(msg.id, emoji, true)}
+                                onToggleReact={(emoji, mine) => msg.id && onReact(msg.id, emoji, mine)}
                             />
                         </Box>
 

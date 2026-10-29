@@ -3,7 +3,8 @@ import { isYggdrasilAddress } from '../../network/utils.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
 import { setSettingsClock } from '../sync/settings-sync.js';
 import { getAlias, getAvatar, getMyUPeerId } from '../../security/identity.js';
-import type { Contact } from '../../../types/chat.js';
+import { getLatestReactionByChat, reactionIsNewer, type LatestReaction } from '../messages/latestReaction.js';
+import type { Contact, LatestReactionPreview } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
     knownAddresses?: string | null;
@@ -37,6 +38,21 @@ type ContactWithLastMessage = StoredContact & {
     lastMessageTime?: number | string | null;
     lastMessageIsMine?: boolean | null;
     lastMessageStatus?: string | null;
+    latestReaction?: LatestReactionPreview;
+};
+
+const withLatestReaction = (entry: ContactWithLastMessage, reaction: LatestReaction | undefined): ContactWithLastMessage => {
+    if (!reaction || !reactionIsNewer(reaction, entry.lastMessageTime)) return entry;
+    return {
+        ...entry,
+        lastMessageTime: String(reaction.timestamp),
+        latestReaction: {
+            emoji: reaction.emoji,
+            message: reaction.message ?? '',
+            timestamp: reaction.timestamp,
+            actorUpeerId: reaction.actorUpeerId
+        }
+    };
 };
 
 export function getContactByUpeerId(upeerId: string) {
@@ -92,17 +108,18 @@ export function getContacts() {
         if (!message?.chatUpeerId || lastMessageByChat.has(message.chatUpeerId)) continue;
         lastMessageByChat.set(message.chatUpeerId, message);
     }
+    const reactionsByChat = getLatestReactionByChat();
 
     const result: ContactWithLastMessage[] = contactsList.map(c => {
         const lastMsgObj = lastMessageByChat.get(c.upeerId || '');
 
-        return {
+        return withLatestReaction({
             ...c,
             lastMessage: lastMsgObj?.message,
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        } as ContactWithLastMessage;
+        } as ContactWithLastMessage, reactionsByChat.get(c.upeerId || ''));
     });
 
     const knownUpeerIds = new Set(result.map(contact => contact.upeerId));
@@ -111,7 +128,7 @@ export function getContacts() {
         if (!chatUpeerId || chatUpeerId.startsWith('grp-') || knownUpeerIds.has(chatUpeerId)) continue;
         const isSelfChat = myUpeerId !== '' && chatUpeerId === myUpeerId;
 
-        result.push({
+        result.push(withLatestReaction({
             upeerId: chatUpeerId,
             address: '',
             name: isSelfChat ? (getAlias() || 'Tú') : 'Contacto eliminado',
@@ -123,7 +140,7 @@ export function getContacts() {
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        } as ContactWithLastMessage);
+        } as ContactWithLastMessage, reactionsByChat.get(chatUpeerId)));
     }
 
     result.sort((a, b) => {

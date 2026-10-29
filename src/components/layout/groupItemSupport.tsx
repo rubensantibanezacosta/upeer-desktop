@@ -5,6 +5,7 @@ import { Group } from '../../types/chat.js';
 import { getFileIcon, LIST_PREVIEW_ICON_SIZE } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
+import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 import { listRowAvatarSx } from './listRowMetrics.js';
 
@@ -26,7 +27,7 @@ export const GroupAvatar: React.FC<{ avatar?: string | null; size?: 'sm' | 'md' 
 );
 
 export const GroupItemStatusIcon: React.FC<{ group: Group }> = ({ group }) => {
-    if (!group.lastMessageIsMine || !group.lastMessage) {
+    if (group.latestReaction || !group.lastMessageIsMine || !group.lastMessage) {
         return null;
     }
     if (group.lastMessageStatus === 'failed') {
@@ -56,8 +57,22 @@ const renderGroupFilePreview = (fileName: string, mimeType: string) => (
 );
 
 export const renderGroupLastMessage = (group: Group, highlight: string) => {
+    if (group.latestReaction) {
+        const { emoji, message } = group.latestReaction;
+        const inner = message ? renderGroupLastMessage({ ...group, latestReaction: undefined, lastMessage: message }, highlight) : null;
+        return (
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                <span>{emoji}</span>
+                {typeof inner === 'string' ? (inner ? <span>{inner}</span> : null) : inner}
+            </Box>
+        );
+    }
     if (!group.lastMessage) {
         return `${group.members.length} miembro${group.members.length !== 1 ? 's' : ''}`;
+    }
+    const systemMessage = systemPreviewText(group.lastMessage);
+    if (systemMessage) {
+        return highlight ? highlightText(systemMessage, highlight) : systemMessage;
     }
     const contactCardSummary = getContactCardSummary(group.lastMessage);
     if (contactCardSummary) {

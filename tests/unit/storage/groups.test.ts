@@ -56,6 +56,11 @@ vi.mock('../../../src/main_process/security/identity.js', () => ({
     getUPeerIdFromPublicKey: (publicKey: Buffer) => publicKey.toString('hex') === 'ab'.repeat(32) ? 'peer' : 'not-peer',
 }));
 
+vi.mock('../../../src/main_process/storage/messages/latestReaction.js', () => ({
+    getLatestReactionByChat: () => new Map(),
+    reactionIsNewer: () => false,
+}));
+
 describe('Groups Operations', () => {
     beforeEach(() => {
         vi.clearAllMocks();

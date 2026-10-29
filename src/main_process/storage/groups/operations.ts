@@ -1,6 +1,8 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 import { getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
+import { getLatestReactionByChat, reactionIsNewer } from '../messages/latestReaction.js';
+import type { LatestReactionPreview } from '../../../types/chat.js';
 
 export interface GroupRecord {
     groupId: string;
@@ -19,6 +21,7 @@ export interface GroupRecord {
     lastMessageTime?: string;
     lastMessageStatus?: string;
     lastMessageIsMine?: boolean;
+    latestReaction?: LatestReactionPreview;
 }
 
 export interface GroupCryptoState {
@@ -207,6 +210,7 @@ export function getGroups(): GroupRecord[] {
     const db = getDb();
     const schema = getSchema();
     const rawGroups = (db.select().from(schema.groups).all() as GroupRow[]).map(parseGroup);
+    const reactionsByChat = getLatestReactionByChat();
     const result = rawGroups.map(g => {
         const lastMsgObj = db.select().from(schema.messages)
             .where(eq(schema.messages.chatUpeerId, g.groupId))
@@ -216,12 +220,23 @@ export function getGroups(): GroupRecord[] {
         // El cast a string causaba que el sorting numérico fallara cuando el
         // timestamp era un número grande interpretado como string corto.
         const lastMessageTime = lastMsgObj?.timestamp !== undefined ? Number(lastMsgObj.timestamp) : undefined;
+        const reaction = reactionsByChat.get(g.groupId);
+        const reactionNewer = reaction !== undefined && reactionIsNewer(reaction, lastMessageTime);
+        const latestReaction = reactionNewer && reaction
+            ? {
+                emoji: reaction.emoji,
+                message: reaction.message ?? '',
+                timestamp: reaction.timestamp,
+                actorUpeerId: reaction.actorUpeerId
+            }
+            : undefined;
         return {
             ...g,
             lastMessage: lastMsgObj?.message as string | undefined,
-            lastMessageTime: lastMessageTime?.toString() ?? undefined,
+            lastMessageTime: latestReaction ? String(latestReaction.timestamp) : lastMessageTime?.toString() ?? undefined,
             lastMessageStatus: lastMsgObj?.status as string | undefined,
-            lastMessageIsMine: !!lastMsgObj?.isMine
+            lastMessageIsMine: !!lastMsgObj?.isMine,
+            latestReaction
         };
     });
     result.sort((a, b) => {

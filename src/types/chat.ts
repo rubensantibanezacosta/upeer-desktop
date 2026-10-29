@@ -133,6 +133,13 @@ export interface ReputationData {
     connectionCount: number;
 }
 
+export interface LatestReactionPreview {
+    emoji: string;
+    message: string;
+    timestamp: number;
+    actorUpeerId: string;
+}
+
 export interface Contact {
     upeerId: string;
     address: string;
@@ -154,6 +161,7 @@ export interface Contact {
     blockedAt?: string | null;
     isConversationOnly?: boolean;
     isSelf?: boolean;
+    latestReaction?: LatestReactionPreview;
 }
 
 export interface Group {
@@ -170,6 +178,7 @@ export interface Group {
     lastMessageTime?: string;
     lastMessageStatus?: string;
     lastMessageIsMine?: boolean;
+    latestReaction?: LatestReactionPreview;
 }
 
 export interface MediaItem {

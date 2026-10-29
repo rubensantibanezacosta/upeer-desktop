@@ -1,8 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ChatSystemMessage, parseCallSystemEvent } from '../../../../src/features/chat/chatAreaSupport.js';
-
+import { ChatSystemMessage, humanizeSystemActor, parseCallSystemEvent, systemPreviewText } from '../../../../src/features/chat/chatAreaSupport.js';
 vi.mock('lucide-react', async (importOriginal) => ({
     ...(await importOriginal<typeof import('lucide-react')>()),
     Phone: () => <span data-testid="audio-call-icon" />,
@@ -55,5 +54,41 @@ describe('ChatSystemMessage', () => {
         expect(parseCallSystemEvent('Llamada de voz perdida')).toEqual({ kind: 'audio', duration: null, startedAt: null, outcome: 'missed' });
         expect(parseCallSystemEvent('Videollamada rechazada')).toEqual({ kind: 'video', duration: null, startedAt: null, outcome: 'rejected' });
         expect(parseCallSystemEvent('mensaje normal')).toBeNull();
+    });
+});
+
+describe('systemPreviewText', () => {
+    it('quita el prefijo de los mensajes de sistema', () => {
+        expect(systemPreviewText('__SYS__|Rubén te añadió al grupo')).toBe('Rubén te añadió al grupo');
+    });
+
+    it('resume los eventos de llamada con su duración y resultado', () => {
+        expect(systemPreviewText('__SYS__|Videollamada · 01:30 · 1792065600000')).toBe('Videollamada · 01:30');
+        expect(systemPreviewText('__SYS__|Llamada de voz perdida')).toBe('Llamada de voz perdida');
+        expect(systemPreviewText('__SYS__|Videollamada rechazada')).toBe('Videollamada rechazada');
+    });
+
+    it('sustituye un identificador suelto por un actor legible', () => {
+        const actor = 'da4163f3528710db1adeca2211274d217728845044c70b912759e856493d1834';
+        expect(systemPreviewText(`__SYS__|${actor} te añadió al grupo`)).toBe('Alguien te añadió al grupo');
+    });
+
+    it('ignora lo que no es un mensaje de sistema', () => {
+        expect(systemPreviewText('hola')).toBeNull();
+        expect(systemPreviewText('__SYS__|   ')).toBeNull();
+    });
+});
+
+describe('humanizeSystemActor', () => {
+    it('no toca un nombre normal', () => {
+        expect(humanizeSystemActor('Ivan dejó el grupo')).toBe('Ivan dejó el grupo');
+    });
+
+    it('respeta palabras cortas con hex', () => {
+        expect(humanizeSystemActor('abc123 dejó el grupo')).toBe('abc123 dejó el grupo');
+    });
+
+    it('sustituye el identificador completo', () => {
+        expect(humanizeSystemActor(`${'a'.repeat(64)} dejó el grupo`)).toBe('Alguien dejó el grupo');
     });
 });

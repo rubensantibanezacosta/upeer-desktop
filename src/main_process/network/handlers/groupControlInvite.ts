@@ -15,6 +15,7 @@ import {
 import { saveMessage } from "../../storage/messages/operations.js";
 import { getContactByUpeerId, isContactBlocked } from "../../storage/contacts/operations.js";
 import { getMyUPeerId } from "../../security/identity.js";
+import { groupActorName } from "./groupActorName.js";
 import { issueVouch, VouchType } from "../../security/reputation/vouches.js";
 import { security, warn } from "../../security/secure-logger.js";
 import { withGroupOperationLock } from "../groupOperationQueue.js";
@@ -55,11 +56,11 @@ async function applyGroupInvite(
   let avatar: string | undefined;
   let epoch: number;
   let senderKey: string;
-  let senderDisplayName = upeerId;
+  let senderDisplayName = await groupActorName(upeerId);
 
   try {
     const contact = await getContactByUpeerId(upeerId);
-    senderDisplayName = contact?.name || contact?.alias || upeerId;
+    senderDisplayName = await groupActorName(upeerId, contact?.name || contact?.alias);
     const inner = await decryptGroupControlPayload(
       upeerId,
       data,

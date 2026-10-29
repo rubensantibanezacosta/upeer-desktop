@@ -53,7 +53,7 @@ export async function applySyncEventOutcome(event: SyncPlainEvent, win: BrowserW
             case 'CHAT_CLEAR':
                 return outcome(await applyClear(event.payload, win));
             case 'REACTION_SET':
-                return outcome(await applyReaction(event.payload, win));
+                return outcome(await applyReaction(event.payload, win, event.occurredAt));
             case 'GROUP_UPSERT':
                 return outcome(await applyGroupUpsert(event.payload, win));
             case 'GROUP_DELETE':
@@ -145,16 +145,17 @@ function applyClear(payload: Record<string, unknown>, win: BrowserWindow | null)
     return true;
 }
 
-function applyReaction(payload: Record<string, unknown>, win: BrowserWindow | null): boolean {
+function applyReaction(payload: Record<string, unknown>, win: BrowserWindow | null, occurredAt?: number): boolean {
     if (typeof payload.messageId !== 'string' || typeof payload.upeerId !== 'string' || typeof payload.emoji !== 'string') {
         return false;
     }
     const message = getMessageById(payload.messageId) as { chatUpeerId?: string } | undefined;
     if (!message) return false;
+    const atMillis = typeof occurredAt === 'number' && Number.isFinite(occurredAt) ? occurredAt : undefined;
     if (payload.remove === true) {
         deleteReaction(payload.messageId, payload.upeerId, payload.emoji);
     } else {
-        saveReaction(payload.messageId, payload.upeerId, payload.emoji);
+        saveReaction(payload.messageId, payload.upeerId, payload.emoji, atMillis);
     }
     win?.webContents.send('message-reaction-updated', {
         msgId: payload.messageId,

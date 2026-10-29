@@ -53,6 +53,11 @@ vi.mock('../../../src/main_process/storage/sync/settings-sync.js', () => ({
     setSettingsClock: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/storage/messages/latestReaction.js', () => ({
+    getLatestReactionByChat: () => new Map(),
+    reactionIsNewer: () => false,
+}));
+
 const identity = vi.hoisted(() => ({ upeerId: '', alias: '', avatar: '' }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
