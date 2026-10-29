@@ -131,6 +131,29 @@ describe('adopción de ajustes sincronizados en el renderer', () => {
         expect(bridge.getPendingSettingsPatches).not.toHaveBeenCalled();
     });
 
+    it('un perfil sincronizado refresca la identidad del renderer', async () => {
+        const bridge = installBridge([]);
+        const identity = vi.fn(async () => ({ address: 'a', upeerId: 'u', publicKey: 'p', alias: 'Remoto', avatar: '' }));
+        (window as unknown as { upeer: Record<string, unknown> }).upeer.getMyIdentity = identity;
+        const settings = await import('../../../src/store/remoteSettings.js');
+        const { useChatStore } = await import('../../../src/store/useChatStore.js');
+
+        settings.handleSettingsUpdated({ block: 'profile', entity: 'profile', values: { alias: 'Remoto' }, occurredAt: 6_000 });
+        await vi.waitFor(() => {
+            expect(useChatStore.getState().myIdentity?.alias).toBe('Remoto');
+        });
+
+        expect(identity).toHaveBeenCalledTimes(1);
+        expect(bridge.getPendingSettingsPatches).not.toHaveBeenCalled();
+    });
+
+    it('el perfil no se puede empujar desde el renderer', async () => {
+        const { isRendererOwnedBlock } = await import('../../../src/store/remoteSettings.js');
+
+        expect(isRendererOwnedBlock('profile')).toBe(false);
+        expect(isRendererOwnedBlock('blocked')).toBe(false);
+    });
+
     it('clasifica como del renderer solo chat, message y lists', async () => {
         const { isRendererOwnedBlock } = await import('../../../src/store/remoteSettings.js');
 

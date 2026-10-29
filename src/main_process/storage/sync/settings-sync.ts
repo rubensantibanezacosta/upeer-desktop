@@ -2,7 +2,7 @@ import { getAppSetting, setAppSetting } from '../settings-operations.js';
 import { resolveRetentionId } from '../../../utils/retention.js';
 import { sanitizeChatIds, sanitizeListName } from '../../../utils/chatLists.js';
 
-export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message' | 'lists' | 'blocked';
+export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message' | 'lists' | 'blocked' | 'profile';
 
 export type SettingsValues = Record<string, boolean | string | string[]>;
 
@@ -15,6 +15,12 @@ export type SettingsPatch = {
 const CLOCK_KEY = 'settings-sync-clock';
 
 const MAX_ID_LENGTH = 200;
+
+export const PROFILE_ALIAS_MAX = 100;
+
+export const PROFILE_AVATAR_MAX = 900_000;
+
+const AVATAR_PATTERN = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 const BOOLEAN_BLOCKS: Record<string, readonly string[]> = {
     privacy: ['readReceipts', 'shareActivity'],
@@ -32,7 +38,7 @@ const ID_FIELD: Record<string, string> = {
     blocked: 'upeerId',
 };
 
-const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message', 'lists', 'blocked'];
+const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message', 'lists', 'blocked', 'profile'];
 
 export function isSettingsBlock(value: unknown): value is SettingsBlock {
     return typeof value === 'string' && (BLOCKS as readonly string[]).includes(value);
@@ -56,6 +62,21 @@ export function settingsEntity(block: unknown, payload: Record<string, unknown>)
     return id ? `${block}:${id}` : '';
 }
 
+export function sanitizeProfilePatch(entity: string, payload: Record<string, unknown>): SettingsPatch | null {
+    const values: SettingsValues = {};
+    if (typeof payload.alias === 'string') {
+        const alias = payload.alias.trim().slice(0, PROFILE_ALIAS_MAX);
+        if (alias) values.alias = alias;
+    }
+    if (typeof payload.avatar === 'string') {
+        const avatar = payload.avatar.trim();
+        if (!avatar) values.avatar = '';
+        else if (avatar.length <= PROFILE_AVATAR_MAX && AVATAR_PATTERN.test(avatar)) values.avatar = avatar;
+    }
+    if (Object.keys(values).length === 0) return null;
+    return { block: 'profile', entity, values };
+}
+
 export function sanitizeSettingsPatch(payload: Record<string, unknown>): SettingsPatch | null {
     const block = payload.block;
     if (!isSettingsBlock(block)) return null;
@@ -68,6 +89,8 @@ export function sanitizeSettingsPatch(payload: Record<string, unknown>): Setting
         const retention = resolveRetentionId(typeof payload.retention === 'string' ? payload.retention : null);
         return { block, entity, values: { chatId, retention } };
     }
+
+    if (block === 'profile') return sanitizeProfilePatch(entity, payload);
 
     if (block === 'lists') {
         const listId = cleanId(payload.listId);

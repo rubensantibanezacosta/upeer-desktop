@@ -1,4 +1,4 @@
-import { getMyPublicKey, getMyUPeerId } from '../../security/identity.js';
+import { getAlias, getAvatar, getMyPublicKey, getMyUPeerId } from '../../security/identity.js';
 import { encryptChatPayload } from '../messaging/chatEncryption.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { buildHelloPayload, getMySyncIdentity } from './auth.js';
@@ -10,6 +10,7 @@ import type { AccountRegistry } from '../accountRegistry.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { getMaxSyncSequence } from '../../storage/sync/events.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
+import { PROFILE_ALIAS_MAX } from '../../storage/sync/settings-sync.js';
 import { listContactProfiles } from '../../storage/contacts/operations.js';
 import { signSyncEventOrigin } from './origin.js';
 
@@ -147,7 +148,25 @@ export async function sendSyncProfiles(peer: SyncPeerRecord): Promise<number> {
         });
         if (await sendSyncEnvelope(peer, event)) sent += 1;
     }
+    sent += await sendSyncProfile(peer);
     return sent;
+}
+
+async function sendSyncProfile(peer: SyncPeerRecord): Promise<number> {
+    const identity = getMySyncIdentity();
+    if (!identity) return 0;
+    const alias = getAlias().slice(0, PROFILE_ALIAS_MAX);
+    const avatar = getAvatar();
+    if (!alias && !avatar) return 0;
+    const event = signSyncEventOrigin({
+        eventId: `profile-self-${Date.now()}`,
+        kind: 'SETTINGS_UPDATE' as const,
+        occurredAt: Date.now(),
+        sequence: nextSyncSequence(),
+        originDeviceId: identity.deviceId,
+        payload: { block: 'profile', alias, avatar },
+    });
+    return (await sendSyncEnvelope(peer, event)) ? 1 : 0;
 }
 
 function peerContact(peer: SyncPeerRecord): {

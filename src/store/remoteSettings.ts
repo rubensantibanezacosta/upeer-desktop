@@ -3,6 +3,8 @@ import { hydratePrivacyPrefs } from './privacySync.js';
 import { useChatActionsStore } from './useChatActionsStore.js';
 import { useChatListsStore } from './useChatListsStore.js';
 import { useChatRetentionStore } from './chatRetentionStore.js';
+import { useChatStore } from './useChatStore.js';
+import type { MyIdentity } from '../types/chat.js';
 
 export type RemoteSettingsPatch = {
     block: string;
@@ -36,9 +38,23 @@ export function applyRemoteSettingsPatch(patch: RemoteSettingsPatch): void {
         useChatListsStore.getState().applyRemoteList(values);
         return;
     }
+    if (patch.block === 'profile') {
+        void refreshMyIdentity();
+        return;
+    }
     hydrateNotificationPrefs().catch((cause: unknown) => {
         console.warn('No se pudieron releer las preferencias de notificación sincronizadas.', cause);
     });
+}
+
+async function refreshMyIdentity(): Promise<void> {
+    const read = typeof window !== 'undefined' ? window.upeer?.getMyIdentity : undefined;
+    if (typeof read !== 'function') return;
+    const identity = (await read().catch((cause: unknown) => {
+        console.warn('No se pudo releer la identidad sincronizada.', cause);
+        return null;
+    })) as MyIdentity | null;
+    if (identity) useChatStore.getState().setMyIdentity(identity);
 }
 
 export function isRendererOwnedBlock(block: string): boolean {

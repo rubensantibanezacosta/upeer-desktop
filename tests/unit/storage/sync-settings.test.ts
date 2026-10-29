@@ -159,6 +159,32 @@ describe('settings-sync', () => {
         expect(isRendererBlock('blocked')).toBe(false);
     });
 
+    it('el perfil de la cuenta viaja como bloque único', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'profile', alias: '  Rubén  ' })).toEqual({
+            block: 'profile',
+            entity: 'profile',
+            values: { alias: 'Rubén' },
+        });
+        expect(sanitizeSettingsPatch({ block: 'profile', avatar: '' })).toEqual({
+            block: 'profile',
+            entity: 'profile',
+            values: { avatar: '' },
+        });
+    });
+
+    it('el perfil descarta un alias vacío y una foto que no es una imagen', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'profile', alias: '   ' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'profile', avatar: 'https://example.com/a.png' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'profile', avatar: `data:image/jpeg;base64,${'A'.repeat(1_000_000)}` })).toBeNull();
+    });
+
+    it('el perfil lo aplica el proceso principal, no el renderer', async () => {
+        const { isRendererBlock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(isRendererBlock('profile')).toBe(false);
+    });
+
     it('rechaza un parche sin valores utilizables', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'privacy' })).toBeNull();

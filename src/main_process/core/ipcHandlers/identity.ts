@@ -21,6 +21,7 @@ import { verifyAccessPin } from '../../security/pin.js';
 import { getIdentityMode } from '../../security/identityMode.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
+import { emitProfileSettings } from '../../security/profileSync.js';
 import { closeUDPServer, startUDPServer } from '../../network/server/tcpServer.js';
 import { stopPeerManager } from '../../sidecars/peer-manager.js';
 
@@ -145,6 +146,7 @@ export function registerIdentityHandlers(): void {
         sendSecurePacket(node.address, syncPacket, myPk);
       }
     }
+    emitProfileSettings();
 
     return { success: true };
   });
@@ -180,6 +182,7 @@ export function registerIdentityHandlers(): void {
         sendSecurePacket(node.address, syncPacket, myPk);
       }
     }
+    emitProfileSettings();
 
     return { success: true };
   });

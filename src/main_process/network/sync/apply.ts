@@ -28,6 +28,7 @@ import {
 import { applyRetentionFromSync } from '../../storage/retention/chatRetention.js';
 import { applyNotificationFromSync } from '../../security/notification-prefs.js';
 import { applyPrivacyFromSync } from '../../security/privacy-prefs.js';
+import { applyProfileFromSync } from '../../security/profileSync.js';
 import type { SyncPlainEvent } from './types.js';
 
 const VALID_STATUSES = new Set(['failed', 'sent', 'delivered', 'read', 'vaulted']);
@@ -242,6 +243,7 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
         applyBlockedFromSync(upeerId, blocked);
         return { upeerId, blocked };
     }
+    if (patch.block === 'profile') return { ...applyProfileFromSync(patch.values, occurredAt) };
     if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };
     return { ...applyNotificationFromSync(patch.values, occurredAt) };
 }

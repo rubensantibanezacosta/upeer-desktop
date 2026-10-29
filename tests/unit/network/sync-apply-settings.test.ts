@@ -36,6 +36,21 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     updateContactName: vi.fn(),
 }));
 
+vi.mock('../../../src/main_process/security/identity.js', () => {
+    let alias = '';
+    let avatar = '';
+    return {
+        getAlias: () => alias,
+        setAlias: (next: string) => { alias = next; },
+        getAvatar: () => avatar,
+        setAvatar: (next: string) => { avatar = next; },
+        getMyAlias: () => alias,
+        setMyAlias: (next: string) => { alias = next; },
+        getMyAvatar: () => avatar,
+        setMyAvatar: (next: string) => { avatar = next; },
+    };
+});
+
 vi.mock('../../../src/main_process/storage/sync/messages.js', () => ({
     upsertSyncMessage: vi.fn(() => ({ applied: false, inserted: false })),
 }));
@@ -110,6 +125,40 @@ describe('applySyncEvent con ajustes', () => {
     it('rechaza un parche vacío', async () => {
         const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
         expect(await applySyncEvent(event({ block: 'privacy' }), null)).toBe(false);
+    });
+
+    it('aplica el perfil de la cuenta que llega de otro dispositivo', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'profile', alias: 'Rubén', avatar: 'data:image/jpeg;base64,AAAA' }), win);
+
+        expect(applied).toBe(true);
+        expect(identity.getAlias()).toBe('Rubén');
+        expect(identity.getAvatar()).toBe('data:image/jpeg;base64,AAAA');
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'profile',
+            entity: 'profile',
+            values: { alias: 'Rubén', avatar: 'data:image/jpeg;base64,AAAA' },
+        });
+    });
+
+    it('el perfil más antiguo no pisa al que ya se aplicó', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const identity = await import('../../../src/main_process/security/identity.js');
+
+        expect(await applySyncEvent(event({ block: 'profile', alias: 'Nuevo' }, 6_000), null)).toBe(true);
+        expect(await applySyncEvent(event({ block: 'profile', alias: 'Viejo' }, 5_000), null)).toBe(false);
+        expect(identity.getAlias()).toBe('Nuevo');
+    });
+
+    it('un perfil sin campos utilizables se rechaza', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const win = windowDouble();
+
+        expect(await applySyncEvent(event({ block: 'profile', alias: '  ' }), win)).toBe(false);
+        expect(win.webContents.send).not.toHaveBeenCalled();
     });
 
     it('aplica el plazo de un chat y lo avisa con su entidad', async () => {
