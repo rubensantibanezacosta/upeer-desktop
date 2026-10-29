@@ -63,6 +63,16 @@ describe('computeSyncProgress', () => {
         expect(progress.percent).toBe(100);
         expect(progress.headline).toBe('¡Al día!');
     });
+
+    it('no anuncia una conexión que ya terminó', () => {
+        const progress = computeSyncProgress({ ...base, phase: 'live' });
+        expect(progress.detail).toBe('Todo sincronizado');
+    });
+
+    it('sigue anunciando la conexión mientras sincroniza', () => {
+        const progress = computeSyncProgress({ ...base, phase: 'syncing' });
+        expect(progress.detail).toBe('Conectando con tus dispositivos');
+    });
 });
 
 describe('trackSyncProgress', () => {

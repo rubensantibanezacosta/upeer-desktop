@@ -41,7 +41,8 @@ function buildDetail(input: SyncProgressInput, determinate: boolean): string {
     const parts: string[] = [];
     if (determinate) parts.push(`${done} de ${plural(total, 'mensaje', 'mensajes')}`);
     else if (done > 0) parts.push(`${plural(done, 'mensaje sincronizado', 'mensajes sincronizados')}`);
-    else parts.push('Conectando con tus dispositivos');
+    else if (input.phase === 'syncing') parts.push('Conectando con tus dispositivos');
+    else parts.push('Todo sincronizado');
     const pendingOutbound = safeCount(input.pendingOutbound);
     const pendingInbound = safeCount(input.pendingInbound);
     const pendingFiles = safeCount(input.pendingFiles);
