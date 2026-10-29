@@ -241,6 +241,12 @@ export class VaultManager {
     }
 
     static async queryOwnVaults(context: VaultRecoveryContext = 'background') {
+        try {
+            const { drainLocalMailbox } = await import('./localMailbox.js');
+            await drainLocalMailbox();
+        } catch (cause) {
+            warn('Local vault mailbox could not be drained', cause, 'vault');
+        }
         const allContacts = await getContacts();
         const myId = getMyUPeerId();
         const myDeviceId = await getMyMailboxDeviceId();
