@@ -6,6 +6,7 @@ import { getFileIcon, LIST_PREVIEW_ICON_SIZE } from '../../utils/fileIcons.js';
 import { highlightText } from '../../utils/highlightText.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
+import { reactionPreviewText } from '../../features/chat/reactionPreview.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 import { listRowAvatarSx } from './listRowMetrics.js';
 
@@ -58,14 +59,8 @@ const renderGroupFilePreview = (fileName: string, mimeType: string) => (
 
 export const renderGroupLastMessage = (group: Group, highlight: string) => {
     if (group.latestReaction) {
-        const { emoji, message } = group.latestReaction;
-        const inner = message ? renderGroupLastMessage({ ...group, latestReaction: undefined, lastMessage: message }, highlight) : null;
-        return (
-            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                <span>{emoji}</span>
-                {typeof inner === 'string' ? (inner ? <span>{inner}</span> : null) : inner}
-            </Box>
-        );
+        const text = reactionPreviewText(group.latestReaction);
+        return highlight ? highlightText(text, highlight) : text;
     }
     if (!group.lastMessage) {
         return `${group.members.length} miembro${group.members.length !== 1 ? 's' : ''}`;

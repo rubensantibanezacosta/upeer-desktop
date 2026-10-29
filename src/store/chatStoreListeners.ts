@@ -258,6 +258,8 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
                     groupChatHistory: state.groupChatHistory.map((message) => message.id === data.msgId ? applyReactionUpdate(message, data.upeerId, data.emoji, data.remove) : message),
                 }));
             }
+            if (data.chatUpeerId.startsWith('grp-')) void get().refreshGroups();
+            else void get().refreshContacts();
         });
 
         window.upeer.onMessageUpdated((data: { id: string; chatUpeerId: string; content: string }) => {

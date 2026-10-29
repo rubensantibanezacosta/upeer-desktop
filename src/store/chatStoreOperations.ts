@@ -69,18 +69,23 @@ export const createChatOperationActions = (set: ChatSet, get: ChatGet) => ({
         await get().refreshContacts();
     },
 
-    handleReaction: (msgId: string, emoji: string, remove: boolean) => {
+    handleReaction: async (msgId: string, emoji: string, remove: boolean) => {
         const { targetUpeerId, activeGroupId, myIdentity } = get();
         const effectiveId = targetUpeerId || activeGroupId;
         if (!effectiveId) {
             return;
         }
-        window.upeer.sendChatReaction(effectiveId, msgId, emoji, remove);
         const myId = myIdentity?.upeerId || 'me';
         set((state) => ({
             chatHistory: state.chatHistory.map((message) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
             groupChatHistory: state.groupChatHistory.map((message) => message.id === msgId ? applyReactionUpdate(message, myId, emoji, remove) : message),
         }));
+        try {
+            await window.upeer.sendChatReaction(effectiveId, msgId, emoji, remove);
+        } finally {
+            if (targetUpeerId) void get().refreshContacts();
+            if (activeGroupId) void get().refreshGroups();
+        }
     },
 
     handleUpdateMessage: (msgId: string, newContent: string, linkPreview?: LinkPreview | null) => {

@@ -2,6 +2,7 @@ import { getDb, getSchema, eq, desc } from '../shared.js';
 import { getUPeerIdFromPublicKey } from '../../security/identity.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
 import { getLatestReactionByChat, reactionIsNewer } from '../messages/latestReaction.js';
+import { buildReactionPreview, reactionActorNames } from '../messages/reactionActor.js';
 import type { LatestReactionPreview } from '../../../types/chat.js';
 
 export interface GroupRecord {
@@ -211,6 +212,7 @@ export function getGroups(): GroupRecord[] {
     const schema = getSchema();
     const rawGroups = (db.select().from(schema.groups).all() as GroupRow[]).map(parseGroup);
     const reactionsByChat = getLatestReactionByChat();
+    const actorNames = reactionActorNames();
     const result = rawGroups.map(g => {
         const lastMsgObj = db.select().from(schema.messages)
             .where(eq(schema.messages.chatUpeerId, g.groupId))
@@ -223,12 +225,7 @@ export function getGroups(): GroupRecord[] {
         const reaction = reactionsByChat.get(g.groupId);
         const reactionNewer = reaction !== undefined && reactionIsNewer(reaction, lastMessageTime);
         const latestReaction = reactionNewer && reaction
-            ? {
-                emoji: reaction.emoji,
-                message: reaction.message ?? '',
-                timestamp: reaction.timestamp,
-                actorUpeerId: reaction.actorUpeerId
-            }
+            ? buildReactionPreview(reaction, actorNames)
             : undefined;
         return {
             ...g,

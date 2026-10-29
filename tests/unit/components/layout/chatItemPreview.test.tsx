@@ -53,16 +53,30 @@ describe('renderGroupLastMessage', () => {
         expect(renderGroupLastMessage(group(card), '')).toBe('Tarjeta de contacto');
     });
 
-    it('antepone la reacción al mensaje reaccionado', () => {
+    it('describe la reacción con quién reaccionó y a qué mensaje', () => {
         const entry = group('mensaje antiguo') as Group;
-        entry.latestReaction = { emoji: '🔥', message: 'mensaje antiguo', timestamp: 10, actorUpeerId: 'b'.repeat(64) };
-        expect(text(renderGroupLastMessage(entry, ''))).toBe('🔥mensaje antiguo');
+        entry.latestReaction = {
+            emoji: '🔥',
+            message: 'mensaje antiguo',
+            timestamp: 10,
+            actorUpeerId: 'b'.repeat(64),
+            actorName: 'Ivan',
+            actorIsMe: false,
+        };
+        expect(text(renderGroupLastMessage(entry, ''))).toBe('Ivan reaccionó con 🔥 al mensaje "mensaje antiguo"');
     });
 
-    it('humaniza el mensaje reaccionado cuando es de sistema', () => {
+    it('describe el aviso reaccionado cuando el mensaje es de sistema', () => {
         const entry = group('') as Group;
-        entry.latestReaction = { emoji: '👍', message: '__SYS__|Ivan dejó el grupo', timestamp: 10, actorUpeerId: 'b'.repeat(64) };
-        expect(text(renderGroupLastMessage(entry, ''))).toBe('👍Ivan dejó el grupo');
+        entry.latestReaction = {
+            emoji: '👍',
+            message: '__SYS__|Ivan dejó el grupo',
+            timestamp: 10,
+            actorUpeerId: 'b'.repeat(64),
+            actorName: 'Ivan',
+            actorIsMe: false,
+        };
+        expect(text(renderGroupLastMessage(entry, ''))).toBe('Ivan reaccionó con 👍 al aviso "Ivan dejó el grupo"');
     });
 });
 
@@ -76,28 +90,44 @@ describe('renderLastMessagePreview', () => {
         expect(text(renderLastMessagePreview(contact(JSON.stringify({ type: 'file', fileName: 'nota.webm', isVoiceNote: true })), ''))).toBe('Nota de voz');
     });
 
-    it('antepone la reacción al mensaje reaccionado', () => {
+    it('describe la reacción del contacto sobre el último mensaje', () => {
         const entry = contact('mensaje antiguo') as Contact;
-        entry.latestReaction = { emoji: '👍', message: 'mensaje antiguo', timestamp: 10, actorUpeerId: 'b'.repeat(64) };
-        expect(text(renderLastMessagePreview(entry, ''))).toBe('👍mensaje antiguo');
+        entry.latestReaction = {
+            emoji: '🤙',
+            message: 'mensaje antiguo',
+            timestamp: 10,
+            actorUpeerId: 'a'.repeat(64),
+            actorName: 'Ivan',
+            actorIsMe: false,
+        };
+        expect(text(renderLastMessagePreview(entry, ''))).toBe('Ivan reaccionó con 🤙 al mensaje "mensaje antiguo"');
     });
 
-    it('resume el mensaje reaccionado cuando es un adjunto', () => {
+    it('nombra el adjunto reaccionado', () => {
         const entry = contact('') as Contact;
         entry.latestReaction = {
             emoji: '❤️',
             message: JSON.stringify({ type: 'file', fileName: 'informe.pdf', mimeType: 'application/pdf' }),
             timestamp: 10,
-            actorUpeerId: 'b'.repeat(64),
+            actorUpeerId: 'a'.repeat(64),
+            actorName: 'Ivan',
+            actorIsMe: false,
         };
-        expect(text(renderLastMessagePreview(entry, ''))).toBe('❤️informe.pdf');
+        expect(text(renderLastMessagePreview(entry, ''))).toBe('Ivan reaccionó con ❤️ al archivo "informe.pdf"');
     });
 
     it('no pinta el estado del mensaje cuando lo último es una reacción', () => {
         const entry = contact('mensaje') as Contact;
         entry.lastMessageIsMine = true;
         entry.lastMessageStatus = 'read';
-        entry.latestReaction = { emoji: '👍', message: 'mensaje', timestamp: 10, actorUpeerId: 'a'.repeat(64) };
+        entry.latestReaction = {
+            emoji: '👍',
+            message: 'mensaje',
+            timestamp: 10,
+            actorUpeerId: 'a'.repeat(64),
+            actorName: 'Ivan',
+            actorIsMe: false,
+        };
         expect(renderMessageStatusIcon(entry)).toBeNull();
     });
 });

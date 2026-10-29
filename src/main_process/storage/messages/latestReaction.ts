@@ -45,7 +45,7 @@ export function getLatestReactionByChat(): Map<string, LatestReaction> {
     return latest;
 }
 
-export function reactionIsNewer(reaction: LatestReaction | undefined, lastMessageTime: number | string | null | undefined): boolean {
+export function reactionIsNewer(reaction: { timestamp: number } | undefined, lastMessageTime: number | string | null | undefined): boolean {
     if (!reaction) return false;
     const messageTime = lastMessageTime ? Number(lastMessageTime) : 0;
     return reaction.timestamp > messageTime;

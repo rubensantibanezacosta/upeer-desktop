@@ -42,6 +42,11 @@ const mockSchema = {
         chatUpeerId: 'chatUpeerId',
         timestamp: 'timestamp',
         message: 'message'
+    },
+    contacts: {
+        upeerId: 'upeerId',
+        name: 'name',
+        alias: 'alias'
     }
 };
 
@@ -67,6 +72,7 @@ describe('Groups Operations', () => {
         mockRun.mockReset();
         mockGet.mockReset();
         mockAll.mockReset();
+        mockAll.mockImplementation(() => []);
         mockGet.mockImplementation((...args: unknown[]) => {
             if (args.length > 0) return undefined;
             return { groupId: 'group1', members: '["user1","user2"]', memberPublicKeys: '{}', status: 'active' };

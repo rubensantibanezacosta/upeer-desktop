@@ -138,6 +138,8 @@ export interface LatestReactionPreview {
     message: string;
     timestamp: number;
     actorUpeerId: string;
+    actorName: string;
+    actorIsMe: boolean;
 }
 
 export interface Contact {

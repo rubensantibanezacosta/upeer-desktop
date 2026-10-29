@@ -4,6 +4,7 @@ import { emitSyncEvent } from '../sync/eventSink.js';
 import { setSettingsClock } from '../sync/settings-sync.js';
 import { getAlias, getAvatar, getMyUPeerId } from '../../security/identity.js';
 import { getLatestReactionByChat, reactionIsNewer, type LatestReaction } from '../messages/latestReaction.js';
+import { actorNamesFrom, buildReactionPreview } from '../messages/reactionActor.js';
 import type { Contact, LatestReactionPreview } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
@@ -41,17 +42,16 @@ type ContactWithLastMessage = StoredContact & {
     latestReaction?: LatestReactionPreview;
 };
 
-const withLatestReaction = (entry: ContactWithLastMessage, reaction: LatestReaction | undefined): ContactWithLastMessage => {
+const withLatestReaction = (
+    entry: ContactWithLastMessage,
+    reaction: LatestReaction | undefined,
+    actorNames: Map<string, string>
+): ContactWithLastMessage => {
     if (!reaction || !reactionIsNewer(reaction, entry.lastMessageTime)) return entry;
     return {
         ...entry,
         lastMessageTime: String(reaction.timestamp),
-        latestReaction: {
-            emoji: reaction.emoji,
-            message: reaction.message ?? '',
-            timestamp: reaction.timestamp,
-            actorUpeerId: reaction.actorUpeerId
-        }
+        latestReaction: buildReactionPreview(reaction, actorNames)
     };
 };
 
@@ -109,6 +109,7 @@ export function getContacts() {
         lastMessageByChat.set(message.chatUpeerId, message);
     }
     const reactionsByChat = getLatestReactionByChat();
+    const actorNames = actorNamesFrom(contactsList);
 
     const result: ContactWithLastMessage[] = contactsList.map(c => {
         const lastMsgObj = lastMessageByChat.get(c.upeerId || '');
@@ -119,7 +120,7 @@ export function getContacts() {
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        } as ContactWithLastMessage, reactionsByChat.get(c.upeerId || ''));
+        } as ContactWithLastMessage, reactionsByChat.get(c.upeerId || ''), actorNames);
     });
 
     const knownUpeerIds = new Set(result.map(contact => contact.upeerId));
@@ -140,7 +141,7 @@ export function getContacts() {
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,
             lastMessageStatus: lastMsgObj?.status
-        } as ContactWithLastMessage, reactionsByChat.get(chatUpeerId)));
+        } as ContactWithLastMessage, reactionsByChat.get(chatUpeerId), actorNames));
     }
 
     result.sort((a, b) => {

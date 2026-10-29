@@ -6,6 +6,7 @@ import { highlightText } from '../../utils/highlightText.js';
 import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
+import { reactionPreviewText } from '../../features/chat/reactionPreview.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 
 const parseJsonMessage = (message: string) => {
@@ -31,14 +32,8 @@ export const renderPendingLabel = (contact: Contact) => (
 
 export const renderLastMessagePreview = (contact: Contact, highlight: string) => {
     if (contact.latestReaction) {
-        const { emoji, message } = contact.latestReaction;
-        const inner = message ? renderLastMessagePreview({ ...contact, latestReaction: undefined, lastMessage: message }, highlight) : null;
-        return (
-            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                <span>{emoji}</span>
-                {typeof inner === 'string' ? (inner ? <span>{inner}</span> : null) : inner}
-            </Box>
-        );
+        const text = reactionPreviewText(contact.latestReaction);
+        return highlight ? highlightText(text, highlight) : text;
     }
     if (!contact.lastMessage) {
         return '';
