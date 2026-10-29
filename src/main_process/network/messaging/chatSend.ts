@@ -4,24 +4,16 @@ import {
 } from '../../security/identity.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { getGroupById } from '../../storage/groups/operations.js';
-import {
-    saveMessage,
-    updateMessageStatus,
-} from '../../storage/messages/operations.js';
+import { saveMessage } from '../../storage/messages/operations.js';
 import { error, warn } from '../../security/secure-logger.js';
 import { buildMessagePayload } from '../messagePayload.js';
 import { sendSecurePacket } from '../server/transport.js';
-import { startDhtSearch } from '../dht/core.js';
 import { MAX_MESSAGE_SIZE_BYTES } from '../server/constants.js';
 import { compressMessage } from '../../utils/messageCompression.js';
+import { ContactAdmissionError } from '../contactAdmission.js';
 import { sendConnectedChatMessage } from './chatDirectDelivery.js';
 import type { ConversationActivitySignal } from '../../../types/chat.js';
-import {
-    emitMessageStatusUpdated,
-    getFanOutAddresses,
-    markMessageAsFailed,
-    vaultChatForOfflineDelivery,
-} from './chatSupport.js';
+import { getFanOutAddresses, vaultOfflineMessage } from './chatSupport.js';
 
 const CHAT_ACK_TIMEOUT_MS = 2500;
 
@@ -119,38 +111,30 @@ export async function sendChatMessage(
     }
 
     if (contact.status !== 'connected') {
-        const timestamp = Date.now();
-        await saveMessage(msgId, upeerId, true, payload, replyTo, '', 'sent', selfId, timestamp);
-        let vaulted = false;
-        try {
-            const nodes = await vaultChatForOfflineDelivery(upeerId, contact, msgId, payload, replyTo, selfId, timestamp);
-            if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted')) {
-                vaulted = true;
-                setTimeout(() => { void emitMessageStatusUpdated(msgId, 'vaulted'); }, 0);
-            }
-        } catch (err) {
-            error('Immediate vault replication failed for offline contact', err, 'vault');
-        }
-        if (!vaulted) await markMessageAsFailed(msgId);
-        startDhtSearch(upeerId, sendSecurePacket);
-        return { id: msgId, savedMessage: payload, timestamp };
+        return vaultOfflineMessage(upeerId, contact, msgId, payload, replyTo, selfId);
     }
 
     const timestamp = Date.now();
     const knownAddresses = parseKnownAddresses(contact.knownAddresses, upeerId, 'Failed to parse knownAddresses for message send');
     const wirePayload = compressMessage(payload);
-    await sendConnectedChatMessage({
-        contact,
-        knownAddresses,
-        msgId,
-        payload: wirePayload,
-        persistContent: payload,
-        replyTo,
-        selfId,
-        timestamp,
-        upeerId,
-        ackTimeoutMs: CHAT_ACK_TIMEOUT_MS,
-    });
+    try {
+        await sendConnectedChatMessage({
+            contact,
+            knownAddresses,
+            msgId,
+            payload: wirePayload,
+            persistContent: payload,
+            replyTo,
+            selfId,
+            timestamp,
+            upeerId,
+            ackTimeoutMs: CHAT_ACK_TIMEOUT_MS,
+        });
+    } catch (err) {
+        if (!(err instanceof ContactAdmissionError)) throw err;
+        warn('Direct delivery rejected by contact admission; the message stays in custody', { upeerId, msgId, reason: err.reason }, 'vault');
+        return vaultOfflineMessage(upeerId, contact, msgId, payload, replyTo, selfId, { timestamp });
+    }
 
     return { id: msgId, savedMessage: payload, timestamp };
 }

@@ -1,9 +1,8 @@
 import { sign } from '../../security/identity.js';
 import { signWithDevice } from '../../security/deviceMessaging.js';
-import { updateMessageStatus } from '../../storage/messages/operations.js';
-import { warn } from '../../security/secure-logger.js';
+import { saveMessage, updateMessageStatus } from '../../storage/messages/operations.js';
+import { error, warn } from '../../security/secure-logger.js';
 import { canonicalStringify } from '../utils.js';
-import { requireContactAdmission } from '../contactAdmission.js';
 import { encryptChatPayload } from './chatEncryption.js';
 
 type ContactAddressRecord = {
@@ -77,7 +76,6 @@ export async function vaultChatForOfflineDelivery(
     senderUpeerId: string,
     timestamp: number,
 ): Promise<number> {
-    if (recipientUpeerId !== senderUpeerId) await requireContactAdmission(recipientUpeerId, recipientContact.publicKey);
     const encryptedPayload = await encryptChatPayload(
         recipientUpeerId,
         content,
@@ -133,6 +131,50 @@ export async function vaultExistingChatPacket(
         return VaultManager.replicateToVaults(recipientUpeerId, packet, undefined, undefined, recipientDeviceId);
     }
     return VaultManager.replicateToVaults(recipientUpeerId, packet);
+}
+
+type OfflineRecipientContact = Parameters<typeof vaultChatForOfflineDelivery>[1];
+
+export type OfflineVaultResult = {
+    id: string;
+    savedMessage: string;
+    timestamp: number;
+};
+
+export async function vaultOfflineMessage(
+    recipientUpeerId: string,
+    contact: OfflineRecipientContact,
+    msgId: string,
+    payload: string,
+    replyTo: string | undefined,
+    senderUpeerId: string,
+    options: { timestamp?: number; discover?: boolean } = {},
+): Promise<OfflineVaultResult> {
+    const timestamp = options.timestamp ?? Date.now();
+    await saveMessage(msgId, recipientUpeerId, true, payload, replyTo, '', 'sent', senderUpeerId, timestamp);
+    let vaulted = false;
+    try {
+        const nodes = await vaultChatForOfflineDelivery(recipientUpeerId, contact, msgId, payload, replyTo, senderUpeerId, timestamp);
+        if (nodes > 0 && await updateMessageStatus(msgId, 'vaulted')) {
+            vaulted = true;
+            setTimeout(() => { void emitMessageStatusUpdated(msgId, 'vaulted'); }, 0);
+        }
+    } catch (cause) {
+        error('Vault replication failed for a message that could not go direct', cause, 'vault');
+    }
+    if (!vaulted) await markMessageAsFailed(msgId);
+    if (options.discover !== false) {
+        try {
+            const [{ sendSecurePacket }, { startDhtSearch }] = await Promise.all([
+                import('../server/transport.js'),
+                import('../dht/core.js'),
+            ]);
+            startDhtSearch(recipientUpeerId, sendSecurePacket);
+        } catch (cause) {
+            warn('DHT search could not start after vaulting a message', { upeerId: recipientUpeerId, error: String(cause) }, 'network');
+        }
+    }
+    return { id: msgId, savedMessage: payload, timestamp };
 }
 
 export async function getSelfAddresses(myId: string): Promise<string[]> {
