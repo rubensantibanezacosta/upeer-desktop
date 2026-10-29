@@ -278,6 +278,7 @@ const notificationApi = {
     setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => ipcRenderer.invoke('set-notification-prefs', patch),
     onSettingsUpdated: (callback: (data: { block: string; entity: string; values: Record<string, boolean | string> }) => void) =>
         subscribe<[{ block: string; entity: string; values: Record<string, boolean | string> }]>('settings-updated', (data) => callback(data)),
+    emitSettingsPatch: (payload: Record<string, unknown>) => ipcRenderer.invoke('emit-settings-patch', payload),
 };
 
 const retentionApi = {

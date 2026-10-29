@@ -20,6 +20,7 @@ import { upsertSyncMessage, type SyncedMessage } from '../../storage/sync/messag
 import {
     claimSettingsUpdate,
     sanitizeSettingsPatch,
+    setSettingsClock,
     type SettingsPatch,
 } from '../../storage/sync/settings-sync.js';
 import { applyRetentionFromSync } from '../../storage/retention/chatRetention.js';
@@ -225,6 +226,10 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
         const retention = typeof patch.values.retention === 'string' ? patch.values.retention : 'off';
         applyRetentionFromSync(chatId, retention, occurredAt);
         return { chatId, retention };
+    }
+    if (patch.block === 'chat') {
+        setSettingsClock(patch.entity, occurredAt);
+        return { ...patch.values };
     }
     if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };
     return { ...applyNotificationFromSync(patch.values, occurredAt) };

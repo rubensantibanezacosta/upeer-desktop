@@ -145,4 +145,27 @@ describe('applySyncEvent con ajustes', () => {
         expect(await applySyncEvent(event({ block: 'retention', chatId: 'chat-3', retention: '24h' }, 8_000), null)).toBe(false);
         expect(getChatRetentionId('chat-3')).toBe('90d');
     });
+
+    it('los ajustes de un chat se reenvían al renderer con su entidad', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'chat', chatId: 'grp-7', muted: true }, 6_000), win);
+
+        expect(applied).toBe(true);
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'chat',
+            entity: 'chat:grp-7',
+            values: { chatId: 'grp-7', muted: true },
+        });
+    });
+
+    it('un ajuste de chat más antiguo que el último aplicado no se reenvía', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const win = windowDouble();
+
+        expect(await applySyncEvent(event({ block: 'chat', chatId: 'grp-8', pinned: true }, 7_000), win)).toBe(true);
+        expect(await applySyncEvent(event({ block: 'chat', chatId: 'grp-8', pinned: false }, 6_000), win)).toBe(false);
+        expect(win.webContents.send).toHaveBeenCalledTimes(1);
+    });
 });

@@ -56,6 +56,30 @@ describe('settings-sync', () => {
         });
     });
 
+    it('los ajustes de un chat son su propia entidad', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'chat', chatId: 'grp-1', muted: true, pinned: false })).toEqual({
+            block: 'chat',
+            entity: 'chat:grp-1',
+            values: { chatId: 'grp-1', muted: true, pinned: false },
+        });
+    });
+
+    it('un parche de chat sin banderas no vale', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'chat', chatId: 'grp-1' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'chat', muted: true })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'chat', chatId: 'grp-1', muted: 'sí' })).toBeNull();
+    });
+
+    it('solo los bloques del renderer se pueden empujar desde la interfaz', async () => {
+        const { isRendererBlock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(isRendererBlock('chat')).toBe(true);
+        expect(isRendererBlock('privacy')).toBe(false);
+        expect(isRendererBlock('retention')).toBe(false);
+        expect(isRendererBlock('appearance')).toBe(false);
+    });
+
     it('rechaza un bloque desconocido', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'appearance', theme: 'dark' })).toBeNull();

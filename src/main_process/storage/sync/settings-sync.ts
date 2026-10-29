@@ -1,7 +1,7 @@
 import { getAppSetting, setAppSetting } from '../settings-operations.js';
 import { resolveRetentionId } from '../../../utils/retention.js';
 
-export type SettingsBlock = 'privacy' | 'notifications' | 'retention';
+export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat';
 
 export type SettingsValues = Record<string, boolean | string>;
 
@@ -20,8 +20,14 @@ const BOOLEAN_FIELDS: Record<'privacy' | 'notifications', readonly string[]> = {
     notifications: ['messages', 'requests', 'sound'],
 };
 
+const CHAT_FIELDS = ['archived', 'muted', 'pinned', 'unread'] as const;
+
 export function isSettingsBlock(value: unknown): value is SettingsBlock {
-    return value === 'privacy' || value === 'notifications' || value === 'retention';
+    return value === 'privacy' || value === 'notifications' || value === 'retention' || value === 'chat';
+}
+
+export function isRendererBlock(value: unknown): boolean {
+    return value === 'chat';
 }
 
 export function cleanId(value: unknown): string | null {
@@ -32,9 +38,9 @@ export function cleanId(value: unknown): string | null {
 
 export function settingsEntity(block: unknown, payload: Record<string, unknown>): string {
     if (!isSettingsBlock(block)) return '';
-    if (block !== 'retention') return block;
-    const chatId = cleanId(payload.chatId);
-    return chatId ? `${block}:${chatId}` : '';
+    if (block === 'privacy' || block === 'notifications') return block;
+    const id = cleanId(payload.chatId);
+    return id ? `${block}:${id}` : '';
 }
 
 export function sanitizeSettingsPatch(payload: Record<string, unknown>): SettingsPatch | null {
@@ -48,6 +54,18 @@ export function sanitizeSettingsPatch(payload: Record<string, unknown>): Setting
         if (!chatId) return null;
         const retention = resolveRetentionId(typeof payload.retention === 'string' ? payload.retention : null);
         return { block, entity, values: { chatId, retention } };
+    }
+
+    if (block === 'chat') {
+        const chatId = cleanId(payload.chatId);
+        if (!chatId) return null;
+        const values: SettingsValues = { chatId };
+        for (const field of CHAT_FIELDS) {
+            const candidate = payload[field];
+            if (typeof candidate === 'boolean') values[field] = candidate;
+        }
+        if (Object.keys(values).length === 1) return null;
+        return { block, entity, values };
     }
 
     const values: SettingsValues = {};
