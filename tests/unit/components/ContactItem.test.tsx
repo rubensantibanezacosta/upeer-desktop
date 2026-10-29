@@ -9,6 +9,7 @@ vi.mock('lucide-react', async (importOriginal) => ({
 }));
 
 import { ContactItem } from '../../../src/components/layout/ContactItem.js';
+import { usePrivacyStore } from '../../../src/store/usePrivacyStore.js';
 
 describe('ContactItem Component', () => {
     const mockContact: Contact = {
@@ -94,6 +95,15 @@ describe('ContactItem Component', () => {
         render(<ContactItem {...defaultProps} contact={staleContact} />);
         expect(screen.queryByText('En línea')).toBeNull();
         expect(screen.getByText('Desconectado')).toBeDefined();
+    });
+
+    it('cae a «Sin mensajes» cuando no hay mensaje ni presencia que enseñar', () => {
+        usePrivacyStore.setState({ shareActivity: false });
+        render(<ContactItem {...defaultProps} contact={{ ...mockContact, lastMessage: '', lastActive: new Date().toISOString() }} />);
+        expect(screen.getByText('Sin mensajes')).toBeDefined();
+        expect(screen.queryByText('En línea')).toBeNull();
+        expect(screen.queryByText('Desconectado')).toBeNull();
+        usePrivacyStore.setState({ shareActivity: true });
     });
 
     it('pinta el icono del tipo de adjunto al tamaño de la fila', () => {

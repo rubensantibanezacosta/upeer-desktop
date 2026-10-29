@@ -129,7 +129,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                             {renderLastMessagePreview(c, highlight)}
                                         </Typography>
                                     </Box>
-                                ) : (presence.hidden ? null : (isOnline ? 'En línea' : 'Desconectado')))
+                                ) : (presence.hidden ? 'Sin mensajes' : (isOnline ? 'En línea' : 'Desconectado')))
                             )}
                         </Typography>
 
