@@ -53,6 +53,13 @@ vi.mock('../../../src/main_process/storage/sync/settings-sync.js', () => ({
     setSettingsClock: vi.fn(),
 }));
 
+const identity = vi.hoisted(() => ({ upeerId: '', alias: '' }));
+
+vi.mock('../../../src/main_process/security/identity.js', () => ({
+    getMyUPeerId: () => identity.upeerId,
+    getAlias: () => identity.alias,
+}));
+
 import {
     getContactByUpeerId,
     getContactByAddress,
@@ -73,6 +80,8 @@ import {
 describe('storage/contacts/operations.ts', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        identity.upeerId = '';
+        identity.alias = '';
     });
 
     describe('getContactByUpeerId', () => {
@@ -155,6 +164,31 @@ describe('storage/contacts/operations.ts', () => {
                 lastMessage: 'Sigo aquí'
             }));
             expect(result.some(contact => contact.upeerId === 'grp-1')).toBe(false);
+        });
+
+        it('should name the own conversation with the profile alias instead of a deleted contact', () => {
+            identity.upeerId = 'me';
+            identity.alias = 'Rubén';
+            mockDb.all
+                .mockReturnValueOnce([])
+                .mockReturnValueOnce([
+                    { chatUpeerId: 'me', message: 'Hola desde el móvil', timestamp: 4000, isMine: true, status: 'sent' },
+                    { chatUpeerId: 'u9', message: 'Sigo aquí', timestamp: 3000, isMine: false, status: 'delivered' }
+                ]);
+
+            const result = getContacts();
+
+            expect(result[0]).toEqual(expect.objectContaining({ upeerId: 'me', name: 'Rubén' }));
+            expect(result[1]).toEqual(expect.objectContaining({ upeerId: 'u9', name: 'Contacto eliminado' }));
+        });
+
+        it('should fall back to a generic self label when there is no alias yet', () => {
+            identity.upeerId = 'me';
+            mockDb.all
+                .mockReturnValueOnce([])
+                .mockReturnValueOnce([{ chatUpeerId: 'me', message: 'Hola', timestamp: 4000, isMine: true, status: 'sent' }]);
+
+            expect(getContacts()[0]).toEqual(expect.objectContaining({ upeerId: 'me', name: 'Tú' }));
         });
     });
 

@@ -12,6 +12,7 @@ const store = vi.hoisted(() => ({
     requests: 0,
     sent: [] as { cursor: string | null }[],
     latest: null as string | null,
+    pages: [] as { deviceId: string; applied: number }[],
 }));
 
 vi.mock('../../../src/main_process/storage/sync/messages.js', () => ({
@@ -50,7 +51,7 @@ vi.mock('../../../src/main_process/network/sync/historyProgress.js', () => ({
     forgetHistoryWork: vi.fn(),
     parsePendingCount: () => 0,
     recordHistoryComplete: (deviceId: string) => { store.completed.push(deviceId); },
-    recordHistoryPage: vi.fn(),
+    recordHistoryPage: (deviceId: string, applied: number) => { store.pages.push({ deviceId, applied }); },
     recordHistoryServed: vi.fn(),
     resetServedHistory: vi.fn(),
 }));
@@ -116,6 +117,7 @@ describe('aplicación del histórico sincronizado', () => {
         store.requests = 0;
         store.sent.length = 0;
         store.latest = null;
+        store.pages.length = 0;
     });
 
     it('aplica un evento ya registrado que nunca llegó a aplicarse', async () => {
@@ -133,8 +135,31 @@ describe('aplicación del histórico sincronizado', () => {
         expect(store.history.at(-1)).toEqual({ deviceId: 'a'.repeat(64), cursor: '2000:m1', done: true });
     });
 
-    it('da por bueno el mensaje que ya estaba en la base de datos', async () => {
+    it('cuenta como recorrida una página que ya estaba aplicada', async () => {
         const { applySyncHistoryResponse } = await import('../../../src/main_process/network/sync/history.js');
+        const entries = [entry('m1', 2000), entry('m2', 3000), entry('m3', 4000)];
+        for (const raw of entries) store.unchanged.add(raw.eventId);
+
+        await applySyncHistoryResponse(peer(), { requestId: 'r', entries, nextCursor: '4000:m3', done: true }, 5000, null);
+
+        expect(store.pages).toEqual([{ deviceId: 'a'.repeat(64), applied: 3 }]);
+    });
+
+    it('no cuenta como recorrido el evento que no se pudo aplicar', async () => {
+        const { applySyncHistoryResponse } = await import('../../../src/main_process/network/sync/history.js');
+        store.failing.add('history-m2');
+
+        await applySyncHistoryResponse(
+            peer(),
+            { requestId: 'r', entries: [entry('m1', 2000), entry('m2', 3000), entry('m3', 4000)], nextCursor: '4000:m3', done: false },
+            5000,
+            null,
+        );
+
+        expect(store.pages).toEqual([{ deviceId: 'a'.repeat(64), applied: 2 }]);
+    });
+
+    it('da por bueno el mensaje que ya estaba en la base de datos', async () => {        const { applySyncHistoryResponse } = await import('../../../src/main_process/network/sync/history.js');
         store.unchanged.add('history-m1');
 
         await applySyncHistoryResponse(

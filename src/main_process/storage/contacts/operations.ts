@@ -2,6 +2,7 @@ import { getDb, getSchema, eq, desc } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
 import { setSettingsClock } from '../sync/settings-sync.js';
+import { getAlias, getMyUPeerId } from '../../security/identity.js';
 import type { Contact } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
@@ -105,13 +106,15 @@ export function getContacts() {
     });
 
     const knownUpeerIds = new Set(result.map(contact => contact.upeerId));
+    const myUpeerId = getMyUPeerId();
     for (const [chatUpeerId, lastMsgObj] of lastMessageByChat.entries()) {
         if (!chatUpeerId || chatUpeerId.startsWith('grp-') || knownUpeerIds.has(chatUpeerId)) continue;
+        const isSelfChat = myUpeerId !== '' && chatUpeerId === myUpeerId;
 
         result.push({
             upeerId: chatUpeerId,
             address: '',
-            name: 'Contacto eliminado',
+            name: isSelfChat ? (getAlias() || 'Tú') : 'Contacto eliminado',
             status: 'offline',
             isConversationOnly: true,
             lastMessage: lastMsgObj?.message,
