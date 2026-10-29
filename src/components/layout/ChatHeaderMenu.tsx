@@ -17,6 +17,7 @@ interface ChatHeaderMenuProps {
     name: string;
     isFavorite: boolean;
     blocked?: boolean;
+    isSelfChat?: boolean;
     onOpenInfo: () => void;
     onSearch: () => void;
     onToggleFavorite: () => void;
@@ -77,6 +78,7 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
     name,
     isFavorite,
     blocked = false,
+    isSelfChat = false,
     onOpenInfo,
     onSearch,
     onToggleFavorite,
@@ -133,7 +135,7 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                 <Menu placement="bottom-end" size="sm" sx={{ minWidth: 248, borderRadius: 'lg', '--ListItem-radius': '8px', boxShadow: 'lg', zIndex: 1200 }}>
                     <MenuItem onClick={onOpenInfo}>
                         {itemIcon(<Info style={{ fontSize: 18 }} />)}
-                        {kind === 'group' ? 'Info. del grupo' : 'Info. del contacto'}
+                        {kind === 'group' ? 'Info. del grupo' : (isSelfChat ? 'Info. de tu cuenta' : 'Info. del contacto')}
                     </MenuItem>
                     <MenuItem onClick={onSearch}>
                         {itemIcon(<Search style={{ fontSize: 18 }} />)}
@@ -144,10 +146,12 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                         {itemIcon(muted ? <Bell style={{ fontSize: 18 }} /> : <BellOff style={{ fontSize: 18 }} />)}
                         {muted ? 'Reactivar notificaciones' : 'Silenciar notificaciones'}
                     </MenuItem>
-                    <MenuItem onClick={onToggleFavorite}>
-                        {itemIcon(<Heart style={{ fontSize: 18 }} fill={isFavorite ? 'currentColor' : 'none'} />)}
-                        {isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
-                    </MenuItem>
+                    {!isSelfChat && (
+                        <MenuItem onClick={onToggleFavorite}>
+                            {itemIcon(<Heart style={{ fontSize: 18 }} fill={isFavorite ? 'currentColor' : 'none'} />)}
+                            {isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
+                        </MenuItem>
+                    )}
                     <MenuItem onClick={onExport}>
                         {itemIcon(<Download style={{ fontSize: 18 }} />)}
                         Exportar chat
@@ -165,7 +169,7 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                         {itemIcon(<X style={{ fontSize: 18 }} />)}
                         Cerrar chat
                     </MenuItem>
-                    {kind === 'contact' && !blocked && onBlock && (
+                    {kind === 'contact' && !isSelfChat && !blocked && onBlock && (
                         <MenuItem onClick={() => setPending('block')}>
                             {itemIcon(<Ban style={{ fontSize: 18 }} />)}
                             Bloquear
@@ -175,12 +179,13 @@ export const ChatHeaderMenu: React.FC<ChatHeaderMenuProps> = ({
                         {itemIcon(<Eraser style={{ fontSize: 18 }} />)}
                         Vaciar chat
                     </MenuItem>
-                    {kind === 'contact' ? (
+                    {kind === 'contact' && !isSelfChat && (
                         <MenuItem onClick={() => setPending('delete')} sx={{ color: 'danger.plainColor' }}>
                             {itemIcon(<Trash2 style={{ fontSize: 18 }} />)}
                             Eliminar chat
                         </MenuItem>
-                    ) : (
+                    )}
+                    {kind === 'group' && (
                         <MenuItem onClick={() => setPending('leave')} sx={{ color: 'danger.plainColor' }}>
                             {itemIcon(<LogOut style={{ fontSize: 18 }} />)}
                             Salir del grupo

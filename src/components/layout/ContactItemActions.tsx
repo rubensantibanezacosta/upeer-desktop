@@ -78,10 +78,12 @@ export const ContactItemActions: React.FC<ContactItemActionsProps> = ({
                         <ListItemDecorator sx={{ color: 'inherit' }}><Mail style={{ fontSize: 18 }} /></ListItemDecorator>
                         {unread ? 'Marcar como leído' : 'Marcar como no leído'}
                     </MenuItem>
-                    <MenuItem onClick={(event) => { event.stopPropagation(); onToggleFavorite(contact.upeerId); }}>
-                        <ListItemDecorator sx={{ color: 'inherit' }}><Heart style={{ fontSize: 18 }} fill={contact.isFavorite ? 'currentColor' : 'none'} /></ListItemDecorator>
-                        {contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
-                    </MenuItem>
+                    {contact.isSelf ? null : (
+                        <MenuItem onClick={(event) => { event.stopPropagation(); onToggleFavorite(contact.upeerId); }}>
+                            <ListItemDecorator sx={{ color: 'inherit' }}><Heart style={{ fontSize: 18 }} fill={contact.isFavorite ? 'currentColor' : 'none'} /></ListItemDecorator>
+                            {contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
+                        </MenuItem>
+                    )}
                     <ListDivider />
                     <MenuItem onClick={(event) => { event.stopPropagation(); setConfirmClearOpen(true); }}>
                         <ListItemDecorator sx={{ color: 'inherit' }}><Eraser style={{ fontSize: 18 }} /></ListItemDecorator>

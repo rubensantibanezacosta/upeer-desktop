@@ -89,13 +89,15 @@ export const buildContactInfoActions = ({
             onClick: onArchive,
             disabled: !onArchive,
         },
-        {
-            key: 'favorite',
-            label: contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos',
-            icon: <Heart style={{ fontSize: 20 }} fill={contact.isFavorite ? 'currentColor' : 'none'} />,
-            onClick: onFavorite,
-            disabled: !onFavorite,
-        },
+        ...(contact.isSelf ? [] : [
+            {
+                key: 'favorite',
+                label: contact.isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos',
+                icon: <Heart style={{ fontSize: 20 }} fill={contact.isFavorite ? 'currentColor' : 'none'} />,
+                onClick: onFavorite,
+                disabled: !onFavorite,
+            },
+        ]),
     ];
 
     const dangerActions: ContactInfoDangerAction[] = [
@@ -106,20 +108,22 @@ export const buildContactInfoActions = ({
             color: 'warning.600',
             onClick: onClearChat,
         },
-        {
-            key: 'block',
-            label: contact.status === 'blocked' ? 'Desbloquear' : `Bloquear a ${contact.name}`,
-            icon: contact.status === 'blocked' ? <LockOpen style={{ fontSize: 20 }} /> : <Ban style={{ fontSize: 20 }} />,
-            color: 'danger.600',
-            onClick: onBlockContact,
-        },
-        {
-            key: 'delete',
-            label: 'Eliminar contacto',
-            icon: <UserMinus style={{ fontSize: 20 }} />,
-            color: 'danger.600',
-            onClick: onDeleteRequest,
-        },
+        ...(contact.isSelf ? [] : [
+            {
+                key: 'block',
+                label: contact.status === 'blocked' ? 'Desbloquear' : `Bloquear a ${contact.name}`,
+                icon: contact.status === 'blocked' ? <LockOpen style={{ fontSize: 20 }} /> : <Ban style={{ fontSize: 20 }} />,
+                color: 'danger.600',
+                onClick: onBlockContact,
+            },
+            {
+                key: 'delete',
+                label: 'Eliminar contacto',
+                icon: <UserMinus style={{ fontSize: 20 }} />,
+                color: 'danger.600',
+                onClick: onDeleteRequest,
+            },
+        ]),
     ];
 
     return { utilityActions, dangerActions };

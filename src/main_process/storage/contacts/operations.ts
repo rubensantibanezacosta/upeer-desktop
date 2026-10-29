@@ -2,7 +2,7 @@ import { getDb, getSchema, eq, desc } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
 import { setSettingsClock } from '../sync/settings-sync.js';
-import { getAlias, getMyUPeerId } from '../../security/identity.js';
+import { getAlias, getAvatar, getMyUPeerId } from '../../security/identity.js';
 import type { Contact } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
@@ -115,8 +115,10 @@ export function getContacts() {
             upeerId: chatUpeerId,
             address: '',
             name: isSelfChat ? (getAlias() || 'Tú') : 'Contacto eliminado',
+            avatar: isSelfChat ? getAvatar() : undefined,
             status: 'offline',
             isConversationOnly: true,
+            isSelf: isSelfChat,
             lastMessage: lastMsgObj?.message,
             lastMessageTime: lastMsgObj?.timestamp,
             lastMessageIsMine: lastMsgObj?.isMine,

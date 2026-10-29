@@ -153,6 +153,7 @@ export interface Contact {
     knownAddresses?: string[];
     blockedAt?: string | null;
     isConversationOnly?: boolean;
+    isSelf?: boolean;
 }
 
 export interface Group {

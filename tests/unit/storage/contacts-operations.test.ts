@@ -53,11 +53,12 @@ vi.mock('../../../src/main_process/storage/sync/settings-sync.js', () => ({
     setSettingsClock: vi.fn(),
 }));
 
-const identity = vi.hoisted(() => ({ upeerId: '', alias: '' }));
+const identity = vi.hoisted(() => ({ upeerId: '', alias: '', avatar: '' }));
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
     getMyUPeerId: () => identity.upeerId,
     getAlias: () => identity.alias,
+    getAvatar: () => identity.avatar,
 }));
 
 import {
@@ -82,6 +83,7 @@ describe('storage/contacts/operations.ts', () => {
         vi.clearAllMocks();
         identity.upeerId = '';
         identity.alias = '';
+        identity.avatar = '';
     });
 
     describe('getContactByUpeerId', () => {
@@ -169,6 +171,7 @@ describe('storage/contacts/operations.ts', () => {
         it('should name the own conversation with the profile alias instead of a deleted contact', () => {
             identity.upeerId = 'me';
             identity.alias = 'Rubén';
+            identity.avatar = 'data:image/jpeg;base64,AAAA';
             mockDb.all
                 .mockReturnValueOnce([])
                 .mockReturnValueOnce([
@@ -178,8 +181,14 @@ describe('storage/contacts/operations.ts', () => {
 
             const result = getContacts();
 
-            expect(result[0]).toEqual(expect.objectContaining({ upeerId: 'me', name: 'Rubén' }));
-            expect(result[1]).toEqual(expect.objectContaining({ upeerId: 'u9', name: 'Contacto eliminado' }));
+            expect(result[0]).toEqual(expect.objectContaining({
+                upeerId: 'me',
+                name: 'Rubén',
+                avatar: 'data:image/jpeg;base64,AAAA',
+                isSelf: true,
+            }));
+            expect(result[1]).toEqual(expect.objectContaining({ upeerId: 'u9', name: 'Contacto eliminado', isSelf: false }));
+            expect(result[1].avatar).toBeUndefined();
         });
 
         it('should fall back to a generic self label when there is no alias yet', () => {

@@ -68,4 +68,34 @@ describe('ContactInfoPanelMainView call and search actions', () => {
 
         expect(onOpenStarred).toHaveBeenCalledOnce();
     });
+
+    it('desactiva las llamadas cuando el contacto soy yo', () => {
+        const onCallAudio = vi.fn();
+        render(
+            <ContactInfoPanelMainView
+                contact={{ upeerId: 'me', name: 'Rubén', address: '', status: 'connected', isSelf: true }}
+                isOnline
+                lastSeenText={null}
+                trust={null}
+                sharedMedia={[]}
+                utilityActions={[]}
+                dangerActions={[]}
+                onClose={vi.fn()}
+                onOpenMedia={vi.fn()}
+                onViewAllMedia={vi.fn()}
+                onOpenCipher={vi.fn()}
+                onCallAudio={onCallAudio}
+                onCallVideo={vi.fn()}
+                onOpenSearch={vi.fn()}
+                onOpenStarred={vi.fn()}
+                starredCount={0}
+                callsUnavailable={false}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Llamar' }));
+
+        expect(onCallAudio).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Llamar' }).hasAttribute('disabled')).toBe(true);
+    });
 });

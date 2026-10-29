@@ -143,6 +143,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
         isGroupUnread(group, groupPrefs[group.groupId])
     ).length;
     const activeContactAvatar = activeContact?.avatar || chatStore.incomingRequests[targetUpeerId]?.avatar;
+    const isSelfChat = targetUpeerId === chatStore.myIdentity?.upeerId;
     const incomingRequest = chatStore.incomingRequests[targetUpeerId];
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
@@ -258,7 +259,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             status={activeContact?.status}
                                             lastSeen={headerPresence.lastSeen ?? undefined}
                                             vouchScore={effectiveVouchScore}
-                                            isSelfChat={targetUpeerId === chatStore.myIdentity?.upeerId}
+                                            isSelfChat={isSelfChat}
                                             onDelete={() => handleClearChat(targetUpeerId)}
                                             onShare={() => navigation.setShareModalOpen(true)}
                                             onAccept={isIncomingRequest ? undefined : handleAcceptContact}
@@ -273,6 +274,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                                     name={activeContact?.name || 'este contacto'}
                                                     isFavorite={!!activeContact?.isFavorite}
                                                     blocked={activeContact?.status === 'blocked'}
+                                                    isSelfChat={isSelfChat}
                                                     onOpenInfo={toggleContactInfo}
                                                     onSearch={openContactSearch}
                                                     onToggleFavorite={() => void chatStore.handleToggleFavorite(targetUpeerId)}

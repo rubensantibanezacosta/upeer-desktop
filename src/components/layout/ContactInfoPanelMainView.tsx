@@ -57,6 +57,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
     callsUnavailable,
 }) => {
     const callsDisabled = callsUnavailable
+        || contact.isSelf === true
         || contact.status === 'blocked'
         || contact.status === 'pending'
         || contact.status === 'incoming';
