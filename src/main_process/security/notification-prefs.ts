@@ -1,4 +1,6 @@
 import { getAppSetting, setAppSetting } from '../storage/settings-operations.js';
+import { emitSyncEvent } from '../storage/sync/eventSink.js';
+import { setSettingsClock } from '../storage/sync/settings-sync.js';
 
 export type NotificationPrefs = {
     messages: boolean;
@@ -20,6 +22,15 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
     return typeof value === 'boolean' ? value : fallback;
 }
 
+function merge(patch: Partial<NotificationPrefs>): NotificationPrefs {
+    const current = getNotificationPrefs();
+    return {
+        messages: asBoolean(patch.messages, current.messages),
+        requests: asBoolean(patch.requests, current.requests),
+        sound: asBoolean(patch.sound, current.sound),
+    };
+}
+
 export function getNotificationPrefs(): NotificationPrefs {
     const stored = getAppSetting<Partial<NotificationPrefs>>(SETTING_KEY, {});
     return {
@@ -30,13 +41,17 @@ export function getNotificationPrefs(): NotificationPrefs {
 }
 
 export function setNotificationPrefs(patch: Partial<NotificationPrefs>): NotificationPrefs {
-    const current = getNotificationPrefs();
-    const next: NotificationPrefs = {
-        messages: asBoolean(patch.messages, current.messages),
-        requests: asBoolean(patch.requests, current.requests),
-        sound: asBoolean(patch.sound, current.sound),
-    };
+    const next = merge(patch);
     setAppSetting(SETTING_KEY, next);
+    setSettingsClock('notifications', Date.now());
+    emitSyncEvent('SETTINGS_UPDATE', { block: 'notifications', ...next });
+    return next;
+}
+
+export function applyNotificationFromSync(patch: Partial<NotificationPrefs>, occurredAt: number): NotificationPrefs {
+    const next = merge(patch);
+    setAppSetting(SETTING_KEY, next);
+    setSettingsClock('notifications', occurredAt);
     return next;
 }
 

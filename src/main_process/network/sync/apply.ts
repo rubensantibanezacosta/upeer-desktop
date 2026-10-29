@@ -17,6 +17,13 @@ import {
 } from '../../storage/contacts/operations.js';
 import { withSyncEventSuppressionAsync } from '../../storage/sync/eventSink.js';
 import { upsertSyncMessage, type SyncedMessage } from '../../storage/sync/messages.js';
+import {
+    claimSettingsUpdate,
+    sanitizeSettingsPatch,
+    type SettingsPatch,
+} from '../../storage/sync/settings-sync.js';
+import { applyNotificationFromSync } from '../../security/notification-prefs.js';
+import { applyPrivacyFromSync } from '../../security/privacy-prefs.js';
 import type { SyncPlainEvent } from './types.js';
 
 const VALID_STATUSES = new Set(['failed', 'sent', 'delivered', 'read', 'vaulted']);
@@ -42,6 +49,8 @@ export async function applySyncEvent(event: SyncPlainEvent, win: BrowserWindow |
                 return applyGroupDelete(event.payload, win);
             case 'CONTACT_PROFILE':
                 return applyContactProfile(event.payload, win);
+            case 'SETTINGS_UPDATE':
+                return applySettingsUpdate(event.payload, event.occurredAt, win);
             default:
                 return false;
         }
@@ -198,6 +207,20 @@ function applyContactProfile(payload: Record<string, unknown>, win: BrowserWindo
     if (!changed) return false;
     win?.webContents.send('contact-presence', { upeerId: payload.upeerId });
     return true;
+}
+
+function applySettingsUpdate(payload: Record<string, unknown>, occurredAt: number, win: BrowserWindow | null): boolean {
+    const patch = sanitizeSettingsPatch(payload);
+    if (!patch) return false;
+    if (!claimSettingsUpdate(patch.block, occurredAt)) return false;
+    const values = applySettingsValues(patch, occurredAt);
+    win?.webContents.send('settings-updated', { block: patch.block, values });
+    return true;
+}
+
+function applySettingsValues(patch: SettingsPatch, occurredAt: number): Record<string, boolean> {
+    if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };
+    return { ...applyNotificationFromSync(patch.values, occurredAt) };
 }
 
 function toSyncedMessage(payload: Record<string, unknown>): SyncedMessage | null {

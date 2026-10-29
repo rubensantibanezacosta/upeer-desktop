@@ -63,4 +63,34 @@ describe('privacy-prefs', () => {
         const disabled = await import('../../../src/main_process/security/privacy-prefs.js');
         expect(disabled.activitySharingEnabled()).toBe(false);
     });
+
+    it('aplica un cambio sincronizado sin emitir otro evento', async () => {
+        settings.getAppSetting.mockReturnValue({ readReceipts: true, shareActivity: true });
+        const sink = vi.fn();
+        const { registerSyncEventSink } = await import('../../../src/main_process/storage/sync/eventSink.js');
+        const { applyPrivacyFromSync } = await import('../../../src/main_process/security/privacy-prefs.js');
+        registerSyncEventSink(sink);
+
+        expect(applyPrivacyFromSync({ shareActivity: false }, 2_000)).toEqual({
+            readReceipts: true,
+            shareActivity: false,
+        });
+        expect(sink).not.toHaveBeenCalled();
+        registerSyncEventSink(null);
+    });
+
+    it('emite el parche completo al cambiar una preferencia', async () => {
+        settings.getAppSetting.mockReturnValue({ readReceipts: true, shareActivity: true });
+        const sink = vi.fn();
+        const { registerSyncEventSink } = await import('../../../src/main_process/storage/sync/eventSink.js');
+        const { setPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
+        registerSyncEventSink(sink);
+
+        setPrivacyPrefs({ shareActivity: false });
+        expect(sink).toHaveBeenCalledTimes(1);
+        expect(sink.mock.calls[0][0].kind).toBe('SETTINGS_UPDATE');
+        expect(sink.mock.calls[0][0].payload).toEqual({ block: 'privacy', readReceipts: true, shareActivity: false });
+        expect(sink.mock.calls[0][0].entityId).toBe('privacy');
+        registerSyncEventSink(null);
+    });
 });

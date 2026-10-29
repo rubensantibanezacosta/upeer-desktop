@@ -9,7 +9,8 @@ export type SyncEventKind =
     | 'REACTION_SET'
     | 'GROUP_UPSERT'
     | 'GROUP_DELETE'
-    | 'CONTACT_PROFILE';
+    | 'CONTACT_PROFILE'
+    | 'SETTINGS_UPDATE';
 
 export type SyncEventDraft = {
     eventId: string;
@@ -48,7 +49,9 @@ export function syncEntityId(kind: SyncEventKind, payload: Record<string, unknow
                 ? payload.groupId
                 : kind === 'CONTACT_PROFILE'
                     ? payload.upeerId
-                    : payload.id;
+                    : kind === 'SETTINGS_UPDATE'
+                        ? payload.block
+                        : payload.id;
     return typeof candidate === 'string' ? candidate : '';
 }
 

@@ -202,8 +202,24 @@ export default function App() {
             })
             : undefined;
 
+        const subscribeSettings = window.upeer?.onSettingsUpdated;
+        const unsubscribeSettings = typeof subscribeSettings === 'function'
+            ? subscribeSettings(({ block }) => {
+                if (block === 'privacy') {
+                    hydratePrivacyPrefs().catch((cause: unknown) => {
+                        console.warn('No se pudieron releer las preferencias de privacidad sincronizadas.', cause);
+                    });
+                    return;
+                }
+                hydrateNotificationPrefs().catch((cause: unknown) => {
+                    console.warn('No se pudieron releer las preferencias de notificación sincronizadas.', cause);
+                });
+            })
+            : undefined;
+
         return () => {
             if (typeof unsubscribeExpired === 'function') unsubscribeExpired();
+            if (typeof unsubscribeSettings === 'function') unsubscribeSettings();
         };
     }, []);
 

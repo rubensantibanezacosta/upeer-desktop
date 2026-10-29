@@ -296,6 +296,7 @@ declare global {
             /** Preferencias de notificación con efecto en el servicio */
             getNotificationPrefs: () => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
             setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
+            onSettingsUpdated: (callback: (data: { block: 'privacy' | 'notifications'; values: Record<string, boolean> }) => void) => UpeerUnsubscribe;
             /** Mensajes temporales por chat (solo este dispositivo) */
             getChatRetention: () => Promise<{ map: Record<string, string>; presets: { id: string; label: string; ms: number }[] }>;
             setChatRetention: (chatId: string, retention: string) => Promise<{ ok: boolean; map: Record<string, string>; expiredChats: string[] }>;
