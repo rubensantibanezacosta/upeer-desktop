@@ -1,9 +1,10 @@
 import { getAppSetting, setAppSetting } from '../settings-operations.js';
 import { resolveRetentionId } from '../../../utils/retention.js';
+import { sanitizeChatIds, sanitizeListName } from '../../../utils/chatLists.js';
 
-export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message';
+export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message' | 'lists';
 
-export type SettingsValues = Record<string, boolean | string>;
+export type SettingsValues = Record<string, boolean | string | string[]>;
 
 export type SettingsPatch = {
     block: SettingsBlock;
@@ -26,16 +27,17 @@ const ID_FIELD: Record<string, string> = {
     retention: 'chatId',
     chat: 'chatId',
     message: 'messageId',
+    lists: 'listId',
 };
 
-const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message'];
+const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message', 'lists'];
 
 export function isSettingsBlock(value: unknown): value is SettingsBlock {
     return typeof value === 'string' && (BLOCKS as readonly string[]).includes(value);
 }
 
 export function isRendererBlock(value: unknown): boolean {
-    return value === 'chat' || value === 'message';
+    return value === 'chat' || value === 'message' || value === 'lists';
 }
 
 export function cleanId(value: unknown): string | null {
@@ -63,6 +65,15 @@ export function sanitizeSettingsPatch(payload: Record<string, unknown>): Setting
         if (!chatId) return null;
         const retention = resolveRetentionId(typeof payload.retention === 'string' ? payload.retention : null);
         return { block, entity, values: { chatId, retention } };
+    }
+
+    if (block === 'lists') {
+        const listId = cleanId(payload.listId);
+        if (!listId) return null;
+        if (payload.deleted === true) return { block, entity, values: { listId, deleted: true } };
+        const name = sanitizeListName(payload.name);
+        if (!name) return null;
+        return { block, entity, values: { listId, name, chatIds: sanitizeChatIds(payload.chatIds) } };
     }
 
     const idField = ID_FIELD[block];

@@ -10,6 +10,7 @@ import { hydratePrivacyPrefs } from './store/privacySync.js';
 import { hydrateNotificationPrefs } from './store/notificationSync.js';
 import { useChatRetentionStore } from './store/chatRetentionStore.js';
 import { useChatActionsStore } from './store/useChatActionsStore.js';
+import { useChatListsStore } from './store/useChatListsStore.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -223,6 +224,10 @@ export default function App() {
                 }
                 if (block === 'message') {
                     useChatActionsStore.getState().applyRemoteMessage(values);
+                    return;
+                }
+                if (block === 'lists') {
+                    useChatListsStore.getState().applyRemoteList(values);
                     return;
                 }
                 hydrateNotificationPrefs().catch((cause: unknown) => {

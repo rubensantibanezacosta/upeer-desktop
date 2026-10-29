@@ -182,4 +182,18 @@ describe('applySyncEvent con ajustes', () => {
             values: { messageId: 'm1', starred: true },
         });
     });
+
+    it('una lista de chats llegada de otro dispositivo se reenvía al renderer', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'lists', listId: 'l1', name: 'Trabajo', chatIds: ['a'] }, 9_000), win);
+
+        expect(applied).toBe(true);
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'lists',
+            entity: 'lists:l1',
+            values: { listId: 'l1', name: 'Trabajo', chatIds: ['a'] },
+        });
+    });
 });

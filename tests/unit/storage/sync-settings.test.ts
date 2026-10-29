@@ -97,6 +97,36 @@ describe('settings-sync', () => {
         expect(sanitizeSettingsPatch({ block: 'message', messageId: '', starred: true })).toBeNull();
     });
 
+    it('una lista de chats viaja con su nombre y sus chats', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'lists', listId: 'l1', name: '  Trabajo ', chatIds: ['a', 'a', 'b'] })).toEqual({
+            block: 'lists',
+            entity: 'lists:l1',
+            values: { listId: 'l1', name: 'Trabajo', chatIds: ['a', 'b'] },
+        });
+    });
+
+    it('borrar una lista viaja como marca, no como lista vacía', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'lists', listId: 'l1', deleted: true })).toEqual({
+            block: 'lists',
+            entity: 'lists:l1',
+            values: { listId: 'l1', deleted: true },
+        });
+    });
+
+    it('una lista sin nombre ni marca de borrado no vale', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'lists', listId: 'l1' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'lists', name: 'Trabajo' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'lists', listId: 'l1', name: '   ' })).toBeNull();
+    });
+
+    it('la lista es un bloque del renderer', async () => {
+        const { isRendererBlock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(isRendererBlock('lists')).toBe(true);
+    });
+
     it('rechaza un bloque desconocido', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'appearance', theme: 'dark' })).toBeNull();
