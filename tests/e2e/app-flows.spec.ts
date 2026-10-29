@@ -112,7 +112,7 @@ test('oculta la presencia de los contactos cuando la privacidad lo pide', async 
 
     await page.getByRole('button', { name: 'Ajustes' }).click();
     await page.getByText('Privacidad', { exact: true }).click();
-    await page.getByText('Mostrar cuando estoy conectado', { exact: true }).click();
+    await page.getByText('Presencia de tus contactos', { exact: true }).click();
     await expect.poll(async () => {
         const state = await readBridgeState(page);
         return state.privacy?.onlineStatus ?? 'missing';
