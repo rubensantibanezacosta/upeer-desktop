@@ -5,7 +5,7 @@ import { getSyncPeer } from '../../../storage/sync/peers.js';
 import { getMySyncIdentity } from '../auth.js';
 import { decryptPayload, type SyncPacket } from '../payloads.js';
 import { FILE_CHUNK, FILE_REQ, FILE_RES, isSyncFileType, parseFileChunk, parseFileRequest, parseFileResponse } from './packets.js';
-import { openSyncFileReceipt, writeSyncFileChunk } from './receiver.js';
+import { flushEarlyChunks, openSyncFileReceipt, writeSyncFileChunk } from './receiver.js';
 import { completeSyncFileRequest, discardSyncFileRequest, logUnavailableRequest, notifyUnavailable } from './request.js';
 import { serveSyncFile } from './responder.js';
 
@@ -38,6 +38,9 @@ export async function routeSyncFilePacket(
             return true;
         }
         await openSyncFileReceipt(response);
+        discardSyncFileRequest(response.fileId);
+        const early = await flushEarlyChunks(response.requestId, win);
+        if (early) completeSyncFileRequest(early);
         return true;
     }
     if (type === FILE_CHUNK) {

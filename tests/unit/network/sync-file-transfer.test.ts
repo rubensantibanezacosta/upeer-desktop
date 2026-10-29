@@ -34,7 +34,7 @@ vi.mock('../../../src/main_process/network/sync/files/storage.js', () => ({
 }));
 
 const { serveSyncFile } = await import('../../../src/main_process/network/sync/files/responder.js');
-const { openSyncFileReceipt, writeSyncFileChunk, receivedFilePath } = await import('../../../src/main_process/network/sync/files/receiver.js');
+const { openSyncFileReceipt, writeSyncFileChunk, flushEarlyChunks, receivedFilePath } = await import('../../../src/main_process/network/sync/files/receiver.js');
 const { FILE_CHUNK, FILE_CHUNK_SIZE, FILE_RES } = await import('../../../src/main_process/network/sync/files/packets.js');
 
 const peer = { deviceId: 'a'.repeat(64), address: '200::1', devicePublicKey: 'b'.repeat(64), certificate: {}, signedPreKey: {}, lastSeen: 0 } as never;
@@ -100,12 +100,12 @@ describe('ida y vuelta de un adjunto por el enlace de sincronización', () => {
         ]);
     });
 
-    it('descarta la recepción cuando un tramo llega fuera de orden', async () => {
+    it('reensambla aunque los tramos lleguen desordenados', async () => {
         mocks.sent.length = 0;
-        await serveSyncFile(peer, { requestId: 'req87654321', fileId: 'file-2' });
+        await serveSyncFile(peer, { requestId: 'req11112222', fileId: 'file-2' });
         const [, ...chunks] = mocks.sent;
         await openSyncFileReceipt({
-            requestId: 'req87654321',
+            requestId: 'req11112222',
             fileId: 'file-2',
             ok: true,
             fileName: 'origen.png',
@@ -113,8 +113,54 @@ describe('ida y vuelta de un adjunto por el enlace de sincronización', () => {
             chunkSize: FILE_CHUNK_SIZE,
             totalChunks: 3,
         });
-        const outcome = await writeSyncFileChunk({ requestId: 'req87654321', index: 2, data: chunks[2].payload.data as string }, null);
+        const outcomes = [];
+        for (const index of [2, 0, 1]) {
+            const chunk = chunks.find((entry) => entry.payload.index === index) as { payload: Record<string, unknown> };
+            outcomes.push(await writeSyncFileChunk({ requestId: 'req11112222', index, data: chunk.payload.data as string }, null));
+        }
+        expect(outcomes).toEqual([null, null, 'file-2']);
+        const written = await fs.promises.readFile(receivedFilePath('file-2', 'origen.png'));
+        expect(written.equals(source)).toBe(true);
+    });
+
+    it('guarda los tramos que llegan antes que la cabecera', async () => {
+        mocks.sent.length = 0;
+        await serveSyncFile(peer, { requestId: 'req33334444', fileId: 'file-3' });
+        const [, ...chunks] = mocks.sent;
+        const first = await writeSyncFileChunk({ requestId: 'req33334444', index: 0, data: chunks[0].payload.data as string }, null);
+        expect(first).toBeNull();
+        await openSyncFileReceipt({
+            requestId: 'req33334444',
+            fileId: 'file-3',
+            ok: true,
+            fileName: 'origen.png',
+            fileSize: source.length,
+            chunkSize: FILE_CHUNK_SIZE,
+            totalChunks: 3,
+        });
+        expect(await flushEarlyChunks('req33334444', null)).toBeNull();
+        await writeSyncFileChunk({ requestId: 'req33334444', index: 1, data: chunks[1].payload.data as string }, null);
+        const done = await writeSyncFileChunk({ requestId: 'req33334444', index: 2, data: chunks[2].payload.data as string }, null);
+        expect(done).toBe('file-3');
+        const written = await fs.promises.readFile(receivedFilePath('file-3', 'origen.png'));
+        expect(written.equals(source)).toBe(true);
+    });
+
+    it('descarta la recepción cuando un tramo cae fuera del rango declarado', async () => {
+        mocks.sent.length = 0;
+        await serveSyncFile(peer, { requestId: 'req55556666', fileId: 'file-4' });
+        const [, ...chunks] = mocks.sent;
+        await openSyncFileReceipt({
+            requestId: 'req55556666',
+            fileId: 'file-4',
+            ok: true,
+            fileName: 'origen.png',
+            fileSize: source.length,
+            chunkSize: FILE_CHUNK_SIZE,
+            totalChunks: 3,
+        });
+        const outcome = await writeSyncFileChunk({ requestId: 'req55556666', index: 9, data: chunks[0].payload.data as string }, null);
         expect(outcome).toBeNull();
-        await expect(fs.promises.readFile(receivedFilePath('file-2', 'origen.png'))).rejects.toThrow();
+        await expect(fs.promises.readFile(receivedFilePath('file-4', 'origen.png'))).rejects.toThrow();
     });
 });

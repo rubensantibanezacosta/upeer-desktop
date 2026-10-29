@@ -7,7 +7,22 @@ import { chunkBounds, chunkCount } from './chunks.js';
 import { FILE_CHUNK, FILE_CHUNK_SIZE, FILE_MAX_BYTES, FILE_RES, type SyncFileRequest } from './packets.js';
 import { findStoredFile } from './storage.js';
 
+const inFlight = new Set<string>();
+
 export async function serveSyncFile(peer: SyncPeerRecord, request: SyncFileRequest): Promise<boolean> {
+    if (inFlight.has(request.requestId)) {
+        debug('Petición de adjunto ya en curso; se ignora el duplicado', { requestId: request.requestId }, 'sync');
+        return true;
+    }
+    inFlight.add(request.requestId);
+    try {
+        return await serveOnce(peer, request);
+    } finally {
+        inFlight.delete(request.requestId);
+    }
+}
+
+async function serveOnce(peer: SyncPeerRecord, request: SyncFileRequest): Promise<boolean> {
     const entry = findStoredFile(request.fileId);
     if (!entry) {
         return refuse(peer, request, 'not-here');
