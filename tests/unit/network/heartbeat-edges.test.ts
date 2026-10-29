@@ -47,6 +47,10 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
     }),
 }));
 
+const privacy = vi.hoisted(() => ({ activitySharingEnabled: vi.fn(() => true) }));
+
+vi.mock('../../../src/main_process/security/privacy-prefs.js', () => privacy);
+
 describe('heartbeat edge cases', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -140,5 +144,48 @@ describe('heartbeat edge cases', () => {
             }),
             'ff'.repeat(32)
         );
+    });
+
+    it('adjunta la hora de actividad mientras se comparte', async () => {
+        const activity = await import('../../../src/main_process/network/messaging/activity.js');
+        const heartbeat = await import('../../../src/main_process/network/messaging/heartbeat.js');
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+
+        vi.mocked(contactsOps.getContacts).mockReturnValue([] as never);
+        privacy.activitySharingEnabled.mockReturnValue(true);
+        activity.markLocalActive(Date.now());
+
+        heartbeat.checkHeartbeat([
+            { upeerId: 'peer-share', status: 'connected', publicKey: 'aa'.repeat(32), address: '200::share' },
+        ]);
+        await Promise.resolve();
+
+        const ping = vi.mocked(transport.sendSecurePacket).mock.calls
+            .map((call) => call[1] as { type?: string; activeAt?: number })
+            .find((packet) => packet.type === 'PING');
+        expect(ping?.activeAt).toBeTypeOf('number');
+    });
+
+    it('omite la hora de actividad cuando se deja de compartir', async () => {
+        const activity = await import('../../../src/main_process/network/messaging/activity.js');
+        const heartbeat = await import('../../../src/main_process/network/messaging/heartbeat.js');
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+
+        vi.mocked(contactsOps.getContacts).mockReturnValue([] as never);
+        privacy.activitySharingEnabled.mockReturnValue(false);
+        activity.markLocalActive(Date.now());
+
+        heartbeat.checkHeartbeat([
+            { upeerId: 'peer-hide', status: 'connected', publicKey: 'bb'.repeat(32), address: '200::hide' },
+        ]);
+        await Promise.resolve();
+
+        const ping = vi.mocked(transport.sendSecurePacket).mock.calls
+            .map((call) => call[1] as { type?: string; activeAt?: number })
+            .find((packet) => packet.type === 'PING');
+        expect(ping).toBeDefined();
+        expect(ping?.activeAt).toBeUndefined();
     });
 });

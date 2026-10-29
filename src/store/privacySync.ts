@@ -4,6 +4,7 @@ export type PrivacyPatch = {
     readReceipts?: boolean;
     onlineStatus?: boolean;
     lastSeen?: boolean;
+    shareActivity?: boolean;
 };
 
 export async function hydratePrivacyPrefs(): Promise<void> {
@@ -12,6 +13,7 @@ export async function hydratePrivacyPrefs(): Promise<void> {
     store.setReadReceipts(prefs.readReceipts);
     store.setOnlineStatus(prefs.onlineStatus);
     store.setLastSeen(prefs.lastSeen);
+    store.setShareActivity(prefs.shareActivity);
 }
 
 export function pushPrivacyPrefs(patch: PrivacyPatch): void {

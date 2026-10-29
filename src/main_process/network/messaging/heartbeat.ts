@@ -13,6 +13,7 @@ import { sendDhtExchange, broadcastDhtUpdate as coreBroadcastDhtUpdate } from '.
 import { isIPBlocked } from '../server/circuitBreaker.js';
 import { sendContactRequest } from './contacts.js';
 import { localActiveAt } from './activity.js';
+import { activitySharingEnabled } from '../../security/privacy-prefs.js';
 
 type ContactStatus = 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
 
@@ -105,7 +106,7 @@ export function checkHeartbeat(contacts: HeartbeatContact[]) {
                     alias: getMyAlias() || undefined,
                     avatar: getMyAvatar() || undefined,
                     signedPreKey: getMySignedPreKeyBundle(),
-                    activeAt: localActiveAt(),
+                    activeAt: activitySharingEnabled() ? localActiveAt() : undefined,
                 }, contact.publicKey);
             }
             sendDhtExchange(contact.upeerId, sendSecurePacket);

@@ -18,32 +18,33 @@ describe('privacy-prefs', () => {
         settings.getAppSetting.mockReturnValue({});
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true, shareActivity: true });
     });
 
     it('lee lo guardado cuando es booleano', async () => {
         settings.getAppSetting.mockReturnValue({ readReceipts: false, onlineStatus: true, lastSeen: false });
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: false });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: false, shareActivity: true });
     });
 
     it('ignora valores que no son booleanos', async () => {
         settings.getAppSetting.mockReturnValue({ readReceipts: 'no', lastSeen: 0 });
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true, shareActivity: true });
     });
 
     it('guarda el parche sin perder las demás claves', async () => {
         settings.getAppSetting.mockReturnValue({ readReceipts: true, onlineStatus: true, lastSeen: true });
         const { setPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(setPrivacyPrefs({ readReceipts: false })).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: true });
+        expect(setPrivacyPrefs({ readReceipts: false })).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: true, shareActivity: true });
         expect(settings.setAppSetting).toHaveBeenCalledWith('privacy-prefs', {
             readReceipts: false,
             onlineStatus: true,
             lastSeen: true,
+            shareActivity: true,
         });
     });
 
@@ -52,5 +53,16 @@ describe('privacy-prefs', () => {
         const { readReceiptsEnabled } = await import('../../../src/main_process/security/privacy-prefs.js');
 
         expect(readReceiptsEnabled()).toBe(false);
+    });
+
+    it('comparte la actividad salvo que se desactive', async () => {
+        settings.getAppSetting.mockReturnValue({});
+        const enabled = await import('../../../src/main_process/security/privacy-prefs.js');
+        expect(enabled.activitySharingEnabled()).toBe(true);
+
+        vi.resetModules();
+        settings.getAppSetting.mockReturnValue({ shareActivity: false });
+        const disabled = await import('../../../src/main_process/security/privacy-prefs.js');
+        expect(disabled.activitySharingEnabled()).toBe(false);
     });
 });
