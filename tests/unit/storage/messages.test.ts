@@ -614,6 +614,52 @@ describe('Storage - Message Operations', () => {
             expect(res2).toBe(false);
         });
 
+        it('should allow moving from vaulted to failed', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            mockDb.update.mockReturnValue({
+                set: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        run: mockRun
+                    })
+                })
+            });
+
+            mockDb.select.mockReturnValueOnce({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ status: 'vaulted' })
+                    })
+                })
+            });
+
+            const result = await updateMessageStatus('msg1', 'failed');
+            expect(result).toBe(true);
+            expect(mockRun).toHaveBeenCalled();
+        });
+
+        it('should not move a delivered message to failed', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            mockDb.update.mockReturnValue({
+                set: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        run: mockRun
+                    })
+                })
+            });
+
+            mockDb.select.mockReturnValueOnce({
+                from: vi.fn().mockReturnValue({
+                    where: vi.fn().mockReturnValue({
+                        get: vi.fn().mockReturnValue({ status: 'delivered' })
+                    })
+                })
+            });
+
+            const result = await updateMessageStatus('msg1', 'failed');
+            expect(result).toBe(false);
+            expect(mockRun).not.toHaveBeenCalled();
+        });
+
         it('should allow retry reset from failed to sent', async () => {
             const mockRun = vi.fn().mockReturnValue({ changes: 1 });
             mockDb.update.mockReturnValue({

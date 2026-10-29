@@ -1,5 +1,6 @@
 import { getDb, getSchema, eq } from '../shared.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
+import { canTransitionStatus } from './statusTransitions.js';
 
 export type MessageDeliveryStatus = 'failed' | 'sent' | 'delivered' | 'read' | 'vaulted';
 
@@ -14,40 +15,7 @@ export async function updateMessageStatus(id: string, status: MessageDeliverySta
     const currentStatus = getMessageStatus(id);
     if (!currentStatus) return false;
 
-    const statusOrder: Record<string, number> = {
-        'failed': 0,
-        'sent': 1,
-        'vaulted': 2,
-        'delivered': 3,
-        'read': 4
-    };
-
-    if (status === 'failed') {
-        // Solo se puede pasar a 'failed' desde 'sent'
-        if (currentStatus !== 'sent') return false;
-        const result = db.update(schema.messages)
-            .set({ status })
-            .where(eq(schema.messages.id, id))
-            .run();
-        if ((result?.changes ?? 0) > 0) emitSyncEvent('MESSAGE_STATUS', { id, status });
-        return (result?.changes ?? 0) > 0;
-    }
-
-    if (currentStatus === 'failed' && status === 'sent') {
-        // Permitir 'failed' → 'sent' (retry)
-        const result = db.update(schema.messages)
-            .set({ status })
-            .where(eq(schema.messages.id, id))
-            .run();
-        if ((result?.changes ?? 0) > 0) emitSyncEvent('MESSAGE_STATUS', { id, status });
-        return (result?.changes ?? 0) > 0;
-    }
-
-    const currentRank = statusOrder[currentStatus] ?? 0;
-    const newRank = statusOrder[status] ?? 0;
-
-    // Degradación: 'vaulted' → 'sent', 'delivered' → 'vaulted', etc.
-    if (newRank <= currentRank) return false;
+    if (!canTransitionStatus(currentStatus, status)) return false;
 
     const result = db.update(schema.messages)
         .set({ status })

@@ -39,6 +39,15 @@ export class UINotifier {
         const messageId = transfer.messageId || transfer.fileId;
         this.safeSend('file-transfer-failed', { ...this.mapToUI(transfer), fileId: messageId, messageId, reason });
         if (transfer.direction === 'sending') {
+            void this.persistFailed(messageId);
+        }
+    }
+
+    private async persistFailed(messageId: string) {
+        const { updateTransferMessageStatus } = await import('./db-helper.js');
+        const { getMessageStatus } = await import('../../storage/messages/status.js');
+        const persisted = await updateTransferMessageStatus(messageId, 'failed');
+        if (persisted || getMessageStatus(messageId) === null) {
             this.notifyStatusUpdated(messageId, 'failed');
         }
     }
