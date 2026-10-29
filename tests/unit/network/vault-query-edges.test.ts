@@ -147,7 +147,7 @@ describe('VaultManager.queryOwnVaults edge cases', () => {
             'vault'
         );
         expect(logger.warn).toHaveBeenCalledWith(
-            'Failed to send VAULT_QUERY to online friend friend-fails',
+            'Failed to send VAULT_QUERY to contact friend friend-fails',
             expect.any(Error),
             'vault'
         );

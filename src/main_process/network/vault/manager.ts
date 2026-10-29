@@ -255,8 +255,8 @@ export class VaultManager {
             && typeof contact.address === 'string'
             && contact.address.length > 0
         );
-        const onlineFriends = knownPeers.filter(c => c.status === 'connected');
-        const fallbackSinglePeer = onlineFriends.length === 0 && knownPeers.length === 1
+        const acceptedContacts = knownPeers.filter(c => c.status === 'connected');
+        const fallbackSinglePeer = acceptedContacts.length === 0 && knownPeers.length === 1
             ? [knownPeers[0]]
             : [];
         const queriedAddresses = new Set<string>();
@@ -286,8 +286,8 @@ export class VaultManager {
             await queryAddress(address, 'self device');
         }
 
-        for (const friend of onlineFriends) {
-            await queryAddress(friend.address, `online friend ${friend.upeerId ?? friend.address}`);
+        for (const friend of acceptedContacts) {
+            await queryAddress(friend.address, `contact friend ${friend.upeerId ?? friend.address}`);
         }
 
         for (const peer of fallbackSinglePeer) {
