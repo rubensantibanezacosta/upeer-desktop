@@ -17,6 +17,7 @@ import {
 } from '../../storage/contacts/operations.js';
 import { withSyncEventSuppressionAsync } from '../../storage/sync/eventSink.js';
 import { upsertSyncMessage, type SyncedMessage } from '../../storage/sync/messages.js';
+import { queueRendererSettingsPatch } from '../../storage/sync/settings-inbox.js';
 import {
     claimSettingsUpdate,
     sanitizeSettingsPatch,
@@ -229,6 +230,7 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
     }
     if (patch.block === 'chat' || patch.block === 'message' || patch.block === 'lists') {
         setSettingsClock(patch.entity, occurredAt);
+        queueRendererSettingsPatch(patch, occurredAt);
         return { ...patch.values };
     }
     if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };

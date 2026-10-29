@@ -279,6 +279,8 @@ const notificationApi = {
     onSettingsUpdated: (callback: (data: { block: string; entity: string; values: Record<string, boolean | string> }) => void) =>
         subscribe<[{ block: string; entity: string; values: Record<string, boolean | string> }]>('settings-updated', (data) => callback(data)),
     emitSettingsPatch: (payload: Record<string, unknown>) => ipcRenderer.invoke('emit-settings-patch', payload),
+    getPendingSettingsPatches: () => ipcRenderer.invoke('get-pending-settings-patches'),
+    ackSettingsPatch: (entity: string, occurredAt: number) => ipcRenderer.invoke('ack-settings-patch', { entity, occurredAt }),
 };
 
 const retentionApi = {

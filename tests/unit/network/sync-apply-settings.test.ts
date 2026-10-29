@@ -169,6 +169,38 @@ describe('applySyncEvent con ajustes', () => {
         expect(win.webContents.send).toHaveBeenCalledTimes(1);
     });
 
+    it('el ajuste de chat queda en la bandeja por si el renderer no está listo', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { listRendererSettingsPatches } = await import('../../../src/main_process/storage/sync/settings-inbox.js');
+
+        expect(await applySyncEvent(event({ block: 'chat', chatId: 'grp-9', unread: true }, 5_000), null)).toBe(true);
+
+        expect(listRendererSettingsPatches()).toEqual([
+            { block: 'chat', entity: 'chat:grp-9', values: { chatId: 'grp-9', unread: true }, occurredAt: 5_000 },
+        ]);
+    });
+
+    it('lo que el renderer confirma deja de estar pendiente', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { ackRendererSettingsPatch, listRendererSettingsPatches } =
+            await import('../../../src/main_process/storage/sync/settings-inbox.js');
+
+        await applySyncEvent(event({ block: 'chat', chatId: 'grp-10', muted: true }, 5_500), null);
+        expect(ackRendererSettingsPatch('chat:grp-10', 5_500)).toBe(true);
+        expect(listRendererSettingsPatches()).toEqual([]);
+    });
+
+    it('privacidad y notificaciones no pasan por la bandeja del renderer', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { listRendererSettingsPatches } = await import('../../../src/main_process/storage/sync/settings-inbox.js');
+
+        await applySyncEvent(event({ block: 'privacy', shareActivity: false }, 4_500), null);
+        await applySyncEvent(event({ block: 'notifications', sound: false }, 4_600), null);
+        await applySyncEvent(event({ block: 'retention', chatId: 'chat-4', retention: '7d' }, 4_700), null);
+
+        expect(listRendererSettingsPatches()).toEqual([]);
+    });
+
     it('un destacado llegado de otro dispositivo se reenvía al renderer', async () => {
         const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
         const win = windowDouble();

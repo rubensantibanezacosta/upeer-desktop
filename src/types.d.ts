@@ -298,6 +298,8 @@ declare global {
             setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
             onSettingsUpdated: (callback: (data: { block: string; entity: string; values: Record<string, boolean | string> }) => void) => UpeerUnsubscribe;
             emitSettingsPatch: (payload: Record<string, unknown>) => Promise<{ ok: boolean }>;
+            getPendingSettingsPatches: () => Promise<{ patches: Array<{ block: string; entity: string; values: Record<string, boolean | string | string[]>; occurredAt: number }> }>;
+            ackSettingsPatch: (entity: string, occurredAt: number) => Promise<{ ok: boolean }>;
             /** Mensajes temporales por chat (solo este dispositivo) */
             getChatRetention: () => Promise<{ map: Record<string, string>; presets: { id: string; label: string; ms: number }[] }>;
             setChatRetention: (chatId: string, retention: string) => Promise<{ ok: boolean; map: Record<string, string>; expiredChats: string[] }>;

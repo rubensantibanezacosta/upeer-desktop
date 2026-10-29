@@ -9,8 +9,7 @@ import { useChatStore } from './store/useChatStore.js';
 import { hydratePrivacyPrefs } from './store/privacySync.js';
 import { hydrateNotificationPrefs } from './store/notificationSync.js';
 import { useChatRetentionStore } from './store/chatRetentionStore.js';
-import { useChatActionsStore } from './store/useChatActionsStore.js';
-import { useChatListsStore } from './store/useChatListsStore.js';
+import { applyRemoteSettingsPatch, drainPendingSettingsPatches } from './store/remoteSettings.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -206,35 +205,20 @@ export default function App() {
 
         const subscribeSettings = window.upeer?.onSettingsUpdated;
         const unsubscribeSettings = typeof subscribeSettings === 'function'
-            ? subscribeSettings(({ block, values }) => {
-                if (block === 'privacy') {
-                    hydratePrivacyPrefs().catch((cause: unknown) => {
-                        console.warn('No se pudieron releer las preferencias de privacidad sincronizadas.', cause);
-                    });
+            ? subscribeSettings((patch) => {
+                const rendererOwned = patch.block === 'chat' || patch.block === 'message' || patch.block === 'lists';
+                if (!rendererOwned) {
+                    applyRemoteSettingsPatch(patch);
                     return;
                 }
-                if (block === 'retention') {
-                    void useChatRetentionStore.getState().hydrate();
-                    return;
-                }
-                if (block === 'chat') {
-                    const chatId = typeof values.chatId === 'string' ? values.chatId : '';
-                    if (chatId) useChatActionsStore.getState().applyRemoteChat(chatId, values);
-                    return;
-                }
-                if (block === 'message') {
-                    useChatActionsStore.getState().applyRemoteMessage(values);
-                    return;
-                }
-                if (block === 'lists') {
-                    useChatListsStore.getState().applyRemoteList(values);
-                    return;
-                }
-                hydrateNotificationPrefs().catch((cause: unknown) => {
-                    console.warn('No se pudieron releer las preferencias de notificación sincronizadas.', cause);
+                drainPendingSettingsPatches().catch((cause: unknown) => {
+                    console.warn('No se pudieron adoptar los ajustes sincronizados pendientes.', cause);
                 });
             })
             : undefined;
+        drainPendingSettingsPatches().catch((cause: unknown) => {
+            console.warn('No se pudieron adoptar los ajustes sincronizados al arrancar.', cause);
+        });
 
         return () => {
             if (typeof unsubscribeExpired === 'function') unsubscribeExpired();
