@@ -54,7 +54,10 @@ export function registerDeviceHandlers(): void {
         const registry = getMyAccountRegistry();
         const state = loadAccountRegistryState();
         const devices = registry?.devices ?? state?.devices ?? [];
-        if (devices.length === 0) return { devices: [], epoch: registry?.epoch ?? state?.epoch ?? null, localDeviceId };
+        const revoked = (registry?.revoked ?? state?.revoked ?? [])
+            .map(entry => ({ deviceId: entry.deviceId, revokedAt: entry.revokedAt }))
+            .sort((left, right) => right.revokedAt - left.revokedAt);
+        if (devices.length === 0) return { devices: [], revoked, epoch: registry?.epoch ?? state?.epoch ?? null, localDeviceId };
         return {
             devices: devices.map(device => ({
                 deviceId: device.deviceId,
@@ -65,6 +68,7 @@ export function registerDeviceHandlers(): void {
                 expiresAt: device.expiresAt,
                 epoch: device.epoch,
             })),
+            revoked,
             epoch: registry?.epoch ?? state?.epoch ?? null,
             localDeviceId,
         };

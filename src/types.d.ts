@@ -276,6 +276,7 @@ declare global {
                     expiresAt: number;
                     epoch: number;
                 }>;
+                revoked: Array<{ deviceId: string; revokedAt: number }>;
                 epoch: number | null;
                 localDeviceId: string | null;
             }>;

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, DialogActions, DialogContent, DialogTitle, IconButton, Modal, ModalDialog, Stack, Tooltip, Typography } from '@mui/joy';
-import { Trash2, BadgeCheck } from 'lucide-react';
+import { Trash2, BadgeCheck, Ban } from 'lucide-react';
 import { CardGroupLabel, cardBodySx } from './sectionShell.js';
 
 export interface AuthorizedDevice {
@@ -13,8 +13,14 @@ export interface AuthorizedDevice {
     epoch: number;
 }
 
+export interface RevokedDevice {
+    deviceId: string;
+    revokedAt: number;
+}
+
 export const AuthorizedDeviceList: React.FC = () => {
     const [devices, setDevices] = useState<AuthorizedDevice[]>([]);
+    const [revoked, setRevoked] = useState<RevokedDevice[]>([]);
     const [epoch, setEpoch] = useState<number | null>(null);
     const [localDeviceId, setLocalDeviceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -26,6 +32,7 @@ export const AuthorizedDeviceList: React.FC = () => {
         try {
             const result = await window.upeer.getAuthorizedDevices();
             setDevices(orderDevices(result.devices, result.localDeviceId ?? null));
+            setRevoked(result.revoked ?? []);
             setEpoch(result.epoch);
             setLocalDeviceId(result.localDeviceId ?? null);
             setError('');
@@ -146,6 +153,29 @@ export const AuthorizedDeviceList: React.FC = () => {
             })}
 
             {error && <Alert color="warning" variant="soft" size="sm">{error}</Alert>}
+            {revoked.length > 0 && (
+                <Box sx={{ mt: 1, borderTop: '1px solid', borderColor: 'divider', pt: 1.25 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ px: 0.5, mb: 0.5 }}>
+                        <Ban style={{ fontSize: 13, opacity: 0.6 }} />
+                        <Typography level="body-xs" sx={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', opacity: 0.6 }}>
+                            REVOCADOS
+                        </Typography>
+                    </Stack>
+                    {revoked.slice(0, 3).map((entry) => (
+                        <Box key={entry.deviceId} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 0.75, opacity: 0.7 }}>
+                            <Typography level="body-xs" sx={{ flexGrow: 1, minWidth: 0, fontFamily: 'monospace', color: 'text.tertiary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {entry.deviceId}
+                            </Typography>
+                            <Typography level="body-xs" sx={{ color: 'text.tertiary', flexShrink: 0 }}>
+                                {authorizedLabel(entry.revokedAt)}
+                            </Typography>
+                        </Box>
+                    ))}
+                    <Typography level="body-xs" sx={{ color: 'text.tertiary', px: 0.5, pt: 0.5 }}>
+                        Un dispositivo revocado deja de recibir mensajes nuevos y puede volver a vincularse con una invitación.
+                    </Typography>
+                </Box>
+            )}
             <Box sx={{ px: 0.5, pb: 0.5 }}>
                 <Button size="sm" variant="plain" color="neutral" onClick={() => void load()}>Actualizar</Button>
             </Box>

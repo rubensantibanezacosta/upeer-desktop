@@ -88,7 +88,10 @@ describe('Devices IPC Handlers', () => {
             accountUpeerId: 'aa'.repeat(32),
             epoch: 4,
             issuedAt: 1,
-            revoked: [],
+            revoked: [
+                { deviceId: 'dd'.repeat(32), revokedAt: 5, reason: 'device revoked by the account owner' },
+                { deviceId: 'ee'.repeat(32), revokedAt: 9, reason: 'lost device' },
+            ],
             devices: [{
                 deviceId: 'bb'.repeat(32),
                 devicePublicKey: 'cc'.repeat(32),
@@ -111,6 +114,10 @@ describe('Devices IPC Handlers', () => {
                 expiresAt: 20,
                 epoch: 4,
             }],
+            revoked: [
+                { deviceId: 'ee'.repeat(32), revokedAt: 9 },
+                { deviceId: 'dd'.repeat(32), revokedAt: 5 },
+            ],
             epoch: 4,
             localDeviceId: 'my-device-id',
         });
@@ -119,7 +126,7 @@ describe('Devices IPC Handlers', () => {
     it('get-authorized-devices responde vacío sin registro', () => {
         vi.mocked(loadAccountRegistryState).mockReturnValue(null);
         const handler = getRegisteredHandler('get-authorized-devices');
-        expect(handler()).toEqual({ devices: [], epoch: null, localDeviceId: 'my-device-id' });
+        expect(handler()).toEqual({ devices: [], revoked: [], epoch: null, localDeviceId: 'my-device-id' });
     });
 
     it('revoke-authorized-device revoca, borra y republica', async () => {
