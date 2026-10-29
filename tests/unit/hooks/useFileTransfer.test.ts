@@ -9,6 +9,7 @@ const mockUpeer = {
     onFileTransferCompleted: vi.fn(),
     onFileTransferCancelled: vi.fn(),
     onFileTransferFailed: vi.fn(),
+    onSyncFileReceived: vi.fn(),
     getFileTransfers: vi.fn(),
     startFileTransfer: vi.fn(),
     cancelFileTransfer: vi.fn(),

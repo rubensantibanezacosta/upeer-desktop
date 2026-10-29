@@ -74,6 +74,11 @@ export function resetTransportConnectionsForTests(): void {
     Array.from(connectionPool.keys()).forEach(destroyConnection);
 }
 
+export function resetPeerConnection(ip: string): void {
+    if (!ip) return;
+    destroyConnection(ip);
+}
+
 function clearIdleTimer(entry: PooledConnection): void {
     if (entry.idleTimer) {
         clearTimeout(entry.idleTimer);

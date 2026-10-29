@@ -177,9 +177,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                                                 }
                                             }
                                         }}
-                                        onOpen={async (_fid) => {
+                                        onOpen={async (fid) => {
                                             const sp = fileData?.savedPath;
-                                            if (sp) await window.upeer.openFile(sp);
+                                            if (sp) {
+                                                const opened = await window.upeer.openFile(sp);
+                                                if (opened.success) return;
+                                            }
+                                            await window.upeer.requestSyncFile(fid);
                                         }}
                                         onMediaClick={onMediaClick}
                                     />

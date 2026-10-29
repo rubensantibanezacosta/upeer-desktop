@@ -152,6 +152,31 @@ export function validateSyncReset(data: Record<string, unknown>): ValidationResu
     return { valid: true };
 }
 
+export function validateSyncFilePacket(data: Record<string, unknown>): ValidationResult {
+    if (!isHex(data.senderDeviceId, 32)) {
+        return { valid: false, error: 'Invalid senderDeviceId' };
+    }
+    if (!isCertificate(data.senderDeviceCertificate)) {
+        return { valid: false, error: 'Invalid senderDeviceCertificate' };
+    }
+    if (!isHex(data.recipientDeviceId, 32)) {
+        return { valid: false, error: 'Invalid recipientDeviceId' };
+    }
+    if (typeof data.content !== 'string' || data.content.length === 0 || data.content.length > MAX_CONTENT_LENGTH) {
+        return { valid: false, error: 'Invalid sync content' };
+    }
+    if (typeof data.nonce !== 'string' || data.nonce.length === 0 || data.nonce.length > 256) {
+        return { valid: false, error: 'Invalid sync nonce' };
+    }
+    if (!isRatchetHeader(data.ratchetHeader)) {
+        return { valid: false, error: 'Invalid ratchet header' };
+    }
+    if (data.x3dhInit !== undefined && !isX3dhInit(data.x3dhInit)) {
+        return { valid: false, error: 'Invalid x3dh init' };
+    }
+    return { valid: true };
+}
+
 export function validateEnrollRequest(data: Record<string, unknown>): ValidationResult {
     if (!isRecord(data.sealed)) {
         return { valid: false, error: 'Invalid sealed envelope' };

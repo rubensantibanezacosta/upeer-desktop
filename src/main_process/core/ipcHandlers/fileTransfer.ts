@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
@@ -15,6 +15,19 @@ const GROUP_SEND_CONCURRENCY = 4;
  * Registra los manejadores IPC relacionados con transferencia de archivos
  */
 export function registerFileTransferHandlers(): void {
+  ipcMain.handle('request-sync-file', async (event, { fileId }) => {
+    if (typeof fileId !== 'string' || !fileId) {
+      return { success: false, error: 'Invalid file id' };
+    }
+    const { requestSyncFile } = await import('../../network/sync/files/request.js');
+    const result = await requestSyncFile(fileId, BrowserWindow.fromWebContents(event.sender));
+    return {
+      success: result.requested > 0 || result.local,
+      requested: result.requested,
+      local: result.local,
+    };
+  });
+
   // File transfer handlers (Phase 16)
   ipcMain.handle('start-file-transfer', async (event, { upeerId, filePath, thumbnail, caption, isVoiceNote, fileName }) => {
     try {

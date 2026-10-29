@@ -161,6 +161,17 @@ export interface FileTransferFailedEvent {
     error: string;
 }
 
+export interface SyncFileReceivedEvent {
+    messageId: string;
+    fileId: string;
+    savedPath: string;
+}
+
+export interface SyncFileUnavailableEvent {
+    fileId: string;
+    reason: string;
+}
+
 export interface YggstackAddressEvent {
     address: string;
 }

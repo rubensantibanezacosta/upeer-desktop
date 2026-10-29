@@ -52,11 +52,16 @@ export const registerFileTransferListeners = ({
         onTransferStateChangeRef.current?.(data.sessionFileId || data.fileId, { transferState: 'failed' });
     }) || (() => undefined);
 
+    const unsubscribeSynced = window.upeer.onSyncFileReceived((data) => {
+        onTransferStateChangeRef.current?.(data.messageId, { savedPath: data.savedPath, transferState: 'completed' });
+    }) || (() => undefined);
+
     return () => {
         unsubscribeStarted();
         unsubscribeProgress();
         unsubscribeCompleted();
         unsubscribeCancelled();
         unsubscribeFailed();
+        unsubscribeSynced();
     };
 };

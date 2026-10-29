@@ -39,7 +39,7 @@ export function sendSyncHello(address: string, ack: boolean): boolean {
 
 export async function sendEncryptedSync(
     peer: SyncPeerRecord,
-    type: 'SYNC_ENVELOPE' | 'SYNC_HISTORY_REQ' | 'SYNC_HISTORY_RES',
+    type: 'SYNC_ENVELOPE' | 'SYNC_HISTORY_REQ' | 'SYNC_HISTORY_RES' | 'SYNC_FILE_REQ' | 'SYNC_FILE_RES' | 'SYNC_FILE_CHUNK',
     payload: Record<string, unknown>,
 ): Promise<boolean> {
     if (!peer.address) return false;
@@ -48,9 +48,10 @@ export async function sendEncryptedSync(
     const contextId = `sync:${peer.deviceId}`;
     const session = getRatchetSession(getMyUPeerId(), contextId);
     if (!session && identity.deviceId > peer.deviceId) return false;
+    const sealedPayload = type.startsWith('SYNC_FILE_') ? { type, ...payload } : payload;
     const encrypted = await encryptChatPayload(
         getMyUPeerId(),
-        JSON.stringify(payload),
+        JSON.stringify(sealedPayload),
         peerContact(peer),
         contextId,
         { allowDeviceIdentity: true },

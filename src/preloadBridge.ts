@@ -217,6 +217,9 @@ const fileTransferApi = {
     getFileTransfers: () => ipcRenderer.invoke('get-file-transfers'),
     getStreamPreview: (fileId: string) => ipcRenderer.invoke('get-stream-preview', { fileId }),
     saveTransferredFile: (fileId: string, destinationPath: string) => ipcRenderer.invoke('save-transferred-file', { fileId, destinationPath }),
+    requestSyncFile: (fileId: string) => ipcRenderer.invoke('request-sync-file', { fileId }),
+    onSyncFileReceived: (callback: (data: { messageId: string; fileId: string; savedPath: string }) => void) => subscribe<[{ messageId: string; fileId: string; savedPath: string }]>('sync-file-received', callback),
+    onSyncFileUnavailable: (callback: (data: { fileId: string; reason: string }) => void) => subscribe<[{ fileId: string; reason: string }]>('sync-file-unavailable', callback),
 };
 
 const callApi = {

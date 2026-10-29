@@ -195,6 +195,9 @@ declare global {
             getFileTransfers: () => Promise<{ success: boolean; transfers?: UpeerTransfer[] | Record<string, UpeerTransfer>; error?: string }>;
             getStreamPreview: (fileId: string) => Promise<{ success: boolean; tempPath?: string; contiguousBytes?: number; totalBytes?: number; error?: string }>;
             saveTransferredFile: (fileId: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
+            requestSyncFile: (fileId: string) => Promise<{ success: boolean; requested?: number; local?: boolean; error?: string }>;
+            onSyncFileReceived: (callback: (data: { messageId: string; fileId: string; savedPath: string }) => void) => UpeerUnsubscribe;
+            onSyncFileUnavailable: (callback: (data: { fileId: string; reason: string }) => void) => UpeerUnsubscribe;
             // BUG EC fix: nuevos métodos para descargar y abrir archivos recibidos
             showSaveDialog: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
             openFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;

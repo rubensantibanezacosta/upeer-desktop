@@ -70,6 +70,7 @@ import {
     validateSyncHistoryRequest,
     validateSyncHistoryResponse,
     validateSyncReset,
+    validateSyncFilePacket,
 } from './validationSync.js';
 import type { ValidationResult } from './validationShared.js';
 
@@ -108,6 +109,9 @@ const VALIDATORS: Record<string, (data: any) => ValidationResult> = {
     SYNC_HISTORY_RES: validateSyncHistoryResponse,
     SYNC_ACK: validateSyncAck,
     SYNC_RESET: validateSyncReset,
+    SYNC_FILE_REQ: validateSyncFilePacket,
+    SYNC_FILE_RES: validateSyncFilePacket,
+    SYNC_FILE_CHUNK: validateSyncFilePacket,
     IDENTITY_UPDATE: validateIdentityUpdate,
     FILE_PROPOSAL: validateFileProposal,
     FILE_START: validateFileProposal,

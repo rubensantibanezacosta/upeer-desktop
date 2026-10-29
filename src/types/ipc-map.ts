@@ -111,6 +111,8 @@ import type {
     FileTransferCompletedEvent,
     FileTransferCancelledEvent,
     FileTransferFailedEvent,
+    SyncFileReceivedEvent,
+    SyncFileUnavailableEvent,
     YggstackAddressEvent,
     YggstackStatusEvent,
     SyncStatusEvent,
@@ -215,6 +217,8 @@ export interface IPCEventMap {
     'file-transfer-completed': FileTransferCompletedEvent;
     'file-transfer-cancelled': FileTransferCancelledEvent;
     'file-transfer-failed': FileTransferFailedEvent;
+    'sync-file-received': SyncFileReceivedEvent;
+    'sync-file-unavailable': SyncFileUnavailableEvent;
     'yggstack-address': YggstackAddressEvent;
     'yggstack-status': YggstackStatusEvent;
     'sync-status': SyncStatusEvent;
