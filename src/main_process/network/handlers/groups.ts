@@ -8,8 +8,8 @@ import { getGroupById } from "../../storage/groups/operations.js";
 import {
   getMessageById,
   saveMessage,
-  updateMessageStatus,
 } from "../../storage/messages/operations.js";
+import { applyGroupAck } from "../../storage/messages/groupAck.js";
 import { decryptGroupMessage } from "../groupState.js";
 import { issueVouch, VouchType } from "../../security/reputation/vouches.js";
 import { security, warn, info } from "../../security/secure-logger.js";
@@ -226,15 +226,15 @@ export async function handleGroupAck(
   const msg = await getMessageById(msgId);
   if (!msg || msg.chatUpeerId !== groupId || !msg.isMine) return;
 
-  if (await updateMessageStatus(msgId, "delivered")) {
-    win?.webContents.send("group-message-delivered", {
-      id: msgId,
-      groupId,
-      upeerId,
-    });
-    win?.webContents.send("message-status-updated", {
-      id: msgId,
-      status: "delivered",
-    });
-  }
+  const outcome = await applyGroupAck(msgId, groupId, upeerId);
+  if (outcome !== 'complete') return;
+  win?.webContents.send("group-message-delivered", {
+    id: msgId,
+    groupId,
+    upeerId,
+  });
+  win?.webContents.send("message-status-updated", {
+    id: msgId,
+    status: "delivered",
+  });
 }

@@ -85,6 +85,38 @@ describe('file transfer peer validation', () => {
         expect(sendMock).not.toHaveBeenCalled();
     });
 
+    it('no da el mensaje por entregado cuando el destinatario solo acepta la propuesta', async () => {
+        const dbHelper = await import('../../../src/main_process/network/file-transfer/db-helper.js');
+        const transfer = manager.store.createTransfer({
+            fileId: 'file-3',
+            messageId: 'msg-3',
+            upeerId: 'peer-owner',
+            peerAddress: 'peer-owner-addr',
+            fileName: 'demo.txt',
+            fileSize: 10,
+            mimeType: 'text/plain',
+            totalChunks: 1,
+            chunkSize: 1024,
+            fileHash: 'c'.repeat(64),
+            direction: 'sending',
+            persistMessage: false,
+        });
+
+        manager.store.updateTransfer(transfer.fileId, 'sending', {
+            phase: TransferPhase.PROPOSED,
+            state: 'active',
+        });
+
+        await manager.handleAccept('peer-owner', 'peer-owner-addr', {
+            fileId: transfer.fileId,
+            signature: 'sig',
+        });
+
+        const updated = manager.getTransfer(transfer.fileId, 'sending');
+        expect(updated?.phase).toBe(TransferPhase.TRANSFERRING);
+        expect(dbHelper.updateTransferMessageStatus).not.toHaveBeenCalled();
+    });
+
     it('ignora FILE_ACK y FILE_DONE_ACK de peers distintos al destinatario', async () => {
         const transfer = manager.store.createTransfer({
             fileId: 'file-2',

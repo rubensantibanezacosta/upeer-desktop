@@ -42,6 +42,7 @@ export const messages = sqliteTable('messages', {
     isEdited: integer('is_edited', { mode: 'boolean' }).notNull().default(false),
     timestamp: integer('timestamp').notNull(), // Unix ms epoch. BUG DB-TS fix: evitar mezcla text/int
     expiresAt: integer('expires_at'), // Unix ms epoch; null si el chat no tiene mensajes temporales
+    deliveredTo: text('delivered_to'), // JSON con los miembros del grupo que confirmaron la entrega
 });
 
 export const reactions = sqliteTable('reactions', {

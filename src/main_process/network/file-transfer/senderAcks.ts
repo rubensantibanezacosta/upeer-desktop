@@ -1,7 +1,6 @@
 import { warn, debug } from '../../security/secure-logger.js';
 import { getContactByUpeerId } from '../../storage/contacts/operations.js';
 import { FileTransfer, TransferPhase } from './types.js';
-import { updateTransferMessageStatus } from './db-helper.js';
 import { verifyFileTransferPacketFromSigner } from './signature.js';
 import type { TransferManager } from './transfer-manager.js';
 
@@ -48,11 +47,6 @@ export async function handleAccept(this: TransferManager, upeerId: string, addre
     });
     if (updated) {
         this.ui.notifyProgress(updated, true);
-        const messageId = updated.messageId || data.fileId;
-        if (await updateTransferMessageStatus(messageId, 'delivered')) {
-            this.ui.safeSend('message-delivered', { id: messageId, upeerId });
-            this.ui.notifyStatusUpdated(messageId, 'delivered');
-        }
         this.sendNextChunks(updated);
     }
 }

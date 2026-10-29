@@ -219,7 +219,7 @@ export const createChatListenerActions = (set: ChatSet, get: ChatGet) => ({
         window.upeer.onGroupMessageDelivered((data) => {
             if (data.groupId === get().activeGroupId) {
                 set((state) => ({
-                    groupChatHistory: state.groupChatHistory.map((message) => message.id === data.id ? { ...message, status: 'read' } : message),
+                    groupChatHistory: state.groupChatHistory.map((message) => message.id === data.id ? { ...message, status: 'delivered' } : message),
                 }));
             }
         });

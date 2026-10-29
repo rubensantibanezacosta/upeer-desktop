@@ -11,6 +11,7 @@ import * as contactsOps from '../../../src/main_process/storage/contacts/operati
 import * as messagesOps from '../../../src/main_process/storage/messages/operations.js';
 import * as identity from '../../../src/main_process/security/identity.js';
 import * as groupControlShared from '../../../src/main_process/network/handlers/groupControlShared.js';
+import * as groupAck from '../../../src/main_process/storage/messages/groupAck.js';
 
 type GroupWindow = NonNullable<Parameters<typeof handleGroupMessage>[3]>;
 type GroupContact = Parameters<typeof handleGroupMessage>[1];
@@ -57,6 +58,10 @@ vi.mock('../../../src/main_process/storage/messages/operations.js', () => ({
     saveMessage: vi.fn(),
     updateMessageStatus: vi.fn(),
     getMessageById: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/messages/groupAck.js', () => ({
+    applyGroupAck: vi.fn(),
 }));
 
 vi.mock('../../../src/main_process/network/messaging/groupControl.js', () => ({
@@ -828,20 +833,36 @@ describe('Group Handlers Final Coverage', () => {
     });
 
     describe('handleGroupAck', () => {
-        it('should update status', async () => {
-            const uuid = '550e8400-e29b-41d4-a716-446655440000';
+        const uuid = '550e8400-e29b-41d4-a716-446655440000';
+
+        it('records the ack without marking the message delivered', async () => {
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: uuid, chatUpeerId: groupId, isMine: 1 } as never);
+            vi.mocked(groupAck.applyGroupAck).mockResolvedValue('recorded');
+
             await handleGroupAck(senderId, { id: uuid, groupId } as GroupAckData, mockWin);
-            expect(messagesOps.updateMessageStatus).toHaveBeenCalled();
+
+            expect(groupAck.applyGroupAck).toHaveBeenCalledWith(uuid, groupId, senderId);
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('group-message-delivered', expect.anything());
+            expect(mockWin.webContents.send).not.toHaveBeenCalledWith('message-status-updated', expect.anything());
+        });
+
+        it('announces delivery only when every member confirmed it', async () => {
+            vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: uuid, chatUpeerId: groupId, isMine: 1 } as never);
+            vi.mocked(groupAck.applyGroupAck).mockResolvedValue('complete');
+
+            await handleGroupAck(senderId, { id: uuid, groupId } as GroupAckData, mockWin);
+
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('group-message-delivered', { id: uuid, groupId, upeerId: senderId });
+            expect(mockWin.webContents.send).toHaveBeenCalledWith('message-status-updated', { id: uuid, status: 'delivered' });
         });
 
         it('should ignore ack for message not owned by me or from another group', async () => {
-            const uuid = '550e8400-e29b-41d4-a716-446655440000';
             vi.mocked(messagesOps.getMessageById).mockResolvedValue({ id: uuid, chatUpeerId: 'other-group', isMine: 0 } as never);
+            vi.mocked(groupAck.applyGroupAck).mockClear();
 
             await handleGroupAck(senderId, { id: uuid, groupId } as GroupAckData, mockWin);
 
-            expect(messagesOps.updateMessageStatus).not.toHaveBeenCalled();
+            expect(groupAck.applyGroupAck).not.toHaveBeenCalled();
             expect(mockWin.webContents.send).not.toHaveBeenCalledWith('group-message-delivered', expect.anything());
         });
     });

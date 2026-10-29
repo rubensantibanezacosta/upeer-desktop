@@ -16,6 +16,8 @@ import { cleanupReceivedChunks } from './receiver-logic.js';
 import * as receiver from './receiver-logic.js';
 import * as vaultRecovery from './receiverVaultRecovery.js';
 import * as resend from './resend.js';
+import { applyGroupAck } from '../../storage/messages/groupAck.js';
+import { updateTransferMessageStatus } from './db-helper.js';
 
 type FileTransferPacket = {
     type: string;
@@ -510,9 +512,12 @@ export class TransferManager implements ITransferManager {
             await saveTransferToDB(updated);
 
             if (updated.direction === 'sending') {
-                const { updateTransferMessageStatus } = await import('./db-helper.js');
                 const messageId = updated.messageId || fileId;
-                if (await updateTransferMessageStatus(messageId, 'delivered')) {
+                const groupId = updated.chatUpeerId?.startsWith('grp-') ? updated.chatUpeerId : null;
+                const applied = groupId
+                    ? await applyGroupAck(messageId, groupId, updated.upeerId) === 'complete'
+                    : await updateTransferMessageStatus(messageId, 'delivered');
+                if (applied) {
                     this.ui.safeSend('message-delivered', { id: messageId, upeerId: updated.upeerId });
                     this.ui.notifyStatusUpdated(messageId, 'delivered');
                 }
