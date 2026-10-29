@@ -70,6 +70,7 @@ export class ChunkVault {
             }
         } catch (err) {
             error('Failed to replicate file to vault', err, 'vault');
+            throw err;
         }
     }
 

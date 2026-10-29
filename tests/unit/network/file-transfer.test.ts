@@ -62,6 +62,12 @@ vi.mock('../../../src/main_process/security/reputation/vouches.js', () => ({
     computeScore: vi.fn(() => 100),
 }));
 
+vi.mock('../../../src/main_process/network/vault/chunk-vault.js', () => ({
+    ChunkVault: {
+        replicateFile: vi.fn(async () => undefined),
+    }
+}));
+
 vi.mock('../../../src/main_process/network/vault/manager.js', () => ({
     VaultManager: {
         replicateToVaults: vi.fn(async () => 3), // Simula que replica a 3 nodos
@@ -675,6 +681,52 @@ describe('TransferManager - Integration', () => {
                 reason: 'peer_disconnected'
             })
         );
+    });
+
+    it('deja fallida la transferencia cuando el vault no puede replicar el fichero', async () => {
+        const { ChunkVault } = await import('../../../src/main_process/network/vault/chunk-vault.js');
+        const dbHelper = await import('../../../src/main_process/network/file-transfer/db-helper.js');
+        vi.mocked(ChunkVault.replicateFile).mockRejectedValueOnce(new Error('ENOENT'));
+
+        vi.mocked(contacts.getContactByUpeerId).mockResolvedValue({
+            upeerId: 'peer1',
+            publicKey: 'pubkey',
+            status: 'disconnected'
+        } as never);
+
+        const fileId = '550e8400-e29b-41d4-a716-4466554400ac';
+        manager.store.createTransfer({
+            fileId,
+            upeerId: 'peer1',
+            peerAddress: 'addr1',
+            fileName: 'sin-origen.bin',
+            fileSize: 2048,
+            mimeType: 'application/octet-stream',
+            totalChunks: 2,
+            chunkSize: 1024,
+            fileHash: '2'.repeat(64),
+            direction: 'sending',
+            filePath: '/tmp/sin-origen.bin'
+        });
+        manager.store.updateTransfer(fileId, 'sending', {
+            state: 'active',
+            phase: TransferPhase.TRANSFERRING,
+        });
+        manager.transferKeys.set(fileId, Buffer.alloc(32, 7));
+
+        const current = manager.getTransfer(fileId, 'sending');
+        if (!current) throw new Error('Transfer not found');
+        current.lastActivity = Date.now() - 10_000;
+
+        manager.checkStaleTransfers(1000);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(manager.getTransfer(fileId, 'sending')?.state).toBe('failed');
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+            'file-transfer-failed',
+            expect.objectContaining({ messageId: fileId, reason: 'vault_file_replication_failed' })
+        );
+        expect(dbHelper.updateTransferMessageStatus).toHaveBeenCalledWith(fileId, 'failed');
     });
 
     it('should handle peer cancellation', async () => {
