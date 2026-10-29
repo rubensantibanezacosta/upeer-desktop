@@ -41,6 +41,20 @@ export function applyRemoteSettingsPatch(patch: RemoteSettingsPatch): void {
     });
 }
 
+export function isRendererOwnedBlock(block: string): boolean {
+    return block === 'chat' || block === 'message' || block === 'lists';
+}
+
+export function handleSettingsUpdated(patch: RemoteSettingsPatch): void {
+    if (!isRendererOwnedBlock(patch.block)) {
+        applyRemoteSettingsPatch(patch);
+        return;
+    }
+    drainPendingSettingsPatches().catch((cause: unknown) => {
+        console.warn('No se pudieron adoptar los ajustes sincronizados pendientes.', cause);
+    });
+}
+
 export async function drainPendingSettingsPatches(): Promise<void> {
     const bridge = typeof window !== 'undefined' ? window.upeer : undefined;
     const read = bridge?.getPendingSettingsPatches;

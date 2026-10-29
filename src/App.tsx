@@ -9,7 +9,7 @@ import { useChatStore } from './store/useChatStore.js';
 import { hydratePrivacyPrefs } from './store/privacySync.js';
 import { hydrateNotificationPrefs } from './store/notificationSync.js';
 import { useChatRetentionStore } from './store/chatRetentionStore.js';
-import { applyRemoteSettingsPatch, drainPendingSettingsPatches } from './store/remoteSettings.js';
+import { drainPendingSettingsPatches, handleSettingsUpdated } from './store/remoteSettings.js';
 import { useFileTransfer } from './hooks/useFileTransfer.js';
 import { useActivitySignal } from './hooks/useActivitySignal.js';
 import { useFilePersistence } from './hooks/useFilePersistence.js';
@@ -206,14 +206,7 @@ export default function App() {
         const subscribeSettings = window.upeer?.onSettingsUpdated;
         const unsubscribeSettings = typeof subscribeSettings === 'function'
             ? subscribeSettings((patch) => {
-                const rendererOwned = patch.block === 'chat' || patch.block === 'message' || patch.block === 'lists';
-                if (!rendererOwned) {
-                    applyRemoteSettingsPatch(patch);
-                    return;
-                }
-                drainPendingSettingsPatches().catch((cause: unknown) => {
-                    console.warn('No se pudieron adoptar los ajustes sincronizados pendientes.', cause);
-                });
+                handleSettingsUpdated(patch);
             })
             : undefined;
         drainPendingSettingsPatches().catch((cause: unknown) => {

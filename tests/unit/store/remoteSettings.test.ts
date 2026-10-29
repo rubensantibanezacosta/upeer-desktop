@@ -91,4 +91,54 @@ describe('adopción de ajustes sincronizados en el renderer', () => {
         await expect(drainPendingSettingsPatches()).resolves.toBeUndefined();
         expect(bridge.ackSettingsPatch).not.toHaveBeenCalled();
     });
+
+    it('un aviso de bloque del renderer solo drena, no aplica el aviso en crudo', async () => {
+        const bridge = installBridge([
+            { block: 'lists', entity: 'lists:l2', values: { listId: 'l2', name: 'Casa', chatIds: [] }, occurredAt: 4_000 },
+        ]);
+        const settings = await import('../../../src/store/remoteSettings.js');
+        const { useChatListsStore } = await import('../../../src/store/useChatListsStore.js');
+
+        settings.handleSettingsUpdated({
+            block: 'lists',
+            entity: 'lists:l2',
+            values: { listId: 'l2', name: 'Otro nombre', chatIds: [] },
+            occurredAt: 4_000,
+        });
+        await vi.waitFor(() => {
+            expect(bridge.ackSettingsPatch).toHaveBeenCalledWith('lists:l2', 4_000);
+        });
+
+        expect(useChatListsStore.getState().lists).toEqual([{ id: 'l2', name: 'Casa', chatIds: [] }]);
+    });
+
+    it('un aviso de bloque nativo se aplica en el acto sin pasar por la bandeja', async () => {
+        const bridge = installBridge([]);
+        const privacy = vi.fn(async () => ({ readReceipts: false, shareActivity: false }));
+        (window as unknown as { upeer: Record<string, unknown> }).upeer.getPrivacyPrefs = privacy;
+        const settings = await import('../../../src/store/remoteSettings.js');
+        const { usePrivacyStore } = await import('../../../src/store/usePrivacyStore.js');
+        usePrivacyStore.getState().setReadReceipts(true);
+        usePrivacyStore.getState().setShareActivity(true);
+
+        settings.handleSettingsUpdated({ block: 'privacy', values: {}, occurredAt: 5_000 });
+        await vi.waitFor(() => {
+            expect(usePrivacyStore.getState().readReceipts).toBe(false);
+        });
+
+        expect(usePrivacyStore.getState().shareActivity).toBe(false);
+        expect(privacy).toHaveBeenCalledTimes(1);
+        expect(bridge.getPendingSettingsPatches).not.toHaveBeenCalled();
+    });
+
+    it('clasifica como del renderer solo chat, message y lists', async () => {
+        const { isRendererOwnedBlock } = await import('../../../src/store/remoteSettings.js');
+
+        expect(isRendererOwnedBlock('chat')).toBe(true);
+        expect(isRendererOwnedBlock('message')).toBe(true);
+        expect(isRendererOwnedBlock('lists')).toBe(true);
+        expect(isRendererOwnedBlock('privacy')).toBe(false);
+        expect(isRendererOwnedBlock('retention')).toBe(false);
+        expect(isRendererOwnedBlock('notification')).toBe(false);
+    });
 });
