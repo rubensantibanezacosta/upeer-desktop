@@ -133,6 +133,32 @@ describe('settings-sync', () => {
         expect(sanitizeSettingsPatch({ block: 42 })).toBeNull();
     });
 
+    it('el bloqueo de un contacto viaja con su identificador', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'blocked', upeerId: 'peer-1', blocked: true })).toEqual({
+            block: 'blocked',
+            entity: 'blocked:peer-1',
+            values: { upeerId: 'peer-1', blocked: true },
+        });
+        expect(sanitizeSettingsPatch({ block: 'blocked', upeerId: 'peer-1', blocked: false })).toEqual({
+            block: 'blocked',
+            entity: 'blocked:peer-1',
+            values: { upeerId: 'peer-1', blocked: false },
+        });
+    });
+
+    it('el bloqueo viaja sin identificador o sin marca no vale', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'blocked', blocked: true })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'blocked', upeerId: 'peer-1' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'blocked', upeerId: 'peer-1', blocked: 'si' })).toBeNull();
+    });
+
+    it('el bloqueo lo aplica el proceso principal, no el renderer', async () => {
+        const { isRendererBlock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(isRendererBlock('blocked')).toBe(false);
+    });
+
     it('rechaza un parche sin valores utilizables', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'privacy' })).toBeNull();

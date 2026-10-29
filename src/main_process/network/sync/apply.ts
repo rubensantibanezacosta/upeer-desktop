@@ -10,6 +10,7 @@ import type { MessageDeliveryStatus } from '../../storage/messages/status.js';
 import { deleteReaction, saveReaction } from '../../storage/messages/reactions.js';
 import { deleteGroup, upsertGroupMetadata } from '../../storage/groups/operations.js';
 import {
+    applyBlockedFromSync,
     getContactByUpeerId,
     setContactFavorite,
     updateContactAvatar,
@@ -232,6 +233,14 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
         setSettingsClock(patch.entity, occurredAt);
         queueRendererSettingsPatch(patch, occurredAt);
         return { ...patch.values };
+    }
+    if (patch.block === 'blocked') {
+        const upeerId = typeof patch.values.upeerId === 'string' ? patch.values.upeerId : '';
+        const blocked = patch.values.blocked === true;
+        if (!upeerId) return {};
+        setSettingsClock(patch.entity, occurredAt);
+        applyBlockedFromSync(upeerId, blocked);
+        return { upeerId, blocked };
     }
     if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };
     return { ...applyNotificationFromSync(patch.values, occurredAt) };

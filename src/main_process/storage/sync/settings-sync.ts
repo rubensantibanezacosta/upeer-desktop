@@ -2,7 +2,7 @@ import { getAppSetting, setAppSetting } from '../settings-operations.js';
 import { resolveRetentionId } from '../../../utils/retention.js';
 import { sanitizeChatIds, sanitizeListName } from '../../../utils/chatLists.js';
 
-export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message' | 'lists';
+export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message' | 'lists' | 'blocked';
 
 export type SettingsValues = Record<string, boolean | string | string[]>;
 
@@ -21,6 +21,7 @@ const BOOLEAN_BLOCKS: Record<string, readonly string[]> = {
     notifications: ['messages', 'requests', 'sound'],
     chat: ['archived', 'muted', 'pinned', 'unread'],
     message: ['starred', 'pinned'],
+    blocked: ['blocked'],
 };
 
 const ID_FIELD: Record<string, string> = {
@@ -28,9 +29,10 @@ const ID_FIELD: Record<string, string> = {
     chat: 'chatId',
     message: 'messageId',
     lists: 'listId',
+    blocked: 'upeerId',
 };
 
-const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message', 'lists'];
+const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message', 'lists', 'blocked'];
 
 export function isSettingsBlock(value: unknown): value is SettingsBlock {
     return typeof value === 'string' && (BLOCKS as readonly string[]).includes(value);

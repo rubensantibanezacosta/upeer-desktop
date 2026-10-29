@@ -45,6 +45,14 @@ vi.mock('../../../src/main_process/network/utils.js', () => ({
     isYggdrasilAddress: vi.fn(() => true),
 }));
 
+vi.mock('../../../src/main_process/storage/sync/eventSink.js', () => ({
+    emitSyncEvent: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/storage/sync/settings-sync.js', () => ({
+    setSettingsClock: vi.fn(),
+}));
+
 import {
     getContactByUpeerId,
     getContactByAddress,
@@ -58,6 +66,7 @@ import {
     unblockContact,
     getBlockedContacts,
     isContactBlocked,
+    applyBlockedFromSync,
     listContactProfiles
 } from '../../../src/main_process/storage/contacts/operations.js';
 
@@ -226,6 +235,7 @@ describe('storage/contacts/operations.ts', () => {
         });
 
         it('should block contact', () => {
+            mockDb.run.mockReturnValueOnce({ changes: 1 });
             blockContact('u1');
             expect(mockDb.update).toHaveBeenCalledWith(mockSchema.contacts);
             expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'blocked' }));
@@ -237,6 +247,53 @@ describe('storage/contacts/operations.ts', () => {
             expect(mockDb.update).toHaveBeenCalledWith(mockSchema.contacts);
             expect(mockDb.set).toHaveBeenCalledWith({ status: 'incoming', blockedAt: null });
             expect(mockDb.run).toHaveBeenCalled();
+        });
+
+        it('bloquear avisa a los demás dispositivos con la entidad del contacto', async () => {
+            const { emitSyncEvent } = await import('../../../src/main_process/storage/sync/eventSink.js');
+            const { setSettingsClock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+            mockDb.run.mockReturnValueOnce({ changes: 1 });
+
+            blockContact('peer-1');
+
+            expect(setSettingsClock).toHaveBeenCalledWith('blocked:peer-1', expect.any(Number));
+            expect(emitSyncEvent).toHaveBeenCalledWith('SETTINGS_UPDATE', {
+                block: 'blocked',
+                upeerId: 'peer-1',
+                blocked: true,
+            });
+        });
+
+        it('desbloquear avisa a los demás dispositivos con la entidad del contacto', async () => {
+            const { emitSyncEvent } = await import('../../../src/main_process/storage/sync/eventSink.js');
+            mockDb.run.mockReturnValueOnce({ changes: 1 });
+
+            unblockContact('peer-2');
+
+            expect(emitSyncEvent).toHaveBeenCalledWith('SETTINGS_UPDATE', {
+                block: 'blocked',
+                upeerId: 'peer-2',
+                blocked: false,
+            });
+        });
+
+        it('un bloqueo que no cambió nada no se anuncia', async () => {
+            const { emitSyncEvent } = await import('../../../src/main_process/storage/sync/eventSink.js');
+            mockDb.run.mockReturnValueOnce({ changes: 0 });
+
+            blockContact('peer-3');
+
+            expect(emitSyncEvent).not.toHaveBeenCalled();
+        });
+
+        it('aplicar un bloqueo recibido no lo vuelve a anunciar', async () => {
+            const { emitSyncEvent } = await import('../../../src/main_process/storage/sync/eventSink.js');
+            mockDb.run.mockReturnValueOnce({ changes: 1 });
+
+            expect(applyBlockedFromSync('peer-4', true)).toBe(true);
+
+            expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'blocked' }));
+            expect(emitSyncEvent).not.toHaveBeenCalled();
         });
 
         it('should get all blocked contacts', () => {

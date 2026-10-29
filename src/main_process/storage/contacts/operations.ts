@@ -1,6 +1,7 @@
 import { getDb, getSchema, eq, desc } from '../shared.js';
 import { isYggdrasilAddress } from '../../network/utils.js';
 import { emitSyncEvent } from '../sync/eventSink.js';
+import { setSettingsClock } from '../sync/settings-sync.js';
 import type { Contact } from '../../../types/chat.js';
 
 type StoredContact = Omit<Contact, 'knownAddresses'> & {
@@ -263,20 +264,40 @@ export function blockContact(upeerId: string) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
+    const result = db.update(schema.contacts)
         .set({ status: 'blocked', blockedAt: new Date().toISOString() })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitBlockedState(upeerId, true);
+    return result;
 }
 
 export function unblockContact(upeerId: string) {
     const db = getDb();
     const schema = getSchema();
 
-    return db.update(schema.contacts)
+    const result = db.update(schema.contacts)
         .set({ status: 'incoming', blockedAt: null })
         .where(eq(schema.contacts.upeerId, upeerId))
         .run();
+    if ((result?.changes ?? 0) > 0) emitBlockedState(upeerId, false);
+    return result;
+}
+
+export function applyBlockedFromSync(upeerId: string, blocked: boolean): boolean {
+    const db = getDb();
+    const schema = getSchema();
+
+    const result = db.update(schema.contacts)
+        .set(blocked ? { status: 'blocked', blockedAt: new Date().toISOString() } : { status: 'incoming', blockedAt: null })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+    return (result?.changes ?? 0) > 0;
+}
+
+function emitBlockedState(upeerId: string, blocked: boolean): void {
+    setSettingsClock(`blocked:${upeerId}`, Date.now());
+    emitSyncEvent('SETTINGS_UPDATE', { block: 'blocked', upeerId, blocked });
 }
 
 export function getBlockedContacts() {

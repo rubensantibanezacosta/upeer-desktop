@@ -29,6 +29,7 @@ vi.mock('../../../src/main_process/storage/groups/operations.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
+    applyBlockedFromSync: vi.fn(() => true),
     getContactByUpeerId: vi.fn(() => null),
     setContactFavorite: vi.fn(),
     updateContactAvatar: vi.fn(),
@@ -57,6 +58,7 @@ function windowDouble() {
 
 describe('applySyncEvent con ajustes', () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         settings.clear();
         settings.set('privacy-prefs', { readReceipts: true, shareActivity: true });
         settings.set('notification-prefs', { messages: true, requests: true, sound: true });
@@ -227,5 +229,41 @@ describe('applySyncEvent con ajustes', () => {
             entity: 'lists:l1',
             values: { listId: 'l1', name: 'Trabajo', chatIds: ['a'] },
         });
+    });
+
+    it('un bloqueo llegado de otro dispositivo se escribe y se avisa sin pasar por la bandeja', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { applyBlockedFromSync } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const { listRendererSettingsPatches } = await import('../../../src/main_process/storage/sync/settings-inbox.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'blocked', upeerId: 'peer-1', blocked: true }, 9_500), win);
+
+        expect(applied).toBe(true);
+        expect(applyBlockedFromSync).toHaveBeenCalledWith('peer-1', true);
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'blocked',
+            entity: 'blocked:peer-1',
+            values: { upeerId: 'peer-1', blocked: true },
+        });
+        expect(listRendererSettingsPatches()).toEqual([]);
+    });
+
+    it('un desbloqueo más antiguo que el aplicado no se repite', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { applyBlockedFromSync } = await import('../../../src/main_process/storage/contacts/operations.js');
+
+        expect(await applySyncEvent(event({ block: 'blocked', upeerId: 'peer-2', blocked: true }, 9_600), null)).toBe(true);
+        expect(await applySyncEvent(event({ block: 'blocked', upeerId: 'peer-2', blocked: false }, 9_500), null)).toBe(false);
+        expect(applyBlockedFromSync).toHaveBeenCalledTimes(1);
+        expect(applyBlockedFromSync).toHaveBeenCalledWith('peer-2', true);
+    });
+
+    it('un bloqueo sin identificador se rechaza', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { applyBlockedFromSync } = await import('../../../src/main_process/storage/contacts/operations.js');
+
+        expect(await applySyncEvent(event({ block: 'blocked', blocked: true }, 9_700), null)).toBe(false);
+        expect(applyBlockedFromSync).not.toHaveBeenCalled();
     });
 });

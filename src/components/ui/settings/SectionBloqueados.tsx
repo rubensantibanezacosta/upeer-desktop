@@ -37,6 +37,15 @@ export const SectionBloqueados: React.FC = () => {
         load();
     }, [load]);
 
+    useEffect(() => {
+        const unsubscribe = window.upeer?.onSettingsUpdated?.((patch) => {
+            if (patch.block === 'blocked') load();
+        });
+        return () => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, [load]);
+
     const handleUnblock = async (upeerId: string) => {
         setUnblocking(upeerId);
         await window.upeer.unblockContact(upeerId);
