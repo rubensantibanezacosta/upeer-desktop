@@ -31,7 +31,7 @@ export const SectionPrivacidad: React.FC = () => {
         <SettingsSection
             icon={<Lock style={{ fontSize: 18 }} />}
             title="Privacidad"
-            description="Controla qué información comparten tus contactos sobre tu actividad."
+            description="Las confirmaciones de lectura se anuncian a tus contactos; presencia y última vez solo cambian lo que ves de ellos."
         >
             <SettingsCard>
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
@@ -59,7 +59,7 @@ export const SectionPrivacidad: React.FC = () => {
                 </List>
             </SettingsCard>
             <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
-                Las confirmaciones de lectura sí se anuncian: al desactivarlas no se envía el mensaje READ y la conversación se marca como leída solo aquí. Presencia y última vez filtran lo que ves de tus contactos; tu propia actividad se sigue anunciando en el ping.
+                Al desactivar las confirmaciones de lectura no se envía el mensaje READ: la conversación se marca como leída solo aquí.
             </Typography>
         </SettingsSection>
     );
