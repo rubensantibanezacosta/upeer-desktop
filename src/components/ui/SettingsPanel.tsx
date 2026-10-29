@@ -32,7 +32,7 @@ const SECTIONS: { id: SettingsSection; label: string; desc: string; icon: React.
     { id: 'dispositivos', label: 'Dispositivos', desc: 'Añadir y revisar los de tu cuenta', icon: <MonitorSmartphone /> },
     { id: 'privacidad', label: 'Privacidad', desc: 'Confirmaciones, estado de conexión', icon: <Lock /> },
     { id: 'bloqueados', label: 'Bloqueados', desc: 'Usuarios que no pueden contactarte', icon: <Ban /> },
-    { id: 'seguridad', label: 'Seguridad', desc: 'Palabras clave, protección de cuenta', icon: <Shield /> },
+    { id: 'seguridad', label: 'Seguridad', desc: 'PIN, frase de recuperación y reputación', icon: <Shield /> },
     { id: 'notificaciones', label: 'Notificaciones', desc: 'Mensajes, solicitudes, sonidos', icon: <Bell /> },
     { id: 'apariencia', label: 'Apariencia', desc: 'Tema y tamaño de texto', icon: <Palette /> },
     { id: 'almacenamiento', label: 'Almacenamiento', desc: 'Mensajes guardados y archivos', icon: <HardDrive /> },

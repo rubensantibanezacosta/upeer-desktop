@@ -6,6 +6,9 @@ import { ToggleRow } from './shared.js';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { RevealMnemonicModal, SecurityPinModal } from './securityDialogs.js';
 import { RecoverySection, SecurityStatusCard } from './securitySections.js';
+import { ProfileInfoModal } from './profileSectionModals.js';
+import { DEFAULT_REPUTATION, ReputationSection, type ReputationData } from './ReputationSection.js';
+import type { InfoKey } from './profileSectionBlocks.js';
 
 export const SectionSeguridad: React.FC = () => {
     const [pinEnabled, setPinEnabled] = useState(false);
@@ -13,6 +16,9 @@ export const SectionSeguridad: React.FC = () => {
     const [pinModalOpen, setPinModalOpen] = useState(false);
     const [pinDigits, setPinDigits] = useState(['', '', '', '']);
     const [errorMsg, setErrorMsg] = useState('');
+
+    const [myReputation, setMyReputation] = useState<ReputationData | null>(null);
+    const [activeInfo, setActiveInfo] = useState<InfoKey | null>(null);
 
     const [revealModalOpen, setRevealModalOpen] = useState(false);
     const [revealDigits, setRevealDigits] = useState(['', '', '', '']);
@@ -29,6 +35,26 @@ export const SectionSeguridad: React.FC = () => {
             setLoading(false);
         };
         checkPin();
+    }, []);
+
+    useEffect(() => {
+        const fetchReputation = () => {
+            if (!window.upeer.getMyReputation) {
+                setMyReputation(DEFAULT_REPUTATION);
+                return;
+            }
+            window.upeer.getMyReputation()
+                .then((reputation) => {
+                    if (reputation && typeof reputation.vouchScore === 'number') {
+                        setMyReputation({ vouchScore: reputation.vouchScore, connectionCount: reputation.connectionCount ?? 0 });
+                        return;
+                    }
+                    setMyReputation(DEFAULT_REPUTATION);
+                })
+                .catch(() => setMyReputation(DEFAULT_REPUTATION));
+        };
+        fetchReputation();
+        window.upeer.onReputationUpdated?.(fetchReputation);
     }, []);
 
     const handlePinToggle = async (_checked: boolean) => {
@@ -146,6 +172,9 @@ export const SectionSeguridad: React.FC = () => {
             <SettingsCard>
                 <RecoverySection onRevealSeed={handleRevealSeed} />
             </SettingsCard>
+
+            <ReputationSection myReputation={myReputation} onToggleInfo={() => setActiveInfo('reputacion')} />
+            <ProfileInfoModal activeInfo={activeInfo} onClose={() => setActiveInfo(null)} />
 
             <RevealMnemonicModal
                 open={revealModalOpen}

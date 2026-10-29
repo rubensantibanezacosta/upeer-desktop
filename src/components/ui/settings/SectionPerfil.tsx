@@ -3,23 +3,12 @@ import { CircleUser } from 'lucide-react';
 import type { Identity } from './types.js';
 import { resizeImageToDataUrl } from './shared.js';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
-import type { ReputationData } from '../../../types/chat.js';
 import {
-    DEFAULT_REPUTATION,
     type InfoKey,
     ProfileAddressSection,
     ProfileHeroSection,
-    ProfileReputationSection,
     ProfileTechnicalSection,
-    ProfileVaultSection,
 } from './profileSectionBlocks.js';
-
-const normalizeReputation = (reputation: ReputationData | null) => {
-    if (reputation && typeof reputation.vouchScore === 'number') {
-        return { vouchScore: reputation.vouchScore, connectionCount: reputation.connectionCount ?? 0 };
-    }
-    return DEFAULT_REPUTATION;
-};
 import { ProfileInfoModal, ProfileQrModal } from './profileSectionModals.js';
 
 interface Props {
@@ -33,8 +22,6 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     const [avatar, setAvatar] = useState(identity?.avatar || '');
     const [isEditingAlias, setIsEditingAlias] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [myReputation, setMyReputation] = useState<ReputationData | null>(null);
-    const [vaultStats, setVaultStats] = useState<{ count: number; sizeBytes: number } | null>(null);
     const [activeInfo, setActiveInfo] = useState<InfoKey | null>(null);
     const [showQR, setShowQR] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -66,21 +53,6 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
         if (identity?.avatar != null) setAvatar(identity.avatar);
     }, [identity?.alias, identity?.avatar]);
 
-    useEffect(() => {
-        const fetchReputation = () => {
-            if (!window.upeer.getMyReputation) {
-                setMyReputation(DEFAULT_REPUTATION);
-                return;
-            }
-            window.upeer.getMyReputation()
-                .then((reputation) => setMyReputation(normalizeReputation(reputation)))
-                .catch(() => setMyReputation(DEFAULT_REPUTATION));
-        };
-        fetchReputation();
-        window.upeer.getVaultStats?.().then(setVaultStats).catch(() => setVaultStats(null));
-        window.upeer.onReputationUpdated?.(fetchReputation);
-    }, []);
-
     const handleAvatarClick = () => fileInputRef.current?.click();
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,16 +81,6 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
         }
     }, [alias, onIdentityUpdate]);
 
-    const fmtBytes = (bytes: number) => {
-        if (bytes === 0) {
-            return '0 B';
-        }
-        const base = 1024;
-        const units = ['B', 'KB', 'MB', 'GB'];
-        const unitIndex = Math.floor(Math.log(bytes) / Math.log(base));
-        return (bytes / Math.pow(base, unitIndex)).toFixed(1) + ' ' + units[unitIndex];
-    };
-
     return (
         <SettingsSection
             icon={<CircleUser style={{ fontSize: 18 }} />}
@@ -142,8 +104,6 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
                     onAliasSave={saveAlias}
                 />
             </SettingsCard>
-            <ProfileReputationSection myReputation={myReputation} onToggleInfo={toggleInfo} />
-            <ProfileVaultSection vaultStats={vaultStats} fmtBytes={fmtBytes} onToggleInfo={toggleInfo} />
             <SettingsCard>
                 <ProfileAddressSection fullId={fullId} copied={copied} copyError={copyError} onCopy={handleCopy} onShowQr={() => setShowQR(true)} onToggleInfo={toggleInfo} />
             </SettingsCard>

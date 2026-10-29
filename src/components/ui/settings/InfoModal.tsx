@@ -45,8 +45,8 @@ export const ReputacionModalContent: React.FC = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography level="body-sm" color="neutral">
             La reputación es un criterio técnico interno que puntúa <strong>cuentas</strong>, no dispositivos
-            ni nodos: la misma cuenta vale lo mismo desde cualquier equipo suyo. Solo se te avisa cuando es
-            muy mala, porque una puntuación normal no es asunto de nadie.
+            ni nodos: la misma cuenta vale lo mismo desde cualquier equipo suyo. La puntuación solo la ves tú,
+            aquí en Seguridad, y únicamente se avisa cuando es muy mala.
         </Typography>
 
         <Divider />
@@ -62,7 +62,7 @@ export const ReputacionModalContent: React.FC = () => (
             },
             {
                 label: 'Cuándo se avisa',
-                desc: 'Únicamente por debajo de 40 sobre 100. El resto del tiempo no se muestra ninguna nota, ni la tuya ni la de los demás.',
+                desc: 'La puntuación se muestra siempre en Seguridad. El aviso en rojo aparece por debajo de 40 sobre 100, y esa nota no se enseña a nadie más.',
             },
             {
                 label: 'Para qué se usa',

@@ -19,7 +19,7 @@ import { StorageBackupsCard } from './StorageBackupsCard.js';
 
 type StorageUsage = Awaited<ReturnType<NonNullable<Window['upeer']>['getStorageUsage']>>;
 
-const VAULT_QUOTA_BYTES = 1024 * 1024 * 1024;
+const MAX_VAULT_ENTRIES = 2000;
 
 const fmt = (bytes: number): string => {
     if (bytes <= 0) return '0 B';
@@ -76,7 +76,7 @@ export const SectionAlmacenamiento: React.FC = () => {
         }
     };
 
-    const vaultPercent = usage ? Math.min((usage.vaultBytes / VAULT_QUOTA_BYTES) * 100, 100) : 0;
+    const vaultPercent = usage ? Math.min((usage.vaultEntries / MAX_VAULT_ENTRIES) * 100, 100) : 0;
     const vaultColor = vaultPercent > 80 ? 'danger' : vaultPercent > 60 ? 'warning' : 'primary';
 
     return (
@@ -153,7 +153,7 @@ export const SectionAlmacenamiento: React.FC = () => {
                                     {fmt(usage.vaultBytes)}
                                 </Typography>
                                 <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-                                    de {fmt(VAULT_QUOTA_BYTES)} · {usage.vaultEntries} mensajes
+                                    {usage.vaultEntries} de {MAX_VAULT_ENTRIES} mensajes
                                 </Typography>
                             </Box>
                             <LinearProgress
