@@ -12,7 +12,6 @@ import {
 import { Check, Copy, Info } from 'lucide-react';
 import { resizeImageToDataUrl as resizeImageToDataUrlBase } from '../../../utils/resizeImageToDataUrl.js';
 import type { SxProps } from '@mui/joy/styles/types';
-import { INPUT_PILL_RADIUS } from '../../../inputShape.js';
 import { listRowButtonSx, listRowDecoratorSx, listRowListItemSx } from '../../layout/listRowMetrics.js';
 
 const rowButtonSx: SxProps = {
@@ -39,6 +38,8 @@ const RowIcon: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
 
 // ─── Campo copiable ───────────────────────────────────────────────────────────
 
+const COPY_FIELD_RADIUS = '8px';
+
 export const CopyableField: React.FC<{ label: string; value: string; onInfo?: () => void }> = ({ label, value, onInfo }) => {
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState('');
@@ -61,8 +62,11 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
             </Box>
             <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
-                backgroundColor: 'background.level1', px: 1.5, py: 1.25,
-                borderRadius: INPUT_PILL_RADIUS,
+                backgroundColor: 'background.level1', px: 1.5, py: 1,
+                minHeight: 44,
+                border: '1px solid',
+                borderColor: 'neutral.outlinedBorder',
+                borderRadius: COPY_FIELD_RADIUS,
             }}>
                 <Typography
                     level="body-sm"
@@ -75,7 +79,9 @@ export const CopyableField: React.FC<{ label: string; value: string; onInfo?: ()
                         size="sm"
                         variant="plain"
                         color={copied ? 'success' : 'neutral'}
+                        disabled={!value}
                         onClick={async () => {
+                            if (!value) return;
                             try {
                                 const result = await window.upeer.writeClipboardText(value);
                                 if (!result.success) throw new Error(result.error || 'Motivo no disponible');

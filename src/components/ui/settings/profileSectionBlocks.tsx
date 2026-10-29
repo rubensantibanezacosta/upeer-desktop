@@ -121,7 +121,7 @@ export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fu
             }
         />
         <Box sx={{ px: 0.5, pb: 1, pt: 0.5 }}>
-        <CopyableField label="Comparte esta dirección para que puedan escribirte" value={fullId || 'Sin dirección de red todavía'} />
+        <CopyableField label="Comparte esta dirección para que puedan escribirte" value={fullId} />
         {fullId ? (
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
                 <Button variant="outlined" color="neutral" size="sm" startDecorator={<QrCode style={{ fontSize: 15 }} />} onClick={onShowQr}>Mostrar QR</Button>
