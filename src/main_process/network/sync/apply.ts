@@ -22,6 +22,7 @@ import {
     sanitizeSettingsPatch,
     type SettingsPatch,
 } from '../../storage/sync/settings-sync.js';
+import { applyRetentionFromSync } from '../../storage/retention/chatRetention.js';
 import { applyNotificationFromSync } from '../../security/notification-prefs.js';
 import { applyPrivacyFromSync } from '../../security/privacy-prefs.js';
 import type { SyncPlainEvent } from './types.js';
@@ -212,13 +213,19 @@ function applyContactProfile(payload: Record<string, unknown>, win: BrowserWindo
 function applySettingsUpdate(payload: Record<string, unknown>, occurredAt: number, win: BrowserWindow | null): boolean {
     const patch = sanitizeSettingsPatch(payload);
     if (!patch) return false;
-    if (!claimSettingsUpdate(patch.block, occurredAt)) return false;
+    if (!claimSettingsUpdate(patch.entity, occurredAt)) return false;
     const values = applySettingsValues(patch, occurredAt);
-    win?.webContents.send('settings-updated', { block: patch.block, values });
+    win?.webContents.send('settings-updated', { block: patch.block, entity: patch.entity, values });
     return true;
 }
 
-function applySettingsValues(patch: SettingsPatch, occurredAt: number): Record<string, boolean> {
+function applySettingsValues(patch: SettingsPatch, occurredAt: number): SettingsPatch['values'] {
+    if (patch.block === 'retention') {
+        const chatId = typeof patch.values.chatId === 'string' ? patch.values.chatId : '';
+        const retention = typeof patch.values.retention === 'string' ? patch.values.retention : 'off';
+        applyRetentionFromSync(chatId, retention, occurredAt);
+        return { chatId, retention };
+    }
     if (patch.block === 'privacy') return { ...applyPrivacyFromSync(patch.values, occurredAt) };
     return { ...applyNotificationFromSync(patch.values, occurredAt) };
 }

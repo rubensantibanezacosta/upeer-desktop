@@ -276,8 +276,8 @@ const privacyApi = {
 const notificationApi = {
     getNotificationPrefs: () => ipcRenderer.invoke('get-notification-prefs'),
     setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => ipcRenderer.invoke('set-notification-prefs', patch),
-    onSettingsUpdated: (callback: (data: { block: 'privacy' | 'notifications'; values: Record<string, boolean> }) => void) =>
-        subscribe<[{ block: 'privacy' | 'notifications'; values: Record<string, boolean> }]>('settings-updated', (data) => callback(data)),
+    onSettingsUpdated: (callback: (data: { block: string; entity: string; values: Record<string, boolean | string> }) => void) =>
+        subscribe<[{ block: string; entity: string; values: Record<string, boolean | string> }]>('settings-updated', (data) => callback(data)),
 };
 
 const retentionApi = {

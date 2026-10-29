@@ -22,7 +22,7 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
     return typeof value === 'boolean' ? value : fallback;
 }
 
-function merge(patch: Partial<NotificationPrefs>): NotificationPrefs {
+function merge(patch: Partial<Record<keyof NotificationPrefs, unknown>>): NotificationPrefs {
     const current = getNotificationPrefs();
     return {
         messages: asBoolean(patch.messages, current.messages),
@@ -48,7 +48,7 @@ export function setNotificationPrefs(patch: Partial<NotificationPrefs>): Notific
     return next;
 }
 
-export function applyNotificationFromSync(patch: Partial<NotificationPrefs>, occurredAt: number): NotificationPrefs {
+export function applyNotificationFromSync(patch: Record<string, unknown>, occurredAt: number): NotificationPrefs {
     const next = merge(patch);
     setAppSetting(SETTING_KEY, next);
     setSettingsClock('notifications', occurredAt);

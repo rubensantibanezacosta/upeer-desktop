@@ -211,6 +211,10 @@ export default function App() {
                     });
                     return;
                 }
+                if (block === 'retention') {
+                    void useChatRetentionStore.getState().hydrate();
+                    return;
+                }
                 hydrateNotificationPrefs().catch((cause: unknown) => {
                     console.warn('No se pudieron releer las preferencias de notificación sincronizadas.', cause);
                 });

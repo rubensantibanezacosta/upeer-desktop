@@ -73,6 +73,7 @@ describe('applySyncEvent con ajustes', () => {
         expect(getPrivacyPrefs()).toEqual({ readReceipts: true, shareActivity: false });
         expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
             block: 'privacy',
+            entity: 'privacy',
             values: { readReceipts: true, shareActivity: false },
         });
     });
@@ -107,5 +108,41 @@ describe('applySyncEvent con ajustes', () => {
     it('rechaza un parche vacío', async () => {
         const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
         expect(await applySyncEvent(event({ block: 'privacy' }), null)).toBe(false);
+    });
+
+    it('aplica el plazo de un chat y lo avisa con su entidad', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { getChatRetentionId } = await import('../../../src/main_process/storage/retention/chatRetention.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'retention', chatId: 'chat-1', retention: '7d' }), win);
+
+        expect(applied).toBe(true);
+        expect(getChatRetentionId('chat-1')).toBe('7d');
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'retention',
+            entity: 'retention:chat-1',
+            values: { chatId: 'chat-1', retention: '7d' },
+        });
+    });
+
+    it('desactivar el plazo borra la entrada del chat', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { getChatRetentionId, getRetentionMap } = await import('../../../src/main_process/storage/retention/chatRetention.js');
+
+        await applySyncEvent(event({ block: 'retention', chatId: 'chat-2', retention: '24h' }, 3_000), null);
+        await applySyncEvent(event({ block: 'retention', chatId: 'chat-2', retention: 'off' }, 4_000), null);
+
+        expect(getChatRetentionId('chat-2')).toBe('off');
+        expect(getRetentionMap()['chat-2']).toBeUndefined();
+    });
+
+    it('rechaza un plazo más antiguo que el del mismo chat', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const { getChatRetentionId } = await import('../../../src/main_process/storage/retention/chatRetention.js');
+
+        expect(await applySyncEvent(event({ block: 'retention', chatId: 'chat-3', retention: '90d' }, 9_000), null)).toBe(true);
+        expect(await applySyncEvent(event({ block: 'retention', chatId: 'chat-3', retention: '24h' }, 8_000), null)).toBe(false);
+        expect(getChatRetentionId('chat-3')).toBe('90d');
     });
 });

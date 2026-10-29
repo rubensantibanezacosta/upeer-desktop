@@ -15,13 +15,14 @@ describe('settings-sync', () => {
     it('acepta un parche de privacidad con sus dos campos', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         const patch = sanitizeSettingsPatch({ block: 'privacy', readReceipts: false, shareActivity: true });
-        expect(patch).toEqual({ block: 'privacy', values: { readReceipts: false, shareActivity: true } });
+        expect(patch).toEqual({ block: 'privacy', entity: 'privacy', values: { readReceipts: false, shareActivity: true } });
     });
 
     it('acepta un parche de notificaciones', async () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'notifications', sound: false })).toEqual({
             block: 'notifications',
+            entity: 'notifications',
             values: { sound: false },
         });
     });
@@ -30,7 +31,28 @@ describe('settings-sync', () => {
         const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(sanitizeSettingsPatch({ block: 'privacy', readReceipts: false, sound: false })).toEqual({
             block: 'privacy',
+            entity: 'privacy',
             values: { readReceipts: false },
+        });
+    });
+
+    it('el plazo de un chat es su propia entidad', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'retention', chatId: 'abc', retention: '7d' })).toEqual({
+            block: 'retention',
+            entity: 'retention:abc',
+            values: { chatId: 'abc', retention: '7d' },
+        });
+        expect(sanitizeSettingsPatch({ block: 'retention', chatId: '', retention: '7d' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'retention', chatId: 42 })).toBeNull();
+    });
+
+    it('normaliza un plazo desconocido a desactivado', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'retention', chatId: 'abc', retention: 'dos días' })).toEqual({
+            block: 'retention',
+            entity: 'retention:abc',
+            values: { chatId: 'abc', retention: 'off' },
         });
     });
 

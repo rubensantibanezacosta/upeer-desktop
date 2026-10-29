@@ -18,7 +18,7 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
     return typeof value === 'boolean' ? value : fallback;
 }
 
-function merge(patch: Partial<PrivacyPrefs>): PrivacyPrefs {
+function merge(patch: Partial<Record<keyof PrivacyPrefs, unknown>>): PrivacyPrefs {
     const current = getPrivacyPrefs();
     return {
         readReceipts: asBoolean(patch.readReceipts, current.readReceipts),
@@ -42,7 +42,7 @@ export function setPrivacyPrefs(patch: Partial<PrivacyPrefs>): PrivacyPrefs {
     return next;
 }
 
-export function applyPrivacyFromSync(patch: Partial<PrivacyPrefs>, occurredAt: number): PrivacyPrefs {
+export function applyPrivacyFromSync(patch: Record<string, unknown>, occurredAt: number): PrivacyPrefs {
     const next = merge(patch);
     setAppSetting(SETTING_KEY, next);
     setSettingsClock('privacy', occurredAt);

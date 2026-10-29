@@ -51,7 +51,7 @@ describe('chatRetention', () => {
         setChatRetention('alice', 'off');
 
         expect(getRetentionMap()).toEqual({});
-        expect(setAppSetting).toHaveBeenLastCalledWith('chat-retention', {});
+        expect(setAppSetting).toHaveBeenCalledWith('chat-retention', {});
     });
 
     it('un valor desconocido desactiva el chat', () => {
@@ -59,5 +59,32 @@ describe('chatRetention', () => {
         setChatRetention('alice', 'mañana');
 
         expect(getChatRetentionId('alice')).toBe('off');
+    });
+
+    it('emite el plazo como ajuste compartido y lo anota en el reloj', async () => {
+        const { registerSyncEventSink } = await import('../../../src/main_process/storage/sync/eventSink.js');
+        const emitted: { kind: string; entityId: string; payload: Record<string, unknown> }[] = [];
+        registerSyncEventSink((event) => { emitted.push(event); });
+
+        setChatRetention('alice', '90d');
+        registerSyncEventSink(null);
+
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0]?.kind).toBe('SETTINGS_UPDATE');
+        expect(emitted[0]?.entityId).toBe('retention:alice');
+        expect(emitted[0]?.payload).toEqual({ block: 'retention', chatId: 'alice', retention: '90d' });
+        expect(persisted.get('settings-sync-clock')).toMatchObject({ 'retention:alice': expect.any(Number) });
+    });
+
+    it('no emite nada si el plazo no cambia', async () => {
+        const { registerSyncEventSink } = await import('../../../src/main_process/storage/sync/eventSink.js');
+        setChatRetention('alice', '7d');
+        const emitted: unknown[] = [];
+        registerSyncEventSink((event) => { emitted.push(event); });
+
+        setChatRetention('alice', '7d');
+        registerSyncEventSink(null);
+
+        expect(emitted).toHaveLength(0);
     });
 });

@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 
+import { settingsEntity } from './settings-sync.js';
+
 export type SyncEventKind =
     | 'MESSAGE_UPSERT'
     | 'MESSAGE_STATUS'
@@ -50,7 +52,7 @@ export function syncEntityId(kind: SyncEventKind, payload: Record<string, unknow
                 : kind === 'CONTACT_PROFILE'
                     ? payload.upeerId
                     : kind === 'SETTINGS_UPDATE'
-                        ? payload.block
+                        ? settingsEntity(payload.block, payload)
                         : payload.id;
     return typeof candidate === 'string' ? candidate : '';
 }
