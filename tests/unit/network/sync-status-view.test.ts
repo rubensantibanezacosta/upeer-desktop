@@ -4,7 +4,7 @@ import { getMyAccountRegistry } from '../../../src/main_process/network/accountR
 import { getDeviceIdentity } from '../../../src/main_process/security/deviceIdentity.js';
 import { getSyncStatus } from '../../../src/main_process/storage/sync/status.js';
 import { getMyUPeerId } from '../../../src/main_process/security/identity.js';
-import { recordHistoryPage, resetHistoryWork } from '../../../src/main_process/network/sync/historyProgress.js';
+import { completeServedHistory, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetHistoryWork } from '../../../src/main_process/network/sync/historyProgress.js';
 import { resetSyncProgressMemory } from '../../../src/main_process/network/sync/progress.js';
 
 vi.mock('../../../src/main_process/security/identity.js', () => ({
@@ -134,5 +134,92 @@ describe('getSyncStatusView: pendientes por dirección', () => {
         });
 
         expect(getSyncStatusView().progress.pendingInbound).toBe(0);
+    });
+
+    it('vuelve a marcar la sincronización en cuanto queda histórico por recibir', () => {
+        vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+        vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+        vi.mocked(getSyncStatus).mockReturnValue({
+            state: 'synced',
+            pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
+            pendingEntityIds: [],
+            peers: [{ deviceId: 'remote-device', state: 'synced', ackSequence: 9, lastSeen: Date.now(), historyCompleted: true }],
+        });
+        recordHistoryPage('remote-device', 10, 40);
+
+        const view = getSyncStatusView();
+
+        expect(view.phase).toBe('syncing');
+        expect(view.progress.headline).toBe('Sincronizando tus dispositivos…');
+        expect(view.progress.percent).toBe(20);
+    });
+
+    it('no despierta la sincronización si el dispositivo lleva callado un minuto', () => {
+        vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+        vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+        vi.mocked(getSyncStatus).mockReturnValue({
+            state: 'synced',
+            pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
+            pendingEntityIds: [],
+            peers: [{
+                deviceId: 'remote-device',
+                state: 'synced',
+                ackSequence: 9,
+                lastSeen: Date.now() - 60_000,
+                historyCompleted: true,
+            }],
+        });
+        recordHistoryPage('remote-device', 10, 40);
+
+        expect(getSyncStatusView().phase).toBe('live');
+    });
+
+    it('da el histórico por terminado cuando el otro dispositivo ya lo recibió todo', () => {
+        vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+        vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+        vi.mocked(getSyncStatus).mockReturnValue({
+            state: 'synced',
+            pendingEvents: 0,
+            pendingMessages: 0,
+            pendingMetadata: 0,
+            pendingEntityIds: [],
+            peers: [{ deviceId: 'remote-device', state: 'synced', ackSequence: 9, lastSeen: Date.now(), historyCompleted: true }],
+        });
+        recordHistoryPage('remote-device', 10, 40);
+        recordHistoryServed('remote-device', 30, 0);
+        completeServedHistory('remote-device');
+        recordHistoryComplete('remote-device');
+
+        const view = getSyncStatusView();
+
+        expect(view.phase).toBe('live');
+        expect(view.progress.pendingInbound).toBe(0);
+        expect(view.progress.percent).toBe(100);
+    });
+
+    it('deja de contar el progreso de un dispositivo que lleva dos minutos callado', () => {
+        vi.useFakeTimers();
+        try {
+            vi.mocked(getMyUPeerId).mockReturnValue('a'.repeat(64));
+            vi.mocked(getMyAccountRegistry).mockReturnValue(null);
+            vi.mocked(getSyncStatus).mockReturnValue({
+                state: 'idle',
+                pendingEvents: 0,
+                pendingMessages: 0,
+                pendingMetadata: 0,
+                pendingEntityIds: [],
+                peers: [],
+            });
+            recordHistoryPage('remote-device', 10, 40);
+            vi.advanceTimersByTime(121_000);
+
+            expect(getSyncStatusView().progress.pendingInbound).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

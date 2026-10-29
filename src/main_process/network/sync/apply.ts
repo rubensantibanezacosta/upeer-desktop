@@ -251,7 +251,7 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
 function toSyncedMessage(payload: Record<string, unknown>): SyncedMessage | null {
     if (typeof payload.id !== 'string' || typeof payload.chatUpeerId !== 'string') return null;
     if (typeof payload.message !== 'string' || typeof payload.timestamp !== 'number') return null;
-    if (typeof payload.status !== 'string' || !VALID_STATUSES.has(payload.status)) return null;
+    if (typeof payload.status !== 'string') return null;
     return {
         id: payload.id,
         chatUpeerId: payload.chatUpeerId,
@@ -260,11 +260,16 @@ function toSyncedMessage(payload: Record<string, unknown>): SyncedMessage | null
         message: payload.message,
         replyTo: typeof payload.replyTo === 'string' ? payload.replyTo : null,
         signature: typeof payload.signature === 'string' ? payload.signature : null,
-        status: payload.status as MessageDeliveryStatus,
+        status: normalizeStatus(payload.status),
         version: typeof payload.version === 'number' ? payload.version : 1,
         isDeleted: payload.isDeleted === true,
         isEdited: payload.isEdited === true,
         timestamp: payload.timestamp,
     };
+}
+
+function normalizeStatus(value: string): MessageDeliveryStatus {
+    if (VALID_STATUSES.has(value)) return value as MessageDeliveryStatus;
+    return 'sent';
 }
 

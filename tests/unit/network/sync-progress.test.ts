@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeSyncProgress, resetSyncProgressMemory, trackSyncProgress } from '../../../src/main_process/network/sync/progress.js';
 import {
+    completeServedHistory,
     forgetHistoryWork,
+    getInboundHistoryWork,
     getHistoryWork,
     parsePendingCount,
     recordHistoryComplete,
@@ -151,5 +153,41 @@ describe('histórico servido al otro dispositivo', () => {
         recordHistoryServed('device-b', 50, 50);
         forgetHistoryWork('device-b');
         expect(getHistoryWork()).toEqual({ done: 0, total: 0, known: false });
+    });
+
+    it('cierra el histórico servido cuando el otro dispositivo ya lo tiene todo', () => {
+        recordHistoryServed('device-b', 30, 70);
+        completeServedHistory('device-b');
+        expect(getHistoryWork()).toEqual({ done: 100, total: 100, known: true });
+    });
+
+    it('separa lo que llega de lo que se sirve', () => {
+        recordHistoryPage('device-a', 10, 40);
+        recordHistoryServed('device-b', 30, 70);
+        expect(getInboundHistoryWork()).toEqual({ done: 10, total: 50, known: true });
+    });
+
+    it('deja de contar el trabajo de un dispositivo callado más de dos minutos', () => {
+        vi.useFakeTimers();
+        try {
+            recordHistoryPage('device-a', 10, 40);
+            vi.advanceTimersByTime(121_000);
+            expect(getHistoryWork()).toEqual({ done: 0, total: 0, known: false });
+            expect(getInboundHistoryWork()).toEqual({ done: 0, total: 0, known: false });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('vuelve a contar el trabajo en cuanto el dispositivo reacciona', () => {
+        vi.useFakeTimers();
+        try {
+            recordHistoryPage('device-a', 10, 40);
+            vi.advanceTimersByTime(121_000);
+            recordHistoryPage('device-a', 5, 35);
+            expect(getInboundHistoryWork()).toEqual({ done: 5, total: 40, known: true });
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

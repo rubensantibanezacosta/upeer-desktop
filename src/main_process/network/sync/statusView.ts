@@ -2,8 +2,8 @@ import { getMyUPeerId } from '../../security/identity.js';
 import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { getMyAccountRegistry } from '../accountRegistry.js';
 import { getSyncStatus, type SyncStatus } from '../../storage/sync/status.js';
-import { computeSyncPhase, type SyncPhase } from './phase.js';
-import { getHistoryWork } from './historyProgress.js';
+import { computeSyncPhase, SYNC_STALE_MS, type SyncPhase, type SyncPhaseReport } from './phase.js';
+import { getHistoryWork, getInboundHistoryWork } from './historyProgress.js';
 import { trackSyncProgress, type SyncProgressView } from './progress.js';
 
 export type SyncDeviceState = 'local' | 'synced' | 'pending' | 'offline';
@@ -62,7 +62,8 @@ export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView
     const myId = getMyUPeerId();
     if (!myId) return EMPTY;
     const status = getSyncStatus(myId);
-    const phase = computeSyncPhase(status.peers.map((peer) => toPhasePeer(peer)), Date.now());
+    const computed = computeSyncPhase(status.peers.map((peer) => toPhasePeer(peer)), Date.now());
+    const phase = pendingHistory(computed) ? { ...computed, phase: 'syncing' as const } : computed;
     const history = getHistoryWork();
     const progress = trackSyncProgress({
         phase: phase.phase,
@@ -74,6 +75,13 @@ export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView
         pendingFiles: Math.max(0, Math.trunc(extras.activeFiles ?? 0)),
     });
     return { ...status, ...phase, devices: buildDevices(status), progress };
+}
+
+function pendingHistory(report: SyncPhaseReport): boolean {
+    if (report.phase === 'syncing') return false;
+    if (report.lastPeerAt === 0 || report.ageMillis > SYNC_STALE_MS) return false;
+    const inbound = getInboundHistoryWork();
+    return inbound.known && inbound.done < inbound.total;
 }
 
 function toPhasePeer(peer: SyncStatus['peers'][number]): { historyCompleted: boolean; lastSeen: number } {

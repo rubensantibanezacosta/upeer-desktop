@@ -17,3 +17,9 @@ export function earliestCursor(first: string | null, second: string | null): str
     if (a.timestamp !== b.timestamp) return a.timestamp < b.timestamp ? first : second;
     return a.id <= b.id ? first : second;
 }
+
+export function retreatToLocalLatest(stored: string | null, latest: string | null): string | null {
+    if (!stored) return null;
+    if (!latest) return stored;
+    return earliestCursor(stored, latest);
+}

@@ -203,12 +203,15 @@ export async function routeSyncPacket(
             break;
         case 'SYNC_ENVELOPE':
             await handleSyncEnvelope(senderDeviceId, data, address, win);
+            notifySyncStatus(win);
             break;
         case 'SYNC_HISTORY_REQ':
             await handleSyncHistoryRequest(senderDeviceId, data, address);
+            notifySyncStatus(win);
             break;
         case 'SYNC_HISTORY_RES':
             await handleSyncHistoryResponse(senderDeviceId, data, address, win);
+            notifySyncStatus(win);
             break;
         case 'SYNC_ACK':
             handleSyncAck(senderDeviceId, data);

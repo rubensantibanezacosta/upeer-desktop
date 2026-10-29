@@ -8,6 +8,8 @@ const store = vi.hoisted(() => ({
     history: [] as { deviceId: string; cursor: string | null; done: boolean }[],
     completed: [] as string[],
     requests: 0,
+    sent: [] as { cursor: string | null }[],
+    latest: null as string | null,
 }));
 
 vi.mock('../../../src/main_process/storage/sync/messages.js', () => ({
@@ -15,6 +17,7 @@ vi.mock('../../../src/main_process/storage/sync/messages.js', () => ({
         const separator = cursor.indexOf(':');
         return { timestamp: Number(cursor.slice(0, separator)), id: cursor.slice(separator + 1) };
     },
+    latestSyncHistoryCursor: () => store.latest,
 }));
 
 vi.mock('../../../src/main_process/storage/sync/events.js', () => ({
@@ -50,7 +53,11 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/sync/transport.js', () => ({
-    sendEncryptedSync: async () => { store.requests += 1; return true; },
+    sendEncryptedSync: async (_peer: unknown, _type: string, payload: { cursor: string | null }) => {
+        store.requests += 1;
+        store.sent.push({ cursor: payload.cursor });
+        return true;
+    },
 }));
 
 vi.mock('../../../src/main_process/network/sync/auth.js', () => ({
@@ -74,7 +81,7 @@ function peer(): SyncPeerRecord {
         lastSeen: 0,
         ackSequence: 0,
         historyCursor: '1000:a',
-    } as SyncPeerRecord;
+    } as unknown as SyncPeerRecord;
 }
 
 function entry(id: string, timestamp: number) {
@@ -94,6 +101,35 @@ describe('aplicación del histórico sincronizado', () => {
         store.history.length = 0;
         store.completed.length = 0;
         store.requests = 0;
+        store.sent.length = 0;
+        store.latest = null;
+    });
+
+    it('pide el histórico desde el último mensaje propio si el cursor se adelantó', async () => {
+        const { requestSyncHistory } = await import('../../../src/main_process/network/sync/history.js');
+        store.latest = '2000:m1';
+
+        await requestSyncHistory({ ...peer(), historyCursor: '9000:z' });
+
+        expect(store.sent).toEqual([{ cursor: '2000:m1' }]);
+    });
+
+    it('mantiene el cursor guardado cuando no va por delante de los mensajes', async () => {
+        const { requestSyncHistory } = await import('../../../src/main_process/network/sync/history.js');
+        store.latest = '9500:z9';
+
+        await requestSyncHistory({ ...peer(), historyCursor: '9000:z' });
+
+        expect(store.sent).toEqual([{ cursor: '9000:z' }]);
+    });
+
+    it('pide desde el principio la primera vez', async () => {
+        const { requestSyncHistory } = await import('../../../src/main_process/network/sync/history.js');
+        store.latest = '2000:m1';
+
+        await requestSyncHistory({ ...peer(), historyCursor: null });
+
+        expect(store.sent).toEqual([{ cursor: null }]);
     });
 
     it('avanza el cursor hasta el último mensaje aplicado y da la página por buena', async () => {

@@ -3,7 +3,7 @@ import type { BrowserWindow } from 'electron';
 
 import { recordSyncEvent } from '../../storage/sync/events.js';
 import { syncEntityId } from '../../storage/sync/eventSink.js';
-import { countSyncHistoryAfter, listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
+import { countSyncHistoryAfter, latestSyncHistoryCursor, listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
 import { listContactProfiles } from '../../storage/contacts/operations.js';
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { applySyncEvent } from './apply.js';
@@ -12,21 +12,24 @@ import { signSyncEventOrigin } from './origin.js';
 import { sendEncryptedSync } from './transport.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
-import { forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
-import { carryHistoryCursor, earliestCursor } from './historyCursor.js';
+import { completeServedHistory, forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
+import { carryHistoryCursor, earliestCursor, retreatToLocalLatest } from './historyCursor.js';
 
 const HISTORY_PAGE_SIZE = 50;
 const inFlight = new Set<string>();
+const requestedCursors = new Map<string, string | null>();
 
 export async function requestSyncHistory(peer: SyncPeerRecord): Promise<void> {
     if (!peer.address || inFlight.has(peer.deviceId)) return;
     inFlight.add(peer.deviceId);
     try {
-        if (!peer.historyCursor) forgetHistoryWork(peer.deviceId);
+        const cursor = retreatToLocalLatest(peer.historyCursor, latestSyncHistoryCursor());
+        if (!cursor) forgetHistoryWork(peer.deviceId);
+        requestedCursors.set(peer.deviceId, cursor);
         const requestId = crypto.randomUUID();
         await sendEncryptedSync(peer, 'SYNC_HISTORY_REQ', {
             requestId,
-            cursor: peer.historyCursor,
+            cursor,
             limit: HISTORY_PAGE_SIZE,
         });
     } finally {
@@ -67,6 +70,7 @@ export async function respondSyncHistory(
     const nextCursor = carryHistoryCursor(page.nextCursor, request.cursor);
     const remaining = nextRemaining(nextCursor, page.done);
     recordHistoryServed(peer.deviceId, page.messages.length, remaining);
+    if (page.done || !nextCursor) completeServedHistory(peer.deviceId);
     await sendEncryptedSync(peer, 'SYNC_HISTORY_RES', {
         requestId: request.requestId,
         entries,
@@ -89,7 +93,7 @@ export async function applySyncHistoryResponse(
     win: BrowserWindow | null,
 ): Promise<void> {
     recordHistoryPage(peer.deviceId, payload.entries.length, parsePendingCount(payload.pending));
-    let processed = peer.historyCursor;
+    let processed = requestedCursors.get(peer.deviceId) ?? peer.historyCursor;
     for (const raw of payload.entries) {
         const entry = toSyncEvent(raw);
         if (!entry) continue;

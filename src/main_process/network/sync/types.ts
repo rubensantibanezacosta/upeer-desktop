@@ -12,6 +12,7 @@ export const SYNC_EVENT_KINDS: SyncEventKind[] = [
     'GROUP_UPSERT',
     'GROUP_DELETE',
     'CONTACT_PROFILE',
+    'SETTINGS_UPDATE',
 ];
 
 export type SyncDeviceBinding = {

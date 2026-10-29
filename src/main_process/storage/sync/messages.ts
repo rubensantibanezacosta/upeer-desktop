@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm';
 import { getDb, getSchema } from '../shared.js';
 import type { MessageDeliveryStatus } from '../messages/status.js';
 import { expiresAtForMessage } from '../retention/chatRetention.js';
@@ -129,6 +129,17 @@ export function listSyncHistoryMessages(afterTimestamp: number, afterId: string,
         nextCursor: last ? `${last.timestamp}:${last.id}` : null,
         done,
     };
+}
+
+export function latestSyncHistoryCursor(): string | null {
+    const db = getDb();
+    const schema = getSchema();
+    const row = db.select({ timestamp: schema.messages.timestamp, id: schema.messages.id })
+        .from(schema.messages)
+        .orderBy(desc(schema.messages.timestamp), desc(schema.messages.id))
+        .limit(1)
+        .get() as { timestamp: number; id: string } | undefined;
+    return row ? `${row.timestamp}:${row.id}` : null;
 }
 
 export function countSyncHistoryAfter(afterTimestamp: number, afterId: string): number {
