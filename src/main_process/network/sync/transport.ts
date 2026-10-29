@@ -12,6 +12,7 @@ import { getMaxSyncSequence } from '../../storage/sync/events.js';
 import { getRatchetSession } from '../../storage/ratchet/operations.js';
 import { PROFILE_ALIAS_MAX } from '../../storage/sync/settings-sync.js';
 import { listContactProfiles } from '../../storage/contacts/operations.js';
+import { listGroupSyncPayloads } from '../../storage/groups/operations.js';
 import { signSyncEventOrigin } from './origin.js';
 
 let sequence = 0;
@@ -149,6 +150,25 @@ export async function sendSyncProfiles(peer: SyncPeerRecord): Promise<number> {
         if (await sendSyncEnvelope(peer, event)) sent += 1;
     }
     sent += await sendSyncProfile(peer);
+    return sent;
+}
+
+export async function sendSyncGroups(peer: SyncPeerRecord): Promise<number> {
+    const identity = getMySyncIdentity();
+    if (!identity || !peer.address) return 0;
+    let sent = 0;
+    for (const group of listGroupSyncPayloads()) {
+        const occurredAt = Date.now();
+        const event = signSyncEventOrigin({
+            eventId: `group-${group.groupId}`,
+            kind: 'GROUP_UPSERT' as const,
+            occurredAt,
+            sequence: nextSyncSequence(),
+            originDeviceId: identity.deviceId,
+            payload: group.payload,
+        });
+        if (await sendSyncEnvelope(peer, event)) sent += 1;
+    }
     return sent;
 }
 

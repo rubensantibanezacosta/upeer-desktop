@@ -6,6 +6,7 @@ import { syncEntityId } from '../../storage/sync/eventSink.js';
 import { debug } from '../../security/secure-logger.js';
 import { countSyncHistoryAfter, latestSyncHistoryCursor, listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
 import { listContactProfiles } from '../../storage/contacts/operations.js';
+import { listGroupSyncPayloads } from '../../storage/groups/operations.js';
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
 import { applySyncEventOutcome } from './apply.js';
 import { getMySyncIdentity } from './auth.js';
@@ -18,6 +19,7 @@ import { carryHistoryCursor, earliestCursor, retreatToLocalLatest } from './hist
 import { repairInboundMessages } from './repair.js';
 
 const HISTORY_PAGE_SIZE = 50;
+const MAX_HISTORY_ENTRIES = 200;
 const inFlight = new Set<string>();
 const requestedCursors = new Map<string, string | null>();
 
@@ -44,9 +46,11 @@ export async function respondSyncHistory(
     request: { requestId: string; cursor: string | null; limit: number },
 ): Promise<void> {
     const cursor = parseSyncHistoryCursor(request.cursor);
-    const limit = Math.max(1, Math.min(200, request.limit));
+    const limit = Math.max(1, Math.min(MAX_HISTORY_ENTRIES, request.limit));
     if (!request.cursor) resetServedHistory(peer.deviceId);
-    const page = listSyncHistoryMessages(cursor.timestamp, cursor.id, limit);
+    const metadata = request.cursor ? [] : historyMetadataEntries();
+    const budget = Math.max(1, MAX_HISTORY_ENTRIES - metadata.length);
+    const page = listSyncHistoryMessages(cursor.timestamp, cursor.id, Math.min(limit, budget));
     const deviceId = getMySyncIdentity()?.deviceId ?? 'unknown-device';
     const entries = page.messages.map((message) => signSyncEventOrigin({
         eventId: `history-${deviceId}-${message.id}`,
@@ -56,19 +60,7 @@ export async function respondSyncHistory(
         originDeviceId: deviceId,
         payload: message as unknown as Record<string, unknown>,
     }));
-    if (!request.cursor) {
-        const now = Date.now();
-        for (const profile of listContactProfiles()) {
-            entries.push(signSyncEventOrigin({
-                eventId: `profile-${profile.upeerId}`,
-                kind: 'CONTACT_PROFILE' as const,
-                occurredAt: now,
-                sequence: now,
-                originDeviceId: deviceId,
-                payload: profile as unknown as Record<string, unknown>,
-            }));
-        }
-    }
+    entries.push(...metadata);
     const nextCursor = carryHistoryCursor(page.nextCursor, request.cursor);
     const remaining = nextRemaining(nextCursor, page.done);
     recordHistoryServed(peer.deviceId, page.messages.length, remaining);
@@ -80,6 +72,33 @@ export async function respondSyncHistory(
         done: page.done,
         pending: remaining,
     });
+}
+
+function historyMetadataEntries(): SyncPlainEvent[] {
+    const deviceId = getMySyncIdentity()?.deviceId ?? 'unknown-device';
+    const now = Date.now();
+    const entries: SyncPlainEvent[] = [];
+    for (const profile of listContactProfiles()) {
+        entries.push(signSyncEventOrigin({
+            eventId: `profile-${profile.upeerId}`,
+            kind: 'CONTACT_PROFILE' as const,
+            occurredAt: now,
+            sequence: now,
+            originDeviceId: deviceId,
+            payload: profile as unknown as Record<string, unknown>,
+        }));
+    }
+    for (const group of listGroupSyncPayloads()) {
+        entries.push(signSyncEventOrigin({
+            eventId: `group-${group.groupId}`,
+            kind: 'GROUP_UPSERT' as const,
+            occurredAt: now,
+            sequence: now,
+            originDeviceId: deviceId,
+            payload: group.payload,
+        }));
+    }
+    return entries.slice(0, MAX_HISTORY_ENTRIES - 1);
 }
 
 function nextRemaining(nextCursor: string | null, done: boolean): number {

@@ -97,10 +97,8 @@ export interface GroupMetadata {
     createdAt: number | null;
 }
 
-function emitGroupMetadata(groupId: string): void {
-    const group = getGroupById(groupId);
-    if (!group) return;
-    emitSyncEvent('GROUP_UPSERT', {
+export function groupSyncPayload(group: GroupRecord): Record<string, unknown> {
+    return {
         groupId: group.groupId,
         name: group.name,
         adminUpeerId: group.adminUpeerId,
@@ -109,7 +107,19 @@ function emitGroupMetadata(groupId: string): void {
         isFavorite: group.isFavorite === true,
         avatar: group.avatar ?? null,
         createdAt: group.createdAt ?? null,
-    });
+    };
+}
+
+export function listGroupSyncPayloads(): Array<{ groupId: string; payload: Record<string, unknown> }> {
+    return getGroups()
+        .filter(group => group.status !== 'removed')
+        .map(group => ({ groupId: group.groupId, payload: groupSyncPayload(group) }));
+}
+
+function emitGroupMetadata(groupId: string): void {
+    const group = getGroupById(groupId);
+    if (!group) return;
+    emitSyncEvent('GROUP_UPSERT', groupSyncPayload(group));
 }
 
 export function upsertGroupMetadata(meta: GroupMetadata): void {

@@ -22,7 +22,7 @@ import { verifySyncEventOrigin } from './origin.js';
 import { relayBacklogToPeer, relaySyncEvent } from './relay.js';
 import { replayAfterAck, replayPendingSyncEvents } from './replay.js';
 import { notifySyncStatus } from './statusNotify.js';
-import { sendSyncAck, sendSyncHello, sendSyncProfiles, sendSyncRegistry, sendSyncReset } from './transport.js';
+import { sendSyncAck, sendSyncGroups, sendSyncHello, sendSyncProfiles, sendSyncRegistry, sendSyncReset } from './transport.js';
 import { SYNC_EVENT_KINDS, type SyncHelloPayload, type SyncPlainEvent } from './types.js';
 
 type SyncPacket = Record<string, unknown>;
@@ -61,6 +61,7 @@ export async function handleSyncHello(
         const registry = getMyAccountRegistry(now);
         if (registry) sendSyncRegistry(peer, registry);
         sendSyncProfiles(peer).catch(err => warn('Sync profile push failed', err, 'sync'));
+        sendSyncGroups(peer).catch(err => warn('Sync group push failed', err, 'sync'));
         replayPendingSyncEvents(peer).catch(err => warn('Sync replay failed', err, 'sync'));
         relayBacklogToPeer(peer).catch(err => warn('Sync relay backlog failed', err, 'sync'));
         const myDeviceId = getMySyncIdentity()?.deviceId ?? '';
