@@ -48,3 +48,16 @@ export function listOutboundSyncEventsAfter(sequence: number, limit = 200): Sync
         .limit(limit)
         .all() as SyncEventRecord[];
 }
+
+export function listInboundMessageEvents(limit = 200): SyncEventRecord[] {
+    const db = getDb();
+    const schema = getSchema();
+    return db.select().from(schema.syncEvents)
+        .where(and(
+            eq(schema.syncEvents.direction, 'inbound'),
+            eq(schema.syncEvents.kind, 'MESSAGE_UPSERT'),
+        ))
+        .orderBy(desc(schema.syncEvents.occurredAt), desc(schema.syncEvents.eventId))
+        .limit(limit)
+        .all() as SyncEventRecord[];
+}

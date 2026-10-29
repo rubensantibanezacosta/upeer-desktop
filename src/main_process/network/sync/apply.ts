@@ -33,38 +33,48 @@ import type { SyncPlainEvent } from './types.js';
 
 const VALID_STATUSES = new Set(['failed', 'sent', 'delivered', 'read', 'vaulted']);
 
+export type SyncApplyOutcome = 'applied' | 'unchanged' | 'rejected';
+
 export async function applySyncEvent(event: SyncPlainEvent, win: BrowserWindow | null): Promise<boolean> {
+    return (await applySyncEventOutcome(event, win)) !== 'rejected';
+}
+
+export async function applySyncEventOutcome(event: SyncPlainEvent, win: BrowserWindow | null): Promise<SyncApplyOutcome> {
     return withSyncEventSuppressionAsync(async () => {
         switch (event.kind) {
             case 'MESSAGE_UPSERT':
                 return applyMessageUpsert(event.payload, win);
             case 'MESSAGE_STATUS':
-                return applyStatus(event.payload, win);
+                return outcome(await applyStatus(event.payload, win));
             case 'MESSAGE_EDIT':
-                return applyEdit(event.payload, win);
+                return outcome(await applyEdit(event.payload, win));
             case 'MESSAGE_DELETE':
-                return applyDelete(event.payload, win);
+                return outcome(await applyDelete(event.payload, win));
             case 'CHAT_CLEAR':
-                return applyClear(event.payload, win);
+                return outcome(await applyClear(event.payload, win));
             case 'REACTION_SET':
-                return applyReaction(event.payload, win);
+                return outcome(await applyReaction(event.payload, win));
             case 'GROUP_UPSERT':
-                return applyGroupUpsert(event.payload, win);
+                return outcome(await applyGroupUpsert(event.payload, win));
             case 'GROUP_DELETE':
-                return applyGroupDelete(event.payload, win);
+                return outcome(await applyGroupDelete(event.payload, win));
             case 'CONTACT_PROFILE':
-                return applyContactProfile(event.payload, win);
+                return outcome(await applyContactProfile(event.payload, win));
             case 'SETTINGS_UPDATE':
-                return applySettingsUpdate(event.payload, event.occurredAt, win);
+                return outcome(await applySettingsUpdate(event.payload, event.occurredAt, win));
             default:
-                return false;
+                return 'rejected';
         }
     });
 }
 
-function applyMessageUpsert(payload: Record<string, unknown>, win: BrowserWindow | null): boolean {
+function outcome(applied: boolean): SyncApplyOutcome {
+    return applied ? 'applied' : 'rejected';
+}
+
+function applyMessageUpsert(payload: Record<string, unknown>, win: BrowserWindow | null): SyncApplyOutcome {
     const message = toSyncedMessage(payload);
-    if (!message) return false;
+    if (!message) return 'rejected';
     const result = upsertSyncMessage(message);
     if (result.applied && result.inserted) {
         win?.webContents.send('receive-p2p-message', {
@@ -78,7 +88,7 @@ function applyMessageUpsert(payload: Record<string, unknown>, win: BrowserWindow
             timestamp: message.timestamp,
         });
     }
-    return result.applied;
+    return result.applied ? 'applied' : 'unchanged';
 }
 
 async function applyStatus(payload: Record<string, unknown>, win: BrowserWindow | null): Promise<boolean> {

@@ -3,10 +3,11 @@ import type { BrowserWindow } from 'electron';
 
 import { recordSyncEvent } from '../../storage/sync/events.js';
 import { syncEntityId } from '../../storage/sync/eventSink.js';
+import { debug } from '../../security/secure-logger.js';
 import { countSyncHistoryAfter, latestSyncHistoryCursor, listSyncHistoryMessages, parseSyncHistoryCursor } from '../../storage/sync/messages.js';
 import { listContactProfiles } from '../../storage/contacts/operations.js';
 import { updateSyncPeerHistory, type SyncPeerRecord } from '../../storage/sync/peers.js';
-import { applySyncEvent } from './apply.js';
+import { applySyncEventOutcome } from './apply.js';
 import { getMySyncIdentity } from './auth.js';
 import { signSyncEventOrigin } from './origin.js';
 import { sendEncryptedSync } from './transport.js';
@@ -14,6 +15,7 @@ import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
 import { completeServedHistory, forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
 import { carryHistoryCursor, earliestCursor, retreatToLocalLatest } from './historyCursor.js';
+import { repairInboundMessages } from './repair.js';
 
 const HISTORY_PAGE_SIZE = 50;
 const inFlight = new Set<string>();
@@ -94,12 +96,14 @@ export async function applySyncHistoryResponse(
 ): Promise<void> {
     recordHistoryPage(peer.deviceId, payload.entries.length, parsePendingCount(payload.pending));
     let processed = requestedCursors.get(peer.deviceId) ?? peer.historyCursor;
+    let rejected = 0;
     for (const raw of payload.entries) {
         const entry = toSyncEvent(raw);
         if (!entry) continue;
-        const recorded = recordSyncEvent({
+        const normalized = { ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId };
+        recordSyncEvent({
             eventId: entry.eventId,
-            originDeviceId: entry.originDeviceId ?? peer.deviceId,
+            originDeviceId: normalized.originDeviceId,
             kind: entry.kind,
             occurredAt: entry.occurredAt,
             sequence: entry.sequence,
@@ -110,18 +114,21 @@ export async function applySyncHistoryResponse(
             direction: 'inbound',
             appliedAt: now,
         });
-        const applied = recorded
-            ? await applySyncEvent({ ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId }, win)
-            : true;
-        if (!applied) continue;
+        const outcome = await applySyncEventOutcome(normalized, win);
+        if (outcome === 'rejected') {
+            rejected += 1;
+            continue;
+        }
         processed = entryCursor(entry, processed);
     }
+    debug('Sync history page processed', { deviceId: peer.deviceId, entries: payload.entries.length, rejected }, 'sync');
     const senderCursor = payload.nextCursor;
     const nextCursor = earliestCursor(senderCursor, processed);
     const caughtUp = senderCursor === null || nextCursor === senderCursor;
     const complete = payload.done && caughtUp;
     updateSyncPeerHistory(peer.deviceId, nextCursor, complete);
     if (complete || !nextCursor) recordHistoryComplete(peer.deviceId);
+    if (complete) await repairInboundMessages(win);
     if (!complete && nextCursor) {
         const { getSyncPeer } = await import('../../storage/sync/peers.js');
         const refreshed = getSyncPeer(peer.deviceId);

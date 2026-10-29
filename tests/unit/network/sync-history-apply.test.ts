@@ -5,6 +5,8 @@ import type { SyncPeerRecord } from '../../../src/main_process/storage/sync/peer
 const store = vi.hoisted(() => ({
     applied: new Set<string>(),
     failing: new Set<string>(),
+    attempted: [] as string[],
+    unchanged: new Set<string>(),
     history: [] as { deviceId: string; cursor: string | null; done: boolean }[],
     completed: [] as string[],
     requests: 0,
@@ -36,7 +38,12 @@ vi.mock('../../../src/main_process/storage/sync/peers.js', () => ({
 }));
 
 vi.mock('../../../src/main_process/network/sync/apply.js', () => ({
-    applySyncEvent: async (event: { eventId: string }) => !store.failing.has(event.eventId),
+    applySyncEventOutcome: async (event: { eventId: string }) => {
+        store.attempted.push(event.eventId);
+        if (store.failing.has(event.eventId)) return 'rejected';
+        if (store.unchanged.has(event.eventId)) return 'unchanged';
+        return 'applied';
+    },
 }));
 
 vi.mock('../../../src/main_process/network/sync/historyProgress.js', () => ({
@@ -46,6 +53,10 @@ vi.mock('../../../src/main_process/network/sync/historyProgress.js', () => ({
     recordHistoryPage: vi.fn(),
     recordHistoryServed: vi.fn(),
     resetServedHistory: vi.fn(),
+}));
+
+vi.mock('../../../src/main_process/network/sync/repair.js', () => ({
+    repairInboundMessages: async () => 0,
 }));
 
 vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
@@ -98,11 +109,43 @@ describe('aplicación del histórico sincronizado', () => {
     beforeEach(() => {
         store.applied.clear();
         store.failing.clear();
+        store.attempted.length = 0;
+        store.unchanged.clear();
         store.history.length = 0;
         store.completed.length = 0;
         store.requests = 0;
         store.sent.length = 0;
         store.latest = null;
+    });
+
+    it('aplica un evento ya registrado que nunca llegó a aplicarse', async () => {
+        const { applySyncHistoryResponse } = await import('../../../src/main_process/network/sync/history.js');
+        store.applied.add('history-m1');
+
+        await applySyncHistoryResponse(
+            peer(),
+            { requestId: 'r', entries: [entry('m1', 2000)], nextCursor: '2000:m1', done: true },
+            4000,
+            null,
+        );
+
+        expect(store.attempted).toEqual(['history-m1']);
+        expect(store.history.at(-1)).toEqual({ deviceId: 'a'.repeat(64), cursor: '2000:m1', done: true });
+    });
+
+    it('da por bueno el mensaje que ya estaba en la base de datos', async () => {
+        const { applySyncHistoryResponse } = await import('../../../src/main_process/network/sync/history.js');
+        store.unchanged.add('history-m1');
+
+        await applySyncHistoryResponse(
+            peer(),
+            { requestId: 'r', entries: [entry('m1', 2000)], nextCursor: '2000:m1', done: true },
+            4000,
+            null,
+        );
+
+        expect(store.history.at(-1)).toEqual({ deviceId: 'a'.repeat(64), cursor: '2000:m1', done: true });
+        expect(store.completed).toEqual(['a'.repeat(64)]);
     });
 
     it('pide el histórico desde el último mensaje propio si el cursor se adelantó', async () => {
