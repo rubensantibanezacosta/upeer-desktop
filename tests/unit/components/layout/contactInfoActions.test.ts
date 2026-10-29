@@ -34,15 +34,15 @@ describe('acciones del panel de información', () => {
         expect(dangerActions.map((action) => action.key)).toEqual(['clear']);
     });
 
-    it('no ofrece favoritos en el chat propio', () => {
+    it('no ofrece compartir ni favoritos en el chat propio', () => {
         const { utilityActions } = build(contact({ upeerId: 'me', name: 'Rubén', isSelf: true }));
 
-        expect(utilityActions.map((action) => action.key)).toEqual(['share', 'mute', 'archive']);
+        expect(utilityActions.map((action) => action.key)).toEqual(['mute', 'archive']);
     });
 
-    it('mantiene favoritos con un contacto normal', () => {
+    it('mantiene favoritos y compartir con un contacto normal', () => {
         const { utilityActions } = build(contact());
 
-        expect(utilityActions.map((action) => action.key)).toContain('favorite');
+        expect(utilityActions.map((action) => action.key)).toEqual(['share', 'mute', 'archive', 'favorite']);
     });
 });

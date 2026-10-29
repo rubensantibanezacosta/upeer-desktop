@@ -68,13 +68,15 @@ export const buildContactInfoActions = ({
     onDeleteRequest,
 }: ContactInfoActionsParams) => {
     const utilityActions: ContactInfoUtilityAction[] = [
-        {
-            key: 'share',
-            label: 'Compartir contacto',
-            icon: <Share2 style={{ fontSize: 20 }} />,
-            onClick: onShare,
-            disabled: false,
-        },
+        ...(contact.isSelf ? [] : [
+            {
+                key: 'share',
+                label: 'Compartir contacto',
+                icon: <Share2 style={{ fontSize: 20 }} />,
+                onClick: onShare,
+                disabled: false,
+            },
+        ]),
         {
             key: 'mute',
             label: 'Silenciar notificaciones',

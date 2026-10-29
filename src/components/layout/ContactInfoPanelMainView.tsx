@@ -77,7 +77,7 @@ export const ContactInfoPanelMainView: React.FC<ContactInfoPanelMainViewProps> =
                 <IconButton aria-label="Cerrar info del contacto" size="sm" variant="plain" color="neutral" onClick={onClose}>
                     <X style={{ fontSize: 20 }} />
                 </IconButton>
-                <Typography level="title-md" sx={{ fontWeight: 600 }}>Info. del contacto</Typography>
+                <Typography level="title-md" sx={{ fontWeight: 600 }}>{contact.isSelf ? 'Info. de tu cuenta' : 'Info. del contacto'}</Typography>
             </Box>
 
             <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
