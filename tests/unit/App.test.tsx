@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock minimal de upeer para evitar errores de compilación/ejecución
 vi.stubGlobal('upeer', {
     isPinEnabled: vi.fn().mockResolvedValue(false),
-    getPrivacyPrefs: vi.fn().mockResolvedValue({ readReceipts: true, onlineStatus: true, lastSeen: true }),
+    getPrivacyPrefs: vi.fn().mockResolvedValue({ readReceipts: true, shareActivity: true }),
     setPrivacyPrefs: vi.fn(),
     getNotificationPrefs: vi.fn().mockResolvedValue({ messages: true, requests: true, sound: true }),
     setNotificationPrefs: vi.fn(),

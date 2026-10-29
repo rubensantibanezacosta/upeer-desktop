@@ -270,7 +270,7 @@ const securityApi = {
 
 const privacyApi = {
     getPrivacyPrefs: () => ipcRenderer.invoke('get-privacy-prefs'),
-    setPrivacyPrefs: (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean; shareActivity?: boolean }) => ipcRenderer.invoke('set-privacy-prefs', patch),
+    setPrivacyPrefs: (patch: { readReceipts?: boolean; shareActivity?: boolean }) => ipcRenderer.invoke('set-privacy-prefs', patch),
 };
 
 const notificationApi = {

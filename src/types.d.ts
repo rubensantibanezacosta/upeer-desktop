@@ -291,8 +291,8 @@ declare global {
             verifyPin: (args: { pin: string }) => Promise<boolean>;
             getMnemonic: (pin: string) => Promise<{ success: boolean; mnemonic?: string; error?: string }>;
             /** Preferencias de privacidad con efecto en el servicio */
-            getPrivacyPrefs: () => Promise<{ readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean; shareActivity: boolean }>;
-            setPrivacyPrefs: (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean; shareActivity?: boolean }) => Promise<{ readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean; shareActivity: boolean }>;
+            getPrivacyPrefs: () => Promise<{ readReceipts: boolean; shareActivity: boolean }>;
+            setPrivacyPrefs: (patch: { readReceipts?: boolean; shareActivity?: boolean }) => Promise<{ readReceipts: boolean; shareActivity: boolean }>;
             /** Preferencias de notificación con efecto en el servicio */
             getNotificationPrefs: () => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;
             setNotificationPrefs: (patch: { messages?: boolean; requests?: boolean; sound?: boolean }) => Promise<{ messages: boolean; requests: boolean; sound: boolean }>;

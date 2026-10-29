@@ -2,8 +2,6 @@ import { usePrivacyStore } from './usePrivacyStore.js';
 
 export type PrivacyPatch = {
     readReceipts?: boolean;
-    onlineStatus?: boolean;
-    lastSeen?: boolean;
     shareActivity?: boolean;
 };
 
@@ -11,8 +9,6 @@ export async function hydratePrivacyPrefs(): Promise<void> {
     const prefs = await window.upeer.getPrivacyPrefs();
     const store = usePrivacyStore.getState();
     store.setReadReceipts(prefs.readReceipts);
-    store.setOnlineStatus(prefs.onlineStatus);
-    store.setLastSeen(prefs.lastSeen);
     store.setShareActivity(prefs.shareActivity);
 }
 

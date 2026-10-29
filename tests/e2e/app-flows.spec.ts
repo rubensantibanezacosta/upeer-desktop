@@ -112,16 +112,16 @@ test('oculta la presencia de los contactos cuando la privacidad lo pide', async 
 
     await page.getByRole('button', { name: 'Ajustes' }).click();
     await page.getByText('Privacidad', { exact: true }).click();
-    await page.getByText('Presencia de tus contactos', { exact: true }).click();
+    await page.getByText('Compartir mi presencia y actividad', { exact: true }).click();
     await expect.poll(async () => {
         const state = await readBridgeState(page);
-        return state.privacy?.onlineStatus ?? 'missing';
+        return state.privacy?.shareActivity ?? 'missing';
     }).toBe(false);
 
     await page.getByRole('button', { name: 'Chats' }).click();
     await page.locator('[aria-label="Abrir chat con Alice"]').first().click();
-    await expect(page.getByText('Desconectado').first()).toBeVisible();
     await expect(page.getByText('En línea')).toHaveCount(0);
+    await expect(page.getByText('Desconectado')).toHaveCount(0);
 });
 
 test('envía mensajes directos, renderiza preview y recibe eventos en tiempo real', async ({ page }) => {

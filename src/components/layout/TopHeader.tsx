@@ -20,6 +20,7 @@ interface TopHeaderProps {
     onShare?: () => void;
     onAccept?: () => void;
     isOnline?: boolean;
+    presenceHidden?: boolean;
     activity?: ConversationActivity;
     status?: 'pending' | 'incoming' | 'connected' | 'offline' | 'blocked';
     lastSeen?: string;
@@ -40,7 +41,7 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-    contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, activity, status, lastSeen, onShowSecurity: _onShowSecurity,
+    contactName, avatar, onDelete: _onDelete, onShare: _onShare, onAccept, isOnline, presenceHidden, activity, status, lastSeen, onShowSecurity: _onShowSecurity,
     isGroup, memberCount, vouchScore, isAdmin, groupId, onUpdateGroup, onInviteMembers, onOpenInfo, onSearch, onCallAudio, onCallVideo, isSelfChat, menu
 }) => {
     const isPeerActive = !!activity;
@@ -151,7 +152,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                             </>
                         )}
                     </Box>
-                    {contactName && (
+                    {contactName && (isGroup || isPeerActive || status === 'pending' || status === 'incoming' || !presenceHidden) && (
                         <Typography
                             level="body-xs"
                             color={isPeerActive ? "primary" : "neutral"}
@@ -162,7 +163,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                                 : (isPeerActive ? (activity === 'recording' ? 'Grabando audio...' : 'Escribiendo...') : (
                                     status === 'pending' ? 'Esperando que acepte...' :
                                         status === 'incoming' ? 'Solicitud de contacto' :
-                                            (isOnline ? 'En línea' : (lastSeen ? `Última vez ${formatTopHeaderLastSeen(lastSeen)}` : 'Desconectado'))
+                                            (isOnline ? 'En línea' : lastSeen ? `Última vez ${formatTopHeaderLastSeen(lastSeen)}` : 'Desconectado')
                                 ))}
                         </Typography>
                     )}

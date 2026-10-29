@@ -14,36 +14,34 @@ describe('privacy-prefs', () => {
         settings.setAppSetting.mockReset();
     });
 
-    it('parte de las tres preferencias activas', async () => {
+    it('parte de las dos preferencias activas', async () => {
         settings.getAppSetting.mockReturnValue({});
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true, shareActivity: true });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, shareActivity: true });
     });
 
     it('lee lo guardado cuando es booleano', async () => {
-        settings.getAppSetting.mockReturnValue({ readReceipts: false, onlineStatus: true, lastSeen: false });
+        settings.getAppSetting.mockReturnValue({ readReceipts: false, shareActivity: false });
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: false, shareActivity: true });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: false, shareActivity: false });
     });
 
     it('ignora valores que no son booleanos', async () => {
-        settings.getAppSetting.mockReturnValue({ readReceipts: 'no', lastSeen: 0 });
+        settings.getAppSetting.mockReturnValue({ readReceipts: 'no', shareActivity: 0 });
         const { getPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, onlineStatus: true, lastSeen: true, shareActivity: true });
+        expect(getPrivacyPrefs()).toEqual({ readReceipts: true, shareActivity: true });
     });
 
     it('guarda el parche sin perder las demás claves', async () => {
-        settings.getAppSetting.mockReturnValue({ readReceipts: true, onlineStatus: true, lastSeen: true });
+        settings.getAppSetting.mockReturnValue({ readReceipts: true, shareActivity: true });
         const { setPrivacyPrefs } = await import('../../../src/main_process/security/privacy-prefs.js');
 
-        expect(setPrivacyPrefs({ readReceipts: false })).toEqual({ readReceipts: false, onlineStatus: true, lastSeen: true, shareActivity: true });
+        expect(setPrivacyPrefs({ readReceipts: false })).toEqual({ readReceipts: false, shareActivity: true });
         expect(settings.setAppSetting).toHaveBeenCalledWith('privacy-prefs', {
             readReceipts: false,
-            onlineStatus: true,
-            lastSeen: true,
             shareActivity: true,
         });
     });

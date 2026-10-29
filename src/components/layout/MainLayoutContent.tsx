@@ -147,12 +147,11 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
     const effectiveVouchScore = activeContact?.vouchScore ?? incomingRequest?.vouchScore;
     const untrustworthyInfo = chatStore.untrustworthyAlerts[targetUpeerId] || incomingRequest?.untrustworthy;
     const keyChangeAlert = chatStore.keyChangeAlerts[targetUpeerId];
-    const onlineStatusPref = usePrivacyStore((state) => state.onlineStatus);
-    const lastSeenPref = usePrivacyStore((state) => state.lastSeen);
+    const shareActivity = usePrivacyStore((state) => state.shareActivity);
     const headerPresence = visiblePresence(
         isWithinPresenceWindow(activeContact?.lastActive),
         activeContact?.lastActive,
-        { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref },
+        { shareActivity },
     );
     const [contactPanelView, setContactPanelView] = useState<ContactPanelView>('main');
     const [groupPanelView, setGroupPanelView] = useState<GroupPanelView>('main');
@@ -254,6 +253,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                             contactName={activeContact?.name}
                                             avatar={activeContactAvatar}
                                             isOnline={headerPresence.isOnline}
+                                            presenceHidden={headerPresence.hidden}
                                             activity={chatStore.peerActivity[targetUpeerId]}
                                             status={activeContact?.status}
                                             lastSeen={headerPresence.lastSeen ?? undefined}

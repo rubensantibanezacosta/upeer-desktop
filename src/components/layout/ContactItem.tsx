@@ -30,9 +30,8 @@ interface ContactItemProps {
 
 export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected, onSelect, onToggleFavorite, onClear, isTyping, highlight = '', searchRowId }) => {
     const [confirmClearOpen, setConfirmClearOpen] = React.useState(false);
-    const onlineStatusPref = usePrivacyStore((s) => s.onlineStatus);
-    const lastSeenPref = usePrivacyStore((s) => s.lastSeen);
-    const presence = visiblePresence(useIsOnline(c.lastActive), null, { onlineStatus: onlineStatusPref, lastSeen: lastSeenPref });
+    const shareActivity = usePrivacyStore((s) => s.shareActivity);
+    const presence = visiblePresence(useIsOnline(c.lastActive), null, { shareActivity });
     const isOnline = presence.isOnline;
     const isPending = c.status === 'pending' || c.status === 'incoming';
 
@@ -130,7 +129,7 @@ export const ContactItem: React.FC<ContactItemProps> = ({ contact: c, isSelected
                                             {renderLastMessagePreview(c, highlight)}
                                         </Typography>
                                     </Box>
-                                ) : (isOnline ? 'En línea' : 'Desconectado'))
+                                ) : (presence.hidden ? null : (isOnline ? 'En línea' : 'Desconectado')))
                             )}
                         </Typography>
 

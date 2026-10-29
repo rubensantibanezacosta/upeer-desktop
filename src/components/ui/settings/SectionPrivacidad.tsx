@@ -2,31 +2,19 @@ import React from 'react';
 import { List, Typography } from '@mui/joy';
 import { SettingsCard, SettingsSection } from './sectionShell.js';
 import { ToggleRow } from './shared.js';
-import { Lock, CheckCheck, Circle, Clock, Activity } from 'lucide-react';
+import { Lock, CheckCheck, Activity } from 'lucide-react';
 import { usePrivacyStore } from '../../../store/usePrivacyStore.js';
 import { pushPrivacyPrefs } from '../../../store/privacySync.js';
 
 export const SectionPrivacidad: React.FC = () => {
     const readReceipts = usePrivacyStore((s) => s.readReceipts);
-    const onlineStatus = usePrivacyStore((s) => s.onlineStatus);
-    const lastSeen = usePrivacyStore((s) => s.lastSeen);
     const shareActivity = usePrivacyStore((s) => s.shareActivity);
     const setReadReceipts = usePrivacyStore((s) => s.setReadReceipts);
-    const setOnlineStatus = usePrivacyStore((s) => s.setOnlineStatus);
-    const setLastSeen = usePrivacyStore((s) => s.setLastSeen);
     const setShareActivity = usePrivacyStore((s) => s.setShareActivity);
 
     const changeReadReceipts = (value: boolean) => {
         setReadReceipts(value);
         pushPrivacyPrefs({ readReceipts: value });
-    };
-    const changeOnlineStatus = (value: boolean) => {
-        setOnlineStatus(value);
-        pushPrivacyPrefs({ onlineStatus: value });
-    };
-    const changeLastSeen = (value: boolean) => {
-        setLastSeen(value);
-        pushPrivacyPrefs({ lastSeen: value });
     };
     const changeShareActivity = (value: boolean) => {
         setShareActivity(value);
@@ -37,7 +25,7 @@ export const SectionPrivacidad: React.FC = () => {
         <SettingsSection
             icon={<Lock style={{ fontSize: 18 }} />}
             title="Privacidad"
-            description="Las dos primeras se anuncian a tus contactos; presencia y última vez solo cambian lo que ves de ellos."
+            description="Las confirmaciones de lectura se anuncian a tus contactos. Presencia y actividad van juntas: o las compartes y las ves, o ni una cosa ni la otra."
         >
             <SettingsCard>
                 <List sx={{ '--ListItem-paddingY': '0px', p: 0.5 }}>
@@ -50,29 +38,15 @@ export const SectionPrivacidad: React.FC = () => {
                     />
                     <ToggleRow
                         icon={<Activity />}
-                        label="Compartir mi hora de actividad"
-                        desc="Enviar la hora de tu última actividad a tus contactos"
+                        label="Compartir mi presencia y actividad"
+                        desc="Ver su presencia y su última actividad, y que ellos vean la tuya"
                         value={shareActivity}
                         onChange={changeShareActivity}
-                    />
-                    <ToggleRow
-                        icon={<Circle style={{ fontSize: 12 }} />}
-                        label="Presencia de tus contactos"
-                        desc="Ver si están en línea en la lista y en el chat"
-                        value={onlineStatus}
-                        onChange={changeOnlineStatus}
-                    />
-                    <ToggleRow
-                        icon={<Clock />}
-                        label="Última vez de tus contactos"
-                        desc="Ver cuándo fue su última actividad"
-                        value={lastSeen}
-                        onChange={changeLastSeen}
                     />
                 </List>
             </SettingsCard>
             <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
-                Al desactivar las confirmaciones de lectura no se envía el mensaje READ: la conversación se marca como leída solo aquí. Al desactivar «Compartir mi hora de actividad» tu último latido deja de llevar la hora: lo que ya vieron tus contactos no se borra, pero deja de avanzar. El punto verde de «en línea» sigue dependiendo de que la app esté abierta, porque se deduce de cualquier paquete y no solo de ese latido.
+                Al desactivar las confirmaciones de lectura no se envía el mensaje READ: la conversación se marca como leída solo aquí. Al desactivar «Compartir mi presencia y actividad» tu último latido deja de llevar la hora, dejas de ver la presencia y la última actividad de tus contactos, y ellos dejan de ver la tuya. El punto verde de «en línea» depende de que la app esté abierta.
             </Typography>
         </SettingsSection>
     );

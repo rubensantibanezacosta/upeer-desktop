@@ -10,17 +10,13 @@ interface ContactPresenceLabelProps {
 }
 
 export const ContactPresenceLabel: React.FC<ContactPresenceLabelProps> = ({ contact, sx }) => {
-    const onlineStatusPref = usePrivacyStore((state) => state.onlineStatus);
-    const lastSeenPref = usePrivacyStore((state) => state.lastSeen);
-    const presence = visiblePresence(isWithinPresenceWindow(contact.lastActive), contact.lastActive, {
-        onlineStatus: onlineStatusPref,
-        lastSeen: lastSeenPref,
-    });
+    const shareActivity = usePrivacyStore((state) => state.shareActivity);
+    const presence = visiblePresence(isWithinPresenceWindow(contact.lastActive), contact.lastActive, { shareActivity });
 
     if (contact.status === 'blocked') {
         return <Typography level="body-xs" color="danger" sx={sx}>Bloqueado</Typography>;
     }
-    if (!onlineStatusPref) return null;
+    if (!shareActivity) return null;
     return (
         <Typography level="body-xs" color={presence.isOnline ? 'success' : 'neutral'} sx={sx}>
             {presence.isOnline ? 'En línea' : 'Desconectado'}

@@ -87,7 +87,7 @@ type BridgeState = {
     groups: Group[];
     messagesByChat: Record<string, RawMessage[]>;
     transfers: Transfer[];
-    privacy: { readReceipts: boolean; onlineStatus: boolean; lastSeen: boolean };
+    privacy: { readReceipts: boolean; shareActivity: boolean };
     notifications: { messages: boolean; requests: boolean; sound: boolean };
     retention: Record<string, string>;
     clipboard: string[];
@@ -113,7 +113,7 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
             myIdentity: input.myIdentity ?? { upeerId: selfId, name: 'E2E User', alias: 'E2E User' },
             myNetworkAddress: input.myNetworkAddress ?? '200:1111:2222:3333:4444:5555:6666:7777',
             networkStatus: input.networkStatus ?? 'up',
-            privacy: { readReceipts: true, onlineStatus: true, lastSeen: true },
+            privacy: { readReceipts: true, shareActivity: true },
             notifications: { messages: true, requests: true, sound: true },
             retention: {} as Record<string, string>,
             databaseBackups: deepClone(input.databaseBackups ?? []),
@@ -237,11 +237,10 @@ export async function installUpeerBridge(page: Page, scenario: Scenario): Promis
         const bridge = {
             isPinEnabled: async () => false,
             getPrivacyPrefs: async () => ({ ...state.privacy }),
-            setPrivacyPrefs: async (patch: { readReceipts?: boolean; onlineStatus?: boolean; lastSeen?: boolean }) => {
+            setPrivacyPrefs: async (patch: { readReceipts?: boolean; shareActivity?: boolean }) => {
                 state.privacy = {
                     readReceipts: patch.readReceipts ?? state.privacy.readReceipts,
-                    onlineStatus: patch.onlineStatus ?? state.privacy.onlineStatus,
-                    lastSeen: patch.lastSeen ?? state.privacy.lastSeen,
+                    shareActivity: patch.shareActivity ?? state.privacy.shareActivity,
                 };
                 return { ...state.privacy };
             },

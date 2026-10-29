@@ -81,11 +81,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         return () => clearInterval(t);
     }, []);
 
-    const onlineStatusPref = usePrivacyStore((s) => s.onlineStatus);
-    const lastSeenPref = usePrivacyStore((s) => s.lastSeen);
+    const shareActivity = usePrivacyStore((s) => s.shareActivity);
     const presence = visiblePresence(isWithinPresenceWindow(contact.lastActive, now), formatSeen(contact.lastActive), {
-        onlineStatus: onlineStatusPref,
-        lastSeen: lastSeenPref,
+        shareActivity,
     });
     const isOnline = presence.isOnline;
     const lastSeenText = presence.lastSeen;
