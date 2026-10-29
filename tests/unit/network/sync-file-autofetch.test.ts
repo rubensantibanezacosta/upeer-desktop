@@ -117,7 +117,7 @@ describe('autodescarga de adjuntos sincronizados', () => {
 
     it('publica el avance para que la barra lo muestre', async () => {
         getFileHistory.mockReturnValue([entry('f1'), entry('f2')]);
-        fileIsLocal.mockReturnValueOnce(true).mockReturnValue(false);
+        fileIsLocal.mockImplementation((fileId: string) => fileId === 'f1');
 
         await sweepMissingFiles();
 
@@ -126,7 +126,7 @@ describe('autodescarga de adjuntos sincronizados', () => {
 
     it('suma al avance el adjunto que se termina de traer', async () => {
         getFileHistory.mockReturnValue([entry('f1'), entry('f2')]);
-        fileIsLocal.mockReturnValueOnce(true).mockReturnValue(false);
+        fileIsLocal.mockImplementation((fileId: string) => fileId === 'f1');
         await sweepMissingFiles();
 
         fileIsLocal.mockReturnValue(true);
@@ -155,5 +155,19 @@ describe('autodescarga de adjuntos sincronizados', () => {
         refreshSyncFileProgress();
 
         expect(requestSyncFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('vuelve a pedir el adjunto que ha desaparecido del disco', async () => {
+        getFileHistory.mockReturnValue([entry('f1')]);
+        fileIsLocal.mockReturnValue(true);
+        await sweepMissingFiles();
+        expect(requestSyncFile).not.toHaveBeenCalled();
+
+        fileIsLocal.mockReturnValue(false);
+        const work = await sweepMissingFiles();
+
+        expect(requestSyncFile).toHaveBeenCalledWith('f1', null);
+        expect(work.total).toBe(1);
+        expect(work.pending).toBe(1);
     });
 });

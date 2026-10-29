@@ -49,6 +49,7 @@ export async function sweepMissingFiles(): Promise<SyncFileWork> {
         if (baseline === null) {
             baseline = new Set([...seen.values()].filter(stored).map((entry) => entry.fileId));
         }
+        reviveMissing(seen);
         let pending = 0;
         let failed = 0;
         for (const entry of seen.values()) {
@@ -78,6 +79,18 @@ export async function sweepMissingFiles(): Promise<SyncFileWork> {
         return work;
     } finally {
         running = false;
+    }
+}
+
+function reviveMissing(seen: Map<string, { fileId: string; savedPath?: string }>): void {
+    const candidates = new Set<string>(completed);
+    for (const fileId of baseline ?? []) candidates.add(fileId);
+    for (const fileId of candidates) {
+        const entry = seen.get(fileId);
+        if (!entry || stored(entry)) continue;
+        completed.delete(fileId);
+        baseline?.delete(fileId);
+        debug('El adjunto ya no está en el dispositivo: se vuelve a pedir', { fileId }, 'sync');
     }
 }
 
