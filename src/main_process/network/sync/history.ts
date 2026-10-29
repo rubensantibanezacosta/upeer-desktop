@@ -115,6 +115,7 @@ export async function applySyncHistoryResponse(
 ): Promise<void> {
     let processed = requestedCursors.get(peer.deviceId) ?? peer.historyCursor;
     let rejected = 0;
+    let messages = 0;
     for (const raw of payload.entries) {
         const entry = toSyncEvent(raw);
         if (!entry) continue;
@@ -137,10 +138,11 @@ export async function applySyncHistoryResponse(
             rejected += 1;
             continue;
         }
+        if (entry.kind === 'MESSAGE_UPSERT') messages += 1;
         processed = entryCursor(entry, processed);
     }
-    debug('Sync history page processed', { deviceId: peer.deviceId, entries: payload.entries.length, rejected }, 'sync');
-    recordHistoryPage(peer.deviceId, payload.entries.length - rejected, parsePendingCount(payload.pending));
+    debug('Sync history page processed', { deviceId: peer.deviceId, entries: payload.entries.length, messages, rejected }, 'sync');
+    recordHistoryPage(peer.deviceId, messages, parsePendingCount(payload.pending));
     const senderCursor = payload.nextCursor;
     const nextCursor = earliestCursor(senderCursor, processed);
     const caughtUp = senderCursor === null || nextCursor === senderCursor;
