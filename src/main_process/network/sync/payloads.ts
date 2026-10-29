@@ -9,11 +9,26 @@ import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
 
 export type SyncPacket = Record<string, unknown>;
 
+const DECRYPT_FAILURE_WINDOW_MS = 15_000;
+const DECRYPT_FAILURE_LIMIT = 3;
+
 export async function decryptEvent(peer: SyncPeerRecord, data: SyncPacket, expectedType: string): Promise<SyncPlainEvent | null> {
     if (data.type !== expectedType) return null;
     const parsed = await decryptPayload(peer, data, expectedType);
     if (!parsed) return null;
     return toSyncEvent(parsed);
+}
+
+const decryptFailures = new Map<string, number[]>();
+
+function shouldResetSession(deviceId: string): boolean {
+    const now = Date.now();
+    const recent = (decryptFailures.get(deviceId) ?? []).filter(at => now - at < DECRYPT_FAILURE_WINDOW_MS);
+    recent.push(now);
+    decryptFailures.set(deviceId, recent);
+    if (recent.length < DECRYPT_FAILURE_LIMIT) return false;
+    decryptFailures.delete(deviceId);
+    return true;
 }
 
 export async function decryptPayload(peer: SyncPeerRecord, data: SyncPacket, expectedType: string): Promise<Record<string, unknown> | null> {
@@ -31,11 +46,16 @@ export async function decryptPayload(peer: SyncPeerRecord, data: SyncPacket, exp
         `sync:${peer.deviceId}`,
     );
     if (!plaintext) {
+        if (!data.x3dhInit && !shouldResetSession(peer.deviceId)) {
+            warn('Duplicate or out-of-order sync frame ignored', { deviceId: peer.deviceId, type: expectedType }, 'sync');
+            return null;
+        }
         warn('Sync payload could not be decrypted; requesting a session reset', { deviceId: peer.deviceId, type: expectedType }, 'sync');
         resetSyncSession(peer.deviceId);
         sendSyncReset(peer);
         return null;
     }
+    decryptFailures.delete(peer.deviceId);
     try {
         const parsed = JSON.parse(plaintext) as unknown;
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;

@@ -16,7 +16,7 @@ describe('tramos de un adjunto sincronizado', () => {
         expect(chunkCount(1, FILE_CHUNK_SIZE)).toBe(1);
         expect(chunkCount(FILE_CHUNK_SIZE, FILE_CHUNK_SIZE)).toBe(1);
         expect(chunkCount(FILE_CHUNK_SIZE + 1, FILE_CHUNK_SIZE)).toBe(2);
-        expect(chunkCount(8 * 1024 * 1024, FILE_CHUNK_SIZE)).toBe(171);
+        expect(chunkCount(8 * 1024 * 1024, FILE_CHUNK_SIZE)).toBe(Math.ceil((8 * 1024 * 1024) / FILE_CHUNK_SIZE));
     });
 
     it('calcula el inicio y la longitud de cada tramo', () => {

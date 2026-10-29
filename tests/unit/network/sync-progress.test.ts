@@ -73,6 +73,65 @@ describe('computeSyncProgress', () => {
         const progress = computeSyncProgress({ ...base, phase: 'syncing' });
         expect(progress.detail).toBe('Conectando con tus dispositivos');
     });
+
+    it('cuenta los adjuntos que se están descargando de otros dispositivos', () => {
+        const progress = computeSyncProgress({
+            ...base,
+            phase: 'syncing',
+            files: { total: 4, done: 3, pending: 1, failed: 0 },
+        });
+        expect(progress.determinate).toBe(true);
+        expect(progress.percent).toBe(75);
+        expect(progress.filesDone).toBe(3);
+        expect(progress.filesTotal).toBe(4);
+        expect(progress.filesKnown).toBe(true);
+        expect(progress.detail).toBe('3 adjuntos sincronizados · 3 de 4 adjuntos');
+    });
+
+    it('reparte la barra entre mensajes y adjuntos', () => {
+        const progress = computeSyncProgress({
+            ...base,
+            historyDone: 5,
+            historyTotal: 10,
+            historyKnown: true,
+            files: { total: 10, done: 5, pending: 5, failed: 0 },
+        });
+        expect(progress.percent).toBe(50);
+        expect(progress.detail).toBe('5 de 10 mensajes · 5 de 10 adjuntos');
+    });
+
+    it('anuncia los adjuntos que ningún dispositivo sirve', () => {        const progress = computeSyncProgress({
+            ...base,
+            historyDone: 10,
+            historyTotal: 10,
+            historyKnown: true,
+            files: { total: 3, done: 2, pending: 0, failed: 1 },
+        });
+        expect(progress.detail).toBe('10 de 10 mensajes · 2 de 3 adjuntos · 1 adjunto sin respuesta');
+    });
+
+    it('avanza con los tramos recibidos del adjunto en curso', () => {
+        const progress = computeSyncProgress({
+            ...base,
+            historyDone: 0,
+            historyTotal: 0,
+            historyKnown: false,
+            files: { total: 4, done: 1, pending: 3, failed: 0, progressUnits: 2.5 },
+        });
+        expect(progress.percent).toBe(63);
+        expect(progress.filesDone).toBe(1);
+    });
+
+    it('nunca deja el porcentaje por debajo de los adjuntos ya terminados', () => {
+        const progress = computeSyncProgress({
+            ...base,
+            historyDone: 0,
+            historyTotal: 0,
+            historyKnown: false,
+            files: { total: 4, done: 3, pending: 1, failed: 0, progressUnits: 1 },
+        });
+        expect(progress.percent).toBe(75);
+    });
 });
 
 describe('trackSyncProgress', () => {

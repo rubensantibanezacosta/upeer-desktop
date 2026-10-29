@@ -3,6 +3,7 @@ import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { getMyAccountRegistry } from '../accountRegistry.js';
 import { getSyncStatus, type SyncStatus } from '../../storage/sync/status.js';
 import { computeSyncPhase, SYNC_STALE_MS, type SyncPhase, type SyncPhaseReport } from './phase.js';
+import { getSyncFileWork } from './files/autofetch.js';
 import { getHistoryWork, getInboundHistoryWork } from './historyProgress.js';
 import { trackSyncProgress, type SyncProgressView } from './progress.js';
 
@@ -38,6 +39,10 @@ const IDLE_PROGRESS: SyncProgressView = {
     pendingOutbound: 0,
     pendingInbound: 0,
     pendingFiles: 0,
+    filesDone: 0,
+    filesTotal: 0,
+    filesFailed: 0,
+    filesKnown: false,
     headline: 'Sin dispositivos que sincronizar',
     detail: 'Este equipo es el único de la cuenta',
 };
@@ -63,7 +68,8 @@ export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView
     if (!myId) return EMPTY;
     const status = getSyncStatus(myId);
     const computed = computeSyncPhase(status.peers.map((peer) => toPhasePeer(peer)), Date.now());
-    const phase = pendingHistory(computed) ? { ...computed, phase: 'syncing' as const } : computed;
+    const files = getSyncFileWork();
+    const phase = pendingHistory(computed) || pendingFiles(computed, files) ? { ...computed, phase: 'syncing' as const } : computed;
     const history = getHistoryWork();
     const progress = trackSyncProgress({
         phase: phase.phase,
@@ -73,8 +79,15 @@ export function getSyncStatusView(extras: SyncStatusExtras = {}): SyncStatusView
         pendingOutbound: status.pendingMessages ?? 0,
         pendingInbound: history.known ? Math.max(0, history.total - history.done) : 0,
         pendingFiles: Math.max(0, Math.trunc(extras.activeFiles ?? 0)),
+        files,
     });
     return { ...status, ...phase, devices: buildDevices(status), progress };
+}
+
+function pendingFiles(report: SyncPhaseReport, files: { pending: number }): boolean {
+    if (report.phase === 'syncing') return false;
+    if (report.lastPeerAt === 0 || report.ageMillis > SYNC_STALE_MS) return false;
+    return files.pending > 0;
 }
 
 function pendingHistory(report: SyncPhaseReport): boolean {

@@ -11,7 +11,7 @@ import { FILE_REQ } from './packets.js';
 import { findStoredFile } from './storage.js';
 
 const REQUEST_TTL_MS = 180_000;
-const RETRY_MS = 6_000;
+const RETRY_MS = 15_000;
 
 type PendingFileRequest = {
     requestId: string;
@@ -70,7 +70,7 @@ export async function requestSyncFile(fileId: string, win: BrowserWindow | null)
 async function dispatch(entry: PendingFileRequest, fileId: string, fresh: boolean): Promise<number> {
     let sent = 0;
     for (const peer of entry.peers) {
-        if (fresh && peer.address) resetPeerConnection(peer.address);
+        if (fresh && entry.attempts === 1 && peer.address) resetPeerConnection(peer.address);
         if (await sendEncryptedSync(peer, FILE_REQ, { requestId: entry.requestId, fileId })) sent += 1;
     }
     entry.attempts += 1;
@@ -99,6 +99,14 @@ function clearRetry(entry: PendingFileRequest): void {
     if (!entry.timer) return;
     clearTimeout(entry.timer);
     entry.timer = undefined;
+}
+
+export function isSyncFilePending(fileId: string): boolean {
+    return pending.has(fileId);
+}
+
+export function pendingFileRequestId(fileId: string): string | null {
+    return pending.get(fileId)?.requestId ?? null;
 }
 
 export function completeSyncFileRequest(fileId: string): void {

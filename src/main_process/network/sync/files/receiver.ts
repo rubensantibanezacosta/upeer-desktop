@@ -130,6 +130,12 @@ export async function flushEarlyChunks(requestId: string, win: BrowserWindow | n
     return null;
 }
 
+export function fileReceiptProgress(requestId: string): number | null {
+    const receipt = receipts.get(requestId);
+    if (!receipt || receipt.totalChunks <= 0) return null;
+    return Math.min(1, receipt.received.size / receipt.totalChunks);
+}
+
 export async function dropReceipt(requestId: string): Promise<void> {
     const receipt = receipts.get(requestId);
     if (!receipt) return;

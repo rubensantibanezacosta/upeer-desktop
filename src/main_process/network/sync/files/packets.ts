@@ -2,7 +2,7 @@ export const FILE_REQ = 'SYNC_FILE_REQ';
 export const FILE_RES = 'SYNC_FILE_RES';
 export const FILE_CHUNK = 'SYNC_FILE_CHUNK';
 
-export const FILE_CHUNK_SIZE = 48 * 1024;
+export const FILE_CHUNK_SIZE = 192 * 1024;
 export const FILE_MAX_BYTES = 512 * 1024 * 1024;
 
 export type SyncFileRequest = {

@@ -9,7 +9,6 @@ import {
     touchSyncPeer,
     updateSyncPeerAck,
     upsertSyncPeer,
-    type SyncPeerRecord,
 } from '../../storage/sync/peers.js';
 import { getMyAccountRegistry } from '../accountRegistry.js';
 import { routeSyncFilePacket } from './files/route.js';

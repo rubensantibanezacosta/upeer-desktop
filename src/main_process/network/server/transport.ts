@@ -192,6 +192,10 @@ function enqueueForSend(ip: string, framedBuf: Buffer, isFileTransfer: boolean, 
     void flushConnection(ip);
 }
 
+export function sendQueueDepth(ip: string): number {
+    return connectionPool.get(ip)?.queue.length ?? 0;
+}
+
 export function drainSendQueue(): void {
     const queue = getSendQueue();
     if (queue.length === 0) return;
