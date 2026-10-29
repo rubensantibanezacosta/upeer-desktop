@@ -121,13 +121,19 @@ export const ProfileAddressSection: React.FC<ProfileAddressSectionProps> = ({ fu
             }
         />
         <Box sx={{ px: 0.5, pb: 1, pt: 0.5 }}>
-        <CopyableField label="Comparte esta dirección para que puedan escribirte" value={fullId} />
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-            <Button variant="outlined" color="neutral" size="sm" startDecorator={<QrCode style={{ fontSize: 15 }} />} onClick={onShowQr}>Mostrar QR</Button>
-            <Button variant={copied ? 'soft' : 'outlined'} color={copied ? 'success' : 'neutral'} size="sm" startDecorator={copied ? <Check style={{ fontSize: 15 }} /> : <Copy style={{ fontSize: 15 }} />} onClick={onCopy} sx={{ transition: 'all 0.2s' }}>
-                {copied ? '¡Copiado!' : 'Copiar'}
-            </Button>
-        </Box>
+        <CopyableField label="Comparte esta dirección para que puedan escribirte" value={fullId || 'Sin dirección de red todavía'} />
+        {fullId ? (
+            <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+                <Button variant="outlined" color="neutral" size="sm" startDecorator={<QrCode style={{ fontSize: 15 }} />} onClick={onShowQr}>Mostrar QR</Button>
+                <Button variant={copied ? 'soft' : 'outlined'} color={copied ? 'success' : 'neutral'} size="sm" startDecorator={copied ? <Check style={{ fontSize: 15 }} /> : <Copy style={{ fontSize: 15 }} />} onClick={onCopy} sx={{ transition: 'all 0.2s' }}>
+                    {copied ? '¡Copiado!' : 'Copiar'}
+                </Button>
+            </Box>
+        ) : (
+            <Typography level="body-xs" sx={{ color: 'warning.400', mt: 1 }}>
+                La dirección se completa en cuanto este equipo tiene dirección de red. Sin ella nadie puede añadirte por esta vía.
+            </Typography>
+        )}
         {copyError && <Typography level="body-xs" color="danger" sx={{ mt: 1 }}>No se pudo copiar al portapapeles: {copyError}</Typography>}
         </Box>
     </Box>

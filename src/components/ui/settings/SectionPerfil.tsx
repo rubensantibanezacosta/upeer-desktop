@@ -31,8 +31,8 @@ export const SectionPerfil: React.FC<Props> = ({ identity, networkAddress, onIde
     const toggleInfo = (key: InfoKey) =>
         setActiveInfo(prev => prev === key ? null : key);
 
-    const addr = identity?.address || networkAddress || '';
-    const fullId = identity ? `${identity.upeerId}@${addr}` : '';
+    const addr = (identity?.address || networkAddress || '').trim();
+    const fullId = identity && addr ? `${identity.upeerId}@${addr}` : '';
     const displayName = alias || identity?.upeerId || 'Mi cuenta';
 
     const handleCopy = useCallback(async () => {

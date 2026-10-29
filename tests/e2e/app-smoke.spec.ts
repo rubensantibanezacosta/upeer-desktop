@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
         const asyncValues: Record<string, unknown> = {
             isPinEnabled: false,
             identityStatus: { isLocked: false },
-            getMyNetworkAddress: 'No detectado',
+            getMyNetworkAddress: '',
             getMyIdentity: { upeerId: 'self-id', name: 'E2E User', alias: 'E2E User', avatar: undefined },
             getContacts: [],
             getGroups: [],

@@ -189,7 +189,7 @@ export const SectionRed: React.FC<Props> = ({ identity, networkAddress, networkS
                 </SettingsCard>
             )}
 
-            {isUp && addr && addr !== 'No detectado' && (
+            {isUp && addr && (
                 <SettingsCard>
                     <Box sx={{ px: 0.5, py: 1 }}>
                         <CopyableField label="Tu dirección de red" value={addr} />

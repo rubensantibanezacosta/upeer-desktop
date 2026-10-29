@@ -20,7 +20,8 @@ export function registerNetworkHandlers(): void {
   // Devuelve la dirección IPv6 Yggdrasil asignada por el sidecar yggstack.
   // Con el modo user-space no hay interfaz TUN, por lo que getNetworkAddress()
   // ya no aplica aquí; usamos getYggstackAddress() que lee del stdout del proceso.
-  ipcMain.handle('get-ygg-ip', () => getYggstackAddress() || 'No detectado');
+  // Sin dirección devuelve cadena vacía: el texto de la interfaz lo pone cada vista.
+  ipcMain.handle('get-ygg-ip', () => getYggstackAddress() || '');
 
   // Devuelve estadísticas de red para la sección Conexión de Settings
   ipcMain.handle('get-network-stats', async () => {

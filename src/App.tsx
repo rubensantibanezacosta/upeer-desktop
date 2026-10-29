@@ -157,7 +157,7 @@ export default function App() {
         void bootstrap();
 
         window.upeer.getMyNetworkAddress().then((addr: string) => {
-            if (addr && addr !== 'No detectado') {
+            if (addr) {
                 setYggAddress(addr);
                 setNetworkStatus('up');
                 setFirstConnect(false);
