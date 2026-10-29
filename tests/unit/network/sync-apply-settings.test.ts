@@ -168,4 +168,18 @@ describe('applySyncEvent con ajustes', () => {
         expect(await applySyncEvent(event({ block: 'chat', chatId: 'grp-8', pinned: false }, 6_000), win)).toBe(false);
         expect(win.webContents.send).toHaveBeenCalledTimes(1);
     });
+
+    it('un destacado llegado de otro dispositivo se reenvía al renderer', async () => {
+        const { applySyncEvent } = await import('../../../src/main_process/network/sync/apply.js');
+        const win = windowDouble();
+
+        const applied = await applySyncEvent(event({ block: 'message', messageId: 'm1', starred: true }, 8_000), win);
+
+        expect(applied).toBe(true);
+        expect(win.webContents.send).toHaveBeenCalledWith('settings-updated', {
+            block: 'message',
+            entity: 'message:m1',
+            values: { messageId: 'm1', starred: true },
+        });
+    });
 });

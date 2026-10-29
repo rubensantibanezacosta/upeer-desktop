@@ -221,6 +221,10 @@ export default function App() {
                     if (chatId) useChatActionsStore.getState().applyRemoteChat(chatId, values);
                     return;
                 }
+                if (block === 'message') {
+                    useChatActionsStore.getState().applyRemoteMessage(values);
+                    return;
+                }
                 hydrateNotificationPrefs().catch((cause: unknown) => {
                     console.warn('No se pudieron releer las preferencias de notificación sincronizadas.', cause);
                 });

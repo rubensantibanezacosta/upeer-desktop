@@ -227,7 +227,7 @@ function applySettingsValues(patch: SettingsPatch, occurredAt: number): Settings
         applyRetentionFromSync(chatId, retention, occurredAt);
         return { chatId, retention };
     }
-    if (patch.block === 'chat') {
+    if (patch.block === 'chat' || patch.block === 'message') {
         setSettingsClock(patch.entity, occurredAt);
         return { ...patch.values };
     }

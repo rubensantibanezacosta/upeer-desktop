@@ -25,6 +25,7 @@ interface ChatActionsState {
     clearChat: (id: string, kind: 'contact' | 'group') => void;
     markAllRead: () => void;
     applyRemoteChat: (chatId: string, values: Record<string, unknown>) => void;
+    applyRemoteMessage: (values: Record<string, unknown>) => void;
 }
 
 const emptyPrefs: ChatActionPrefs = { archived: false, muted: false, pinned: false, unread: false };
@@ -34,11 +35,22 @@ const CHAT_KEYS: ReadonlyArray<keyof ChatActionPrefs> = ['archived', 'muted', 'p
 const isGroupChat = (id: string): boolean => id.startsWith('grp-');
 
 function emitChatFlags(chatId: string, prefs: ChatActionPrefs): void {
+    emitSettingsPatch({ block: 'chat', chatId, ...prefs }, 'No se pudieron compartir los ajustes del chat.');
+}
+
+function emitMessageFlags(messageId: string, prefs: MessageActionPrefs): void {
+    emitSettingsPatch(
+        { block: 'message', messageId, starred: prefs.starred, pinned: prefs.pinned },
+        'No se pudieron compartir los destacados del mensaje.',
+    );
+}
+
+function emitSettingsPatch(payload: Record<string, unknown>, message: string): void {
     if (typeof window === 'undefined') return;
     const emit = window.upeer?.emitSettingsPatch;
     if (typeof emit !== 'function') return;
-    emit({ block: 'chat', chatId, ...prefs }).catch((cause: unknown) => {
-        console.warn('No se pudieron compartir los ajustes del chat.', cause);
+    emit(payload).catch((cause: unknown) => {
+        console.warn(message, cause);
     });
 }
 
@@ -71,12 +83,18 @@ export const useChatActionsStore = create<ChatActionsState>()(
                 set({ groupPrefs });
                 emitChatFlags(id, groupPrefs[id] ?? { ...emptyPrefs });
             },
-            toggleMessage: (id, key) => set((state) => ({ messagePrefs: toggleMessage(state.messagePrefs, id, key) })),
-            setMessageFlag: (id, key, value) => set((state) => {
-                const current = state.messagePrefs[id] || { ...emptyMessagePrefs };
-                if (current[key] === value) return state;
-                return { messagePrefs: { ...state.messagePrefs, [id]: { ...current, [key]: value } } };
-            }),
+            toggleMessage: (id, key) => {
+                const messagePrefs = toggleMessage(get().messagePrefs, id, key);
+                set({ messagePrefs });
+                emitMessageFlags(id, messagePrefs[id] ?? { ...emptyMessagePrefs });
+            },
+            setMessageFlag: (id, key, value) => {
+                const current = get().messagePrefs[id] || { ...emptyMessagePrefs };
+                if (current[key] === value) return;
+                const next = { ...current, [key]: value };
+                set({ messagePrefs: { ...get().messagePrefs, [id]: next } });
+                emitMessageFlags(id, next);
+            },
             clearChat: (id, kind) => {
                 const prefs = kind === 'contact' ? get().contactPrefs : get().groupPrefs;
                 const next = { ...prefs };
@@ -107,6 +125,18 @@ export const useChatActionsStore = create<ChatActionsState>()(
                     return;
                 }
                 set({ contactPrefs: { ...get().contactPrefs, [chatId]: merged } });
+            },
+            applyRemoteMessage: (values) => {
+                const messageId = typeof values.messageId === 'string' ? values.messageId.trim() : '';
+                if (!messageId) return;
+                const current = get().messagePrefs[messageId] ?? emptyMessagePrefs;
+                const merged: MessageActionPrefs = { ...current };
+                for (const key of ['starred', 'pinned'] as const) {
+                    const candidate = values[key];
+                    if (typeof candidate === 'boolean') merged[key] = candidate;
+                }
+                if (merged.starred === current.starred && merged.pinned === current.pinned) return;
+                set({ messagePrefs: { ...get().messagePrefs, [messageId]: merged } });
             },
         }),
         { name: 'chat-actions-prefs' }

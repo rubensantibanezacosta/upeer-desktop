@@ -75,9 +75,26 @@ describe('settings-sync', () => {
     it('solo los bloques del renderer se pueden empujar desde la interfaz', async () => {
         const { isRendererBlock } = await import('../../../src/main_process/storage/sync/settings-sync.js');
         expect(isRendererBlock('chat')).toBe(true);
+        expect(isRendererBlock('message')).toBe(true);
         expect(isRendererBlock('privacy')).toBe(false);
         expect(isRendererBlock('retention')).toBe(false);
         expect(isRendererBlock('appearance')).toBe(false);
+    });
+
+    it('los destacados de un mensaje son su propia entidad', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'message', messageId: ' m1 ', starred: true, chatId: 'x' })).toEqual({
+            block: 'message',
+            entity: 'message:m1',
+            values: { messageId: 'm1', starred: true },
+        });
+    });
+
+    it('un parche de mensaje sin banderas ni id no vale', async () => {
+        const { sanitizeSettingsPatch } = await import('../../../src/main_process/storage/sync/settings-sync.js');
+        expect(sanitizeSettingsPatch({ block: 'message', messageId: 'm1' })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'message', starred: true })).toBeNull();
+        expect(sanitizeSettingsPatch({ block: 'message', messageId: '', starred: true })).toBeNull();
     });
 
     it('rechaza un bloque desconocido', async () => {

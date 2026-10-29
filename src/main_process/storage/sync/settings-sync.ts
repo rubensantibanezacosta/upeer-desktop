@@ -1,7 +1,7 @@
 import { getAppSetting, setAppSetting } from '../settings-operations.js';
 import { resolveRetentionId } from '../../../utils/retention.js';
 
-export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat';
+export type SettingsBlock = 'privacy' | 'notifications' | 'retention' | 'chat' | 'message';
 
 export type SettingsValues = Record<string, boolean | string>;
 
@@ -15,19 +15,27 @@ const CLOCK_KEY = 'settings-sync-clock';
 
 const MAX_ID_LENGTH = 200;
 
-const BOOLEAN_FIELDS: Record<'privacy' | 'notifications', readonly string[]> = {
+const BOOLEAN_BLOCKS: Record<string, readonly string[]> = {
     privacy: ['readReceipts', 'shareActivity'],
     notifications: ['messages', 'requests', 'sound'],
+    chat: ['archived', 'muted', 'pinned', 'unread'],
+    message: ['starred', 'pinned'],
 };
 
-const CHAT_FIELDS = ['archived', 'muted', 'pinned', 'unread'] as const;
+const ID_FIELD: Record<string, string> = {
+    retention: 'chatId',
+    chat: 'chatId',
+    message: 'messageId',
+};
+
+const BLOCKS: readonly SettingsBlock[] = ['privacy', 'notifications', 'retention', 'chat', 'message'];
 
 export function isSettingsBlock(value: unknown): value is SettingsBlock {
-    return value === 'privacy' || value === 'notifications' || value === 'retention' || value === 'chat';
+    return typeof value === 'string' && (BLOCKS as readonly string[]).includes(value);
 }
 
 export function isRendererBlock(value: unknown): boolean {
-    return value === 'chat';
+    return value === 'chat' || value === 'message';
 }
 
 export function cleanId(value: unknown): string | null {
@@ -38,8 +46,9 @@ export function cleanId(value: unknown): string | null {
 
 export function settingsEntity(block: unknown, payload: Record<string, unknown>): string {
     if (!isSettingsBlock(block)) return '';
-    if (block === 'privacy' || block === 'notifications') return block;
-    const id = cleanId(payload.chatId);
+    const idField = ID_FIELD[block];
+    if (!idField) return block;
+    const id = cleanId(payload[idField]);
     return id ? `${block}:${id}` : '';
 }
 
@@ -56,24 +65,18 @@ export function sanitizeSettingsPatch(payload: Record<string, unknown>): Setting
         return { block, entity, values: { chatId, retention } };
     }
 
-    if (block === 'chat') {
-        const chatId = cleanId(payload.chatId);
-        if (!chatId) return null;
-        const values: SettingsValues = { chatId };
-        for (const field of CHAT_FIELDS) {
-            const candidate = payload[field];
-            if (typeof candidate === 'boolean') values[field] = candidate;
-        }
-        if (Object.keys(values).length === 1) return null;
-        return { block, entity, values };
-    }
-
+    const idField = ID_FIELD[block];
     const values: SettingsValues = {};
-    for (const field of BOOLEAN_FIELDS[block]) {
+    if (idField) {
+        const id = cleanId(payload[idField]);
+        if (!id) return null;
+        values[idField] = id;
+    }
+    for (const field of BOOLEAN_BLOCKS[block]) {
         const candidate = payload[field];
         if (typeof candidate === 'boolean') values[field] = candidate;
     }
-    if (Object.keys(values).length === 0) return null;
+    if (Object.keys(values).length === (idField ? 1 : 0)) return null;
     return { block, entity, values };
 }
 
