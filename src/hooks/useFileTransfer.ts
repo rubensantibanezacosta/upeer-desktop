@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useChatStore } from '../store/useChatStore';
 import { aggregateTransfers, buildTransferError, formatTransferFileSize, formatTransferProgress } from './fileTransferSupport.js';
 import { registerFileTransferListeners } from './useFileTransferListeners.js';
 import type { FileTransfer, SaveFileParams, StartTransferParams, TransferProgress, TransferStateUpdate } from './fileTransferTypes.js';
@@ -97,7 +98,7 @@ export function useFileTransfer(
     });
   }, [loadTransfers, updateTransferProgress]);
 
-  const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string }> => {
+  const startTransfer = async (params: StartTransferParams): Promise<{ success: boolean; fileId?: string; error?: string; self?: boolean }> => {
     try {
       const result = await window.upeer.startFileTransfer(
         params.upeerId,
@@ -110,6 +111,9 @@ export function useFileTransfer(
 
       if (result.success) {
         await loadTransfers();
+        if (result.self) {
+          await useChatStore.getState().setTargetUpeerId(params.upeerId);
+        }
       }
 
       return result;

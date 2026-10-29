@@ -10,7 +10,7 @@ type FileDialogFilter = {
 };
 
 interface FileTransferApi {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; isVoiceNote?: boolean; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string; self?: boolean }>;
 }
 
 export function useFilePersistence(fileTransfer: FileTransferApi) {
@@ -161,10 +161,10 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
                 caption: captions?.[i],
                 fileName: file.name
             });
-            if (result.success && result.fileId) {
+            if (result.success && result.fileId && !result.self) {
                 const tempHash = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                 addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, tempHash, thumbnails?.[i] || '', captions?.[i] || '', true);
-            } else {
+            } else if (!result.success) {
                 console.error('Error al iniciar la transferencia de archivo', { file: file.name, error: result });
             }
         }
@@ -207,7 +207,9 @@ export function useFilePersistence(fileTransfer: FileTransferApi) {
         });
 
         if (result.success && result.fileId) {
-            addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, result.fileId, '', '', true, finalPath, true, 'pending');
+            if (!result.self) {
+                addFileTransferMessage(effectiveId, result.fileId, file.name, file.size, file.type, result.fileId, '', '', true, finalPath, true, 'pending');
+            }
             return;
         }
         throw new Error(result.error || 'No se pudo iniciar el envío de la nota de voz');

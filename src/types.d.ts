@@ -189,7 +189,7 @@ declare global {
             }>;
             persistSelectedFile: (file: File) => Promise<{ success: boolean; path?: string; error?: string }>;
             getPathForFile: (file: File) => string;
-            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean, fileName?: string) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+            startFileTransfer: (upeerId: string, filePath: string, thumbnail?: string, caption?: string, isVoiceNote?: boolean, fileName?: string) => Promise<{ success: boolean; fileId?: string; error?: string; self?: boolean }>;
             cancelFileTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
             retryFileTransfer: (fileId: string) => Promise<{ success: boolean; error?: string }>;
             getFileTransfers: () => Promise<{ success: boolean; transfers?: UpeerTransfer[] | Record<string, UpeerTransfer>; error?: string }>;

@@ -8,7 +8,7 @@ type FileDialogFilter = {
 };
 
 type FileTransferType = {
-    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string }>;
+    startTransfer: (params: { upeerId: string; filePath: string; thumbnail?: string; caption?: string; fileName?: string }) => Promise<{ success: boolean; fileId?: string; error?: string; self?: boolean }>;
     cancelTransfer: (fileId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
 };
 
@@ -92,8 +92,7 @@ export const useFileTransferHandlers = ({
                     fileName: file.name
                 });
 
-                if (result.success && result.fileId) {
-                    // Add a file transfer message to the chat
+                if (result.success && result.fileId && !result.self) {
                     const tempHash = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                     addFileTransferMessage(
                         targetUpeerId,
@@ -107,7 +106,7 @@ export const useFileTransferHandlers = ({
                         true,
                         file.path
                     );
-                } else {
+                } else if (!result.success) {
                     console.error('Failed to start transfer for', file.name, ':', result.error);
                 }
             } catch (error) {

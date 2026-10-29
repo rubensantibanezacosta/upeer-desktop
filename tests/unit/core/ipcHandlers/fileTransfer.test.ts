@@ -169,4 +169,37 @@ describe('start-file-transfer multi-send a grupo', () => {
         expect(result.success).toBe(false);
         expect(startSend).not.toHaveBeenCalled();
     });
+
+    it('guarda el adjunto en la conversación propia sin contactos ni red', async () => {
+        vi.mocked(getGroupById).mockReturnValue(null);
+        vi.mocked(getMyUPeerId).mockReturnValue('self-id');
+        vi.mocked(getContactByUpeerId).mockResolvedValue(undefined);
+
+        const handler = getHandler('start-file-transfer');
+        const result = await handler({}, {
+            upeerId: 'SELF-ID',
+            filePath: '/home/user/.config/upeer/assets/foto.png',
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.fileId).toEqual(expect.any(String));
+        expect(startSend).not.toHaveBeenCalled();
+        expect(saveFileMessage).toHaveBeenCalledWith(
+            result.fileId,
+            'SELF-ID',
+            true,
+            'foto.png',
+            result.fileId,
+            2048,
+            'image/png',
+            '/home/user/.config/upeer/assets/foto.png',
+            undefined,
+            'read',
+            'self-id',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+        );
+    });
 });

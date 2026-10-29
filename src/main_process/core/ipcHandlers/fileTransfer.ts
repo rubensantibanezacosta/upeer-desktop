@@ -88,6 +88,31 @@ export function registerFileTransferHandlers(): void {
         return { success: true, fileId: messageId };
       }
 
+      const myId = getMyUPeerId();
+      if (upeerId.toLowerCase() === myId.toLowerCase()) {
+        const messageId = crypto.randomUUID();
+        const stats = await fs.stat(resolvedSrc);
+        const mimeType = fileTransferManager.validator.detectMimeType(resolvedSrc);
+        await saveFileMessage(
+          messageId,
+          upeerId,
+          true,
+          fileName || path.basename(resolvedSrc),
+          messageId,
+          stats.size,
+          mimeType,
+          resolvedSrc,
+          undefined,
+          'read',
+          myId,
+          undefined,
+          thumbnail,
+          caption,
+          isVoiceNote
+        );
+        return { success: true, fileId: messageId, self: true };
+      }
+
       const contact = await getContactByUpeerId(upeerId);
       if (!contact || !['connected', 'offline', 'disconnected'].includes(contact.status)) {
         return { success: false, error: 'Contact is not available for file transfer' };
