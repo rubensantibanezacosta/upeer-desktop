@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carryHistoryCursor } from '../../../src/main_process/network/sync/historyCursor.js';
+import { carryHistoryCursor, earliestCursor } from '../../../src/main_process/network/sync/historyCursor.js';
 
 describe('Sync history cursor carry over', () => {
     it('advances to the cursor of the served page', () => {
@@ -15,5 +15,20 @@ describe('Sync history cursor carry over', () => {
     it('stays empty while nothing has been synchronised', () => {
         expect(carryHistoryCursor(null, null)).toBeNull();
         expect(carryHistoryCursor('', undefined)).toBeNull();
+    });
+
+    it('no retrocede cuando el cursor propio va por delante', () => {
+        expect(earliestCursor('1600000000000:a', '1700000000000:b')).toBe('1600000000000:a');
+        expect(earliestCursor('1700000000000:b', '1600000000000:a')).toBe('1600000000000:a');
+    });
+
+    it('con la misma marca manda el identificador menor', () => {
+        expect(earliestCursor('1700000000000:b', '1700000000000:a')).toBe('1700000000000:a');
+        expect(earliestCursor('1700000000000:a', '1700000000000:b')).toBe('1700000000000:a');
+    });
+
+    it('si solo hay un cursor, ese manda', () => {
+        expect(earliestCursor(null, '1700000000000:b')).toBe('1700000000000:b');
+        expect(earliestCursor('1700000000000:b', null)).toBe('1700000000000:b');
     });
 });

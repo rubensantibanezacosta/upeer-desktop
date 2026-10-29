@@ -13,7 +13,7 @@ import { sendEncryptedSync } from './transport.js';
 import { parseCertificate } from '../../security/deviceCertificate.js';
 import { SYNC_EVENT_KINDS, type SyncPlainEvent } from './types.js';
 import { forgetHistoryWork, parsePendingCount, recordHistoryComplete, recordHistoryPage, recordHistoryServed, resetServedHistory } from './historyProgress.js';
-import { carryHistoryCursor } from './historyCursor.js';
+import { carryHistoryCursor, earliestCursor } from './historyCursor.js';
 
 const HISTORY_PAGE_SIZE = 50;
 const inFlight = new Set<string>();
@@ -89,6 +89,7 @@ export async function applySyncHistoryResponse(
     win: BrowserWindow | null,
 ): Promise<void> {
     recordHistoryPage(peer.deviceId, payload.entries.length, parsePendingCount(payload.pending));
+    let processed = peer.historyCursor;
     for (const raw of payload.entries) {
         const entry = toSyncEvent(raw);
         if (!entry) continue;
@@ -105,16 +106,33 @@ export async function applySyncHistoryResponse(
             direction: 'inbound',
             appliedAt: now,
         });
-        if (recorded) await applySyncEvent({ ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId }, win);
+        const applied = recorded
+            ? await applySyncEvent({ ...entry, originDeviceId: entry.originDeviceId ?? peer.deviceId }, win)
+            : true;
+        if (!applied) continue;
+        processed = entryCursor(entry, processed);
     }
-    const nextCursor = carryHistoryCursor(payload.nextCursor, peer.historyCursor);
-    updateSyncPeerHistory(peer.deviceId, nextCursor, payload.done);
-    if (payload.done || !nextCursor) recordHistoryComplete(peer.deviceId);
-    if (!payload.done && nextCursor) {
+    const senderCursor = payload.nextCursor;
+    const nextCursor = earliestCursor(senderCursor, processed);
+    const caughtUp = senderCursor === null || nextCursor === senderCursor;
+    const complete = payload.done && caughtUp;
+    updateSyncPeerHistory(peer.deviceId, nextCursor, complete);
+    if (complete || !nextCursor) recordHistoryComplete(peer.deviceId);
+    if (!complete && nextCursor) {
         const { getSyncPeer } = await import('../../storage/sync/peers.js');
         const refreshed = getSyncPeer(peer.deviceId);
         if (refreshed) await requestSyncHistory(refreshed);
     }
+}
+
+
+function entryCursor(entry: SyncPlainEvent, previous: string | null): string | null {
+    if (entry.kind !== 'MESSAGE_UPSERT') return previous;
+    const timestamp = entry.payload.timestamp;
+    const id = entry.payload.id;
+    if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return previous;
+    if (typeof id !== 'string' || !id) return previous;
+    return `${timestamp}:${id}`;
 }
 
 function toSyncEvent(value: unknown): SyncPlainEvent | null {
