@@ -3,6 +3,7 @@ import { Box } from '@mui/joy';
 import { IconButton } from '@mui/joy';
 import { Check, CheckCheck, Clock, RotateCcw, CloudUpload } from 'lucide-react';
 import { useChatStore } from '../../../store/useChatStore.js';
+import { messageStatusIconKind, messageStatusIsRead } from '../messageStatusIcon.js';
 
 interface MessageStatusProps {
     status: string;
@@ -47,8 +48,8 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, messageId,
         );
     }
 
-    const isRead = status === 'read';
-    const isSingleCheck = status === 'sent' || status === 'vaulted';
+    const isRead = messageStatusIsRead(status);
+    const isSingleCheck = messageStatusIconKind(status) === 'sent';
     const Icon = isSingleCheck ? Check : CheckCheck;
     const readableStatus = isRead ? 'leído' : isSingleCheck ? 'enviado' : 'entregado';
     return (

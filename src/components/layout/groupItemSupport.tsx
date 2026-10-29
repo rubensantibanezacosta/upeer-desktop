@@ -7,6 +7,7 @@ import { highlightText } from '../../utils/highlightText.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
 import { reactionPreviewText } from '../../features/chat/reactionPreview.js';
+import { messageStatusIconKind, messageStatusIsRead } from '../../features/chat/messageStatusIcon.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 import { listRowAvatarSx } from './listRowMetrics.js';
 
@@ -31,18 +32,20 @@ export const GroupItemStatusIcon: React.FC<{ group: Group }> = ({ group }) => {
     if (group.latestReaction || !group.lastMessageIsMine || !group.lastMessage) {
         return null;
     }
-    if (group.lastMessageStatus === 'failed') {
+    const kind = messageStatusIconKind(group.lastMessageStatus);
+    if (kind === 'failed') {
         return <CircleAlert style={{ fontSize: 16, color: 'var(--joy-palette-danger-500)' }} />;
     }
-    if (group.lastMessageStatus === 'sent' || group.lastMessageStatus === 'vaulted') {
+    if (kind === 'sent') {
         return <Check style={{ fontSize: 16, opacity: 0.7 }} />;
     }
+    const isRead = messageStatusIsRead(group.lastMessageStatus);
     return (
         <CheckCheck
             style={{
                 fontSize: 16,
-                color: group.lastMessageStatus === 'read' ? '#53bdeb' : 'inherit',
-                opacity: group.lastMessageStatus === 'read' ? 1 : 0.7,
+                color: isRead ? '#53bdeb' : 'inherit',
+                opacity: isRead ? 1 : 0.7,
             }}
         />
     );

@@ -7,6 +7,7 @@ import type { Contact } from '../../types/chat.js';
 import { getContactCardSummary } from '../../features/chat/message/messageItemSupport.js';
 import { systemPreviewText } from '../../features/chat/chatAreaSupport.js';
 import { reactionPreviewText } from '../../features/chat/reactionPreview.js';
+import { messageStatusIconKind, messageStatusIsRead } from '../../features/chat/messageStatusIcon.js';
 import { formatMessageTime } from '../../utils/dateTime.js';
 
 const parseJsonMessage = (message: string) => {
@@ -93,18 +94,20 @@ export const renderMessageStatusIcon = (contact: Contact) => {
     if (contact.latestReaction || !contact.lastMessageIsMine) {
         return null;
     }
-    if (contact.lastMessageStatus === 'failed') {
+    const kind = messageStatusIconKind(contact.lastMessageStatus);
+    if (kind === 'failed') {
         return <CircleAlert style={{ fontSize: 16, color: 'var(--joy-palette-danger-500)' }} />;
     }
-    if (contact.lastMessageStatus === 'sent' || contact.lastMessageStatus === 'vaulted') {
+    if (kind === 'sent') {
         return <Check style={{ fontSize: 16, opacity: 0.7 }} />;
     }
+    const isRead = messageStatusIsRead(contact.lastMessageStatus);
     return (
         <CheckCheck
             style={{
                 fontSize: 16,
-                color: contact.lastMessageStatus === 'read' ? '#53bdeb' : 'inherit',
-                opacity: contact.lastMessageStatus === 'read' ? 1 : 0.7,
+                color: isRead ? '#53bdeb' : 'inherit',
+                opacity: isRead ? 1 : 0.7,
             }}
         />
     );
