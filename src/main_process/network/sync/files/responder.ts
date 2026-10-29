@@ -102,7 +102,7 @@ async function serveOnce(peer: SyncPeerRecord, request: SyncFileRequest): Promis
             const sent = await sendEncryptedSync(peer, FILE_CHUNK, {
                 requestId: request.requestId,
                 index,
-                data: buffer.toString('hex'),
+                data: buffer.toString('base64'),
             });
             if (!sent) {
                 warn('Enlace de sincronización cortado sirviendo un adjunto', { fileId: request.fileId, index }, 'sync');

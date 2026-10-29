@@ -29,7 +29,8 @@ export type SyncFileChunk = {
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const FILE_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
-const HEX_PATTERN = /^[0-9a-fA-F]+$/;
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+const MAX_ENCODED_SIZE = Math.ceil(FILE_CHUNK_SIZE / 3) * 4;
 
 export function isSyncFileType(type: unknown): boolean {
     return type === FILE_REQ || type === FILE_RES || type === FILE_CHUNK;
@@ -69,8 +70,8 @@ export function parseFileChunk(value: Record<string, unknown>): SyncFileChunk | 
     const index = value.index;
     if (typeof index !== 'number' || !Number.isSafeInteger(index) || index < 0) return null;
     const data = value.data;
-    if (typeof data !== 'string' || data.length === 0 || data.length > FILE_CHUNK_SIZE * 2) return null;
-    if (data.length % 2 !== 0 || !HEX_PATTERN.test(data)) return null;
+    if (typeof data !== 'string' || data.length === 0 || data.length > MAX_ENCODED_SIZE) return null;
+    if (data.length % 4 !== 0 || !BASE64_PATTERN.test(data)) return null;
     return { requestId, index, data };
 }
 

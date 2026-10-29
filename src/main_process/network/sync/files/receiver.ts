@@ -78,7 +78,7 @@ async function writeIntoReceipt(receipt: OpenReceipt, chunk: SyncFileChunk, win:
     }
     const offset = chunk.index * receipt.chunkSize;
     const expected = Math.min(receipt.chunkSize, receipt.fileSize - offset);
-    const buffer = Buffer.from(chunk.data, 'hex');
+    const buffer = Buffer.from(chunk.data, 'base64');
     if (buffer.length !== expected) {
         warn('Tramo de adjunto con longitud inesperada', { requestId: chunk.requestId, index: chunk.index, size: buffer.length }, 'sync');
         await dropReceipt(chunk.requestId);
@@ -106,7 +106,7 @@ async function writeIntoReceipt(receipt: OpenReceipt, chunk: SyncFileChunk, win:
 function stashEarlyChunk(chunk: SyncFileChunk): void {
     const store = early.get(chunk.requestId) ?? new Map<number, Buffer>();
     if (store.size >= MAX_EARLY_CHUNKS) return;
-    store.set(chunk.index, Buffer.from(chunk.data, 'hex'));
+    store.set(chunk.index, Buffer.from(chunk.data, 'base64'));
     early.set(chunk.requestId, store);
 }
 
@@ -122,7 +122,7 @@ export async function flushEarlyChunks(requestId: string, win: BrowserWindow | n
     if (store.size === 0) return null;
     const ordered = Array.from(store.entries()).sort((left, right) => left[0] - right[0]);
     for (const [index, data] of ordered) {
-        const chunk: SyncFileChunk = { requestId, index, data: data.toString('hex') };
+        const chunk: SyncFileChunk = { requestId, index, data: data.toString('base64') };
         const done = await writeSyncFileChunk(chunk, win);
         if (done) return done;
         if (!receipts.has(requestId)) return null;
