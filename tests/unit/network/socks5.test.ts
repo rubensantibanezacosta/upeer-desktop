@@ -3,12 +3,13 @@ import net from 'node:net';
 import { EventEmitter } from 'node:events';
 import { parseIPv6ToBuffer, encodeFrame, socks5Connect } from '../../../src/main_process/network/server/socks5.js';
 
-type MockSocket = EventEmitter & Pick<net.Socket, 'write' | 'setTimeout' | 'destroy'>;
+type MockSocket = EventEmitter & Pick<net.Socket, 'write' | 'setTimeout' | 'setNoDelay' | 'destroy'>;
 
 function createMockSocket(): MockSocket {
     const socket = new EventEmitter() as MockSocket;
     socket.write = vi.fn();
     socket.setTimeout = vi.fn();
+    socket.setNoDelay = vi.fn();
     socket.destroy = vi.fn();
     return socket;
 }

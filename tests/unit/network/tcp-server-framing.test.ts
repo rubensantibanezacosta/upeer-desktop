@@ -7,6 +7,8 @@ type MockSocket = {
     remotePort: number;
     on: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
+    setNoDelay: ReturnType<typeof vi.fn>;
+    setKeepAlive: ReturnType<typeof vi.fn>;
     emitData: (chunk: Buffer) => Promise<void>;
 };
 
@@ -140,6 +142,8 @@ function createMockSocket(): MockSocket {
             handlers.set(event, handler);
         }),
         destroy: vi.fn(),
+        setNoDelay: vi.fn(),
+        setKeepAlive: vi.fn(),
         emitData: async (chunk: Buffer) => {
             const handler = handlers.get('data');
             if (handler) await handler(chunk);

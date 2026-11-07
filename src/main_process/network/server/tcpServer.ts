@@ -45,6 +45,10 @@ export function startUDPServer(win: BrowserWindow) {
         // El remoteAddress puede ser 127.0.0.1 (yggstack forward).
         // La dirección real del peer viene firmada dentro del paquete (senderYggAddress).
         const peerHint = socket.remoteAddress || '127.0.0.1';
+        // Cada tramo de fichero es un frame: sin esto espera al temporizador de Nagle y el retardo
+        // se acumula a lo largo de los ~140 tramos de un vídeo. En chat/control no cuesta nada.
+        socket.setNoDelay(true);
+        socket.setKeepAlive(true);
         let frameBuf = Buffer.alloc(0);
 
         socket.on('data', async (chunk: Buffer) => {

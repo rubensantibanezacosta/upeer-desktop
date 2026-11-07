@@ -35,6 +35,9 @@ export function socks5Connect(host: string, port: number): Promise<net.Socket> {
         let state: 'greeting' | 'connect' = 'greeting';
         let buf = Buffer.alloc(0);
 
+        // Las conexiones de fichero agrupan muchos tramos por este socket: sin NoDelay cada frame
+        // pequeño espera al temporizador de Nagle.
+        socket.setNoDelay(true);
         socket.setTimeout(8000);
         socket.on('timeout', () => {
             socket.destroy();
