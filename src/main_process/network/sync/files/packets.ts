@@ -75,6 +75,44 @@ export function parseFileChunk(value: Record<string, unknown>): SyncFileChunk | 
     return { requestId, index, data };
 }
 
+/** Varios tramos por frame: el móvil los agrupa para no pagar una vuelta de ratchet por tramo. */
+export const FILE_CHUNK_BATCH_LIMIT = 8;
+const MAX_BATCH_ENCODED = 2 * 1024 * 1024;
+
+/**
+ * Deshace un frame de fichero en tramos sueltos.
+ *
+ * Acepta el formato de siempre (`data`, un tramo) y el agrupado (`batch`) que manda el móvil desde el
+ * 08/11. Devolver una lista en los dos casos deja al receptor igual: sigue escribiendo por índice y
+ * admitiendo huecos. Sin esto, un lote del móvil llegaría al escritorio como frame sin `data` y se
+ * descartaría en silencio.
+ */
+export function parseFileChunks(value: Record<string, unknown>): SyncFileChunk[] {
+    const batch = value.batch;
+    if (batch === undefined) {
+        const single = parseFileChunk(value);
+        return single ? [single] : [];
+    }
+    if (!Array.isArray(batch) || batch.length === 0 || batch.length > FILE_CHUNK_BATCH_LIMIT) return [];
+    const requestId = value.requestId;
+    if (typeof requestId !== 'string' || !ID_PATTERN.test(requestId)) return [];
+    const chunks: SyncFileChunk[] = [];
+    let encodedBytes = 0;
+    for (const item of batch) {
+        if (typeof item !== 'object' || item === null) return [];
+        const entry = item as Record<string, unknown>;
+        const index = entry.index;
+        if (typeof index !== 'number' || !Number.isSafeInteger(index) || index < 0) return [];
+        const data = entry.data;
+        if (typeof data !== 'string' || data.length === 0 || data.length > MAX_ENCODED_SIZE) return [];
+        if (data.length % 4 !== 0 || !BASE64_PATTERN.test(data)) return [];
+        encodedBytes += data.length;
+        if (encodedBytes > MAX_BATCH_ENCODED) return [];
+        chunks.push({ requestId, index, data });
+    }
+    return chunks;
+}
+
 function validSize(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= FILE_MAX_BYTES;
 }

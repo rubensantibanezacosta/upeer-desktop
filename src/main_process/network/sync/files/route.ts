@@ -4,7 +4,7 @@ import { warn } from '../../../security/secure-logger.js';
 import { getSyncPeer } from '../../../storage/sync/peers.js';
 import { getMySyncIdentity } from '../auth.js';
 import { decryptPayload, type SyncPacket } from '../payloads.js';
-import { FILE_CHUNK, FILE_REQ, FILE_RES, isSyncFileType, parseFileChunk, parseFileRequest, parseFileResponse } from './packets.js';
+import { FILE_CHUNK, FILE_REQ, FILE_RES, isSyncFileType, parseFileChunks, parseFileRequest, parseFileResponse } from './packets.js';
 import { flushEarlyChunks, openSyncFileReceipt, writeSyncFileChunk } from './receiver.js';
 import { completeSyncFileRequest, discardSyncFileRequest, logUnavailableRequest, notifyUnavailable } from './request.js';
 import { serveSyncFile } from './responder.js';
@@ -44,10 +44,14 @@ export async function routeSyncFilePacket(
         return true;
     }
     if (type === FILE_CHUNK) {
-        const chunk = parseFileChunk(payload);
-        if (!chunk) return true;
-        const completedFileId = await writeSyncFileChunk(chunk, win);
-        if (completedFileId) completeSyncFileRequest(completedFileId);
+        // Un frame puede traer varios tramos (`batch`) o uno solo (`data`).
+        for (const chunk of parseFileChunks(payload)) {
+            const completedFileId = await writeSyncFileChunk(chunk, win);
+            if (completedFileId) {
+                completeSyncFileRequest(completedFileId);
+                return true;
+            }
+        }
         return true;
     }
     warn('Paquete de fichero de sincronización sin tratamiento', { type }, 'sync');

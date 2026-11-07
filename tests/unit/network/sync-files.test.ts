@@ -4,8 +4,10 @@ import { chunkBounds, chunkCount } from '../../../src/main_process/network/sync/
 import { validateMessage } from '../../../src/main_process/security/validation.js';
 import {
     FILE_CHUNK_SIZE,
+    FILE_CHUNK_BATCH_LIMIT,
     isSyncFileType,
     parseFileChunk,
+    parseFileChunks,
     parseFileRequest,
     parseFileResponse,
 } from '../../../src/main_process/network/sync/files/packets.js';
@@ -99,5 +101,40 @@ describe('admisión de los paquetes del canal de adjuntos', () => {
 
     it('rechaza el paquete sin destinatario', () => {
         expect(validateMessage('SYNC_FILE_RES', { ...base, recipientDeviceId: undefined }).valid).toBe(false);
+    });
+});
+
+describe('varios tramos por frame', () => {
+    const requestId = 'abcdef123456';
+    const item = (index: number, data = 'AAAA') => ({ index, data });
+
+    it('deshace un lote en tramos con sus índices', () => {
+        const chunks = parseFileChunks({ requestId, batch: [item(4), item(5), item(6)] });
+
+        expect(chunks.map(c => c.index)).toEqual([4, 5, 6]);
+        expect(chunks.every(c => c.requestId === requestId)).toBe(true);
+    });
+
+    it('sigue aceptando el frame de un solo tramo', () => {
+        const chunks = parseFileChunks({ requestId, index: 2, data: 'AAAA' });
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0].index).toBe(2);
+    });
+
+    it('rechaza un lote con más tramos de los permitidos', () => {
+        const batch = Array.from({ length: FILE_CHUNK_BATCH_LIMIT + 1 }, (_, i) => item(i));
+        expect(parseFileChunks({ requestId, batch })).toEqual([]);
+    });
+
+    it('rechaza un lote vacío o con un índice inválido', () => {
+        expect(parseFileChunks({ requestId, batch: [] })).toEqual([]);
+        expect(parseFileChunks({ requestId, batch: [item(0), item(-1)] })).toEqual([]);
+        expect(parseFileChunks({ requestId, batch: [{ index: 0, data: 'no-es-base64!' }] })).toEqual([]);
+    });
+
+    it('sin datos válidos no inventa tramos', () => {
+        expect(parseFileChunks({ requestId })).toEqual([]);
+        expect(parseFileChunks({ batch: [item(0)] })).toEqual([]);
     });
 });
