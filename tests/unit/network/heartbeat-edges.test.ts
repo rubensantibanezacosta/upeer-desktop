@@ -12,6 +12,15 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     getContacts: vi.fn(() => []),
 }));
 
+vi.mock('../../../src/main_process/security/deviceMessaging.js', () => ({
+    buildMyDeviceHandshakeFields: vi.fn(() => ({
+        devicePublicKey: 'cc'.repeat(32),
+        deviceId: 'dd'.repeat(32),
+        deviceCertificate: 'cert-json',
+        deviceSignedPreKey: { spkPub: 'ee'.repeat(32), spkSig: 'ff'.repeat(64), spkId: 11 },
+    })),
+}));
+
 vi.mock('../../../src/main_process/security/secure-logger.js', () => ({
     warn: vi.fn(),
     network: vi.fn(),
@@ -165,6 +174,30 @@ describe('heartbeat edge cases', () => {
             .map((call) => call[1] as { type?: string; activeAt?: number })
             .find((packet) => packet.type === 'PING');
         expect(ping?.activeAt).toBeTypeOf('number');
+    });
+
+    it('anuncia el dispositivo en el PING para que el contacto pueda descifrar', async () => {
+        // Sin estos campos el receptor no puede completar el X3DH por dispositivo: su
+        // `deviceSignedPreKey` queda a NULL y el mensaje cifrado contra el dispositivo no
+        // descifra. El PING es la única vía rutinaria de anunciarlo junto al handshake.
+        const heartbeat = await import('../../../src/main_process/network/messaging/heartbeat.js');
+        const contactsOps = await import('../../../src/main_process/storage/contacts/operations.js');
+        const transport = await import('../../../src/main_process/network/server/transport.js');
+
+        vi.mocked(contactsOps.getContacts).mockReturnValue([] as never);
+
+        heartbeat.checkHeartbeat([
+            { upeerId: 'peer-device', status: 'connected', publicKey: 'aa'.repeat(32), address: '200::device' },
+        ]);
+        await Promise.resolve();
+
+        const ping = vi.mocked(transport.sendSecurePacket).mock.calls
+            .map((call) => call[1] as Record<string, unknown>)
+            .find((packet) => packet.type === 'PING');
+        expect(ping?.devicePublicKey).toBe('cc'.repeat(32));
+        expect(ping?.deviceId).toBe('dd'.repeat(32));
+        expect(ping?.deviceCertificate).toBe('cert-json');
+        expect(ping?.deviceSignedPreKey).toEqual({ spkPub: 'ee'.repeat(32), spkSig: 'ff'.repeat(64), spkId: 11 });
     });
 
     it('omite la hora de actividad cuando se deja de compartir', async () => {

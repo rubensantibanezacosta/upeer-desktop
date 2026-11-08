@@ -5,6 +5,7 @@ import {
     getMySignedPreKeyBundle,
     isSessionLocked,
 } from '../../security/identity.js';
+import { buildMyDeviceHandshakeFields } from '../../security/deviceMessaging.js';
 import { getContacts } from '../../storage/contacts/operations.js';
 import { warn, network } from '../../security/secure-logger.js';
 import { getDhtNetworkAddresses, generateSignedLocationBlock, getDeviceMetadata, isYggdrasilAddress } from '../utils.js';
@@ -106,6 +107,13 @@ export function checkHeartbeat(contacts: HeartbeatContact[]) {
                     alias: getMyAlias() || undefined,
                     avatar: getMyAvatar() || undefined,
                     signedPreKey: getMySignedPreKeyBundle(),
+                    // El PING es, junto al handshake, la única vía por la que el contacto
+                    // conoce nuestro dispositivo. Faltaban estos campos, así que
+                    // `parseDeviceHandshakeFields` devolvía null en el otro lado y su
+                    // `deviceSignedPreKey` quedaba a NULL: sin él no se puede completar el
+                    // X3DH por dispositivo y el mensaje cifrado contra el dispositivo no
+                    // descifra (el "escribiendo", que no pasa por el ratchet, sí llegaba).
+                    ...buildMyDeviceHandshakeFields(),
                     activeAt: activitySharingEnabled() ? localActiveAt() : undefined,
                 }, contact.publicKey);
             }
