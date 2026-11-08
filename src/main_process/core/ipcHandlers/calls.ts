@@ -38,9 +38,20 @@ export function registerCallHandlers(): void {
         if (change.phase === 'ended') {
             callFanoutPolicy.removeCall(change.callId);
             const session = callManager.get(change.callId);
+            // Una saliente que no llegó a conectarse y no la rechazó el otro extremo es una llamada
+            // perdida, sea cual sea el motivo: colgar a mano (`local-hangup`), que caduque el timbre
+            // (`no-answer`), no poder entregar (`error`), estar ocupado (`busy`) o que el otro cancele
+            // (`canceled`).
+            //
+            // Antes la lista tenía solo `no-answer`, `error`, `rejected` y `busy`, así que marcar a
+            // alguien que está **offline** y colgar no dejaba rastro: ni evento en el historial ni
+            // evento en el vault, porque `local-hangup` no estaba y nunca entraba la condición.
             const isMissedCall = change.direction === 'outgoing'
                 && change.connectedAt === undefined
-                && ['no-answer', 'error', 'rejected', 'busy'].includes(change.endReason ?? '');
+                && change.endReason !== 'rejected'
+                // Contestada en otro dispositivo de la misma cuenta: no es una llamada perdida y
+                // escribirla dejaría una fila falsa en este cada vez que se contesta desde el móvil.
+                && change.endReason !== 'answered-elsewhere';
             const isIncomingRejectedCall = change.direction === 'incoming' && change.endReason === 'rejected';
             if (session && !session.eventWritten && (change.connectedAt !== undefined || isMissedCall || isIncomingRejectedCall)) {
                 session.eventWritten = true;

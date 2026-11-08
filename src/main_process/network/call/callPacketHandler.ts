@@ -57,7 +57,10 @@ export function handleCallPacket(
 
     switch (type) {
         case 'CALL_OFFER': {
-            if (callManager.hasActiveWith(upeerId)) {
+            // Si esta misma oferta ya está viva aquí, el dispositivo ya la contestó o la está
+            // timbrando: no es una llamada nueva y contestar «ocupado» tiraría la del propio usuario.
+            // Con varios dispositivos de la misma cuenta todas las ofertas comparten `callId`.
+            if (!callManager.hasSessionWithCallId(callId) && callManager.hasActiveWith(upeerId)) {
                 sendCallBusy(upeerId, callId);
                 break;
             }

@@ -1,9 +1,27 @@
 import { getContactByUpeerId, isContactBlocked } from '../../storage/contacts/operations.js';
+import { info, warn } from '../../security/secure-logger.js';
+import { getDeviceIdentity } from '../../security/deviceIdentity.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { getVouchScore } from '../../security/reputation/vouches.js';
 import { sendSecurePacket } from '../server/transport.js';
 import { callManager } from './callManager.js';
+import { callRingTargets } from './multiDeviceRing.js';
 import type { CallMediaKind } from './callTypes.js';
+
+/**
+ * Identificador del dispositivo que contesta.
+ *
+ * Sin esto, dos dispositivos de la misma cuenta comparten `upeerId` y el llamante no sabe a cuál de
+ * ellos hay que mandar la media ni a cuál contestar el `CALL_END`. Es opcional en el paquete para no
+ * romper con un cliente anterior, que seguirá funcionando por cuenta como antes.
+ */
+export function myDeviceIdForCall(): string | undefined {
+    try {
+        return getDeviceIdentity()?.deviceId;
+    } catch {
+        return undefined;
+    }
+}
 
 type ResolvedPeer = {
     address: string;
@@ -27,20 +45,80 @@ function send(peerUpeerId: string, packet: Record<string, unknown>): boolean {
     return true;
 }
 
+/**
+ * Manda un paquete a **todas** las direcciones conocidas del contacto, no solo a la principal.
+ *
+ * `send()` resuelve una única dirección —`contact.address`, la última que se guardó— y con la cuenta
+ * abierta en móvil y portátil eso dejaba la llamada sonando en uno solo, elegido por el orden en que
+ * se habían visto las direcciones. Aquí se manda a todas y la sesión queda a la espera de que conteste
+ * la primera.
+ *
+ * Devuelve cuántas salieron: cero significa que no se alcanzó a nadie.
+ */
+function sendToAllDevices(peerUpeerId: string, packet: Record<string, unknown>): number {
+    const contact = getContactByUpeerId(peerUpeerId);
+    if (!contact) return 0;
+    const targets = callRingTargets(contact.address, contact.knownAddresses);
+    let sent = 0;
+    for (const address of targets) {
+        try {
+            sendSecurePacket(address, packet, contact.publicKey);
+            sent += 1;
+        } catch (cause) {
+            // Una dirección caída no puede impedir que suene en las demás.
+            warn('No se pudo ofrecer la llamada a un dispositivo del contacto', { upeerId: peerUpeerId, cause: String(cause) }, 'call');
+        }
+    }
+    return sent;
+}
+
 export async function sendCallOffer(peerUpeerId: string, kind: CallMediaKind): Promise<string> {
-    if (isContactBlocked(peerUpeerId) || !resolvePeer(peerUpeerId)) throw new Error('Contact unavailable');
+    if (isContactBlocked(peerUpeerId)) throw new Error('Contact unavailable');
+    if (!resolvePeer(peerUpeerId)) throw new Error('Contact unavailable');
     const session = callManager.create(peerUpeerId, kind, 'outgoing');
-    const sent = send(peerUpeerId, {
+    // La oferta va a todos los dispositivos del contacto: gana el que conteste antes y a los demás se
+    // les calla con `answered-elsewhere`. Antes iba a uno solo, elegido al azar.
+    const startedAt = Date.now();
+    const sent = sendToAllDevices(peerUpeerId, {
         type: 'CALL_OFFER',
         callId: session.callId,
         kind,
-        timestamp: Date.now(),
+        timestamp: startedAt,
     });
-    if (!sent) {
+    if (sent === 0) {
+        // Nadie recibió la oferta: el otro está offline. La sesión se cierra con `error` para que la
+        // UI deje de decir que suena, y se deja un aviso en el vault para que lo vea al volver. Antes
+        // esta rama solo lanzaba, así que no quedaba rastro en ningún sitio.
         callManager.end(session.callId, 'error');
+        void queueMissedCallNotice(peerUpeerId, session.callId, kind, startedAt);
         throw new Error('Contact unavailable');
     }
     return session.callId;
+}
+
+/**
+ * Deja el aviso de llamada perdida en el vault, para entrega cuando el otro vuelva a estar en línea.
+ *
+ * Sin esto, marcar a alguien offline no dejaba rastro: ni historial ni buzón. Va sin `await` en la
+ * ruta de la llamada porque replicar en el vault tarda y no puede retrasar el marcar; un fallo se
+ * anota y se sigue, que la llamada ya está cerrada de todas formas.
+ */
+async function queueMissedCallNotice(peerUpeerId: string, callId: string, kind: CallMediaKind, timestamp: number): Promise<void> {
+    try {
+        const { VaultManager } = await import('../vault/manager.js');
+        const { missedCallNotice, missedCallPayloadId, MISSED_CALL_VAULT_TTL_MS } = await import('./missedCallVault.js');
+        const contact = getContactByUpeerId(peerUpeerId);
+        if (!contact) return;
+        await VaultManager.replicateToVaults(
+            contact.upeerId,
+            missedCallNotice(callId, kind, timestamp) as unknown as Record<string, unknown>,
+            MISSED_CALL_VAULT_TTL_MS,
+            missedCallPayloadId(callId),
+        );
+        info('Llamada perdida guardada en el vault para entrega al reconectar', { callId }, 'call');
+    } catch (cause) {
+        warn('No se pudo guardar el aviso de llamada perdida', { callId, cause: String(cause) }, 'call');
+    }
 }
 
 export async function startGroupCall(memberUpeerIds: string[], kind: CallMediaKind, groupId?: string): Promise<string> {
@@ -63,7 +141,8 @@ export function sendCallRing(peerUpeerId: string, callId: string): void {
 }
 
 export function sendCallAccept(peerUpeerId: string, callId: string): void {
-    send(peerUpeerId, { type: 'CALL_ACCEPT', callId, timestamp: Date.now() });
+    // Con el dispositivo que contesta, el llamante sabe a dónde mandar la media y a quién callar.
+    send(peerUpeerId, { type: 'CALL_ACCEPT', callId, deviceId: myDeviceIdForCall(), timestamp: Date.now() });
 }
 
 export function sendCallReject(peerUpeerId: string, callId: string): void {

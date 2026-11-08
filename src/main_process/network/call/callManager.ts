@@ -92,6 +92,21 @@ class CallManager {
         return false;
     }
 
+    /**
+     * ¿Ya hay una llamada viva con este `callId`, venga del dispositivo que venga?
+     *
+     * Es lo que hace falta para el caso de varios dispositivos de la misma cuenta: la oferta suena en
+     * todos con **el mismo `callId`**, así que cuando llega a uno que ya la contestó —o a otro
+     * dispositivo que sigue sonando— no es una llamada nueva y no se puede tratar como ocupado. Con
+     * `hasActiveWith` por cuenta, el segundo dispositivo de la misma persona contestaba `BUSY` a su
+     * propio llamante y tiraba la llamada del primero.
+     */
+    hasSessionWithCallId(callId: string): boolean {
+        if (!callId) return false;
+        const session = this.sessions.get(callId);
+        return !!session && session.phase !== 'ended';
+    }
+
     create(peerUpeerId: string, kind: CallMediaKind, direction: CallDirection, existingCallId?: string): CallSession {
         const callId = existingCallId && existingCallId.length > 0 ? existingCallId : createCallId();
         const session: CallSession = {

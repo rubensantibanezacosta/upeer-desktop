@@ -33,8 +33,9 @@ function formatDuration(totalSeconds: number): string {
 export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAliases, peerAvatars, avatar, onToggleMute, onToggleCamera, onEnd, embedded = false, compact = false, onExpand }) => {
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
     const [size] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
-    const [startedAt] = useState<number>(Date.now());
     const [seconds, setSeconds] = useState(0);
+    // Marca de conexión de la llamada (no de apertura de esta ventana).
+    const connectedAt = call.connectedAt;
     const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
     const remoteCanvasRef = useRef<HTMLCanvasElement>(null);
     const screenCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,11 +58,18 @@ export const CallWindow: React.FC<CallWindowProps> = ({ call, peerName, peerAlia
         return () => setOnScreenShareError(null);
     }, [setOnScreenShareError]);
     useEffect(() => {
-        const timer = setInterval(() => {
-            setSeconds(Math.floor((Date.now() - startedAt) / 1000));
-        }, 1000);
+        // El cronómetro cuenta desde que la llamada se **conecta**, no desde que se abre esta ventana.
+        // Antes usaba un `Date.now()` de la primera pintura, así que al marcar a alguien que está
+        // offline el contador ya iba por los 30 s del timbre y parecía una llamada en curso.
+        if (!connectedAt) {
+            setSeconds(0);
+            return;
+        }
+        const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
+        tick();
+        const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [startedAt]);
+    }, [connectedAt]);
 
     const isVideo = call.kind === 'video';
     const isGroup = call.isGroup === true;
