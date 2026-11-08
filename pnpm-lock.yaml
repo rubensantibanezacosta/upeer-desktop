@@ -177,6 +177,9 @@ importers:
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1(@noble/hashes@1.8.0)
+      lodash:
+        specifier: ^4.17.21
+        version: 4.18.1
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
