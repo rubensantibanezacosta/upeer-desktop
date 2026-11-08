@@ -27,6 +27,8 @@ vi.mock('../../../src/main_process/storage/contacts/operations.js', () => ({
     setContactFavorite: vi.fn(),
     updateContactAvatar: vi.fn(),
     updateContactName: vi.fn(),
+    // El applier también aplica la dirección del perfil (08/11), así que el módulo tiene que exponerla.
+    applyContactProfileAddresses: vi.fn(() => false),
 }));
 
 import { applySyncEvent } from '../../../src/main_process/network/sync/apply.js';

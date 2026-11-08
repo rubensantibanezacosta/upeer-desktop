@@ -73,22 +73,54 @@ export function getContactByAddress(address: string) {
         .get() as StoredContact | undefined;
 }
 
-export function listContactProfiles(): { upeerId: string; name: string; avatar: string | null; isFavorite: boolean; publicKey: string | null }[] {
+/**
+ * Perfiles que se sincronizan a los demás dispositivos de la cuenta.
+ *
+ * **La dirección viaja aquí**, y eso es el arreglo del 08/11: antes el perfil llevaba solo nombre,
+ * avatar, favorito y clave, así que el resto de dispositivos se quedaban **sin dirección** de los
+ * contactos. Se veía en el móvil: cuatro contactos, tres con la dirección vacía, y por eso las
+ * llamadas a esos contactos no salían nunca (y los mensajes no tenían a dónde ir hasta que el
+ * contacto se veía por otra vía).
+ *
+ * Se envían la principal y las conocidas: un contacto puede estar en varios dispositivos del mismo
+ * usuario y el receptor necesita todas para poder ofrecer una llamada en todos ellos.
+ */
+export function listContactProfiles(): {
+    upeerId: string;
+    name: string;
+    avatar: string | null;
+    isFavorite: boolean;
+    publicKey: string | null;
+    address: string | null;
+    knownAddresses: string[];
+}[] {
     const db = getDb();
     const schema = getSchema();
 
     const rows = db.select().from(schema.contacts).all() as StoredContact[];
-    const profiles: { upeerId: string; name: string; avatar: string | null; isFavorite: boolean; publicKey: string | null }[] = [];
+    const profiles: ReturnType<typeof listContactProfiles> = [];
     for (const row of rows) {
         const upeerId = (row.upeerId ?? '').toLowerCase();
         if (!/^[0-9a-f]{64}$/.test(upeerId)) continue;
         const publicKey = (row.publicKey ?? '').toLowerCase();
+        let known: string[] = [];
+        try {
+            const parsed: unknown = JSON.parse(row.knownAddresses ?? '[]');
+            if (Array.isArray(parsed)) known = parsed.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+        } catch {
+            known = [];
+        }
+        const primary = typeof row.address === 'string' && row.address.length > 0 ? row.address : null;
+        // La principal va primero y sin repetirse en la lista de conocidas.
+        const addresses = primary ? [primary, ...known.filter((entry) => entry !== primary)] : known;
         profiles.push({
             upeerId,
             name: row.name ?? '',
             avatar: row.avatar ?? null,
             isFavorite: row.isFavorite === true,
             publicKey: /^[0-9a-f]{64}$/.test(publicKey) ? publicKey : null,
+            address: primary,
+            knownAddresses: addresses,
         });
     }
     return profiles;
@@ -232,6 +264,56 @@ export function deleteContact(upeerId: string) {
     const schema = getSchema();
 
     return db.delete(schema.contacts).where(eq(schema.contacts.upeerId, upeerId)).run();
+}
+
+/**
+ * Aplica las direcciones que llegan en un perfil sincronizado de otro dispositivo de la cuenta.
+ *
+ * El escritorio aprendía la dirección de un contacto **solo** cuando ese contacto le mandaba un paquete
+ * (`handlers.ts`: `directContact && contact.address !== rinfo.address`). Con varios dispositivos propios
+ * eso no basta: el móvil ve el escritorio, pero el escritorio no ve al móvil, así que la fila del móvil se
+ * quedaba con la dirección vacía y desde ahí la sincronización la repartía vacía a todos.
+ *
+ * Lo que llega de un perfil se fusiona, no se sobrescribe: una dirección que ya funciona no se pierde
+ * porque otro dispositivo mande un perfil sin ella, y la principal solo cambia si la nueva es válida.
+ */
+export function applyContactProfileAddresses(upeerId: string, primary: unknown, known: unknown): boolean {
+    const db = getDb();
+    const schema = getSchema();
+    const existing = db.select({ address: schema.contacts.address, knownAddresses: schema.contacts.knownAddresses })
+        .from(schema.contacts)
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .get() as { address: string | null; knownAddresses: string | null } | undefined;
+    if (!existing) return false;
+    let previous: string[] = [];
+    try {
+        const parsed: unknown = JSON.parse(existing.knownAddresses ?? '[]');
+        if (Array.isArray(parsed)) previous = parsed.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+    } catch {
+        previous = [];
+    }
+    const incoming: string[] = [];
+    const push = (value: unknown) => {
+        if (typeof value !== 'string') return;
+        const trimmed = value.trim();
+        if (!trimmed || !isYggdrasilAddress(trimmed) || incoming.includes(trimmed)) return;
+        incoming.push(trimmed);
+    };
+    push(primary);
+    if (Array.isArray(known)) for (const entry of known) push(entry);
+    if (incoming.length === 0) return false;
+    // La lista final: la que llegue primero (la principal anunciada), luego lo que ya había.
+    const merged = [...incoming];
+    for (const address of previous) if (!merged.includes(address)) merged.push(address);
+    const currentPrimary = typeof existing.address === 'string' && existing.address.length > 0 ? existing.address : null;
+    const nextPrimary = incoming.includes(currentPrimary ?? '') ? currentPrimary : merged[0];
+    const nextKnown = JSON.stringify(merged.slice(0, 20));
+    if (nextPrimary === currentPrimary && nextKnown === (existing.knownAddresses ?? '[]')) return false;
+    const result = db.update(schema.contacts)
+        .set({ address: nextPrimary ?? '', knownAddresses: nextKnown, lastSeen: new Date().toISOString() })
+        .where(eq(schema.contacts.upeerId, upeerId))
+        .run();
+    return (result?.changes ?? 0) > 0;
 }
 
 export function updateContactName(upeerId: string, name: string) {

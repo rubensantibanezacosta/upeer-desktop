@@ -11,6 +11,7 @@ import { deleteReaction, saveReaction } from '../../storage/messages/reactions.j
 import { deleteGroup, upsertGroupMetadata } from '../../storage/groups/operations.js';
 import {
     applyBlockedFromSync,
+    applyContactProfileAddresses,
     getContactByUpeerId,
     setContactFavorite,
     updateContactAvatar,
@@ -218,6 +219,11 @@ function applyContactProfile(payload: Record<string, unknown>, win: BrowserWindo
     }
     if (typeof payload.isFavorite === 'boolean') {
         setContactFavorite(payload.upeerId, payload.isFavorite);
+        changed = true;
+    }
+    // La dirección viaja en el perfil desde el 08/11. Sin esto el escritorio se quedaba sin la del
+    // móvil (solo la aprendía de un paquete entrante del contacto) y la repartía vacía a los demás.
+    if (applyContactProfileAddresses(payload.upeerId, payload.address, payload.knownAddresses)) {
         changed = true;
     }
     if (!changed) return false;

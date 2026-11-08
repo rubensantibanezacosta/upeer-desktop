@@ -379,7 +379,12 @@ describe('storage/contacts/operations.ts', () => {
                 name: 'Alice',
                 avatar: null,
                 isFavorite: true,
-                publicKey: 'b'.repeat(64)
+                publicKey: 'b'.repeat(64),
+                // La dirección viaja desde el 08/11: sin ella el resto de dispositivos de la cuenta se
+                // quedaban sin saber dónde está el contacto y no podían llamarle. Esta fila de prueba
+                // no trae dirección, así que salen vacías.
+                address: null,
+                knownAddresses: []
             });
             expect(profiles[1].upeerId).toBe('c'.repeat(64));
             expect(profiles[1].publicKey).toBeNull();
