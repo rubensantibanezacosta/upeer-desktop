@@ -79,7 +79,7 @@ export async function receiveChatMessage(
                 status: 'delivered',
                 senderUpeerId: upeerId,
                 timestamp: data.timestamp,
-            }, ratchetResult.session, ratchetResult.spkIdUsed);
+            }, ratchetResult.session, ratchetResult.spkIdUsed, ratchetResult.contextId);
             sendResponse(fromAddress, { type: 'ACK', id: incomingId, status: 'delivered' });
             return;
         }
@@ -101,7 +101,7 @@ export async function receiveChatMessage(
             status: isInternalSync ? 'read' : 'delivered',
             senderUpeerId: isInternalSync ? myId : upeerId,
             timestamp: data.timestamp,
-        }, (ratchetResult as DecryptedChatPayload).session, (ratchetResult as DecryptedChatPayload).spkIdUsed)
+        }, (ratchetResult as DecryptedChatPayload).session, (ratchetResult as DecryptedChatPayload).spkIdUsed, (ratchetResult as DecryptedChatPayload).contextId)
         : await saveMessage(msgId, upeerId, isInternalSync, displayContent, data.replyTo, signature,
             isInternalSync ? 'read' : 'delivered', isInternalSync ? myId : upeerId, data.timestamp);
     const changes = (saved as SaveMessageResult)?.changes;

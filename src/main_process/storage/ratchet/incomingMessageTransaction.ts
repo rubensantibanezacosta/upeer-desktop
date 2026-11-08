@@ -20,6 +20,10 @@ export function commitRatchetIncomingMessage(
     message: RatchetIncomingMessage,
     session: RatchetState,
     spkIdUsed: number | null,
+    // Contexto del ratchet con el que se descifró. Debe coincidir con el que usa el
+    // cifrado (`direct:<deviceId>` en el chat directo), o el estado se guarda en una
+    // sesión distinta de la que luego se lee y la conversación se atasca.
+    contextId = 'direct',
 ): { changes: number } {
     const db = getDb();
     const schema = getSchema();
@@ -59,7 +63,7 @@ export function commitRatchetIncomingMessage(
 
         db.insert(schema.ratchetSessions).values({
             upeerId: message.chatUpeerId,
-            contextId: 'direct',
+            contextId,
             state: serializedState,
             spkIdUsed,
             establishedAt: now,

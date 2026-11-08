@@ -17,7 +17,7 @@ type DoubleRatchetPayload = {
     senderDeviceId?: string;
 };
 
-export type RatchetContext = 'direct' | `group:${string}` | `sync:${string}`;
+export type RatchetContext = 'direct' | `direct:${string}` | `group:${string}` | `sync:${string}`;
 
 const createResetPacket = (contextId: RatchetContext, senderDeviceId?: string): ChatDrResetPacket =>
     createDrResetPacket(contextId as ChatDrResetPacket['ratchetContext'], { useDeviceIdentity: Boolean(senderDeviceId) });

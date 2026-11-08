@@ -4,6 +4,7 @@ import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/r
 import { resolveInboundDeviceSpk } from '../../security/deviceMessaging.js';
 import type { ChatAckPacket, ChatDrResetPacket, ChatIncomingPayload } from './chatMessageTypes.js';
 import { createDrResetPacket } from './drResetPacket.js';
+import { directRatchetContextCandidates } from '../../security/directRatchetContext.js';
 
 function createReset(data: ChatIncomingPayload): ChatDrResetPacket {
     return createDrResetPacket('direct', { useDeviceIdentity: Boolean(data.senderDeviceId) });
@@ -13,6 +14,8 @@ export type DecryptedChatPayload = {
     plaintext: string;
     session: RatchetState;
     spkIdUsed: number | null;
+    /** Contexto con el que se descifró: hay que guardar el estado en el mismo. */
+    contextId: string;
 };
 
 export type ChatDecryptResult = DecryptedChatPayload | { alreadyConsumed: true };
@@ -44,7 +47,21 @@ async function decryptDoubleRatchetContentUnlocked(
         const { getRatchetSession } = await import('../../storage/ratchet/operations.js');
         const { x3dhResponder, ratchetInitBob, ratchetDecrypt } = await import('../../security/ratchet.js');
         const { getMyIdentitySkBuffer, getSpkBySpkId } = await import('../../security/identity.js');
-        const sessionResult = getRatchetSession(upeerId, 'direct');
+        // El emisor puede haber cifrado contra su dispositivo (`direct:<deviceId>`, lo que
+        // hace el chat directo desde el arreglo de multi-dispositivo) o contra el contexto
+        // histórico (`direct`). Se prueba el del dispositivo emisor primero, que es lo que
+        // manda en el paquete, y se cae al histórico para sesiones ya abiertas.
+        const contextCandidates = directRatchetContextCandidates(data.senderDeviceId);
+        let activeContextId = contextCandidates[0];
+        let sessionResult: ReturnType<typeof getRatchetSession> = null;
+        for (const candidate of contextCandidates) {
+            const found = getRatchetSession(upeerId, candidate);
+            if (found) {
+                sessionResult = found;
+                activeContextId = candidate;
+                break;
+            }
+        }
         let session = sessionResult?.state;
         let usedSpkId = sessionResult?.spkIdUsed;
 
@@ -91,7 +108,7 @@ async function decryptDoubleRatchetContentUnlocked(
         ) return { alreadyConsumed: true };
 
         const plaintext = ratchetDecrypt(session, data.ratchetHeader, data.content, data.nonce);
-        if (plaintext) return { plaintext: plaintext.toString('utf-8'), session, spkIdUsed: usedSpkId ?? null };
+        if (plaintext) return { plaintext: plaintext.toString('utf-8'), session, spkIdUsed: usedSpkId ?? null, contextId: activeContextId };
 
         if (sessionResult && data.x3dhInit && !isDuplicate) {
             const { ekPub, ikPub, spkId } = data.x3dhInit;
@@ -109,7 +126,7 @@ async function decryptDoubleRatchetContentUnlocked(
                 const retry = ratchetDecrypt(freshSession, data.ratchetHeader, data.content, data.nonce);
                 if (retry) {
                     info('DR race resolved: replaced stale Alice session with Bob session', { upeerId }, 'security');
-                    return { plaintext: retry.toString('utf-8'), session: freshSession, spkIdUsed: spkId };
+                    return { plaintext: retry.toString('utf-8'), session: freshSession, spkIdUsed: spkId, contextId: activeContextId };
                 }
             }
             sendResponse(fromAddress, createReset(data));

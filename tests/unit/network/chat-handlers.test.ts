@@ -320,7 +320,7 @@ describe('Chat Handlers', () => {
                 chatUpeerId: senderId,
                 message: 'dr-decrypted-content',
                 status: 'delivered',
-            }), expect.anything(), 99);
+            }), expect.anything(), 99, expect.any(String));
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
         });
 
@@ -350,7 +350,7 @@ describe('Chat Handlers', () => {
                 id: messageId,
                 chatUpeerId: senderId,
                 message: 'decrypted retry',
-            }), expect.anything(), 99);
+            }), expect.anything(), 99, expect.any(String));
             expect(messagesOps.saveMessage).not.toHaveBeenCalled();
             expect(mockWin.webContents.send).not.toHaveBeenCalledWith('receive-p2p-message', expect.anything());
             expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', { type: 'ACK', id: messageId, status: 'delivered' });
@@ -377,7 +377,7 @@ describe('Chat Handlers', () => {
             }, mockWin, 'sig', '1.2.3.4', mockSendResponse);
 
             expect(ratchet.ratchetInitBob).toHaveBeenCalledOnce();
-            expect(commitRatchetIncomingMessage).toHaveBeenCalledWith(expect.objectContaining({ id: messageId }), expect.anything(), 99);
+            expect(commitRatchetIncomingMessage).toHaveBeenCalledWith(expect.objectContaining({ id: messageId }), expect.anything(), 99, expect.any(String));
             expect(mockSendResponse).toHaveBeenCalledWith('1.2.3.4', { type: 'ACK', id: messageId, status: 'delivered' });
         });
 

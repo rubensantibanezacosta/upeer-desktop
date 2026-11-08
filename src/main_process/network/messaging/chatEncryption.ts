@@ -6,6 +6,7 @@ import { getDeviceMessagingIdentity } from '../../security/deviceMessaging.js';
 import { getRatchetSession, saveRatchetSession } from '../../storage/ratchet/operations.js';
 import { x3dhInitiator, ratchetEncrypt, ratchetInitAlice } from '../../security/ratchet.js';
 import { ratchetSessionQueueKey, withRatchetSessionLock } from '../../security/ratchetSessionQueue.js';
+import { directRatchetContext } from '../../security/directRatchetContext.js';
 
 type RatchetEncryptHeader = {
     dh: string;
@@ -33,6 +34,7 @@ export type ChatEncryptionContact = {
     publicKey?: string | null;
     signedPreKey?: string | null;
     signedPreKeyId?: number | null;
+    deviceId?: string | null;
     devicePublicKey?: string | null;
     deviceSignedPreKey?: string | null;
     deviceSignedPreKeyId?: number | null;
@@ -59,7 +61,14 @@ export async function encryptChatPayload(
     contextId = 'direct',
     options: { allowDeviceIdentity?: boolean } = {},
 ): Promise<EncryptedChatPayload> {
-    return withRatchetSessionLock(ratchetSessionQueueKey(upeerId, contextId), async () => {
+    // El chat directo se cifra contra el dispositivo concreto del contacto, no contra su
+    // cuenta: la cuenta puede tener varios dispositivos hablando con nosotros y una única
+    // sesión DR compartida se desincroniza en cuanto dos escriben. Los demás contextos
+    // (grupos, sync) ya llevan su propio identificador y no se tocan.
+    const deviceAwareContext = contextId === 'direct' && options.allowDeviceIdentity
+        ? directRatchetContext(contact.deviceId)
+        : contextId;
+    return withRatchetSessionLock(ratchetSessionQueueKey(upeerId, deviceAwareContext), async () => {
         const contactPublicKey = contact.publicKey;
         if (!contactPublicKey) {
             throw new DoubleRatchetUnavailableError('missing-public-key');
@@ -75,7 +84,7 @@ export async function encryptChatPayload(
         const recipientSignedPreKey = device ? contact.deviceSignedPreKey : contact.signedPreKey;
         const recipientSignedPreKeyId = device ? contact.deviceSignedPreKeyId : contact.signedPreKeyId;
 
-        const sessionResult = getRatchetSession(upeerId, contextId);
+        const sessionResult = getRatchetSession(upeerId, deviceAwareContext);
         let session = sessionResult?.state;
         let usedSpkId = sessionResult?.spkIdUsed;
         let x3dhInit: EncryptedChatPayload['x3dhInit'];
@@ -110,7 +119,7 @@ export async function encryptChatPayload(
         }
 
         const encrypted = ratchetEncrypt(session, Buffer.from(payload, 'utf-8')) as RatchetEncryptResult;
-        saveRatchetSession(upeerId, session, usedSpkId, contextId);
+        saveRatchetSession(upeerId, session, usedSpkId, deviceAwareContext);
 
         return {
             content: encrypted.ciphertext,
