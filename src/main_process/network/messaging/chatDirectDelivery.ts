@@ -72,7 +72,15 @@ export async function sendConnectedChatMessage({
     persistContent,
 }: ConnectedSendOptions): Promise<void> {
     if (upeerId !== selfId) {
+        // Misma situación que en móvil (`ContactEncryptionAdmission.requireAdmitted`): si la
+        // DHT no tiene el account registry no se puede verificar el dispositivo, y el móvil
+        // deja pasar el mensaje con auditoría. El desktop vetaba con la policy por defecto
+        // ('reject') y mandaba el mensaje al vault, así que un contacto conectado con la
+        // dirección correcta no recibía nada. Aquí ya sabemos que el contacto está
+        // 'connected' y el paquete va cifrado con su clave pública, así que se admite el
+        // hueco auditándolo en vez de descartar la entrega.
         await requireContactAdmission(upeerId, contact.publicKey, {
+            policy: 'allow-with-audit',
             expectedDevice: {
                 deviceId: contact.deviceId,
                 devicePublicKey: contact.devicePublicKey,

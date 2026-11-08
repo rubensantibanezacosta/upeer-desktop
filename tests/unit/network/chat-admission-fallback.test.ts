@@ -21,7 +21,10 @@ vi.mock('../../../src/main_process/network/contactAdmission.js', () => {
 
     return {
         ContactAdmissionError,
-        requireContactAdmission: vi.fn(async (upeerId: string) => {
+        requireContactAdmission: vi.fn(async (upeerId: string, _publicKey?: unknown, options?: { policy?: string }) => {
+            // Con 'allow-with-audit' el hueco de registro se admite y la entrega sigue;
+            // solo vetamos cuando la política es la estricta por defecto.
+            if (options?.policy === 'allow-with-audit') return;
             if (upeerId === 'a1'.repeat(32)) throw new ContactAdmissionError('account registry is unavailable');
         }),
         resetContactAdmissionCache: vi.fn(),
@@ -116,10 +119,11 @@ describe('envío con la admisión de contacto caída', () => {
         vi.clearAllMocks();
     });
 
-    it('deja el mensaje en custodia en vez de devolver un fallo al remitente', async () => {
+    it('entrega con auditoría cuando el registro de cuenta no está disponible', async () => {
         const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
         const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
-        const { VaultManager } = await import('../../../src/main_process/network/vault/manager.js');
+        const { requireContactAdmission } = await import('../../../src/main_process/network/contactAdmission.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
         const { sendChatMessage } = await import('../../../src/main_process/network/messaging/chat.js');
 
         vi.mocked(getContactByUpeerId).mockResolvedValue({
@@ -128,33 +132,58 @@ describe('envío con la admisión de contacto caída', () => {
             publicKey: 'aa'.repeat(32),
             signedPreKey: 'bb'.repeat(32),
             signedPreKeyId: 7,
-            address: '200::9',
+            address: '200:3e61:590f:2529:4204:63ea:4676:e43f',
             knownAddresses: '[]',
         } as unknown as ContactRecord);
         vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
         vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
-        vi.mocked(VaultManager.replicateToVaults).mockResolvedValue(1);
 
-        const result = await sendChatMessage(ACCOUNT, 'hola sin registro');
+        await sendChatMessage(ACCOUNT, 'hola conectado sin registro');
 
-        expect(result).toEqual(expect.objectContaining({ savedMessage: 'hola sin registro' }));
-        expect(messagesOps.saveMessage).toHaveBeenCalledWith(
+        // El envío directo no veta: pide la política auditada, igual que hace el móvil.
+        expect(requireContactAdmission).toHaveBeenCalledWith(
+            ACCOUNT,
             expect.any(String),
-            ACCOUNT,
-            true,
-            'hola sin registro',
-            undefined,
-            '',
-            'sent',
-            'self-id',
-            expect.any(Number),
+            expect.objectContaining({ policy: 'allow-with-audit' }),
         );
-        expect(VaultManager.replicateToVaults).toHaveBeenCalledWith(
-            ACCOUNT,
-            expect.objectContaining({ type: 'CHAT', senderUpeerId: 'self-id' }),
+        // Y el paquete sale hacia la dirección real del contacto en vez de quedarse en el vault.
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200:3e61:590f:2529:4204:63ea:4676:e43f',
+            expect.objectContaining({ type: 'CHAT' }),
+            expect.anything(),
+            false,
         );
-        expect(messagesOps.updateMessageStatus).toHaveBeenCalledWith(expect.any(String), 'vaulted');
-        expect(messagesOps.updateMessageStatus).not.toHaveBeenCalledWith(expect.any(String), 'failed');
+        expect(messagesOps.updateMessageStatus).not.toHaveBeenCalledWith(expect.any(String), 'vaulted');
+    });
+
+    it('entrega en vez de dejar en custodia cuando la admisión veta con la política estricta', async () => {
+        const { getContactByUpeerId } = await import('../../../src/main_process/storage/contacts/operations.js');
+        const messagesOps = await import('../../../src/main_process/storage/messages/operations.js');
+        const { sendSecurePacket } = await import('../../../src/main_process/network/server/transport.js');
+        const { sendChatMessage } = await import('../../../src/main_process/network/messaging/chat.js');
+
+        vi.mocked(getContactByUpeerId).mockResolvedValue({
+            upeerId: ACCOUNT,
+            status: 'connected',
+            publicKey: 'aa'.repeat(32),
+            signedPreKey: 'bb'.repeat(32),
+            signedPreKeyId: 7,
+            address: '200:3e61:590f:2529:4204:63ea:4676:e43f',
+            knownAddresses: '[]',
+        } as unknown as ContactRecord);
+        vi.mocked(messagesOps.saveMessage).mockResolvedValue({ changes: 1 } as SaveMessageResult);
+        vi.mocked(messagesOps.updateMessageStatus).mockResolvedValue(true);
+
+        await sendChatMessage(ACCOUNT, 'hola sin registro');
+
+        // El envío directo siempre pide la política auditada, así que el paquete sale
+        // aunque la admisión estricta habría vetado este caso.
+        expect(sendSecurePacket).toHaveBeenCalledWith(
+            '200:3e61:590f:2529:4204:63ea:4676:e43f',
+            expect.objectContaining({ type: 'CHAT' }),
+            expect.anything(),
+            false,
+        );
     });
 
     it('un contacto desconectado tampoco pasa por la admisión', async () => {
