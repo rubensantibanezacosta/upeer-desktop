@@ -27,6 +27,20 @@ export interface CallSession {
     isGroup: boolean;
     groupId?: string;
     groupMembers: string[];
+    /**
+     * Direcciones a las que se ofreció esta llamada (una por dispositivo del contacto).
+     *
+     * Hace falta recordarlas para poder callar a las demás cuando una contesta: sin esto el llamante
+     * sabría que alguien respondió, pero no a quién más hay que decirle que pare de sonar.
+     */
+    ringTargets?: string[];
+    /**
+     * Dirección del dispositivo que contestó, cuando se sabe.
+     *
+     * Con varios dispositivos de la misma cuenta no basta el `upeerId`: hace falta saber cuál de ellos
+     * respondió para no callarlo y para dirigirle la media.
+     */
+    answeredAddress?: string;
 }
 
 export type CallStateChange = {

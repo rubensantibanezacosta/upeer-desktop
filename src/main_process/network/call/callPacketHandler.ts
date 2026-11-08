@@ -3,6 +3,7 @@ import { warn } from '../../security/secure-logger.js';
 import { getMyUPeerId } from '../../security/identity.js';
 import { callManager } from './callManager.js';
 import {
+    cancelOtherDevices,
     sendCallBusy,
     sendCallMediaTo,
     sendCallMeta,
@@ -41,6 +42,7 @@ export function handleCallPacket(
     upeerId: string,
     data: Record<string, unknown>,
     win: BrowserWindow | null,
+    sourceAddress?: string,
 ): void {
     const type = typeof data.type === 'string' ? data.type : '';
     const validation = validateCallPacket(type, data);
@@ -98,6 +100,15 @@ export function handleCallPacket(
             win?.webContents.send('call-ring', { callId, peerUpeerId: upeerId });
             break;
         case 'CALL_ACCEPT': {
+            const answeredSession = callManager.get(callId);
+            if (answeredSession) {
+                // Se apunta cuál de los dispositivos contestó (por la dirección de origen del paquete,
+                // que es lo único que los distingue: comparten upeerId) y se calla a los demás. Sin
+                // esto el portátil seguía sonando hasta el tope de 30 s con la llamada ya en marcha
+                // en el móvil.
+                answeredSession.answeredAddress = sourceAddress;
+                cancelOtherDevices(callId);
+            }
             callManager.accept(callId);
             callManager.connect(callId);
             sendCallRendererEvent('call-accepted', { callId, peerUpeerId: upeerId, connectedAt: callManager.get(callId)?.connectedAt });
@@ -115,11 +126,17 @@ export function handleCallPacket(
             callManager.end(callId, 'canceled');
             win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: 'canceled' });
             break;
-        case 'CALL_END':
+        case 'CALL_END': {
+            // `answered-elsewhere`: otro dispositivo de la misma cuenta contestó y esta llamada ya no
+            // es para este. Se para el timbre, pero **no** se cierra como perdida: la llamada existe,
+            // solo que la cogió el móvil en vez del portátil. Cerrarla con `remote-end` dejaría una
+            // fila «Llamada perdida» falsa en este dispositivo cada vez que se contesta desde el otro.
+            const endReason = data.reason === 'answered-elsewhere' ? 'answered-elsewhere' : 'remote-end';
             callFanoutPolicy.clearSpeaker(callId, upeerId);
-            callManager.end(callId, 'remote-end');
-            win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: 'remote-end' });
+            callManager.end(callId, endReason);
+            win?.webContents.send('call-ended', { callId, peerUpeerId: upeerId, reason: endReason });
             break;
+        }
         case 'CALL_MEDIA': {
             win?.webContents.send('call-media', {
                 callId,

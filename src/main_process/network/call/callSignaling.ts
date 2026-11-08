@@ -72,6 +72,49 @@ function sendToAllDevices(peerUpeerId: string, packet: Record<string, unknown>):
     return sent;
 }
 
+function ringTargetsOf(peerUpeerId: string): string[] {
+    const contact = getContactByUpeerId(peerUpeerId);
+    return contact ? callRingTargets(contact.address, contact.knownAddresses) : [];
+}
+
+/**
+ * Calla los demás dispositivos cuando uno contesta.
+ *
+ * Manda un `CALL_END` con `reason: 'answered-elsewhere'` a todas las direcciones ofrecidas menos a la
+ * que contestó. Sin esto, el portátil se quedaba sonando hasta el tope de 30 s aunque la llamada ya
+ * estuviera en marcha en el móvil: la sesión del llamante se cerraba, pero el otro extremo no se
+ * enteraba.
+ *
+ * Se manda por dirección y no por `upeerId` porque es justo lo que hay que distinguir aquí: los
+ * dispositivos de una misma cuenta comparten usuario.
+ */
+export function cancelOtherDevices(callId: string): number {
+    const session = callManager.get(callId);
+    if (!session || session.isGroup) return 0;
+    const targets = session.ringTargets ?? [];
+    if (targets.length === 0) return 0;
+    const contact = getContactByUpeerId(session.peerUpeerId);
+    if (!contact) return 0;
+    const answered = session.answeredAddress;
+    let sent = 0;
+    for (const address of targets) {
+        if (answered && address === answered) continue;
+        try {
+            sendSecurePacket(address, {
+                type: 'CALL_END',
+                callId,
+                reason: 'answered-elsewhere',
+                timestamp: Date.now(),
+            }, contact.publicKey);
+            sent += 1;
+        } catch (cause) {
+            warn('No se pudo callar un dispositivo del contacto', { callId, cause: String(cause) }, 'call');
+        }
+    }
+    if (sent > 0) info('Callados los demás dispositivos de la llamada', { callId, dispositivos: sent }, 'call');
+    return sent;
+}
+
 export async function sendCallOffer(peerUpeerId: string, kind: CallMediaKind): Promise<string> {
     if (isContactBlocked(peerUpeerId)) throw new Error('Contact unavailable');
     if (!resolvePeer(peerUpeerId)) throw new Error('Contact unavailable');
@@ -79,6 +122,8 @@ export async function sendCallOffer(peerUpeerId: string, kind: CallMediaKind): P
     // La oferta va a todos los dispositivos del contacto: gana el que conteste antes y a los demás se
     // les calla con `answered-elsewhere`. Antes iba a uno solo, elegido al azar.
     const startedAt = Date.now();
+    // Se guardan las direcciones ofrecidas para poder callar a las demás cuando una conteste.
+    session.ringTargets = ringTargetsOf(peerUpeerId);
     const sent = sendToAllDevices(peerUpeerId, {
         type: 'CALL_OFFER',
         callId: session.callId,
