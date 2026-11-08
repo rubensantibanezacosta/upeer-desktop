@@ -1,12 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
     Box,
-    Typography,
-    IconButton,
-    Tooltip,
-    Input
+    Typography
 } from '@mui/joy';
-import { Pencil } from 'lucide-react';
 import { resizeImageToDataUrl } from '../../utils/resizeImageToDataUrl.js';
 import { TopHeaderActions } from './TopHeaderActions.js';
 import { LIST_ROW_MIN_HEIGHT } from './listRowMetrics.js';
@@ -46,8 +42,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 }) => {
     const isPeerActive = !!activity;
     const avatarFileRef = useRef<HTMLInputElement>(null);
-    const [editingName, setEditingName] = useState(false);
-    const [nameValue, setNameValue] = useState('');
 
     const handleAvatarClick = () => {
         if (isGroup && isAdmin) avatarFileRef.current?.click();
@@ -67,18 +61,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         event.target.value = '';
     };
 
-    const startEditName = () => {
-        setNameValue(contactName || '');
-        setEditingName(true);
-    };
-
-    const commitNameEdit = () => {
-        const trimmed = nameValue.trim();
-        if (trimmed && trimmed !== contactName && onUpdateGroup && groupId) {
-            onUpdateGroup({ name: trimmed });
-        }
-        setEditingName(false);
-    };
     return (
         <Box sx={{
             p: 1.5,
@@ -120,37 +102,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 <TopHeaderAvatar isGroup={isGroup} isAdmin={isAdmin} avatar={avatar} contactName={contactName} vouchScore={vouchScore} onAvatarClick={handleAvatarClick} avatarFileRef={avatarFileRef} onAvatarFileChange={handleAvatarFileChange} />
                 <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {isGroup && isAdmin && editingName ? (
-                            <Input
-                                aria-label="Editar nombre del grupo"
-                                size="sm"
-                                variant="outlined"
-                                value={nameValue}
-                                autoFocus
-                                onChange={(e) => setNameValue(e.target.value)}
-                                onBlur={commitNameEdit}
-                                onKeyDown={(e) => {
-                                    e.stopPropagation();
-                                    if (e.key === 'Enter') commitNameEdit();
-                                    if (e.key === 'Escape') setEditingName(false);
-                                }}
-                                sx={{ fontSize: '0.875rem', fontWeight: 500, height: '26px', py: 0, width: '160px' }}
-                            />
-                        ) : (
-                            <>
-                                <Typography level="body-md" sx={{ fontWeight: 500 }}>
-                                    {contactName || 'Selecciona un chat'}
-                                </Typography>
-                                {isGroup && isAdmin && contactName && (
-                                    <Tooltip title="Editar nombre del grupo" variant="soft" size="sm">
-                                        <IconButton aria-label="Editar nombre del grupo" size="sm" variant="plain" color="neutral" onClick={(event) => { event.stopPropagation(); startEditName(); }}
-                                            sx={{ minHeight: 'auto', p: 0.25 }}>
-                                            <Pencil style={{ fontSize: 13 }} />
-                                        </IconButton>
-                                    </Tooltip>
-                                )}
-                            </>
-                        )}
+                        {/* Renombrar el grupo ya no vive aquí: está en el hero de la ficha del grupo,
+                            como en el móvil, y así la cabecera no mezcla edición con llamadas y menú. */}
+                        <Typography level="body-md" sx={{ fontWeight: 500 }}>
+                            {contactName || 'Selecciona un chat'}
+                        </Typography>
                     </Box>
                     {contactName && (isGroup || isPeerActive || status === 'pending' || status === 'incoming' || !presenceHidden) && (
                         <Typography

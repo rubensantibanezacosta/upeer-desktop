@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, IconButton, List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
-import { X, Users, UserPlus, BellOff, Heart, Eraser, LogOut, ShieldCheck, UserMinus, Phone, Video, Search, Star, ChevronRight } from 'lucide-react';
+import { Avatar, Box, Button, Chip, DialogActions, DialogContent, DialogTitle, IconButton, Input, List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Modal, ModalDialog, Tooltip, Typography } from '@mui/joy';
+import { X, Users, UserPlus, BellOff, Heart, Eraser, LogOut, ShieldCheck, UserMinus, Phone, Video, Search, Star, ChevronRight, Pencil } from 'lucide-react';
 import { Contact, Group } from '../../types/chat.js';
 import { useChatActionsStore } from '../../store/useChatActionsStore.js';
 import { useChatStore } from '../../store/useChatStore.js';
@@ -34,12 +34,14 @@ interface GroupInfoPanelProps {
     onRemoveMember?: (memberId: string) => void;
     onCallAudio?: () => void;
     onCallVideo?: () => void;
+    /** Renombrar el grupo desde el hero, igual que el móvil. Solo se ofrece al administrador. */
+    onRenameGroup?: (name: string) => Promise<void> | void;
     callsUnavailable?: boolean;
     view?: GroupPanelView;
     onViewChange?: (view: GroupPanelView) => void;
 }
 
-export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember, onCallAudio, onCallVideo, callsUnavailable = false, view, onViewChange }) => {
+export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts, currentUserId, sharedMedia = [], onClose, onInviteMembers, onOpenMedia, onFavorite, onClearChat, onLeaveGroup, onTransferAdmin, onRemoveMember, onCallAudio, onCallVideo, onRenameGroup, callsUnavailable = false, view, onViewChange }) => {
     const [currentView, setCurrentView] = usePanelView<GroupPanelView>(view, onViewChange, 'main');
     const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'leave' } | { type: 'transfer' | 'remove'; memberId: string } | null>(null);
     const toggleGroup = useChatActionsStore((state) => state.toggleGroup);
@@ -54,6 +56,29 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
         isCurrentUser: memberId === currentUserId,
     }));
     const isAdmin = group.adminUpeerId === currentUserId;
+    // Renombrar vive aquí y no en el header del chat, como en el móvil: el nombre del hero es el
+    // sitio natural y el header ya carga con llamar, videollamar, buscar y el menú.
+    const [renaming, setRenaming] = useState(false);
+    const [draftName, setDraftName] = useState('');
+    const [savingName, setSavingName] = useState(false);
+    const startRename = () => {
+        setDraftName(group.name);
+        setRenaming(true);
+    };
+    const commitRename = async () => {
+        const trimmed = draftName.trim();
+        if (!trimmed || trimmed === group.name || !onRenameGroup) {
+            setRenaming(false);
+            return;
+        }
+        setSavingName(true);
+        try {
+            await onRenameGroup(trimmed);
+            setRenaming(false);
+        } finally {
+            setSavingName(false);
+        }
+    };
 
     return (
         <Box sx={{ width: { xs: '100%', sm: 380, lg: 480 }, minWidth: 0, maxWidth: 480, flexShrink: 0, borderLeft: '1px solid', borderColor: 'divider', backgroundColor: 'background.surface', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -80,7 +105,56 @@ export const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ group, contacts,
                     <Avatar src={group.avatar || undefined} variant="soft" sx={{ width: 96, height: 96, mb: 1 }}>
                         {!group.avatar && <Users style={{ fontSize: 40 }} />}
                     </Avatar>
-                    <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
+                    {renaming ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%', maxWidth: 280 }}>
+                            <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.tertiary', alignSelf: 'flex-start' }}>
+                                Nombre del grupo
+                            </Typography>
+                            <Input
+                                aria-label="Nombre del grupo"
+                                autoFocus
+                                disabled={savingName}
+                                value={draftName}
+                                onChange={(e) => setDraftName(e.target.value)}
+                                onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter') void commitRename();
+                                    if (e.key === 'Escape') setRenaming(false);
+                                }}
+                                sx={{ width: '100%' }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+                                <Button variant="outlined" color="neutral" disabled={savingName} onClick={() => setRenaming(false)} sx={{ flex: 1 }}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    disabled={savingName || draftName.trim().length === 0}
+                                    onClick={() => void commitRename()}
+                                    sx={{ flex: 1, fontWeight: 700 }}
+                                >
+                                    {savingName ? 'Guardando…' : 'Guardar'}
+                                </Button>
+                            </Box>
+                        </Box>
+                    ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography level="h3" sx={{ fontWeight: 700 }}>{group.name}</Typography>
+                            {isAdmin && (
+                                <Tooltip title="Renombrar el grupo" variant="soft" size="sm">
+                                    <IconButton
+                                        aria-label="Renombrar el grupo"
+                                        size="sm"
+                                        variant="plain"
+                                        color="neutral"
+                                        onClick={startRename}
+                                        sx={{ minHeight: 'auto', p: 0.25 }}
+                                    >
+                                        <Pencil style={{ fontSize: 15 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Box>
+                    )}
                     <Typography level="body-xs" color="neutral">Grupo · {group.members.length} miembro{group.members.length === 1 ? '' : 's'}</Typography>
                 </Box>
                 <Box sx={actionsRowSx}>

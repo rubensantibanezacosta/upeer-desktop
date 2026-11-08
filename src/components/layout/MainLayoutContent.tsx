@@ -406,6 +406,7 @@ export const MainLayoutContent: React.FC<MainLayoutContentProps> = ({
                                         onOpenMedia={handleMediaClick}
                                         onCallAudio={() => void startCall(activeGroupId, 'audio', true, activeGroup.members, activeGroupId)}
                                         onCallVideo={() => void startCall(activeGroupId, 'video', true, activeGroup.members, activeGroupId)}
+                                        onRenameGroup={(name) => chatStore.handleUpdateGroup(activeGroupId, { name })}
                                         callsUnavailable={callsUnavailable}
                                         view={groupPanelView}
                                         onViewChange={setGroupPanelView}

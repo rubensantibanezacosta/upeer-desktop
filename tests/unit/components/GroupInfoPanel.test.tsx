@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GroupInfoPanel } from '../../../src/components/layout/GroupInfoPanel.js';
 import { useChatActionsStore } from '../../../src/store/useChatActionsStore.js';
 
@@ -160,5 +160,65 @@ describe('GroupInfoPanel', () => {
         fireEvent.click(screen.getByText('Salir del grupo'));
         fireEvent.click(screen.getByText('Salir del grupo', { selector: 'button' }));
         expect(onLeaveGroup).toHaveBeenCalledOnce();
+    });
+
+    it('el administrador renombra el grupo desde el hero, como en el móvil', async () => {
+        const onRenameGroup = vi.fn().mockResolvedValue(undefined);
+        render(
+            <GroupInfoPanel
+                group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'self', members: ['self', 'peer'], status: 'active' }}
+                contacts={[]}
+                currentUserId="self"
+                onClose={vi.fn()}
+                onInviteMembers={vi.fn()}
+                onRenameGroup={onRenameGroup}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Renombrar el grupo' }));
+        const input = screen.getByRole('textbox', { name: 'Nombre del grupo' });
+        // El campo arranca con el nombre actual, para poder corregirlo sin reescribirlo entero.
+        expect((input as HTMLInputElement).value).toBe('Peña');
+        fireEvent.change(input, { target: { value: '  Cuadrilla  ' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+        // El guardado es asíncrono (espera al IPC), así que se espera con waitFor y no en vano.
+        await waitFor(() => expect(onRenameGroup).toHaveBeenCalledWith('Cuadrilla'));
+    });
+
+    it('no ofrece renombrar a quien no es administrador', () => {
+        render(
+            <GroupInfoPanel
+                group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'other', members: ['self', 'other'], status: 'active' }}
+                contacts={[]}
+                currentUserId="self"
+                onClose={vi.fn()}
+                onInviteMembers={vi.fn()}
+                onRenameGroup={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: 'Renombrar el grupo' })).toBeNull();
+    });
+
+    it('no guarda si el nombre no cambia', () => {
+        const onRenameGroup = vi.fn().mockResolvedValue(undefined);
+        render(
+            <GroupInfoPanel
+                group={{ groupId: 'group-1', name: 'Peña', adminUpeerId: 'self', members: ['self'], status: 'active' }}
+                contacts={[]}
+                currentUserId="self"
+                onClose={vi.fn()}
+                onInviteMembers={vi.fn()}
+                onRenameGroup={onRenameGroup}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Renombrar el grupo' }));
+        // Con espacios de sobra tampoco: se compara el texto ya recortado.
+        fireEvent.change(screen.getByRole('textbox', { name: 'Nombre del grupo' }), { target: { value: '  Peña  ' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+        expect(onRenameGroup).not.toHaveBeenCalled();
     });
 });
