@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { ChatSearchView } from '../../../../src/features/chat/ChatSearchView.js';
@@ -28,11 +28,21 @@ const firstPage = [
 
 describe('ChatSearchView', () => {
     beforeEach(() => {
+        // El calendario abre en el mes de `Date.now()` y estos casos hablan de octubre de 2026, así
+        // que el reloj tiene que ser parte del fixture. Sin esto las pruebas pasaban solo mientras la
+        // fecha real del sistema caía en octubre de 2026, y en cuanto cambió el mes empezaron a fallar
+        // por buscar «noviembre 2026» donde esperaban «octubre 2026».
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        vi.setSystemTime(new Date(2026, 9, 20, 12, 0, 0));
         setPendingScrollMsgId.mockClear();
         Object.defineProperty(window, 'upeer', {
             configurable: true,
             value: { searchChatMessages: vi.fn(async () => firstPage) },
         });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('no busca con el término vacío', async () => {
