@@ -1,5 +1,4 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 // import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -30,7 +29,15 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    // Squirrel es el instalador de Windows y solo tiene sentido ahí. Se carga **dentro** del array y
+    // solo en win32 en vez de importarlo arriba: `MakerSquirrel` arrastra `electron-winstaller`, que
+    // hace `require('lodash')` por una ruta que jiti no resuelve igual fuera de Windows. En Linux y
+    // macOS ni se importa, así que no puede romper el arranque. (En Windows sí se carga, y por eso
+    // `lodash` está declarado en devDependencies.)
+    ...(process.platform === 'win32'
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      ? [new (require('@electron-forge/maker-squirrel').MakerSquirrel)({})]
+      : []),
     new MakerZIP({}, ['darwin']),
     createDebMaker({
       name: 'upeer-chat',
