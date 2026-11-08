@@ -25,6 +25,20 @@ vi.mock('../../../src/main_process/network/renewalTokens.js', () => ({
     verifyRenewalToken: vi.fn(() => true),
 }));
 
+vi.mock('../../../src/main_process/security/deviceIdentity.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../src/main_process/security/deviceIdentity.js')>();
+    return {
+        ...actual,
+        verifyDeviceCertificate: vi.fn(() => ({ deviceId: 'd'.repeat(64) })),
+        verifyDeviceLocationBlock: vi.fn(() => true),
+    };
+});
+
+vi.mock('../../../src/main_process/network/accountRegistry.js', () => ({
+    findAccountRegistry: vi.fn(async () => null),
+    verifyDeviceAdmission: vi.fn(() => true),
+}));
+
 type LocationBlock = {
     address: string;
     addresses?: string[];
@@ -175,6 +189,34 @@ describe('locationBlocks', () => {
             const identity = await import('../../../src/main_process/security/identity.js');
             vi.mocked(identity.verify).mockReturnValue(true);
             expect(await mod.verifyLocationBlockWithDHT('peer-1', block as never, 'aa'.repeat(32))).toBe(true);
+        });
+
+        it('acepta el bloque con certificado cuando falta el registro de cuenta', async () => {
+            // Sin registro no se puede comprobar la admisión del dispositivo, pero rechazar
+            // por eso el bloque dejaba al contacto sin devicePublicKey: el remitente cifraba
+            // por clave de cuenta y el receptor, que espera cifrado por dispositivo, no
+            // descifraba. Todo lo demás del bloque es válido aquí a propósito, así que la
+            // única razón por la que la función podría devolver false es el registro ausente.
+            const accountRegistry = await import('../../../src/main_process/network/accountRegistry.js');
+            const deviceIdentity = await import('../../../src/main_process/security/deviceIdentity.js');
+            vi.mocked(accountRegistry.findAccountRegistry).mockResolvedValue(null);
+            vi.mocked(deviceIdentity.verifyDeviceCertificate).mockReturnValue({
+                accountUpeerId: 'peer-1',
+                accountPublicKey: 'aa'.repeat(32),
+                deviceId: 'd'.repeat(64),
+                devicePublicKey: 'bb'.repeat(32),
+                issuedAt: Date.now() - 1000,
+                expiresAt: Date.now() + 100000,
+            } as never);
+            vi.mocked(deviceIdentity.verifyDeviceLocationBlock).mockReturnValue(true);
+
+            const withCertificate = {
+                ...block,
+                deviceId: 'd'.repeat(64),
+                deviceCertificate: 'cert',
+            };
+
+            expect(await mod.verifyLocationBlockWithDHT('peer-1', withCertificate as never, 'aa'.repeat(32))).toBe(true);
         });
     });
 });

@@ -148,8 +148,16 @@ export async function verifyLocationBlockWithDHT(
     if (block.deviceCertificate) {
         const certificate = verifyDeviceCertificate(block.deviceCertificate, upeerId);
         if (!certificate) return false;
+        // El registro de cuenta vive en la DHT y puede no estar disponible. Sin él no se
+        // puede comprobar que el dispositivo esté admitido, pero exigirlo hacía que TODO
+        // DHT_UPDATE con certificado se rechazara como "Invalid DHT_UPDATE signature"
+        // (se veía en el log como un rechazo de firma, que despistaba), y sin esos bloques
+        // el contacto se quedaba sin devicePublicKey. Entonces el remitente cifraba por la
+        // clave de cuenta y el receptor, que espera cifrado por dispositivo, no descifraba:
+        // el "escribiendo" llegaba y los mensajes no. Si el registro no está, se valida lo
+        // que sí se puede validar aquí: el certificado y la firma del bloque.
         const registry = await findAccountRegistry(upeerId);
-        if (!registry || !verifyDeviceAdmission(certificate, registry)) return false;
+        if (registry && !verifyDeviceAdmission(certificate, registry)) return false;
         return verifyLocationBlock(upeerId, block, publicKeyHex);
     }
 
